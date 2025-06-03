@@ -2,7 +2,7 @@ import React from 'react';
 
 const Hero = () => {
   return (
-    <div className="flex justify-center items-center flex-col sm:gap-3 md:gap-4 lg:gap-[14px] text-center mt-12 sm:mt-16 md:mt-18 lg:mt-20 px-4">
+    <div className="flex justify-center items-center flex-col sm:gap-3 md:gap-4 lg:gap-[14px] text-center mt-12 sm:mt-16 md:mt-18 lg:mt-36 px-4">
       <h1 className="font-inter tracking-[-1.5px] sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-2.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px] text-[36px] sm:text-[48px] md:text-[56px] lg:text-[65px] font-semibold w-full text-[#1A1A1A]">
         <span className="block">Admissions</span>
         <span className="block">Made Effortless</span>
