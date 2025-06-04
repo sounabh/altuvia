@@ -82,12 +82,12 @@ export default function ApplicationManagement() {
   ];
 
   return (
-    <div className="min-h-screen lg:mt-48 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen lg:mt-52 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-16 animate-fade-in">
         
-          <h1 className="font-inter tracking-[-1.5px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[75px] text-[32px] sm:text-[40px] md:text-[48px] lg:text-[56px] font-semibold w-full text-[#1A1A1A] mb-4">
+          <h1 className="font-inter tracking-[-1.5px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[64px] text-[32px] sm:text-[40px] md:text-[48px] lg:text-[56px] font-semibold w-full text-[#1A1A1A] mb-4">
             <span className="bg-[#1a1a1a] bg-clip-text text-transparent">
               Comprehensive
             </span>

@@ -35,7 +35,7 @@ export default function AltuviaFAQ() {
             <AccordionTrigger className="text-left font-inter font-semibold text-lg md:text-base sm:text-sm text-[#262C37] hover:text-black py-6 md:py-5 sm:py-4">
               How does Altuvia help me stay organized?
             </AccordionTrigger>
-            <AccordionContent className="font-inter font-normal text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#404245] pb-6 md:pb-5 sm:pb-4 pt-2">
+            <AccordionContent className="font-inter font-normal text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#404245] pb-6 md:pb-5 sm:pb-4 pt-2 text-left">
               Altuvia centralizes all your applications, deadlines, and documents in one user-friendly workspace.
             </AccordionContent>
           </AccordionItem>
@@ -44,7 +44,7 @@ export default function AltuviaFAQ() {
             <AccordionTrigger className="text-left font-inter font-semibold text-lg md:text-base sm:text-sm text-[#262C37] hover:text-black py-6 md:py-5 sm:py-4">
               Is there a limit on the number of applications I can track?
             </AccordionTrigger>
-            <AccordionContent className="font-inter font-normal text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#404245] pb-6 md:pb-5 sm:pb-4 pt-2">
+            <AccordionContent className="font-inter font-normal text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#404245] pb-6 md:pb-5 sm:pb-4 pt-2 text-left">
               No, you can track as many applications as needed in our Pro Plan.
             </AccordionContent>
           </AccordionItem>
@@ -53,7 +53,7 @@ export default function AltuviaFAQ() {
             <AccordionTrigger className="text-left font-inter font-semibold text-lg md:text-base sm:text-sm text-[#262C37] hover:text-black py-6 md:py-5 sm:py-4">
               Can I upgrade my plan later?
             </AccordionTrigger>
-            <AccordionContent className="font-inter font-normal text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#404245] pb-6 md:pb-5 sm:pb-4 pt-2">
+            <AccordionContent className="font-inter font-normal text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#404245] pb-6 md:pb-5 sm:pb-4 pt-2 text-left">
               Absolutely! You can switch from the Free Plan to the Pro Plan at any time.
             </AccordionContent>
           </AccordionItem>

@@ -8,17 +8,21 @@ import AltuviaFooter from './sections/Footer'
 import ContactUsPage from './sections/ContactUsPage'
 import PricingCards from './sections/Pricing'
 import ApplicationManagement from './sections/ApplicationMgmt'
+import Marquee from './sections/Marqueee'
+import ProductShowcase from './sections/Products'
 
 const page = () => {
   return (
     <div className='w-full'>
    <Nav></Nav>
    <Hero></Hero>
+   <Marquee></Marquee>
    <Steps></Steps>
    <ApplicationManagement></ApplicationManagement>
    <ImpactNumbers></ImpactNumbers>
    <PricingCards></PricingCards>
    <Accordions></Accordions>
+   <ProductShowcase></ProductShowcase>
 
       <ContactUsPage></ContactUsPage>
    <AltuviaFooter></AltuviaFooter>

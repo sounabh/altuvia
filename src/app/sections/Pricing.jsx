@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function PricingCards() {
   return (
-    <div className="w-full min-h-screen px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
+    <div className="w-full min-h-screen px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:pt-44">
       <div className="max-w-6xl mx-auto">
         {/* Header Section - Centered */}
         <div className="text-center mb-12 sm:mb-16 lg:mb-20">
@@ -20,7 +20,7 @@ export default function PricingCards() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-10 max-w-5xl">
             
             {/* Free Plan Card */}
-            <div className='w-full max-w-sm sm:max-w-md md:max-w-lg  mx-auto bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl border-4 sm:border-6 md:border-8 border-black shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] sm:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.35)] lg:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] hover:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.4)] sm:hover:shadow-[14px_14px_35px_0px_rgba(0,0,0,0.45)] lg:hover:shadow-[16px_16px_40px_0px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out relative overflow-hidden group lg-h-[80%] '>
+            <div className='w-full max-w-sm sm:max-w-md md:max-w-lg  mx-auto bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl border-4 sm:border-6 md:border-8 border-black shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] sm:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.35)] lg:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] hover:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.4)] sm:hover:shadow-[14px_14px_35px_0px_rgba(0,0,0,0.45)] lg:hover:shadow-[16px_16px_40px_0px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out relative overflow-hidden group lg:h-[80%] '>
 
               <div className="p-6 sm:p-8 md:p-10">
                 {/* Header */}

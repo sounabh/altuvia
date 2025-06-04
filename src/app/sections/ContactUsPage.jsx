@@ -26,7 +26,7 @@ const ContactUsPage = () => {
   };
 
   return (
-    <div className="w-full min-h-screen  px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
+    <div className="w-full min-h-screen  px-4 sm:px-6 lg:px-8 py-8  lg:pt-44 mt-44 md:mt-0 pb-14">
       <div className="max-w-6xl mx-auto">
         {/* Header Section */}
         <div className="text-center mb-12 sm:mb-16 lg:mb-20">
@@ -46,7 +46,7 @@ const ContactUsPage = () => {
 
         {/* Form Section */}
         <div className="flex justify-center">
-          <div className="w-full max-w-[320px] sm:max-w-[400px] lg:max-w-[480px] h-auto bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl lg:rounded-3xl border-2 sm:border-2 lg:border-4 border-black shadow-[4px_4px_12px_0px_rgba(0,0,0,0.2)] sm:shadow-[6px_6px_15px_0px_rgba(0,0,0,0.25)] lg:shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] transform rotate-1 sm:rotate-2 lg:rotate-3 hover:-rotate-1 transition-all duration-500 ease-out hover:shadow-[6px_6px_20px_0px_rgba(0,0,0,0.3)] sm:hover:shadow-[8px_8px_25px_0px_rgba(0,0,0,0.35)] lg:hover:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] group relative overflow-hidden">
+          <div className="w-full max-w-[320px] sm:max-w-[400px] lg:max-w-[480px] h-auto bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl lg:rounded-3xl border-2 sm:border-2 lg:border-4 border-black shadow-[4px_4px_12px_0px_rgba(0,0,0,0.2)] sm:shadow-[6px_6px_15px_0px_rgba(0,0,0,0.25)] lg:shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)]  hover:shadow-[6px_6px_20px_0px_rgba(0,0,0,0.3)] sm:hover:shadow-[8px_8px_25px_0px_rgba(0,0,0,0.35)] lg:hover:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] group relative overflow-hidden">
             
             <div className="p-6 sm:p-8 lg:p-10 space-y-4 sm:space-y-5 lg:space-y-6">
               {/* Name Field */}

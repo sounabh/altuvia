@@ -3,7 +3,7 @@ import { ArrowRight, User, FolderOpen } from 'lucide-react'
 
 const Steps = () => {
   return (
-    <div className='flex justify-center items-center flex-col gap-[14px] text-center mt-20 sm:mt-32 md:mt-28 lg:mt-48 mb-20 px-4'>
+    <div className='flex justify-center items-center flex-col gap-[14px] text-center mt-20  md:mt-28 lg:mt-36 mb-20 px-4'>
 
       <h1 className="font-inter tracking-[-1px] sm:tracking-[-1.5px] md:tracking-[-1.7px] lg:tracking-[-1.9px] leading-[35px] sm:leading-[42px] md:leading-[50px] lg:leading-[57px] text-[28px] sm:text-[36px] md:text-[42px] lg:text-[48px] font-semibold w-full ">
         <span className="block">Streamline Your</span>
