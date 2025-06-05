@@ -7,10 +7,13 @@ export default function AltuviaFooter() {
           {/* Brand Section */}           
           <div className="col-span-1 sm:col-span-2 lg:col-span-1 text-center sm:text-left">             
             <div className="mb-4">           
-              <span className="font-inter font-semibold tracking-[-1.7px] leading-[28.8px] text-xl sm:text-[22px] text-[#1a1a1a]">             
-                Altuvia           
-              </span>             
-            </div>             
+             <span className="font-serif font-semibold tracking-[-0.1px] leading-[28.8px] text-[22px] text-[#002147]">
+            Altu 
+            <span className="text-[#3598FE]">via</span>
+          </span>         
+            </div>   
+
+
             <p className="text-[#404245] text-sm sm:text-base font-inter font-normal leading-6 sm:leading-[27px] max-w-xs mx-auto sm:mx-0">               
               Your partner in simplifying the admissions process.             
             </p>           
@@ -18,22 +21,22 @@ export default function AltuviaFooter() {
           
           {/* Quick Links */}           
           <div className="col-span-1 text-center sm:text-left">             
-            <h3 className="text-[#1a1a1a] font-medium font-inter text-base sm:text-lg mb-3 sm:mb-4">
+            <h3 className="text-[##002147] font-medium font-inter text-base sm:text-lg mb-3 sm:mb-4">
               Quick Links
             </h3>             
             <ul className="space-y-2 sm:space-y-3">               
               <li>                 
-                <a href="#" className="text-[#0088FF] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
+                <a href="#" className="text-[#3598FE] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
                   Home                 
                 </a>               
               </li>               
               <li>                 
-                <a href="#" className="text-[#0088FF] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
+                <a href="#" className="text-[#3598FE] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
                   Features                 
                 </a>               
               </li>               
               <li>                 
-                <a href="#" className="text-[#0088FF] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
+                <a href="#" className="text-[#3598FE] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
                   Pricing                 
                 </a>               
               </li>             
@@ -42,22 +45,22 @@ export default function AltuviaFooter() {
           
           {/* Support */}           
           <div className="col-span-1 text-center sm:text-left">             
-            <h3 className="text-[#1a1a1a] font-medium font-inter text-base sm:text-lg mb-3 sm:mb-4">
+            <h3 className="text-[#002147] font-medium font-inter text-base sm:text-lg mb-3 sm:mb-4">
               Support
             </h3>             
             <ul className="space-y-2 sm:space-y-3">               
               <li>                 
-                <a href="#" className="text-[#0088FF] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
+                <a href="#" className="text-[#3598FE] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
                   FAQs                 
                 </a>               
               </li>               
               <li>                 
-                <a href="#" className="text-[#0088FF] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
+                <a href="#" className="text-[##3598FE] hover:text-[#6595dd] text-sm sm:text-base transition-colors font-inter font-normal inline-block sm:block py-1">                   
                   Contact Us                 
                 </a>               
               </li>               
               <li>                 
-                <span className="text-[#404245] text-sm sm:text-base font-inter font-normal inline-block sm:block py-1 cursor-pointer hover:text-[#6595dd] transition-colors">                   
+                <span className="text-[#404245] text-sm sm:text-base font-inter font-normal inline-block sm:block py-1 cursor-pointer hover:text-[#3598FE] transition-colors">                   
                   Privacy Policy                 
                 </span>               
               </li>             
@@ -66,22 +69,22 @@ export default function AltuviaFooter() {
           
           {/* Connect with Us */}           
           <div className="col-span-1 text-center sm:text-left">             
-            <h3 className="text-[#1a1a1a] font-medium font-inter text-base sm:text-lg mb-3 sm:mb-4">
+            <h3 className="text-[#002147] font-medium font-inter text-base sm:text-lg mb-3 sm:mb-4">
               Connect with Us
             </h3>             
             <ul className="space-y-2 sm:space-y-3">               
               <li>                 
-                <a href="#" className="text-[#404245] hover:text-[#0088FF] text-sm sm:text-base font-normal font-inter inline-block sm:block py-1 transition-colors">                   
+                <a href="#" className="text-[#404245] hover:text-[#3598FE] text-sm sm:text-base font-normal font-inter inline-block sm:block py-1 transition-colors">                   
                   LinkedIn                 
                 </a>               
               </li>               
               <li>                 
-                <a href="#" className="text-[#404245] hover:text-[#0088FF] text-sm sm:text-base font-normal font-inter inline-block sm:block py-1 transition-colors">                   
+                <a href="#" className="text-[#404245] hover:text-[#3598FE] text-sm sm:text-base font-normal font-inter inline-block sm:block py-1 transition-colors">                   
                   Twitter                 
                 </a>               
               </li>               
               <li>                 
-                <a href="#" className="text-[#404245] hover:text-[#0088FF] text-sm sm:text-base font-normal font-inter inline-block sm:block py-1 transition-colors">                   
+                <a href="#" className="text-[#404245] hover:text-[#3598FE] text-sm sm:text-base font-normal font-inter inline-block sm:block py-1 transition-colors">                   
                   Facebook                 
                 </a>               
               </li>             

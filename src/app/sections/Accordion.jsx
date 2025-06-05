@@ -12,9 +12,9 @@ export default function AltuviaFAQ() {
     <div className='flex justify-center items-center flex-col text-center mt-44 md:mt-32 sm:mt-24 mb-20 md:mb-16 sm:mb-12 px-6 md:px-4 sm:px-3'>
              
       {/* Big Opening Quote Icon */}
-      <Quote className="w-16 h-16 md:w-12 md:h-12 sm:w-10 sm:h-10 fill-black mb-2 mt-10 md:mt-8 sm:mt-6" />
+    <Quote className="w-16 h-16 md:w-12 md:h-12 sm:w-10 sm:h-10 fill-[#002147] mb-2 mt-10 md:mt-8 sm:mt-6" />
              
-      <h1 className="font-inter tracking-[-1.9px] md:tracking-[-1.5px] sm:tracking-[-1.2px] leading-[57px] md:leading-[45px] sm:leading-[38px] text-[40px] lg:text-[42px] md:text-[38px] sm:text-[32px] font-semibold w-full max-w-3xl md:max-w-2xl sm:max-w-2xl mt-12 md:mt-10 sm:mt-8">
+      <h1 className="font-serif text-[#002147] tracking-[-1.9px] md:tracking-[-1.5px] sm:tracking-[-1.2px] leading-[57px] md:leading-[45px] sm:leading-[38px] text-[40px] lg:text-[42px] md:text-[38px] sm:text-[32px] font-medium w-full max-w-3xl md:max-w-2xl sm:max-w-2xl mt-12 md:mt-10 sm:mt-8">
         <span className="block">"Altuvia transformed my application </span>
         <span className="block">process. I felt organized and </span>
         <span className="block">confident!"</span>
@@ -23,7 +23,7 @@ export default function AltuviaFAQ() {
       <span className='font-inter font-medium text-base md:text-sm sm:text-sm leading-[25px] md:leading-[22px] sm:leading-[20px] text-[#262C37] mt-6 md:mt-5 sm:mt-4'>Jessica Lee</span>
       <span className='font-inter leading-[27px] md:leading-[24px] sm:leading-[22px] text-[#404245] font-normal text-[14px] md:text-[13px] sm:text-[12px]'>MBA Applicant</span>
              
-      <h1 className='font-inter leading-[60px] md:leading-[26px] sm:leading-[24px] tracking-[-2.3px] md:tracking-[-1.8px] sm:tracking-[-1.5px] text-[48px] md:text-[38px] sm:text-[32px] font-semibold mt-26 lg:mt-32 md:mt-28  text-[#262C37]'>
+      <h1 className='font-serif leading-[60px] md:leading-[26px] sm:leading-[24px] tracking-[-2.3px] md:tracking-[-1.8px] sm:tracking-[-1.5px] text-[48px] md:text-[38px] sm:text-[32px] font-medium mt-26 lg:mt-32 md:mt-28  text-[#002147]'>
         Frequently Asked Questions
       </h1>
              

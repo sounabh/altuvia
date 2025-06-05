@@ -19,7 +19,7 @@ const page = () => {
    <Marquee></Marquee>
    <Steps></Steps>
    <ApplicationManagement></ApplicationManagement>
-   <ImpactNumbers></ImpactNumbers>
+  {/* <ImpactNumbers></ImpactNumbers>*/}
    <PricingCards></PricingCards>
    <Accordions></Accordions>
    <ProductShowcase></ProductShowcase>

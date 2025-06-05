@@ -1,67 +1,164 @@
-import React from 'react'
-import { ArrowRight, User, FolderOpen } from 'lucide-react'
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  ArrowRight,
+  User,
+  FolderOpen,
+  CheckCircle,
+  Sparkles,
+} from "lucide-react";
 
 const Steps = () => {
-  return (
-    <div className='flex justify-center items-center flex-col gap-[14px] text-center mt-20  md:mt-28 lg:mt-36 mb-20 px-4'>
+  const [isVisible, setIsVisible] = useState(false);
 
-      <h1 className="font-inter tracking-[-1px] sm:tracking-[-1.5px] md:tracking-[-1.7px] lg:tracking-[-1.9px] leading-[35px] sm:leading-[42px] md:leading-[50px] lg:leading-[57px] text-[28px] sm:text-[36px] md:text-[42px] lg:text-[48px] font-semibold w-full ">
-        <span className="block">Streamline Your</span>
-        <span className="block">Application Process</span>
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  return (
+    <div className="relative bg-white overflow-hidden">
+      {/* Hero Section */}
+      <div className="relative pt-24 lg:pt-32 ">
+        <div className="container mx-auto px-6">
+          <div
+            className={`text-center max-w-4xl mx-auto transform transition-all duration-1000 ease-out ${
+              isVisible
+                ? "translate-y-0 opacity-100"
+                : "translate-y-10 opacity-0"
+            }`}
+          >
+            <div className="inline-flex items-center gap-2 bg-[#002147] backdrop-blur-sm border border-[#002147] rounded-full px-6 py-3 mb-8 shadow-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+              <span className="text-sm font-medium text-white">
+                Streamlined Process
+              </span>
+            </div>
+
+            <h1
+              className="font-serif font-normal text-[#002147] w-full
+              text-[36px] sm:text-[48px] md:text-[56px] lg:text-[45px]
+              leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[57px]
+              tracking-[-1.5px] sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-0.6px] mt-14 md:mt-10 lg:mt-8"
+            >
+              <span className="block">Get up to 3.5x more</span>
+              <span className="block">application success</span>
+            </h1>
+
+            <p
+              className="font-inter font-normal text-[#6C7280] text-base sm:text-lg
+              leading-[24px] sm:leading-[28px] md:leading-[30px] lg:leading-[32px]
+              w-3/4 mt-6 max-w-xl sm:max-w-2xl mx-auto lg:mt-7 md:mt-4 px-2 sm:px-4"
+            >
+              <span className="block">
+                When your application process breaks the norm, more students get
+                accepted.
+              </span>
+              <span className="block">
+                Think personalized profiles, smart organization, and strategic
+                guidance.
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 1 - Profile Setup */}
+      <div className="py-24 lg:py-32">
+        <div className="container mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+            {/* Left Content */}
+            <div
+              className={`order-2 lg:order-1 transition-all duration-700 ease-out ${
+                isVisible
+                  ? "translate-x-0 opacity-100"
+                  : "-translate-x-10 opacity-0"
+              }`}
+              style={{ transitionDelay: "200ms" }}
+            >
+              <div className="mb-4">
+                <div className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 font-medium rounded-full px-4 py-2">
+                  <User className="w-5 h-5" />
+                  Create Your Profile
+                </div>
+              </div>
+                <h1 className="font-serif font-normal text-[#002147] w-full
+        text-[18px] md:text-[20px] lg:text-[24px]
+        leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
+        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px]">
+        <span className="block">Start with a solid foundation</span>
+       
       </h1>
-             
-      <p className="font-inter leading-[24px] sm:leading-[26px] md:leading-[28px] lg:leading-[30px] text-[#404245] font-normal text-base sm:text-lg max-w-xl sm:max-w-2xl w-full px-4 mx-auto text-center">
-        <span className="block">Follow these simple steps to maximize your application success.</span>
-      </p>
-             
-      <div className='flex flex-col lg:flex-row items-center gap-4 sm:gap-6 lg:gap-8 mt-6 sm:mt-8 w-full lg:ml-52 max-w-6xl'>
-        {/* Step 1 Card */}
-        <div className='w-full max-w-[280px] sm:max-w-[350px] lg:w-[400px] h-[300px] sm:h-[380px] lg:h-[450px] bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl lg:rounded-3xl border-2 sm:border-2 lg:border-4 border-black shadow-[4px_4px_12px_0px_rgba(0,0,0,0.2)] sm:shadow-[6px_6px_15px_0px_rgba(0,0,0,0.25)] lg:shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] transform rotate-1 sm:rotate-2 lg:rotate-3 hover:-rotate-1 transition-all duration-500 ease-out hover:shadow-[6px_6px_20px_0px_rgba(0,0,0,0.3)] sm:hover:shadow-[8px_8px_25px_0px_rgba(0,0,0,0.35)] lg:hover:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] group relative overflow-hidden'>
-          <div className='absolute inset-1 sm:inset-1 lg:inset-2 bg-white rounded-lg sm:rounded-xl lg:rounded-2xl border border-gray-100'></div>
-          <div className='relative p-3 sm:p-4 lg:p-8 h-full flex flex-col justify-between z-10'>
-            <div className='flex-1 flex items-center justify-center'>
-              <div className='w-16 h-16 sm:w-24 sm:h-24 lg:w-32 lg:h-32 bg-[#1a1a1a]  rounded-full flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 shadow-lg'>
-                <User size={20} className="sm:w-8 sm:h-8 lg:w-12 lg:h-12 text-white drop-shadow-sm" />
-              </div>
-            </div>
-                         
-            <div className='text-left'>
-              <h3 className='text-base sm:text-lg lg:text-2xl font-bold mb-1 sm:mb-2 lg:mb-4 text-black'>Step 1: Set Up Your Profile</h3>
-              <p className='text-gray-600 text-xs sm:text-sm lg:text-lg leading-relaxed'>
-                Create a personalized profile and connect your applications.
+              <p className="text-[#6C7280] text-base leading-relaxed">
+                Build a personalized applicant profile that showcases your strengths,
+                achievements, and goals. This profile powers every part of your journey.
               </p>
             </div>
-          </div>
-        </div>
-                 
-        {/* Arrow */}
-        <div className='flex-shrink-0 rotate-90 lg:rotate-0'>
-          <div className='w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 bg-[#1a1a1a] rounded-full flex items-center justify-center shadow-lg transform hover:scale-110 transition-all duration-300'>
-            <ArrowRight size={16} className="sm:w-5 sm:h-5 lg:w-7 lg:h-7 text-white transform hover:translate-x-1 lg:hover:translate-y-0 hover:translate-y-1 lg:hover:translate-x-1 transition-transform duration-300" />
-          </div>
-        </div>
-                 
-        {/* Step 2 Card */}
-        <div className='w-full max-w-[280px] sm:max-w-[350px] lg:w-[400px] h-[300px] sm:h-[380px] lg:h-[450px] bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl lg:rounded-3xl border-2 sm:border-2 lg:border-4 border-black shadow-[4px_4px_12px_0px_rgba(0,0,0,0.2)] sm:shadow-[6px_6px_15px_0px_rgba(0,0,0,0.25)] lg:shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] transform -rotate-1 sm:-rotate-2 lg:-rotate-3 hover:rotate-1 transition-all duration-500 ease-out hover:shadow-[6px_6px_20px_0px_rgba(0,0,0,0.3)] sm:hover:shadow-[8px_8px_25px_0px_rgba(0,0,0,0.35)] lg:hover:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] group relative overflow-hidden'>
-          <div className='absolute inset-1 sm:inset-1 lg:inset-2 bg-white rounded-lg sm:rounded-xl lg:rounded-2xl border border-gray-100'></div>
-          <div className='relative p-3 sm:p-4 lg:p-8 h-full flex flex-col justify-between z-10'>
-            <div className='flex-1 flex items-center justify-center'>
-              <div className='w-16 h-16 sm:w-24 sm:h-24 lg:w-32 lg:h-32 bg-[#1a1a1a] rounded-full flex items-center justify-center transform group-hover:scale-110 group-hover:-rotate-12 transition-all duration-500 shadow-lg'>
-                <FolderOpen size={20} className="sm:w-8 sm:h-8 lg:w-12 lg:h-12 text-white drop-shadow-sm" />
-              </div>
-            </div>
-                         
-            <div className='text-left'>
-              <h3 className='text-base sm:text-lg lg:text-2xl font-bold mb-1 sm:mb-2 lg:mb-4 text-black'>Step 2: Organize Your Applications</h3>
-              <p className='text-gray-600 text-xs sm:text-sm lg:text-lg leading-relaxed'>
-                Sync deadlines, documents, and resources in one intuitive workspace.
-              </p>
+
+            {/* Right Content (Image/Graphic placeholder) */}
+            <div className="order-1 lg:order-2">
+              <div className="w-full h-64 bg-indigo-100 rounded-xl" />
             </div>
           </div>
         </div>
       </div>
-    </div>
-  )
-}
 
-export default Steps
+
+
+
+
+
+    
+      {/* Section 3 - Submit With Confidence */}
+      <div className="py-10 lg:py-10">
+        <div className="container mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+
+
+
+              {/* Right Content */}
+            <div className="order-1 lg:order-1">
+              <div className="w-full h-64 bg-green-100 rounded-xl" />
+            </div>
+            {/* Left Content */}
+            <div
+              className={`order-2 lg:order-1 transition-all duration-700 ease-out ${
+                isVisible
+                  ? "translate-x-0 opacity-100"
+                  : "-translate-x-10 opacity-0"
+              }`}
+              style={{ transitionDelay: "400ms" }}
+            >
+              <div className="mb-8">
+                <div className="inline-flex items-center gap-2 bg-green-50 text-green-600 font-medium rounded-full px-4 py-2">
+                    <FolderOpen className="w-5 h-5" />
+                    Organize Documents
+                </div>
+              </div>
+              <h1 className="font-serif font-normal text-[#002147] w-full
+        text-[18px] md:text-[20px] lg:text-[24px]
+        leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
+        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px]">
+        <span className="block">  Everything in one place</span>
+       
+      </h1>
+             
+
+ 
+
+
+              <p className="text-[#6C7280] text-base leading-relaxed">
+                 Automatically organize your resumes, essays, and test scores by school
+                and deadline. No more digging through folders.
+              </p>
+            </div>
+
+          
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Steps;

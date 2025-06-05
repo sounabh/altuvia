@@ -64,7 +64,7 @@ const ProductShowcase = () => {
           animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 30 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="font-inter tracking-[-1.5px] text-center sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[57px] text-[36px] sm:text-[48px] md:text-[56px] lg:text-[48px] font-semibold w-full text-[#1A1A1A]">
+          <h1 className="font-serif tracking-[-1.5px] text-center sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[57px] text-[36px] sm:text-[48px] md:text-[56px] lg:text-[48px] font-medium w-full text-[#002147]">
         <span className="block">Ready to Take Control</span>
         <span className="block">of Your Applications?</span>
       </h1>
@@ -88,7 +88,7 @@ const ProductShowcase = () => {
             whileHover={{ scale: 1.02 }}
           >
             {/* Desktop Frame */}
-            <div className="w-[800px] h-[520px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-black shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            <div className="w-[800px] h-[520px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-[#002147] shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden">
               
               
             </div>
@@ -106,13 +106,13 @@ const ProductShowcase = () => {
             <div className=" w-[250px] h-[450px] md:w-[310px] md:h-[600px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-black shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden">
               
               {/* Notch */}
-              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-20 h-6 bg-black rounded-full z-10"></div>
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-20 h-6 bg-[#002147] rounded-full z-10"></div>
               
               {/* Screen Content - Mobile App Mockup */}
             
               
               {/* Home Indicator */}
-              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-28 h-1 bg-black rounded-full"></div>
+            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-28 h-1 bg-[#002147] rounded-full"></div>
             </div>
           </motion.div>
         </div>

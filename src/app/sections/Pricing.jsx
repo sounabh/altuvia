@@ -6,7 +6,7 @@ export default function PricingCards() {
       <div className="max-w-6xl mx-auto">
         {/* Header Section - Centered */}
         <div className="text-center mb-12 sm:mb-16 lg:mb-20">
-          <h1 className="font-inter tracking-[-1.5px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[75px] text-[32px] sm:text-[40px] md:text-[48px] lg:text-[56px] font-semibold w-full text-[#1A1A1A] mb-6">
+          <h1 className="font-serif tracking-[-1.5px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[75px] text-[32px] sm:text-[40px] md:text-[48px] lg:text-[56px] font-medium w-full text-[#002147] mb-6">
             Choose Your Plan
           </h1>
           
@@ -20,13 +20,13 @@ export default function PricingCards() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-10 max-w-5xl">
             
             {/* Free Plan Card */}
-            <div className='w-full max-w-sm sm:max-w-md md:max-w-lg  mx-auto bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl border-4 sm:border-6 md:border-8 border-black shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] sm:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.35)] lg:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] hover:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.4)] sm:hover:shadow-[14px_14px_35px_0px_rgba(0,0,0,0.45)] lg:hover:shadow-[16px_16px_40px_0px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out relative overflow-hidden group lg:h-[80%] '>
+            <div className='w-full max-w-sm sm:max-w-md md:max-w-lg  mx-auto bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl border-1  md:border-1 border-[#002147] shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] sm:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.35)] lg:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] hover:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.4)] sm:hover:shadow-[14px_14px_35px_0px_rgba(0,0,0,0.45)] lg:hover:shadow-[16px_16px_40px_0px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out relative overflow-hidden group lg:h-[80%] '>
 
               <div className="p-6 sm:p-8 md:p-10">
                 {/* Header */}
                 <div className="text-center mb-6 sm:mb-8">
                   <div className="text-3xl sm:text-4xl mb-3 sm:mb-4">🆓</div>
-                  <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2">Free Plan</h3>
+                  <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#002147] mb-2">Free Plan</h3>
                 </div>
 
                 {/* Features */}
@@ -46,7 +46,7 @@ export default function PricingCards() {
                 </div>
 
                 {/* CTA Button */}
-                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-xl bg-[#1a1a1a] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-gray-800 transition-colors duration-300">
+                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-xl bg-[#002147] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-gray-800 transition-colors duration-300">
                   Start Free Trial
                 </button>
               </div>
@@ -56,7 +56,7 @@ export default function PricingCards() {
             </div>
 
             {/* Pro Plan Card */}
-            <div className='w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl border-4 sm:border-6 md:border-8 border-black shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] sm:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.35)] lg:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] hover:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.4)] sm:hover:shadow-[14px_14px_35px_0px_rgba(0,0,0,0.45)] lg:hover:shadow-[16px_16px_40px_0px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out relative overflow-hidden group'>
+          <div className='w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto bg-gradient-to-br from-white to-gray-50 rounded-2xl sm:rounded-3xl border-1  md:border-1 border-[#002147] shadow-[8px_8px_20px_0px_rgba(0,0,0,0.3)] sm:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.35)] lg:shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] hover:shadow-[10px_10px_25px_0px_rgba(0,0,0,0.4)] sm:hover:shadow-[14px_14px_35px_0px_rgba(0,0,0,0.45)] lg:hover:shadow-[16px_16px_40px_0px_rgba(0,0,0,0.5)] transition-all duration-500 ease-out relative overflow-hidden group'>
               
               {/* Popular Badge */}
               <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-bl-2xl rounded-tr-2xl text-xs font-semibold">
@@ -66,8 +66,8 @@ export default function PricingCards() {
               <div className="p-6 sm:p-8 md:p-10">
                 {/* Header */}
                 <div className="text-center mb-6 sm:mb-8">
-                  <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2">Pro Plan</h3>
-                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1">$7.99</div>
+                  <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#002147] mb-2">Pro Plan</h3>
+                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#002147] mb-1">$7.99</div>
                   <div className="text-gray-600 text-sm">/month</div>
                 </div>
 
@@ -96,7 +96,7 @@ export default function PricingCards() {
                 </div>
 
                 {/* CTA Button */}
-                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-xl bg-[#1a1a1a] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-gray-800 transition-colors duration-300">
+                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-xl bg-[#002147] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-gray-800 transition-colors duration-300">
                   Start Free Trial
                 </button>
               </div>

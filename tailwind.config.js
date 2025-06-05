@@ -9,7 +9,9 @@ module.exports = {
     extend: {
       fontFamily: {
         inter: ["var(--font-inter)", "system-ui", "sans-serif"],
+        playfair: ["var(--font-playfair)", "serif"],
         sans: ["var(--font-inter)", "system-ui", "sans-serif"], // Make Inter the default sans font
+        serif: ["var(--font-playfair)", "serif"], // Make Playfair the default serif font
       },
       fontWeight: {
         normal: "400",
