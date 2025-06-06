@@ -26,7 +26,7 @@ const UniversityMarquee = () => {
   );
 
   return (
-    <div className="w-full  py-12 md:mt-24 mt-16">
+    <div className="w-full py-12 md:mt-24 mt-16">
       <div className="max-w-full mx-auto">
        
         <p className="font-inter leading-[24px] sm:leading-[28px] md:leading-[30px] text-center lg:leading-[32px] text-[#6C7280] font-normal text-lg">

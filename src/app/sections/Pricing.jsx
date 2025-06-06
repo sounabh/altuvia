@@ -16,7 +16,7 @@ export default function PricingCards() {
         </div>
 
         {/* Cards Grid */}
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center py-12 mt-16 md:mt-24">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-10 max-w-5xl">
             
             {/* Free Plan Card */}

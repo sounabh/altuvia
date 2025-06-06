@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { Send, MapPin, Mail, MessageCircle } from 'lucide-react';
 
+
+
 const PremiumContactPage = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -19,12 +21,14 @@ const PremiumContactPage = () => {
     });
   };
 
+
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('Form submitted:', formData);
     alert('Thank you for your message! We\'ll get back to you within 24 hours.');
     setFormData({ name: '', email: '', location: '', message: '' });
   };
+
 
   const formFields = [
     {
@@ -53,11 +57,13 @@ const PremiumContactPage = () => {
     }
   ];
 
+
+
   return (
     <div className="min-h-screen bg-white py-44 lg:36 px-6">
       <div className="max-w-5xl mx-auto">
         
-        {/* Header Section */}
+    
        
 
 
@@ -65,10 +71,13 @@ const PremiumContactPage = () => {
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-2 gap-16 items-start">
           
+
           {/* Left Side - Info */}
           <div className="space-y-12">
             <div className="text-center mb-20">
         
+
+
 <h1 className="font-serif font-normal text-[#002147] w-full
         text-[36px] sm:text-[48px] md:text-[56px] lg:text-[65px]
         leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
@@ -76,6 +85,8 @@ const PremiumContactPage = () => {
         <span className="block">  Get in Touch</span>
        
       </h1>
+
+
 
       {/* Subheading/paragraph: responsive size and spacing */}
       <p className="font-inter font-normal text-[#6C7280] text-base sm:text-lg
@@ -85,19 +96,26 @@ const PremiumContactPage = () => {
        
       </p>
 
+
+
         </div>
           </div>
+
+
 
           {/* Right Side - Form */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100/20 p-12">
             <div className="space-y-8">
               
+
+
               {/* Form Fields */}
               {formFields.map((field) => {
                 const IconComponent = field.icon;
                 const isFocused = focusedField === field.name;
                 const hasValue = formData[field.name];
                 
+
                 return (
                   <div key={field.name} className="space-y-3">
                     <label className="block text-sm font-medium text-gray-700 tracking-wide">
@@ -105,6 +123,7 @@ const PremiumContactPage = () => {
                       {field.required && <span className="text-red-400 ml-1">*</span>}
                     </label>
                     
+
                     <div className="relative">
                       <div className={`
                         absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors duration-200
@@ -113,6 +132,7 @@ const PremiumContactPage = () => {
                         <IconComponent size={18} strokeWidth={1.5} />
                       </div>
                       
+
                       <input
                         type={field.type}
                         name={field.name}
@@ -137,11 +157,13 @@ const PremiumContactPage = () => {
                 );
               })}
 
+
               {/* Message Field */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-700 tracking-wide">
                   Message <span className="text-red-400 ml-1">*</span>
                 </label>
+
                 
                 <div className="relative">
                   <div className={`
@@ -151,6 +173,7 @@ const PremiumContactPage = () => {
                     <MessageCircle size={18} strokeWidth={1.5} />
                   </div>
                   
+
                   <textarea
                     name="message"
                     value={formData.message}
@@ -173,6 +196,8 @@ const PremiumContactPage = () => {
                 </div>
               </div>
 
+
+
               {/* Submit Button */}
               <button
                 type="button"
@@ -190,6 +215,8 @@ const PremiumContactPage = () => {
                 <span>Send Message</span>
                 <Send size={18} className="transition-transform duration-300 group-hover:translate-x-1" />
               </button>
+              
+
               
               {/* Privacy Note */}
               <p className="text-xs text-gray-500 text-center font-light leading-relaxed">

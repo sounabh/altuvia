@@ -90,7 +90,7 @@ export default function TypeformStyleApplicationManagement() {
         </div>
 
         {/* Features Grid - Typeform Style */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 py-12 mt-16 md:mt-24 gap-8 mb-20">
           {features.map((feature, index) => {
             const IconComponent = feature.icon;
             const isHovered = hoveredCard === feature.id;
@@ -174,7 +174,7 @@ export default function TypeformStyleApplicationManagement() {
       </h1>
               
              
-              <p className="font-inter font-normal text-[#6C7280] text-base sm:text-lg
+              <p className="font-inter font-normal text-white text-base sm:text-lg
         leading-[24px] sm:leading-[28px] md:leading-[30px] lg:leading-[32px]
         lg:w-1/2 max-w-xl sm:max-w-2xl mx-auto mt-2 lg:mt-3 sm:mt-3 md:mt-4 px-2 sm:px-4">
    Join thousands of students who have streamlined their application process
@@ -185,12 +185,15 @@ export default function TypeformStyleApplicationManagement() {
               
               <button className="
                 inline-flex items-center justify-center
-                bg-white text-gray-900 px-12 py-5 rounded-2xl 
+                bg-white  px-12 py-5  
                 text-lg font-medium tracking-wide
-                transition-all duration-300 hover:scale-105 hover:shadow-xl
-                focus:outline-none focus:ring-4 focus:ring-white/20
+
+               rounded-lg hover:rounded-3xl hover:text-white hover:bg-[#3598FE] transition-all duration-700 ease-in-out  text-[#002147]
                 group mt-7
               ">
+
+
+
                 <span>Start for free</span>
                 <svg className="w-5 h-5 ml-3 transition-transform duration-300 group-hover:translate-x-1" 
                      fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

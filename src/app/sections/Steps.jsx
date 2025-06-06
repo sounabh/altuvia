@@ -48,23 +48,21 @@ const Steps = () => {
             <p
               className="font-inter font-normal text-[#6C7280] text-base sm:text-lg
               leading-[24px] sm:leading-[28px] md:leading-[30px] lg:leading-[32px]
-              w-3/4 mt-6 max-w-xl sm:max-w-2xl mx-auto lg:mt-7 md:mt-4 px-2 sm:px-4"
+               mt-6 md:max-w-3xl   mx-auto lg:mt-7 md:mt-4 px-2 sm:px-4"
             >
               <span className="block">
                 When your application process breaks the norm, more students get
-                accepted.
-              </span>
-              <span className="block">
-                Think personalized profiles, smart organization, and strategic
+                accepted.Think personalized profiles, smart organization, and strategic
                 guidance.
               </span>
+             
             </p>
           </div>
         </div>
       </div>
 
       {/* Section 1 - Profile Setup */}
-      <div className="py-24 lg:py-32">
+      <div className="py-12 mt-16 md:mt-24">
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
             {/* Left Content */}
@@ -85,7 +83,7 @@ const Steps = () => {
                 <h1 className="font-serif font-normal text-[#002147] w-full
         text-[18px] md:text-[20px] lg:text-[24px]
         leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
-        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px]">
+        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px] md-mt-4 -mt-2">
         <span className="block">Start with a solid foundation</span>
        
       </h1>
@@ -138,7 +136,7 @@ const Steps = () => {
               <h1 className="font-serif font-normal text-[#002147] w-full
         text-[18px] md:text-[20px] lg:text-[24px]
         leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
-        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px]">
+        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px] -mt-5">
         <span className="block">  Everything in one place</span>
        
       </h1>
@@ -147,7 +145,7 @@ const Steps = () => {
  
 
 
-              <p className="text-[#6C7280] text-base leading-relaxed">
+              <p className="text-[#6C7280] text-base leading-relaxed ">
                  Automatically organize your resumes, essays, and test scores by school
                 and deadline. No more digging through folders.
               </p>

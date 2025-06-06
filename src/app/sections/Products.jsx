@@ -77,33 +77,33 @@ const ProductShowcase = () => {
         </motion.div>
 
         {/* Showcase Section */}
-        <div className="relative flex items-start justify-start mt-32">
+        <div className="relative flex items-start justify-center sm:justify-start py-12 mt-16 md:mt-24">
           
-          {/* Desktop Mockup */}
+          {/* Desktop Mockup - Hidden on small screens, shown on medium+ */}
           <motion.div
-            className="relative z-10 hidden md:block"
+            className="relative z-10 hidden sm:block"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 50 }}
             transition={{ duration: 1, delay: 0.2 }}
             whileHover={{ scale: 1.02 }}
           >
-            {/* Desktop Frame */}
-            <div className="w-[800px] h-[520px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-[#002147] shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            {/* Desktop Frame - Smaller on medium screens, full size on large+ */}
+            <div className="sm:w-[600px] sm:h-[390px] lg:w-[800px] lg:h-[520px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-[#002147] shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden left-[150px]">
               
               
             </div>
           </motion.div>
 
-          {/* Mobile Mockup - With Gap from Desktop */}
+          {/* Mobile Mockup - Only shown on small screens and large+ screens */}
           <motion.div
-            className="absolute -top-10 lg:left-[750px] left-[100px] z-20"
+            className="relative z-20 block sm:hidden lg:absolute lg:-top-0 lg:left-[750px] lg:block"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 50 }}
             transition={{ duration: 1, delay: 0.4 }}
             whileHover={{ scale: 1.05 }}
           >
-            {/* Mobile Frame - Same Height as Desktop */}
-            <div className=" w-[250px] h-[450px] md:w-[310px] md:h-[600px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-black shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            {/* Mobile Frame */}
+            <div className="w-[250px] h-[450px] md:w-[310px] md:h-[600px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-black shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden">
               
               {/* Notch */}
               <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-20 h-6 bg-[#002147] rounded-full z-10"></div>
@@ -117,17 +117,9 @@ const ProductShowcase = () => {
           </motion.div>
         </div>
 
-        {/* Bottom Text */}
-        <motion.div 
-          className="text-left mt-20"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 30 }}
-          transition={{ duration: 0.8, delay: 1.2 }}
-        >
-        
-        </motion.div>
+     
 
-        {/* Floating Elements */}
+    
       
       
       </div>
