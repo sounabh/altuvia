@@ -1,4 +1,5 @@
 
+"use client"
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import {
@@ -9,6 +10,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
+
+
+
 
 export const SearchFilters = ({
   searchTerm,
@@ -28,6 +32,8 @@ export const SearchFilters = ({
     setActiveFilters(count);
   }, [selectedRankFilter, selectedGmatFilter]);
 
+
+
   const clearAllFilters = () => {
     onRankFilterChange('all');
     onGmatFilterChange('all');
@@ -39,7 +45,7 @@ export const SearchFilters = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE] to-[#2979FF] rounded-3xl flex items-center justify-center shadow-lg">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE]  rounded-3xl flex items-center justify-center shadow-lg">
             <SlidersHorizontal className="h-6 w-6 text-white" />
           </div>
           <div>
@@ -66,25 +72,38 @@ export const SearchFilters = ({
       {/* Search and Filter Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-center sm:gap-6">
         {/* Search Input */}
-        <div className="xl:col-span-6 relative">
-          <div className={`relative transition-all duration-300 ${isSearchFocused ? 'transform scale-[1.02]' : ''}`}>
-            <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 transition-colors duration-300" />
-            <Input
-              type="text"
-              placeholder="Search by name, location, or program..."
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              className="w-full h-14 pl-12 pr-6 py-4 bg-white/95 backdrop-blur-sm text-gray-900 border-none outline-none focus:outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl text-base placeholder:text-gray-500 font-medium"
-            />
-          </div>
-        </div>
+        <div className="xl:col-span-6 relative w-full max-w-2xl mx-auto">
+  <form
+    onSubmit={(e) => {
+      e.preventDefault();
+      // handle search logic here (submitSearch(searchTerm) or similar)
+    }}
+    className="flex items-center relative"
+  >
+
+    <Input
+      type="text"
+      placeholder="Search by name, location, or program..."
+      value={searchTerm}
+      onChange={(e) => onSearchChange(e.target.value)}
+      onFocus={() => setIsSearchFocused(true)}
+      onBlur={() => setIsSearchFocused(false)}
+      className="w-full h-12 pl-12 pr-28 py-2 bg-white/90  rounded-full text-sm placeholder:text-[#002147] font-medium "
+    />
+    <button
+      type="submit"
+      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#3598FE] text-white px-5 py-2 text-sm font-semibold rounded-full shadow-md hover:shadow-[0_0_10px_#00f0ff] transition-all duration-300"
+    >
+      Search
+    </button>
+  </form>
+</div>
+
 
         {/* Rank Filter */}
         <div className="lg:col-span-2">
           <Select value={selectedRankFilter} onValueChange={onRankFilterChange}>
-            <SelectTrigger className="h-14 bg-white/95 backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">
+            <SelectTrigger className="h-14 bg-white backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">
               <SelectValue placeholder="University Rank" />
             </SelectTrigger>
             <SelectContent className="bg-white/95 backdrop-blur-sm text-gray-900 border-none shadow-2xl rounded-2xl">
