@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function PricingCards() {
   return (
-    <div className="w-full min-h-screen px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:pt-44">
+    <div className="w-full min-h-screen px-4  lg:px-8 py-8 mt-20 lg:pt-44">
       <div className="max-w-6xl mx-auto">
         {/* Header Section - Centered */}
         <div className="text-center mb-12 sm:mb-16 lg:mb-20">
@@ -45,8 +45,12 @@ export default function PricingCards() {
                   </div>
                 </div>
 
+
+
+  
+
                 {/* CTA Button */}
-                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-xl bg-[#002147] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-gray-800 transition-colors duration-300">
+                <button className="w-full px-4  md:px-5 lg:px-4 py-[10px] ] md:py-[12px] lg:py-[10px] rounded-lg bg-[#002147] border-0 outline-0 leading-[24px]  md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center   hover:bg-[#3598FE] transition-all duration-700 ease-in-out transform hover:rounded-3xl">
                   Start Free Trial
                 </button>
               </div>
@@ -96,7 +100,7 @@ export default function PricingCards() {
                 </div>
 
                 {/* CTA Button */}
-                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-xl bg-[#002147] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-gray-800 transition-colors duration-300">
+                <button className="w-full px-4 sm:px-4 md:px-5 lg:px-4 py-[10px] sm:py-[10px] md:py-[12px] lg:py-[10px] rounded-lg bg-[#002147] border-0 outline-0 leading-[24px] sm:leading-[26px] md:leading-[27px] text-white font-inter font-medium text-balance text-[13px] sm:text-[14px] flex items-center justify-center hover:bg-[#3598FE] transition-all duration-700 ease-in-out transform hover:rounded-3xl">
                   Start Free Trial
                 </button>
               </div>

@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowRight,
   User,
@@ -9,152 +9,252 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const Steps = () => {
+// Custom intersection observer hook for scroll animations
+const useIntersectionObserver = (threshold = 0.1) => {
   const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef(null);
 
   useEffect(() => {
-    setIsVisible(true);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      if (ref.current) {
+        observer.unobserve(ref.current);
+      }
+    };
+  }, [threshold]);
+
+  return [ref, isVisible];
+};
+
+// Animated component wrapper
+const AnimatedSection = ({ children, direction = "left", delay = 0, className = "" }) => {
+  const [ref, isVisible] = useIntersectionObserver(0.1);
+  
+  const baseClasses = "transition-all duration-700 ease-out";
+  const animationClasses = isVisible 
+    ? "translate-x-0 opacity-100" 
+    : direction === "left" 
+      ? "-translate-x-16 opacity-0" 
+      : "translate-x-16 opacity-0";
+
+  return (
+    <div 
+      ref={ref}
+      className={`${baseClasses} ${animationClasses} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+};
+
+const Steps = () => {
+  const [heroVisible, setHeroVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHeroVisible(true);
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
-    <div className="relative bg-white overflow-hidden py-12 mt-12">
+    <div className="relative bg-white overflow-hidden">
       {/* Hero Section */}
-      <div className="relative pt-24 lg:pt-32 ">
-        <div className="container mx-auto px-6">
+      <section className="relative pt-16 sm:pt-20 lg:pt-24 pb-12 lg:pb-16">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
           <div
-            className={`text-center max-w-4xl mx-auto transform transition-all duration-1000 ease-out ${
-              isVisible
+            className={`text-center max-w-5xl mx-auto transform transition-all duration-1000 ease-out ${
+              heroVisible
                 ? "translate-y-0 opacity-100"
                 : "translate-y-10 opacity-0"
             }`}
           >
-            <div className="inline-flex items-center gap-2 bg-[#002147] backdrop-blur-sm border border-[#002147] rounded-full px-6 py-3 mb-8 shadow-lg">
-              <Sparkles className="w-5 h-5 text-white" />
-              <span className="text-sm font-medium text-white">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-[#002147] backdrop-blur-sm border border--[#002147] rounded-full px-4 sm:px-6 py-2 sm:py-3 mb-6 sm:mb-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <span className="text-xs sm:text-sm font-medium text-white">
                 Streamlined Process
               </span>
             </div>
 
-            <h1
-              className="font-serif font-normal text-[#002147] w-full
-              text-[36px] sm:text-[48px] md:text-[56px] lg:text-[45px]
-              leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[57px]
-              tracking-[-1.5px] sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-0.6px] mt-14 md:mt-10 lg:mt-8"
-            >
-              <span className="block">Get up to 3.5x more</span>
+            {/* Main Heading */}
+            <h1 className="font-serif font-normal text--[#002147] text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight mb-6 sm:mb-8">
+              <span className="block mb-2">Get up to 3.5x more</span>
               <span className="block">application success</span>
             </h1>
 
-            <p
-              className="font-inter font-normal text-[#6C7280] text-base sm:text-lg
-              leading-[24px] sm:leading-[28px] md:leading-[30px] lg:leading-[32px]
-               mt-6 md:max-w-3xl   mx-auto lg:mt-7 md:mt-4 px-2 sm:px-4"
-            >
-              <span className="block">
+            {/* Description */}
+            <div className="max-w-4xl mx-auto">
+              <p className="font-sans font-normal text-slate-600 text-base sm:text-lg lg:text-xl leading-relaxed px-4">
                 When your application process breaks the norm, more students get
-                accepted.Think personalized profiles, smart organization, and strategic
+                accepted. Think personalized profiles, smart organization, and strategic
                 guidance.
-              </span>
-             
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 1 - Profile Setup */}
-      <div className="mt-16">
-        <div className="container mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
-            {/* Left Content */}
-            <div
-              className={`order-2 lg:order-1 transition-all duration-700 ease-out ${
-                isVisible
-                  ? "translate-x-0 opacity-100"
-                  : "-translate-x-10 opacity-0"
-              }`}
-              style={{ transitionDelay: "200ms" }}
-            >
-              <div className="mb-4">
-                <div className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 font-medium rounded-full px-4 py-2">
-                  <User className="w-5 h-5" />
-                  Create Your Profile
-                </div>
-              </div>
-                <h1 className="font-serif font-normal text-[#002147] w-full
-        text-[18px] md:text-[20px] lg:text-[24px]
-        leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
-        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px] md-mt-4 -mt-2">
-        <span className="block">Start with a solid foundation</span>
-       
-      </h1>
-              <p className="text-[#6C7280] text-base leading-relaxed">
-                Build a personalized applicant profile that showcases your strengths,
-                achievements, and goals. This profile powers every part of your journey.
               </p>
             </div>
-
-            {/* Right Content (Image/Graphic placeholder) */}
-            <div className="order-1 lg:order-2">
-              <div className="w-full h-64 bg-indigo-100 rounded-xl" />
-            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-
-
-
-
-
-    
-      {/* Section 3 - Submit With Confidence */}
-      <div className="py-10 lg:py-10">
-        <div className="container mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
-
-
+      {/* Features Section */}
+      <section className="py-12 lg:py-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+          
+          {/* Feature 1 - Profile Setup */}
+          <div className="mb-20 lg:mb-32">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 xl:gap-24 items-center">
+              {/* Left Content */}
+              <AnimatedSection 
+                direction="left" 
+                delay={200}
+                className="order-2 lg:order-1 space-y-6"
+              >
+                <div className="inline-flex items-center gap-2 bg-[#002147] text-white font-medium rounded-full px-4 py-2 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-sm">Create Your Profile</span>
+                </div>
+                
+                <h2 className="font-serif font-normal text--[#002147] text-xl sm:text-2xl lg:text-3xl xl:text-4xl leading-tight tracking-tight">
+                  Start with a solid foundation
+                </h2>
+                
+                <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-lg">
+                  Build a personalized applicant profile that showcases your strengths,
+                  achievements, and goals. This profile powers every part of your journey.
+                </p>
+              </AnimatedSection>
 
               {/* Right Content */}
-            <div className="order-1 lg:order-1">
-              <div className="w-full h-64 bg-green-100 rounded-xl" />
-            </div>
-            {/* Left Content */}
-            <div
-              className={`order-2 lg:order-1 transition-all duration-700 ease-out ${
-                isVisible
-                  ? "translate-x-0 opacity-100"
-                  : "-translate-x-10 opacity-0"
-              }`}
-              style={{ transitionDelay: "400ms" }}
-            >
-              <div className="mb-8">
-                <div className="inline-flex items-center gap-2 bg-green-50 text-green-600 font-medium rounded-full px-4 py-2">
-                    <FolderOpen className="w-5 h-5" />
-                    Organize Documents
+              <AnimatedSection 
+                direction="right" 
+                delay={400}
+                className="order-1 lg:order-2"
+              >
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-[#002147] rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                  <div className="relative w-full h-64 sm:h-72 lg:h-80 xl:h-96 bg-[#002147] rounded-2xl shadow-2xl transform group-hover:scale-105 transition-all duration-500 flex items-center justify-center">
+                    <User className="w-16 h-16 text-white opacity-50" />
+                  </div>
                 </div>
-              </div>
-              <h1 className="font-serif font-normal text-[#002147] w-full
-        text-[18px] md:text-[20px] lg:text-[24px]
-        leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[80px]
-        tracking-[-0.5px]  md:tracking-[-0.5px] lg:tracking-[-0.6px] -mt-5">
-        <span className="block">  Everything in one place</span>
-       
-      </h1>
-             
-
- 
-
-
-              <p className="text-[#6C7280] text-base leading-relaxed ">
-                 Automatically organize your resumes, essays, and test scores by school
-                and deadline. No more digging through folders.
-              </p>
+              </AnimatedSection>
             </div>
+          </div>
 
-          
+          {/* Feature 2 - Organize Documents */}
+          <div className="mb-20 lg:mb-32">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 xl:gap-24 items-center">
+              {/* Left Content (Image) */}
+              <AnimatedSection 
+                direction="left" 
+                delay={200}
+                className="order-1"
+              >
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-[#002147] rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                  <div className="relative w-full h-64 sm:h-72 lg:h-80 xl:h-96 bg-[#002147] rounded-2xl shadow-2xl transform group-hover:scale-105 transition-all duration-500 flex items-center justify-center">
+                    <FolderOpen className="w-16 h-16 text-white opacity-50" />
+                  </div>
+                </div>
+              </AnimatedSection>
+
+              {/* Right Content */}
+              <AnimatedSection 
+                direction="right" 
+                delay={400}
+                className="order-2 space-y-6"
+              >
+                <div className="inline-flex items-center gap-2 bg-[#002147] text-white font-medium rounded-full px-4 py-2 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
+                  <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-sm">Organize Documents</span>
+                </div>
+                
+                <h2 className="font-serif font-normal text-[#002147] text-xl sm:text-2xl lg:text-3xl xl:text-4xl leading-tight tracking-tight">
+                  Everything in one place
+                </h2>
+                
+                <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-lg">
+                  Automatically organize your resumes, essays, and test scores by school
+                  and deadline. No more digging through folders.
+                </p>
+              </AnimatedSection>
+            </div>
+          </div>
+
+          {/* Feature 3 - Submit With Confidence */}
+          <div>
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 xl:gap-24 items-center">
+              {/* Left Content */}
+              <AnimatedSection 
+                direction="left" 
+                delay={200}
+                className="order-2 lg:order-1 space-y-6"
+              >
+                <div className="inline-flex items-center gap-2 bg-[#002147] text-white font-medium rounded-full px-4 py-2 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-sm">Submit With Confidence</span>
+                </div>
+                
+                <h2 className="font-serif font-normal text-[#002147] text-xl sm:text-2xl lg:text-3xl xl:text-4xl leading-tight tracking-tight">
+                  Ready to impress admissions
+                </h2>
+                
+                <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-lg">
+                  Submit polished applications with confidence, knowing every detail has been
+                  reviewed and optimized for maximum impact.
+                </p>
+              </AnimatedSection>
+
+              {/* Right Content */}
+              <AnimatedSection 
+                direction="right" 
+                delay={400}
+                className="order-1 lg:order-2"
+              >
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-[#002147] rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                  <div className="relative w-full h-64 sm:h-72 lg:h-80 xl:h-96 bg-[#002147] rounded-2xl shadow-2xl transform group-hover:scale-105 transition-all duration-500 flex items-center justify-center">
+                    <CheckCircle className="w-16 h-16 text-white opacity-50" />
+                  </div>
+                </div>
+              </AnimatedSection>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Call to Action Section */}
+      <section className="py-12 lg:py-20 bg-[#002147]  rounded-2xl mt-10 ">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8  max-w-7xl">
+          <AnimatedSection 
+            direction="left" 
+            delay={0}
+            className="text-center"
+          >
+            <h2 className="font-serif font-normal text-white text-2xl sm:text-3xl lg:text-4xl xl:text-5xl leading-tight tracking-tight mb-6">
+              Ready to transform your applications?
+            </h2>
+            <p className="text-blue-100 text-base sm:text-lg lg:text-xl leading-relaxed mb-8 max-w-3xl mx-auto">
+              Join thousands of students who have already streamlined their application process and increased their acceptance rates.
+            </p>
+            <button className="inline-flex items-center gap-3 bg-white text-slate-900 font-semibold px-8 py-4 rounded-full hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl">
+              <span>Get Started Today</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </AnimatedSection>
+        </div>
+      </section>
     </div>
   );
 };
