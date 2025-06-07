@@ -12,6 +12,7 @@ const UniversityMarquee = () => {
     { name: 'Yale', src: '/images/yale.jpeg' }
   ];
 
+
   const LogoImage = ({ logo, index, setKey }) => (
     <div key={`${setKey}-${index}`} className="flex-shrink-0 mx-6 flex items-center justify-center">
       <Image 
@@ -24,6 +25,7 @@ const UniversityMarquee = () => {
       />
     </div>
   );
+
 
   return (
     <div className="w-full py-12 md:mt-24 mt-16">
@@ -62,6 +64,7 @@ const UniversityMarquee = () => {
         
        
       </div>
+      
       
       <style dangerouslySetInnerHTML={{
         __html: `

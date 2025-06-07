@@ -17,7 +17,7 @@ const Steps = () => {
   }, []);
 
   return (
-    <div className="relative bg-white overflow-hidden">
+    <div className="relative bg-white overflow-hidden py-12 mt-12">
       {/* Hero Section */}
       <div className="relative pt-24 lg:pt-32 ">
         <div className="container mx-auto px-6">
@@ -62,7 +62,7 @@ const Steps = () => {
       </div>
 
       {/* Section 1 - Profile Setup */}
-      <div className="py-12 mt-16 md:mt-24">
+      <div className="mt-16">
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
             {/* Left Content */}
