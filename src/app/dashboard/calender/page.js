@@ -163,6 +163,7 @@ const SmartCalendar = () => {
         textDecoration: event.status === 'completed' ? 'line-through' : 'none'
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelectEvent = useCallback((event) => {
@@ -228,14 +229,14 @@ const SmartCalendar = () => {
       <div className="flex items-center gap-4">
         <button
           onClick={() => onNavigate('PREV')}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 bg-white border border-[#d9e4f1] rounded-lg hover:bg-[#e6f0fa] transition-colors text-[#002147]"
         >
           Previous
         </button>
-        <h2 className="text-xl font-semibold text-gray-900">{label}</h2>
+        <h2 className="text-xl font-semibold text-[#002147]">{label}</h2>
         <button
           onClick={() => onNavigate('NEXT')}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 bg-white border border-[#d9e4f1] rounded-lg hover:bg-[#e6f0fa] transition-colors text-[#002147]"
         >
           Next
         </button>
@@ -245,7 +246,7 @@ const SmartCalendar = () => {
         <select
           value={filterSchool}
           onChange={(e) => setFilterSchool(e.target.value)}
-          className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="px-3 py-2 bg-white border border-[#d9e4f1] rounded-lg text-sm focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
         >
           <option value="all">All Schools</option>
           {schools.map(school => (
@@ -256,7 +257,7 @@ const SmartCalendar = () => {
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="px-3 py-2 bg-white border border-[#d9e4f1] rounded-lg text-sm focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
         >
           <option value="all">All Types</option>
           {eventTypes.map(type => (
@@ -264,15 +265,15 @@ const SmartCalendar = () => {
           ))}
         </select>
 
-        <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
+        <div className="flex bg-white border border-[#d9e4f1] rounded-lg overflow-hidden">
           {['month', 'week', 'day'].map(viewType => (
             <button
               key={viewType}
               onClick={() => onView(viewType)}
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 view === viewType 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-[#002147] text-white' 
+                  : 'text-[#002147] hover:bg-[#e6f0fa]'
               }`}
             >
               {viewType.charAt(0).toUpperCase() + viewType.slice(1)}
@@ -284,23 +285,23 @@ const SmartCalendar = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#f5f9ff]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
+        <div className="bg-gradient-to-r from-[#002147] to-[#003a70] rounded-xl shadow-lg p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-medium  text-white font-serif mb-2">
                 🎓 Application Calendar
               </h1>
-              <p className="text-gray-600">
+              <p className="text-white/90 font-inter text-base mt-3 font-normal">
                 Track deadlines, interviews, and tasks across all your applications
               </p>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowEventModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg"
+                className="flex items-center gap-2 px-6 py-3 bg-[#3598FE] text-white font-medium rounded-lg hover:bg-[#2a7ac8] transition-colors duration-200 shadow-lg"
               >
                 <Plus size={20} />
                 Add Event
@@ -312,7 +313,7 @@ const SmartCalendar = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Calendar */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-lg border border-[#d9e4f1] overflow-hidden">
               <div className="p-6">
                 <CustomToolbar 
                   label={moment(date).format('MMMM YYYY')}
@@ -358,12 +359,12 @@ const SmartCalendar = () => {
           <div className="space-y-6">
             {/* Event Details */}
             {selectedEvent && (
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-lg border border-[#d9e4f1] p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Event Details</h3>
+                  <h3 className="text-lg font-semibold text-[#002147]">Event Details</h3>
                   <button
                     onClick={() => setSelectedEvent(null)}
-                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="p-1 hover:bg-[#e6f0fa] rounded-lg transition-colors text-[#002147]"
                   >
                     <X size={20} />
                   </button>
@@ -371,7 +372,7 @@ const SmartCalendar = () => {
                 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">{selectedEvent.title}</h4>
+                    <h4 className="font-medium text-[#002147] mb-2">{selectedEvent.title}</h4>
                     <div className="flex items-center gap-2 mb-2">
                       <span 
                         className="px-3 py-1 rounded-full text-xs font-medium"
@@ -386,11 +387,11 @@ const SmartCalendar = () => {
                         {selectedEvent.type}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                      <Clock size={16} />
+                    <div className="flex items-center gap-2 text-sm text-[#002147] mb-2">
+                      <Clock size={16} className="text-[#3598FE]" />
                       <span>{moment(selectedEvent.start).format('MMM DD, YYYY h:mm A')}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                    <div className="flex items-center gap-2 text-sm text-[#002147] mb-3">
                       {priorityIcons[selectedEvent.priority]}
                       <span className="capitalize">{selectedEvent.priority} priority</span>
                     </div>
@@ -398,7 +399,7 @@ const SmartCalendar = () => {
                       <p className="text-sm text-gray-600 mb-4">{selectedEvent.description}</p>
                     )}
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-                      <Bell size={12} />
+                      <Bell size={12} className="text-[#3598FE]" />
                       <span>{selectedEvent.reminder} day{selectedEvent.reminder !== 1 ? 's' : ''} before</span>
                     </div>
                   </div>
@@ -406,7 +407,7 @@ const SmartCalendar = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEditEvent(selectedEvent)}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#e6f0fa] text-[#002147] rounded-lg hover:bg-[#d0e0f5] transition-colors"
                     >
                       <Edit2 size={16} />
                       Edit
@@ -424,18 +425,18 @@ const SmartCalendar = () => {
             )}
 
             {/* Upcoming Events */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Events</h3>
+            <div className="bg-white rounded-xl shadow-lg border border-[#d9e4f1] p-6">
+              <h3 className="text-lg font-semibold text-[#002147] mb-4">Upcoming Events</h3>
               <div className="space-y-3">
                 {upcomingEvents.map(event => (
                   <div
                     key={event.id}
-                    className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                    className="p-4 bg-[#f5f9ff] rounded-lg border border-[#d9e4f1] hover:bg-[#e6f0fa] transition-colors cursor-pointer"
                     onClick={() => setSelectedEvent(event)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h4 className="font-medium text-gray-900 mb-1">{event.title}</h4>
+                        <h4 className="font-medium text-[#002147] mb-1">{event.title}</h4>
                         <div className="flex items-center gap-2 mb-2">
                           <span 
                             className="px-2 py-1 rounded-full text-xs font-medium"
@@ -444,8 +445,8 @@ const SmartCalendar = () => {
                             {event.school}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Clock size={14} />
+                        <div className="flex items-center gap-2 text-sm text-[#002147]">
+                          <Clock size={14} className="text-[#3598FE]" />
                           <span>{moment(event.start).format('MMM DD, h:mm A')}</span>
                         </div>
                       </div>
@@ -472,60 +473,60 @@ const SmartCalendar = () => {
       {showEventModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">
+            <div className="p-6 border-b border-[#d9e4f1]">
+              <h3 className="text-xl font-semibold text-[#002147]">
                 {editingEvent ? 'Edit Event' : 'Add New Event'}
               </h3>
             </div>
             
             <div className="p-6 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-[#002147] mb-2">
                   Event Title *
                 </label>
                 <input
                   type="text"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   placeholder="Enter event title"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     Start Date & Time *
                   </label>
                   <input
                     type="datetime-local"
                     value={moment(newEvent.start).format('YYYY-MM-DDTHH:mm')}
                     onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     End Date & Time *
                   </label>
                   <input
                     type="datetime-local"
                     value={moment(newEvent.end).format('YYYY-MM-DDTHH:mm')}
                     onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     Type *
                   </label>
                   <select
                     value={newEvent.type}
                     onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   >
                     {eventTypes.map(type => (
                       <option key={type} value={type}>
@@ -535,13 +536,13 @@ const SmartCalendar = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     School *
                   </label>
                   <select
                     value={newEvent.school}
                     onChange={(e) => setNewEvent({ ...newEvent, school: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   >
                     <option value="">Select School</option>
                     {schools.map(school => (
@@ -553,13 +554,13 @@ const SmartCalendar = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     Priority
                   </label>
                   <select
                     value={newEvent.priority}
                     onChange={(e) => setNewEvent({ ...newEvent, priority: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   >
                     {priorities.map(priority => (
                       <option key={priority} value={priority}>
@@ -569,13 +570,13 @@ const SmartCalendar = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     Status
                   </label>
                   <select
                     value={newEvent.status}
                     onChange={(e) => setNewEvent({ ...newEvent, status: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   >
                     {statuses.map(status => (
                       <option key={status} value={status}>
@@ -585,13 +586,13 @@ const SmartCalendar = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#002147] mb-2">
                     Reminder (days)
                   </label>
                   <select
                     value={newEvent.reminder}
                     onChange={(e) => setNewEvent({ ...newEvent, reminder: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   >
                     <option value={1}>1 day</option>
                     <option value={2}>2 days</option>
@@ -603,29 +604,29 @@ const SmartCalendar = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-[#002147] mb-2">
                   Description
                 </label>
                 <textarea
                   value={newEvent.description}
                   onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
                   rows={4}
                   placeholder="Add event description"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+            <div className="flex justify-end gap-3 p-6 border-t border-[#d9e4f1]">
               <button
                 onClick={resetForm}
-                className="px-6 py-3 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-3 text-[#002147] border border-[#d9e4f1] rounded-lg hover:bg-[#e6f0fa] transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEvent}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-medium shadow-lg"
+                className="px-6 py-3 bg-[#3598FE] text-white rounded-lg hover:bg-[#2a7ac8] transition-colors duration-200 font-medium shadow-lg"
                 disabled={!newEvent.title || !newEvent.school}
               >
                 {editingEvent ? 'Update Event' : 'Save Event'}
@@ -646,28 +647,35 @@ const SmartCalendar = () => {
           font-size: 12px !important;
         }
         .rbc-today {
-          background-color: rgba(59, 130, 246, 0.1) !important;
+          background-color: rgba(0, 33, 71, 0.1) !important;
         }
         .rbc-month-view {
-          border: 1px solid #e5e7eb !important;
+          border: 1px solid #d9e4f1 !important;
           border-radius: 8px !important;
           overflow: hidden;
         }
         .rbc-header {
-          background-color: #f8fafc !important;
-          border-bottom: 1px solid #e5e7eb !important;
+          background-color: #f5f9ff !important;
+          border-bottom: 1px solid #d9e4f1 !important;
           padding: 12px 8px !important;
           font-weight: 600 !important;
-          color: #374151 !important;
+          color: #002147 !important;
         }
         .rbc-date-cell {
           padding: 8px !important;
+          color: #002147;
         }
         .rbc-off-range-bg {
-          background-color: #f9fafb !important;
+          background-color: #f5f9ff !important;
+        }
+        .rbc-off-range .rbc-button-link {
+          color: #a0aec0 !important;
         }
         .rbc-day-bg:hover {
-          background-color: rgba(59, 130, 246, 0.05) !important;
+          background-color: rgba(0, 33, 71, 0.05) !important;
+        }
+        .rbc-button-link {
+          color: #002147 !important;
         }
       `}</style>
     </div>
