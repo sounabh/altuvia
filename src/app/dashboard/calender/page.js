@@ -285,8 +285,8 @@ const SmartCalendar = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f9ff]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen ">
+      <div className="max-w-7xl mx-auto  ">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#002147] to-[#003a70] rounded-xl shadow-lg p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
