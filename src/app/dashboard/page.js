@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 import React, { useState } from 'react';
 import { StatsOverview } from './components/StatsOverview';
@@ -6,6 +6,9 @@ import { UniversityCard } from './components/UniversityCard';
 import { AddUniversityModal } from './components/AddUniversityModal';
 import { FloatingAddButton } from './components/FloatingAddButton';
 
+
+
+// 🏫 Dummy data for initial universities
 const mockUniversities = [
   {
     id: 1,
@@ -45,61 +48,88 @@ const mockUniversities = [
   }
 ];
 
+
 const Index = () => {
+
+  // 🎯 Modal open/close state for "Add University" popup
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // 🎓 All universities (initially from mock data)
   const [universities, setUniversities] = useState(mockUniversities);
 
+
+  // ❌ Handle removing a university from the list by filtering out the clicked one
   const handleRemoveUniversity = (id) => {
     setUniversities(universities.filter(u => u.id !== id));
   };
 
+
+  // 📊 Compute some overview statistics for the dashboard summary
   const stats = {
-    total: universities.length,
-    inProgress: universities.filter(u => u.status === 'in-progress').length,
-    submitted: universities.filter(u => u.status === 'submitted').length,
-    upcomingDeadlines: universities.filter(u => u.status !== 'submitted').length
+    total: universities.length, // total universities
+    inProgress: universities.filter(u => u.status === 'in-progress').length, // active ones
+    submitted: universities.filter(u => u.status === 'submitted').length, // submitted ones
+    upcomingDeadlines: universities.filter(u => u.status !== 'submitted').length // anything not yet submitted
   };
 
   return (
     <div className="min-h-screen ">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
+
+      <div className=" px-4 py-8 max-w-7xl">
+
+        {/* 🧭 Header Section */}
         <div className="mb-8">
-          <h1 className="text-center text-[44px] -mt-10">
+
+          <h1 className="text-center text-[40px] tracking-[0.2px] -mt-10">
             University Applications
           </h1>
+
           <p className="text-center">
             Track your application progress and manage deadlines
           </p>
         </div>
 
-        {/* Stats Overview */}
+
+        {/* 📊 Stats Overview (summary tiles like Total, In Progress, etc.) */}
         <StatsOverview stats={stats} />
 
-        {/* Universities Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+
+        {/* 🏫 University Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* 🖼️ Render each university as a card */}
           {universities.map((university) => (
+
             <UniversityCard 
               key={university.id} 
               university={university} 
-              onRemove={handleRemoveUniversity}
+              onRemove={handleRemoveUniversity} // pass remove function to card
             />
           ))}
         </div>
 
-        {/* Floating Add Button */}
+
+        {/* ➕ Floating Add Button to open modal */}
         <FloatingAddButton onClick={() => setIsModalOpen(true)} />
 
-        {/* Add University Modal */}
+
+        {/* 🆕 Add University Modal (popup for adding a new one) */}
         <AddUniversityModal 
           isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => setIsModalOpen(false)} // close modal
+          
+          // When user adds a new university
           onAdd={(newUniversity) => {
+            // Add new university to list with a unique id
             setUniversities([...universities, { ...newUniversity, id: Date.now() }]);
+
+            // Close modal after adding
             setIsModalOpen(false);
           }}
         />
+
       </div>
+
     </div>
   );
 };

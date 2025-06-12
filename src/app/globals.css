@@ -114,14 +114,18 @@
 
 /* Custom component classes */
 @layer base {
+  body{
+  font-family: var(--font-roboto);
+  }
+
  h1 {
-  font-family: 'serif';
-  font-weight: 400;
+  font-family: var(--font-roboto);
+  font-weight: 500;
   color: #002147;
   width: 100%;
   font-size: 36px;
   line-height: 45px;
-  letter-spacing: -1.5px;
+  letter-spacing: -1px;
 }
 
 @media (min-width: 640px) {
@@ -135,8 +139,8 @@
 @media (min-width: 768px) {
   h1 {
     font-size: 56px;
-    line-height: 65px;
-    letter-spacing: -2.5px;
+    line-height: 68px;
+    letter-spacing: -1.5px;
   }
 }
 
@@ -149,7 +153,7 @@
 }
 
 p {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-roboto);
   font-weight: 400;
   color: #6C7280;
   font-size: 16px;

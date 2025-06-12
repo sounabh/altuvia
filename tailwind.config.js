@@ -10,10 +10,12 @@ module.exports = {
       fontFamily: {
         inter: ["var(--font-inter)", "system-ui", "sans-serif"],
         playfair: ["var(--font-playfair)", "serif"],
+        roboto: ["var(--font-roboto)", "system-ui", "sans-serif"],
         sans: ["var(--font-inter)", "system-ui", "sans-serif"], // Make Inter the default sans font
         serif: ["var(--font-playfair)", "serif"], // Make Playfair the default serif font
       },
       fontWeight: {
+        light: "300",
         normal: "400",
         medium: "500",
         semibold: "600",
