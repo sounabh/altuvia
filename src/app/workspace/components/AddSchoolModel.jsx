@@ -1,8 +1,8 @@
 "use client"
 
-import  React from "react"
+import React, { useState } from "react"
 
-import { useState } from "react"
+// UI Components
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+
+// Icons
 import { CalendarIcon, GraduationCap, DollarSign, Star } from "lucide-react"
 import { format } from "date-fns"
 
-
-
+// Color palette for school selection
 const schoolColors = [
   { name: "Harvard Red", value: "#A41E22" },
   { name: "Stanford Cardinal", value: "#8C1515" },
@@ -29,6 +30,7 @@ const schoolColors = [
 ]
 
 export function AddSchoolModal({ isOpen, onClose, onAdd }) {
+  // Form data state
   const [formData, setFormData] = useState({
     name: "",
     shortName: "",
@@ -37,21 +39,28 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
     deadline: "",
     applicationFee: "",
   })
+
+  // Deadline state
   const [deadlineDate, setDeadlineDate] = useState()
+
+  // Loading state for form submission
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulate API call
+    // Simulate API call delay
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
+    // Prepare final data
     const schoolData = {
       ...formData,
       deadline: deadlineDate ? format(deadlineDate, "MMMM d, yyyy") : formData.deadline,
     }
 
+    // Trigger callback
     onAdd(schoolData)
 
     // Reset form
@@ -63,10 +72,12 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
       deadline: "",
       applicationFee: "",
     })
+
     setDeadlineDate(undefined)
     setIsSubmitting(false)
   }
 
+  // Update form field value
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
@@ -83,7 +94,9 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
           </DialogTitle>
         </DialogHeader>
 
+        {/* Form starts */}
         <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+
           {/* School Name */}
           <div className="space-y-2">
             <Label htmlFor="name" className="text-sm font-medium text-[#002147]">
@@ -129,7 +142,7 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
             />
           </div>
 
-          {/* School Color */}
+          {/* School Color Picker */}
           <div className="space-y-3">
             <Label className="text-sm font-medium text-[#002147]">School Color</Label>
             <div className="grid grid-cols-5 gap-3">
@@ -158,6 +171,7 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
 
           {/* Deadline and Application Fee */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Deadline Picker */}
             <div className="space-y-2">
               <Label className="text-sm font-medium text-[#002147]">Application Deadline</Label>
               <Popover>
@@ -171,11 +185,17 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={deadlineDate} onSelect={setDeadlineDate} initialFocus />
+                  <Calendar
+                    mode="single"
+                    selected={deadlineDate}
+                    onSelect={setDeadlineDate}
+                    initialFocus
+                  />
                 </PopoverContent>
               </Popover>
             </div>
 
+            {/* Application Fee */}
             <div className="space-y-2">
               <Label htmlFor="applicationFee" className="text-sm font-medium text-[#002147]">
                 Application Fee
@@ -193,7 +213,7 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
             </div>
           </div>
 
-          {/* Preview Card */}
+          {/* Preview Section */}
           {formData.name && (
             <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
               <p className="text-sm font-medium text-[#002147] mb-2">Preview:</p>
@@ -217,11 +237,17 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
             </div>
           )}
 
-          {/* Action Buttons */}
+          {/* Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
+
             <Button
               type="submit"
               disabled={!formData.name || !formData.shortName || isSubmitting}
@@ -231,6 +257,7 @@ export function AddSchoolModal({ isOpen, onClose, onAdd }) {
             </Button>
           </div>
         </form>
+        {/* Form ends */}
       </DialogContent>
     </Dialog>
   )

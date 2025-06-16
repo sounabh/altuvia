@@ -11,6 +11,7 @@ import { AddSchoolModal } from "./AddSchoolModel"
 import { EssayAnalytics } from "./EssayAnalytics"
 import { BookOpen, Target, Sparkles, TrendingUp, Clock, Award } from "lucide-react"
 
+// Initial mock data for schools with their respective essays
 const initialSchools = [
   {
     id: "harvard",
@@ -81,30 +82,54 @@ const initialSchools = [
   },
 ]
 
+/**
+ * Main Essay Workspace Component
+ * Provides a comprehensive interface for managing and editing application essays for multiple schools
+ */
 export function EssayWorkspace() {
+  // Core state management for schools and essays
   const [schools, setSchools] = useState(initialSchools)
   const [activeSchool, setActiveSchool] = useState(schools[0].id)
   const [activeEssay, setActiveEssay] = useState(schools[0].essays[0].id)
+  
+  // UI state management for different panels and modals
   const [showVersions, setShowVersions] = useState(false)
   const [showAI, setShowAI] = useState(true)
-  const [showAnalytics, setShowAnalytics] = useState(true) // Changed to true by default
+  const [showAnalytics, setShowAnalytics] = useState(true) // Analytics panel shown by default
   const [showAddSchool, setShowAddSchool] = useState(false)
-  const [similarityWarning, setSimilarityWarning] = useState({ show: false, percentage: 0, sourceSchool: "" })
+  
+  // Similarity detection warning state
+  const [similarityWarning, setSimilarityWarning] = useState({ 
+    show: false, 
+    percentage: 0, 
+    sourceSchool: "" 
+  })
 
+  // Derived state - get currently selected school and essay
   const currentSchool = schools.find((s) => s.id === activeSchool)
   const currentEssay = currentSchool?.essays.find((e) => e.id === activeEssay)
 
-  // Fix: Ensure activeEssay is updated when switching schools
+  /**
+   * Effect to handle active essay synchronization when switching schools
+   * Ensures that when a user switches schools, the active essay is valid for that school
+   */
   useEffect(() => {
     if (currentSchool && currentSchool.essays.length > 0) {
-      // If the current essay doesn't belong to the selected school, switch to the first essay of that school
+      // Check if the current essay belongs to the selected school
       const essayBelongsToSchool = currentSchool.essays.some(essay => essay.id === activeEssay)
+      
+      // If not, switch to the first essay of the selected school
       if (!essayBelongsToSchool) {
         setActiveEssay(currentSchool.essays[0].id)
       }
     }
   }, [activeSchool, currentSchool, activeEssay])
 
+  /**
+   * Updates essay content and word count, triggers similarity detection
+   * @param {string} content - The updated essay content
+   * @param {number} wordCount - The updated word count
+   */
   const updateEssayContent = (content, wordCount) => {
     setSchools((prev) =>
       prev.map((school) =>
@@ -126,9 +151,11 @@ export function EssayWorkspace() {
       ),
     )
 
-    // Enhanced copy/paste detection
+    // Enhanced copy/paste detection - simulate similarity checking
     if (content.length > 50) {
       const similarity = Math.random() * 100
+      
+      // Show warning if similarity is above 75%
       if (similarity > 75) {
         setSimilarityWarning({
           show: true,
@@ -139,6 +166,10 @@ export function EssayWorkspace() {
     }
   }
 
+  /**
+   * Saves the current essay content as a new version
+   * @param {string} label - Label for the saved version
+   */
   const saveVersion = (label) => {
     if (!currentEssay) return
 
@@ -168,6 +199,10 @@ export function EssayWorkspace() {
     )
   }
 
+  /**
+   * Adds a new school to the workspace with a default essay
+   * @param {Object} schoolData - The new school data
+   */
   const addNewSchool = (schoolData) => {
     const newSchool = {
       ...schoolData,
@@ -186,12 +221,15 @@ export function EssayWorkspace() {
         },
       ],
     }
+    
+    // Add the new school and make it active
     setSchools((prev) => [...prev, newSchool])
     setActiveSchool(newSchool.id)
     setActiveEssay(newSchool.essays[0].id)
     setShowAddSchool(false)
   }
 
+  // Calculate aggregate statistics across all schools and essays
   const totalWords = schools.reduce(
     (acc, school) => acc + school.essays.reduce((essayAcc, essay) => essayAcc + essay.wordCount, 0),
     0,
@@ -206,10 +244,12 @@ export function EssayWorkspace() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
-      {/* Enhanced Header */}
+      {/* Enhanced Header with stats and controls */}
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
+            
+            {/* Left side - Logo and title */}
             <div className="flex items-center space-x-4">
               <div className="w-10 h-10 bg-gradient-to-br from-[#002147] to-[#003366] rounded-xl flex items-center justify-center shadow-lg">
                 <BookOpen className="w-6 h-6 text-white" />
@@ -220,8 +260,10 @@ export function EssayWorkspace() {
               </div>
             </div>
 
+            {/* Right side - Stats and controls */}
             <div className="flex items-center space-x-6">
-              {/* Quick Stats */}
+              
+              {/* Quick Stats - Hidden on mobile */}
               <div className="hidden lg:flex items-center space-x-6">
                 <div className="flex items-center space-x-2 px-3 py-2 bg-green-50 rounded-lg">
                   <Award className="w-4 h-4 text-green-600" />
@@ -235,7 +277,7 @@ export function EssayWorkspace() {
                 </div>
               </div>
 
-              {/* Word Count for Current Essay */}
+              {/* Current Essay Word Count with Progress Bar */}
               {currentEssay && (
                 <div className="flex items-center space-x-3 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200">
                   <Target className="w-5 h-5 text-[#6C7280]" />
@@ -243,6 +285,8 @@ export function EssayWorkspace() {
                     <span className="text-sm font-semibold text-[#002147]">
                       {currentEssay.wordCount}/{currentEssay.wordLimit}
                     </span>
+                    
+                    {/* Dynamic progress bar with color coding */}
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className="h-full transition-all duration-500 ease-out"
@@ -250,10 +294,10 @@ export function EssayWorkspace() {
                           width: `${Math.min((currentEssay.wordCount / currentEssay.wordLimit) * 100, 100)}%`,
                           backgroundColor:
                             currentEssay.wordCount > currentEssay.wordLimit
-                              ? "#EF4444"
+                              ? "#EF4444" // Red for over limit
                               : currentEssay.wordCount > currentEssay.wordLimit * 0.8
-                                ? "#F59E0B"
-                                : "#10B981",
+                                ? "#F59E0B" // Yellow for close to limit
+                                : "#10B981", // Green for under limit
                         }}
                       />
                     </div>
@@ -261,8 +305,10 @@ export function EssayWorkspace() {
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons for toggling panels */}
               <div className="flex items-center space-x-3">
+                
+                {/* Analytics Toggle */}
                 <Button
                   variant={showAnalytics ? "default" : "outline"}
                   size="sm"
@@ -276,6 +322,7 @@ export function EssayWorkspace() {
                   Analytics
                 </Button>
 
+                {/* AI Assistant Toggle */}
                 <Button
                   variant={showAI ? "default" : "outline"}
                   size="sm"
@@ -294,9 +341,11 @@ export function EssayWorkspace() {
         </div>
       </header>
 
+      {/* Main Content Area */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-8">
         <div className="grid grid-cols-12 gap-8">
-          {/* School Selector - Narrower */}
+          
+          {/* Left Sidebar - School Selector */}
           <div className="col-span-12 lg:col-span-3">
             <SchoolSelector
               schools={schools}
@@ -308,14 +357,16 @@ export function EssayWorkspace() {
             />
           </div>
 
-          {/* Main Editor - Much Wider */}
+          {/* Main Editor Area */}
           <div className="col-span-12 lg:col-span-6">
             <Card className="h-full shadow-xl border-0 bg-white/70 backdrop-blur-sm">
               <div className="p-8">
                 {currentEssay && (
                   <>
+                    {/* Essay Header with title and metadata */}
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center space-x-4">
+                        {/* School color indicator */}
                         <div
                           className="w-4 h-4 rounded-full shadow-sm"
                           style={{ backgroundColor: currentSchool?.color }}
@@ -331,6 +382,8 @@ export function EssayWorkspace() {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Versions toggle button */}
                       <Button
                         variant="outline"
                         size="sm"
@@ -341,11 +394,13 @@ export function EssayWorkspace() {
                       </Button>
                     </div>
 
+                    {/* Essay Prompt Display */}
                     <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
                       <p className="text-sm text-blue-800 font-medium mb-2">Essay Prompt:</p>
                       <p className="text-sm text-blue-700 leading-relaxed">{currentEssay.prompt}</p>
                     </div>
 
+                    {/* Similarity Warning - Shown when content similarity is detected */}
                     {similarityWarning.show && (
                       <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
                         <div className="flex items-start space-x-3">
@@ -370,12 +425,14 @@ export function EssayWorkspace() {
                       </div>
                     )}
 
+                    {/* Main Essay Editor */}
                     <EssayEditor
                       content={currentEssay.content}
                       onChange={updateEssayContent}
                       wordLimit={currentEssay.wordLimit}
                     />
 
+                    {/* Editor Footer with metadata and actions */}
                     <div className="mt-6 flex justify-between items-center">
                       <p className="text-xs text-[#6C7280]">
                         Last modified: {currentEssay.lastModified.toLocaleString()}
@@ -395,9 +452,10 @@ export function EssayWorkspace() {
             </Card>
           </div>
 
-          {/* Right Sidebar - Wider for better content */}
+          {/* Right Sidebar - Analytics, AI, and Versions */}
           <div className="col-span-12 lg:col-span-3 space-y-6">
-            {/* Analytics - Now always rendered when toggled and currentEssay exists */}
+            
+            {/* Essay Analytics Panel - Shown when toggled and essay exists */}
             {showAnalytics && currentEssay && (
               <EssayAnalytics 
                 key={`${activeSchool}-${activeEssay}`} // Force re-render when essay changes
@@ -406,6 +464,7 @@ export function EssayWorkspace() {
               />
             )}
 
+            {/* AI Suggestions Panel - Shown when toggled and essay exists */}
             {showAI && currentEssay && (
               <AISuggestions
                 key={`ai-${activeSchool}-${activeEssay}`} // Force re-render when essay changes
@@ -416,6 +475,7 @@ export function EssayWorkspace() {
               />
             )}
 
+            {/* Version Manager Panel - Shown when toggled and essay exists */}
             {showVersions && currentEssay && (
               <VersionManager
                 key={`versions-${activeSchool}-${activeEssay}`} // Force re-render when essay changes
@@ -428,7 +488,12 @@ export function EssayWorkspace() {
         </div>
       </div>
 
-      <AddSchoolModal isOpen={showAddSchool} onClose={() => setShowAddSchool(false)} onAdd={addNewSchool} />
+      {/* Add School Modal - Shown when user wants to add a new school */}
+      <AddSchoolModal 
+        isOpen={showAddSchool} 
+        onClose={() => setShowAddSchool(false)} 
+        onAdd={addNewSchool} 
+      />
     </div>
   )
 }

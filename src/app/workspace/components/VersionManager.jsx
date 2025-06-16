@@ -8,14 +8,11 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { History, RotateCcw, Eye, Calendar, GitBranch, Download, Share } from "lucide-react"
 
-
-
-
-
 export function VersionManager({ versions, currentContent, onRestoreVersion }) {
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [showComparison, setShowComparison] = useState(false)
 
+  // Format date for display (e.g., "Jun 16, 02:30 PM")
   const formatDate = (date) => {
     return date.toLocaleDateString("en-US", {
       month: "short",
@@ -25,10 +22,12 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
     })
   }
 
+  // Count number of words in content
   const getWordCount = (content) => {
     return content.trim() ? content.trim().split(/\s+/).length : 0
   }
 
+  // Get time difference between now and version timestamp
   const getTimeDifference = (date) => {
     const now = new Date()
     const diff = now.getTime() - date.getTime()
@@ -40,11 +39,13 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
     return "Just now"
   }
 
+  // Find selected version data by ID
   const selectedVersionData = versions.find((v) => v.id === selectedVersion)
 
   return (
     <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm">
       <div className="p-6">
+        {/* Header: Title and Saved Count */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -60,6 +61,7 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
           </Badge>
         </div>
 
+        {/* Empty state */}
         {versions.length === 0 ? (
           <div className="text-center py-8">
             <GitBranch className="w-8 h-8 text-gray-400 mx-auto mb-3" />
@@ -69,7 +71,7 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
         ) : (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-4">
-              {/* Current Version */}
+              {/* Current Version Section */}
               <div className="p-4 bg-gradient-to-r from-[#3598FE]/10 to-blue-100 border border-[#3598FE]/30 rounded-xl">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
@@ -80,10 +82,14 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs font-medium text-[#002147]">{getWordCount(currentContent)} words</span>
+                    <span className="text-xs font-medium text-[#002147]">
+                      {getWordCount(currentContent)} words
+                    </span>
                     <p className="text-xs text-[#6C7280]">Active</p>
                   </div>
                 </div>
+
+                {/* Export and Share Buttons */}
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-[#6C7280]">{formatDate(new Date())}</p>
                   <div className="flex items-center space-x-2">
@@ -113,24 +119,34 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
                         ? "border-[#3598FE] bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md"
                         : "border-gray-200 hover:border-gray-300 hover:shadow-sm bg-white/50"
                     }`}
-                    onClick={() => setSelectedVersion(selectedVersion === version.id ? null : version.id)}
+                    onClick={() =>
+                      setSelectedVersion(selectedVersion === version.id ? null : version.id)
+                    }
                   >
+                    {/* Version Header */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-3">
                         <div className="w-3 h-3 bg-gray-400 rounded-full" />
                         <div>
-                          <span className="text-sm font-semibold text-[#002147]">{version.label}</span>
-                          <p className="text-xs text-[#6C7280]">Version {versions.length - index}</p>
+                          <span className="text-sm font-semibold text-[#002147]">
+                            {version.label}
+                          </span>
+                          <p className="text-xs text-[#6C7280]">
+                            Version {versions.length - index}
+                          </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <span className="text-xs font-medium text-[#002147]">
                           {getWordCount(version.content)} words
                         </span>
-                        <p className="text-xs text-[#6C7280]">{getTimeDifference(version.timestamp)}</p>
+                        <p className="text-xs text-[#6C7280]">
+                          {getTimeDifference(version.timestamp)}
+                        </p>
                       </div>
                     </div>
 
+                    {/* Action Buttons */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-xs text-[#6C7280]">
                         <Calendar className="w-3 h-3" />
@@ -168,6 +184,7 @@ export function VersionManager({ versions, currentContent, onRestoreVersion }) {
                       )}
                     </div>
 
+                    {/* Comparison Preview Section */}
                     {selectedVersion === version.id && showComparison && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <div className="bg-white rounded-lg p-3 max-h-40 overflow-y-auto">

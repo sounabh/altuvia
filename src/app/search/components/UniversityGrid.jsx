@@ -1,7 +1,10 @@
 import React from 'react';
 import UniversityCard from './UniversityCard';
 
+// Main University Grid Component
 const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
+
+  // Sample university data
   const universities = [
     {
       id: 1,
@@ -80,6 +83,9 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   ];
 
+  // ---------- Filter Helper Functions ----------
+
+  // GMAT filter matcher
   const matchesGmat = (gmat, filter) => {
     switch (filter) {
       case '700+': return gmat >= 700;
@@ -90,6 +96,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   };
 
+  // Rank filter matcher
   const matchesRank = (rankStr, filter) => {
     const rank = parseInt(rankStr.replace('#', ''));
     switch (filter) {
@@ -100,6 +107,8 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       default: return true;
     }
   };
+
+  // ---------- Filtered Universities Based on Search & Filters ----------
 
   const filteredUniversities = universities.filter(university => {
     const searchMatch =
@@ -114,6 +123,8 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       matchesRank(university.rank, selectedRanking)
     );
   });
+
+  // ---------- Render Grid UI ----------
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 
+// GMAT score filter options
 const gmatAverages = [
   { value: 'all', label: 'All Scores' },
   { value: '700+', label: '700 and above' },
@@ -9,6 +10,7 @@ const gmatAverages = [
   { value: 'below-600', label: 'Below 600' }
 ];
 
+// University ranking filter options
 const rankings = [
   { value: 'all', label: 'All Ranks' },
   { value: 'top-10', label: 'Top 10' },
@@ -17,6 +19,7 @@ const rankings = [
   { value: '100+', label: 'Ranked 100+' }
 ];
 
+// Reusable dropdown component for filtering
 const FilterDropdown = ({ value, onChange, options }) => (
   <div className="relative group">
     <select
@@ -30,10 +33,13 @@ const FilterDropdown = ({ value, onChange, options }) => (
         </option>
       ))}
     </select>
+
+    {/* Chevron icon on the right side of the dropdown */}
     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors duration-200" />
   </div>
 );
 
+// Main filter section containing GMAT and Ranking dropdowns
 const FilterSection = ({
   selectedGmat,
   setSelectedGmat,
@@ -42,11 +48,14 @@ const FilterSection = ({
 }) => {
   return (
     <div className="flex flex-wrap gap-4 justify-center">
+      {/* GMAT filter dropdown */}
       <FilterDropdown
         value={selectedGmat}
         onChange={setSelectedGmat}
         options={gmatAverages}
       />
+
+      {/* Ranking filter dropdown */}
       <FilterDropdown
         value={selectedRanking}
         onChange={setSelectedRanking}

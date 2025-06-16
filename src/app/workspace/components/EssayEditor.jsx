@@ -1,21 +1,36 @@
 "use client"
 
-import  React from "react"
+import React, { useEffect } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
+
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Bold, Italic, List, ListOrdered, Quote, Undo, Redo, Type, Strikethrough } from "lucide-react"
-import { useEffect } from "react"
+
+import {
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Quote,
+  Undo,
+  Redo,
+  Type,
+  Strikethrough,
+} from "lucide-react"
 
 
+// EssayEditor component accepts content, onChange handler, and wordLimit as props
 export function EssayEditor({ content, onChange, wordLimit }) {
+
+  // Initialize TipTap editor with StarterKit and styles
   const editor = useEditor({
     extensions: [StarterKit],
     content,
     editorProps: {
       attributes: {
-        class: "prose prose-lg max-w-none focus:outline-none min-h-[500px] p-6 text-gray-800 leading-relaxed",
+        class:
+          "prose prose-lg max-w-none focus:outline-none min-h-[500px] p-6 text-gray-800 leading-relaxed",
       },
     },
     onUpdate: ({ editor }) => {
@@ -26,23 +41,23 @@ export function EssayEditor({ content, onChange, wordLimit }) {
     },
   })
 
+  // Sync content when prop changes externally
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content)
     }
   }, [content, editor])
 
-  if (!editor) {
-    return null
-  }
+  if (!editor) return null
 
+  // Toolbar button with dynamic styling and tooltip
   const ToolbarButton = ({
     onClick,
     isActive,
     children,
     title,
     variant = "default",
-  } ) => (
+  }) => (
     <Button
       variant={isActive ? "default" : "ghost"}
       size="sm"
@@ -60,10 +75,12 @@ export function EssayEditor({ content, onChange, wordLimit }) {
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-      {/* Enhanced Toolbar */}
+
+      {/* Toolbar */}
       <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-3">
         <div className="flex items-center space-x-1 flex-wrap gap-1">
-          {/* Text Formatting */}
+
+          {/* Text formatting options */}
           <div className="flex items-center space-x-1">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
@@ -90,9 +107,10 @@ export function EssayEditor({ content, onChange, wordLimit }) {
             </ToolbarButton>
           </div>
 
+          {/* Divider */}
           <Separator orientation="vertical" className="h-6 mx-2" />
 
-          {/* Headings */}
+          {/* Heading levels */}
           <div className="flex items-center space-x-1">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -111,9 +129,10 @@ export function EssayEditor({ content, onChange, wordLimit }) {
             </ToolbarButton>
           </div>
 
+          {/* Divider */}
           <Separator orientation="vertical" className="h-6 mx-2" />
 
-          {/* Lists */}
+          {/* Lists and Quote */}
           <div className="flex items-center space-x-1">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -140,26 +159,33 @@ export function EssayEditor({ content, onChange, wordLimit }) {
             </ToolbarButton>
           </div>
 
+          {/* Divider */}
           <Separator orientation="vertical" className="h-6 mx-2" />
 
-          {/* Undo/Redo */}
+          {/* Undo / Redo */}
           <div className="flex items-center space-x-1">
-            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo (Ctrl+Z)">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().undo().run()}
+              title="Undo (Ctrl+Z)"
+            >
               <Undo className="w-4 h-4" />
             </ToolbarButton>
 
-            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo (Ctrl+Y)">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().redo().run()}
+              title="Redo (Ctrl+Y)"
+            >
               <Redo className="w-4 h-4" />
             </ToolbarButton>
           </div>
         </div>
       </div>
 
-      {/* Editor Content */}
+      {/* Main Editor Body */}
       <div className="bg-white relative">
         <EditorContent editor={editor} className="min-h-[500px] focus-within:outline-none" />
 
-        {/* Writing Guidelines Overlay */}
+        {/* Placeholder Tips when editor is empty */}
         {editor.getText().length === 0 && (
           <div className="absolute top-6 left-6 pointer-events-none">
             <p className="text-gray-400 text-lg">Start writing your compelling story...</p>
@@ -172,18 +198,21 @@ export function EssayEditor({ content, onChange, wordLimit }) {
         )}
       </div>
 
-      {/* Footer with helpful info */}
+      {/* Footer with info and autosave status */}
       <div className="bg-gray-50 border-t border-gray-200 px-6 py-3">
         <div className="flex items-center justify-between text-xs text-gray-500">
+
           <div className="flex items-center space-x-4">
             <span>Use Ctrl+B for bold, Ctrl+I for italic</span>
             <span>•</span>
             <span>Press Tab for suggestions</span>
           </div>
+
           <div className="flex items-center space-x-2">
             <span>Auto-save enabled</span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           </div>
+
         </div>
       </div>
     </div>

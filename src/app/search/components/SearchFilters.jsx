@@ -1,5 +1,5 @@
+"use client";
 
-"use client"
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,9 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 
-
-
-
+// SearchFilters component for handling search + filter controls
 export const SearchFilters = ({
   searchTerm,
   onSearchChange,
@@ -25,6 +23,7 @@ export const SearchFilters = ({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeFilters, setActiveFilters] = useState(0);
 
+  // Count how many filters are active
   useEffect(() => {
     let count = 0;
     if (selectedRankFilter && selectedRankFilter !== 'all') count++;
@@ -32,8 +31,7 @@ export const SearchFilters = ({
     setActiveFilters(count);
   }, [selectedRankFilter, selectedGmatFilter]);
 
-
-
+  // Reset all filters and search
   const clearAllFilters = () => {
     onRankFilterChange('all');
     onGmatFilterChange('all');
@@ -41,11 +39,14 @@ export const SearchFilters = ({
   };
 
   return (
-    <div className="rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border p-6 sm:p-8 mb-8 transition-all duration-500 hover:shadow-[0_16px_50px_rgb(0,0,0,0.15)] bg-[#002147]  backdrop-blur-sm">
-      {/* Header */}
+    <div className="rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border p-6 sm:p-8 mb-8 transition-all duration-500 hover:shadow-[0_16px_50px_rgb(0,0,0,0.15)] bg-[#002147] backdrop-blur-sm">
+      
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+        
+        {/* Icon and Title */}
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE]  rounded-3xl flex items-center justify-center shadow-lg">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE] rounded-3xl flex items-center justify-center shadow-lg">
             <SlidersHorizontal className="h-6 w-6 text-white" />
           </div>
           <div>
@@ -58,6 +59,7 @@ export const SearchFilters = ({
           </div>
         </div>
 
+        {/* Clear All Filters Button */}
         {(activeFilters > 0 || searchTerm) && (
           <button
             onClick={clearAllFilters}
@@ -69,38 +71,37 @@ export const SearchFilters = ({
         )}
       </div>
 
-      {/* Search and Filter Grid */}
+      {/* Search Input and Filters */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-center sm:gap-6">
-        {/* Search Input */}
+
+        {/* Search Bar */}
         <div className="xl:col-span-6 relative w-full max-w-2xl mx-auto">
-  <form
-    onSubmit={(e) => {
-      e.preventDefault();
-      // handle search logic here (submitSearch(searchTerm) or similar)
-    }}
-    className="flex items-center relative"
-  >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              // Search logic can be handled externally
+            }}
+            className="flex items-center relative"
+          >
+            <Input
+              type="text"
+              placeholder="Search by name, location, or program..."
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              className="w-full h-12 pl-12 pr-28 py-2 bg-white/90 rounded-full text-sm placeholder:text-[#002147] font-medium"
+            />
+            <button
+              type="submit"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#3598FE] text-white px-5 py-2 text-sm font-semibold rounded-full shadow-md hover:shadow-[0_0_10px_#00f0ff] transition-all duration-300"
+            >
+              Search
+            </button>
+          </form>
+        </div>
 
-    <Input
-      type="text"
-      placeholder="Search by name, location, or program..."
-      value={searchTerm}
-      onChange={(e) => onSearchChange(e.target.value)}
-      onFocus={() => setIsSearchFocused(true)}
-      onBlur={() => setIsSearchFocused(false)}
-      className="w-full h-12 pl-12 pr-28 py-2 bg-white/90  rounded-full text-sm placeholder:text-[#002147] font-medium "
-    />
-    <button
-      type="submit"
-      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#3598FE] text-white px-5 py-2 text-sm font-semibold rounded-full shadow-md hover:shadow-[0_0_10px_#00f0ff] transition-all duration-300"
-    >
-      Search
-    </button>
-  </form>
-</div>
-
-
-        {/* Rank Filter */}
+        {/* University Ranking Filter */}
         <div className="lg:col-span-2">
           <Select value={selectedRankFilter} onValueChange={onRankFilterChange}>
             <SelectTrigger className="h-14 bg-white backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">
@@ -115,7 +116,7 @@ export const SearchFilters = ({
           </Select>
         </div>
 
-        {/* GMAT Filter */}
+        {/* GMAT Score Filter */}
         <div className="lg:col-span-2">
           <Select value={selectedGmatFilter} onValueChange={onGmatFilterChange}>
             <SelectTrigger className="h-14 bg-white/95 backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">

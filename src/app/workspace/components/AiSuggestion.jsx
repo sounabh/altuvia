@@ -4,15 +4,23 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, AlertTriangle, CheckCircle, RefreshCw, Zap, Target, Eye, Lightbulb } from "lucide-react"
-
-
+import {
+  Sparkles,
+  AlertTriangle,
+  CheckCircle,
+  RefreshCw,
+  Zap,
+  Target,
+  Eye,
+  Lightbulb,
+} from "lucide-react"
 
 export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
   const [suggestions, setSuggestions] = useState([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [overallScore, setOverallScore] = useState(0)
 
+  // Function to generate AI-based suggestions
   const generateSuggestions = () => {
     setIsAnalyzing(true)
 
@@ -21,7 +29,7 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
       let score = 60
 
       if (content.length > 0) {
-        // Critical issues (Red)
+        // 1. Critical Issues (Red)
         if (wordCount > wordLimit * 1.1) {
           newSuggestions.push({
             id: "1",
@@ -35,7 +43,7 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           score -= 20
         }
 
-        // Warnings (Yellow/Orange)
+        // 2. Warnings (Yellow/Orange)
         const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0)
         const avgSentenceLength = content.length / sentences.length
 
@@ -52,18 +60,15 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           score -= 10
         }
 
-        // Word repetition
+        // 3. Word Repetition
         const words = content.toLowerCase().split(/\s+/)
-        const wordFreq = words.reduce(
-          (acc, word) => {
-            if (word.length > 4) acc[word] = (acc[word] || 0) + 1
-            return acc
-          },
-          {} ,
-        )
+        const wordFreq = words.reduce((acc, word) => {
+          if (word.length > 4) acc[word] = (acc[word] || 0) + 1
+          return acc
+        }, {})
 
         const repeatedWords = Object.entries(wordFreq)
-          .filter(([word, count]) => count > 3)
+          .filter(([_, count]) => count > 3)
           .map(([word]) => word)
 
         if (repeatedWords.length > 0) {
@@ -79,7 +84,7 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           score -= 8
         }
 
-        // Improvements (Blue)
+        // 4. Improvements (Blue)
         if (wordCount < wordLimit * 0.7) {
           newSuggestions.push({
             id: "4",
@@ -104,15 +109,14 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           })
         }
 
-        // Strengths (Green)
+        // 5. Strengths (Green)
         if (content.includes("leadership") || content.includes("led") || content.includes("managed")) {
           newSuggestions.push({
             id: "6",
             type: "strength",
             priority: "low",
             title: "Strong Leadership Focus",
-            description:
-              "Excellent! You're effectively highlighting your leadership experience, which is crucial for MBA applications.",
+            description: "Excellent! You're effectively highlighting your leadership experience, which is crucial for MBA applications.",
             impact: "high",
           })
           score += 15
@@ -130,7 +134,7 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           score += 10
         }
 
-        // Structure analysis
+        // 6. Structural Feedback
         const paragraphs = content.split("\n").filter((p) => p.trim().length > 0)
         if (paragraphs.length === 1 && wordCount > 200) {
           newSuggestions.push({
@@ -144,24 +148,26 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           })
         }
       } else {
+        // Empty content fallback
         newSuggestions.push({
           id: "0",
           type: "improvement",
           priority: "high",
           title: "Start Your Essay",
-          description:
-            "Begin with a compelling hook that directly addresses the prompt. Consider starting with a specific moment or challenge.",
+          description: "Begin with a compelling hook that directly addresses the prompt. Consider starting with a specific moment or challenge.",
           action: "Begin writing",
           impact: "high",
         })
       }
 
+      // Finalize suggestions and score
       setSuggestions(newSuggestions)
       setOverallScore(Math.max(0, Math.min(100, score)))
       setIsAnalyzing(false)
     }, 2000)
   }
 
+  // Auto-generate suggestions when input changes
   useEffect(() => {
     const timer = setTimeout(() => {
       generateSuggestions()
@@ -170,6 +176,7 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
     return () => clearTimeout(timer)
   }, [content, wordCount, wordLimit])
 
+  // Config styling and icons based on suggestion type
   const getSuggestionConfig = (type) => {
     switch (type) {
       case "critical":
@@ -220,12 +227,14 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
     }
   }
 
+  // Score color helper
   const getScoreColor = (score) => {
     if (score >= 80) return "text-green-600"
     if (score >= 60) return "text-amber-600"
     return "text-red-600"
   }
 
+  // Score bar gradient helper
   const getScoreGradient = (score) => {
     if (score >= 80) return "from-green-500 to-emerald-600"
     if (score >= 60) return "from-amber-500 to-orange-600"
@@ -235,6 +244,8 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
   return (
     <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm">
       <div className="p-6">
+
+        {/* Header: AI Title and Refresh Button */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-[#3598FE] to-[#2563EB] rounded-lg flex items-center justify-center">
@@ -256,7 +267,7 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           </Button>
         </div>
 
-        {/* Overall Score */}
+        {/* Overall Score Display */}
         <div className="mb-6 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-[#002147]">Essay Quality Score</span>
@@ -270,7 +281,9 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           </div>
         </div>
 
+        {/* Suggestions Display */}
         {isAnalyzing ? (
+          // Loading Skeletons
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
@@ -282,12 +295,14 @@ export function AISuggestions({ content, prompt, wordCount, wordLimit }) {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* If no suggestions yet */}
             {suggestions.length === 0 ? (
               <div className="text-center py-8">
                 <Eye className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-[#6C7280]">Start writing to get AI-powered insights</p>
               </div>
             ) : (
+              // Render suggestions
               suggestions.map((suggestion) => {
                 const config = getSuggestionConfig(suggestion.type)
                 return (

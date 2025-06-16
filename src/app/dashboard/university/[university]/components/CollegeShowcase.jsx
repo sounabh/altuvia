@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, MapPin, Star, Users, Award, BookOpen } from 'lucide-react';
 
 const CollegeShowcase = () => {
+  // State to keep track of which image is currently shown
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // Dummy college data
   const college = {
     name: "Stanford Graduate School of Business",
     location: "Stanford, California",
@@ -28,12 +30,14 @@ const CollegeShowcase = () => {
     }
   };
 
+  // Go to the previous image (wraps around)
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
       prev === 0 ? college.images.length - 1 : prev - 1
     );
   };
 
+  // Go to the next image (wraps around)
   const handleNextImage = () => {
     setCurrentImageIndex((prev) => 
       prev === college.images.length - 1 ? 0 : prev + 1
@@ -41,21 +45,26 @@ const CollegeShowcase = () => {
   };
 
   return (
-    <div className=" max-w-7xl mx-auto rounded-2xl my-12">
+    <div className="max-w-7xl mx-auto rounded-2xl my-12">
       <div className="p-0">
-        {/* Top Title Bar */}
+
+        {/* ----------------- Top Heading Bar ------------------ */}
         <div className="p-6 pb-4">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
               <div className="w-1 h-8 bg-[#002147] mr-4"></div>
-              <h2 className="text-2xl font-bold text-[#002147] tracking-tight">Featured College</h2>
+              <h2 className="text-2xl font-bold text-[#002147] tracking-tight">
+                Featured College
+              </h2>
             </div>
           </div>
         </div>
 
+        {/* ---------------- Main Content Grid ---------------- */}
         <div className="relative">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-8 pb-8">
-            {/* Image Section */}
+
+            {/* ---------------- College Image Section ---------------- */}
             <div className="space-y-4">
               <div className="relative overflow-hidden shadow-2xl rounded-2xl">
                 <img 
@@ -63,7 +72,11 @@ const CollegeShowcase = () => {
                   alt={college.name}
                   className="w-full h-80 md:h-96 object-cover transition-transform duration-500 hover:scale-105"
                 />
+
+                {/* Overlay gradient for better text visibility */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
+
+                {/* Bottom-Left College Info on Image */}
                 <div className="absolute bottom-6 left-6 text-white">
                   <h3 className="text-2xl md:text-3xl font-bold mb-2 leading-tight">{college.name}</h3>
                   <div className="flex items-center text-sm opacity-90 mb-3">
@@ -81,13 +94,15 @@ const CollegeShowcase = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Top-Right Current Image Indicator */}
                 <div className="absolute top-6 right-6 bg-white/90 px-3 py-2 backdrop-blur-sm rounded-full">
                   <span className="text-xs font-semibold text-[#002147]">
                     {currentImageIndex + 1} / {college.images.length}
                   </span>
                 </div>
-                
-                {/* Navigation Arrows */}
+
+                {/* Image Navigation Buttons */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -96,6 +111,7 @@ const CollegeShowcase = () => {
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -105,8 +121,8 @@ const CollegeShowcase = () => {
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
-              
-              {/* Image Thumbnails */}
+
+              {/* Thumbnails as Dot Indicators */}
               <div className="flex space-x-2 justify-center">
                 {college.images.map((_, idx) => (
                   <button
@@ -122,13 +138,15 @@ const CollegeShowcase = () => {
               </div>
             </div>
 
-            {/* Content Section */}
+            {/* ---------------- College Content Section ---------------- */}
             <div className="space-y-6">
+
+              {/* Description & Biography */}
               <div>
                 <p className="text-gray-700 text-lg leading-relaxed font-medium mb-4">
                   {college.description}
                 </p>
-                
+
                 <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
                   <h4 className="text-lg font-bold text-[#002147] mb-3 flex items-center">
                     <BookOpen className="h-5 w-5 mr-2 text-[#3598FE]" />
@@ -140,7 +158,7 @@ const CollegeShowcase = () => {
                 </div>
               </div>
 
-              {/* Stats Grid */}
+              {/* Stats Boxes */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-[#002147] shadow-sm hover:shadow-md transition-shadow rounded-xl">
                   <div className="text-2xl font-bold text-white mb-1">{college.stats.acceptance}</div>
@@ -156,7 +174,7 @@ const CollegeShowcase = () => {
                 </div>
               </div>
 
-              {/* Programs */}
+              {/* Programs Offered Tags */}
               <div className="space-y-3">
                 <h4 className="text-lg font-bold text-[#002147] flex items-center">
                   <Award className="h-5 w-5 mr-2 text-[#3598FE]" />
@@ -173,7 +191,9 @@ const CollegeShowcase = () => {
                   ))}
                 </div>
               </div>
+
             </div>
+            {/* ---------------- End of Content Section ---------------- */}
           </div>
         </div>
       </div>

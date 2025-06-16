@@ -4,10 +4,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Brain, School, Bell, History, BookOpen } from 'lucide-react';
 
 export default function ModernApplicationManagement() {
+  // Track hovered card for animation
   const [hoveredCard, setHoveredCard] = useState(null);
+
+  // Track if section is in view for animation trigger
   const [isVisible, setIsVisible] = useState(false);
+
+  // Ref for intersection observer to detect when component is in viewport
   const sectionRef = useRef(null);
 
+  // Feature cards data
   const features = [
     {
       id: 1,
@@ -59,6 +65,7 @@ export default function ModernApplicationManagement() {
     }
   ];
 
+  // Run once to observe the section for entry animation
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -84,29 +91,27 @@ export default function ModernApplicationManagement() {
   }, []);
 
   return (
-    <div ref={sectionRef} className="min-h-screen bg-[#002147] py-20 px-4  lg:px-12 mt-52 rounded-2xl">
+    <div ref={sectionRef} className="min-h-screen bg-[#002147] py-20 px-4 lg:px-12 mt-52 rounded-2xl">
       <div className="max-w-6xl mx-auto">
         
-        {/* Header Section */}
+        {/* ---------- Header Section ---------- */}
         <div className="text-center mb-16">
           <div className={`transform transition-all duration-1000 ease-out ${
             isVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
           }`}>
-            <h1 className="font-serif font-normal text-white w-full
-              text-3xl sm:text-4xl md:text-5xl lg:text-65l
-              leading-tight tracking-tight mb-4">
+            <h1 className="font-serif font-normal text-white w-full text-3xl sm:text-4xl md:text-5xl lg:text-65l leading-tight tracking-tight mb-4">
               <span className="block">Application Management</span>
-              <span className="block ">Made Simple</span>
+              <span className="block">Made Simple</span>
             </h1>
-            <p className="text-blue-100 text-base s max-w-2xl mt-10 mx-auto font-light">
+            <p className="text-blue-100 text-base max-w-2xl mt-10 mx-auto font-light">
               Streamline your college application process with our comprehensive suite of tools
             </p>
           </div>
         </div>
 
-        {/* Features Grid */}
+        {/* ---------- Features Grid ---------- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-          {features.map((feature, index) => {
+          {features.map((feature) => {
             const IconComponent = feature.icon;
             const isHovered = hoveredCard === feature.id;
             
@@ -127,8 +132,7 @@ export default function ModernApplicationManagement() {
                 onMouseEnter={() => setHoveredCard(feature.id)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
-                
-                {/* Icon */}
+                {/* ---------- Icon ---------- */}
                 <div className={`
                   w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-6
                   transition-all duration-300 group-hover:scale-110 group-hover:bg-white/20
@@ -136,18 +140,17 @@ export default function ModernApplicationManagement() {
                   <IconComponent className={`w-6 h-6 ${feature.iconColor}`} strokeWidth={1.5} />
                 </div>
 
-                {/* Content */}
+                {/* ---------- Title & Description ---------- */}
                 <div className="space-y-4">
                   <h3 className="text-lg sm:text-xl font-semibold text-white tracking-tight">
                     {feature.title}
                   </h3>
-                  
                   <p className="text-sm sm:text-base text-blue-100 leading-relaxed font-light">
                     {feature.description}
                   </p>
                 </div>
 
-                {/* Hover Effect Arrow */}
+                {/* ---------- Hover Arrow Effect ---------- */}
                 <div className={`
                   absolute top-6 right-6 transition-all duration-300
                   ${isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'}
@@ -159,14 +162,14 @@ export default function ModernApplicationManagement() {
                   </div>
                 </div>
 
-                {/* Gradient Overlay on Hover */}
+                {/* ---------- Gradient Overlay on Hover ---------- */}
                 <div className={`
                   absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 
                   transition-opacity duration-500 pointer-events-none
                   bg-gradient-to-br from-white/5 via-transparent to-transparent
                 `} />
 
-                {/* Subtle Border Glow */}
+                {/* ---------- Subtle Border Glow Effect ---------- */}
                 <div className={`
                   absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-500
                   ${isHovered ? 'opacity-100' : ''}
@@ -177,7 +180,7 @@ export default function ModernApplicationManagement() {
           })}
         </div>
 
-        {/* Bottom Gradient Line */}
+        {/* ---------- Decorative Bottom Line ---------- */}
         <div className={`
           mt-16 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent
           transform transition-all duration-1000 delay-700 ease-out
