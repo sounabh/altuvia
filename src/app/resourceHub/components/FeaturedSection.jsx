@@ -102,7 +102,7 @@ const FeaturedSection = () => {
                     className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Access Premium Content
+                    Access Premium Contents
                     <ExternalLink className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
