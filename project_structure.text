@@ -1,0 +1,141 @@
+- .gitignore
+- .md
+- components.json
+- eslint.config.mjs
+- jsconfig.json
+- modern-ui.json
+- next-env.d.ts
+- next.config.mjs
+- package-lock.json
+- package.json
+- postcss.config.mjs
+- public
+  - file.svg
+  - globe.svg
+  - images
+    - block-s-right.webp
+    - bocconi-university-logo-png_seeklogo-463777.png
+    - mit.webp
+    - nus.jpeg
+    - ox.jpeg
+    - university-cambridge-full-colour-preferred-logo-transparency-2362x491.png
+    - yale.jpeg
+  - next.svg
+  - vercel.svg
+  - window.svg
+- README.md
+- src
+  - app
+    - cv-builder
+      - (Forms)
+        - AchievementForm.jsx
+        - EducationForm.jsx
+        - ExperienceForm.jsx
+        - PersonalInfoFor,.jsx
+        - ProjectForm.jsx
+        - SkillsForms.jsx
+        - VolunteerForm.jsx
+      - (templates)
+        - ClassicTemplate.jsx
+        - MinimalTemplate.jsx
+        - ModernTemplate.jsx
+      - components
+        - AIssitant.jsx
+        - CVBuilder.jsx
+        - Header.jsx
+        - PreviewPanel.jsx
+        - Sidebar.jsx
+        - SmartTipsPanel.jsx
+        - VersionManager.jsx
+      - page.js
+    - dashboard
+      - calender
+        - page.js
+      - components
+        - AddUniversityModal.jsx
+        - FloatingAddButton.jsx
+        - StatsOverview.jsx
+        - UniversityCard.jsx
+      - layout.js
+      - page.js
+      - university
+        - [university]
+          - components
+            - ApplicationTabs.jsx
+            - CollegeShowcase.jsx
+            - Header.jsx
+            - UniversityOverview.jsx
+          - page.js
+    - favicon.ico
+    - globals.css
+    - layout.js
+    - page.js
+    - resourcehub
+      - components
+        - FeaturedSection.jsx
+        - ModernFilterSidebar.jsx
+        - QuickAction.jsx
+        - ResourceCard.jsx
+      - data
+        - mockResource.js
+      - page.js
+    - search
+      - components
+        - FilterSection.jsx
+        - SearchBar.jsx
+        - SearchFilters.jsx
+        - UniversityCard.jsx
+        - UniversityGrid.jsx
+      - page.js
+    - sections
+      - Accordion.jsx
+      - ApplicationMgmt.jsx
+      - ContactUsPage.jsx
+      - Footer.jsx
+      - Hero.jsx
+      - ImpactNumbers.jsx
+      - Marqueee.jsx
+      - Nav.jsx
+      - Pricing.jsx
+      - Products.jsx
+      - Steps.jsx
+    - workspace
+      - components
+        - AddSchoolModel.jsx
+        - AiSuggestion.jsx
+        - EssayAnalytics.jsx
+        - EssayEditor.jsx
+        - EssayWorkspace.jsx
+        - SchoolSelectpr.jsx
+        - VersionManager.jsx
+      - page.js
+  - components
+    - modern-ui
+      - accordion.jsx
+    - ui
+      - badge.jsx
+      - button.jsx
+      - calendar.jsx
+      - card.jsx
+      - checkbox.jsx
+      - collapsible.jsx
+      - context-menu.jsx
+      - dialog.jsx
+      - dropdown-menu.jsx
+      - input.jsx
+      - label.jsx
+      - popover.jsx
+      - progress.jsx
+      - scroll-area.jsx
+      - select.jsx
+      - separator.jsx
+      - sheet.jsx
+      - tabs.jsx
+      - textarea.jsx
+      - toggle.jsx
+  - lib
+    - utils
+      - index.js
+    - utils.js
+    - utils.ts
+- tailwind.config.js

@@ -51,12 +51,7 @@ const CollegeShowcase = () => {
         {/* ----------------- Top Heading Bar ------------------ */}
         <div className="p-6 pb-4">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="w-1 h-8 bg-[#002147] mr-4"></div>
-              <h2 className="text-2xl font-bold text-[#002147] tracking-tight">
-                Featured College
-              </h2>
-            </div>
+           
           </div>
         </div>
 
@@ -176,20 +171,8 @@ const CollegeShowcase = () => {
 
               {/* Programs Offered Tags */}
               <div className="space-y-3">
-                <h4 className="text-lg font-bold text-[#002147] flex items-center">
-                  <Award className="h-5 w-5 mr-2 text-[#3598FE]" />
-                  Programs Offered
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {college.programs.map((program, idx) => (
-                    <span 
-                      key={idx}
-                      className="px-4 py-2 bg-[#002147] text-white text-sm font-medium shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 rounded-full"
-                    >
-                      {program}
-                    </span>
-                  ))}
-                </div>
+               
+               
               </div>
 
             </div>

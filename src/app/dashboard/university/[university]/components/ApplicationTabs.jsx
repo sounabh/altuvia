@@ -10,12 +10,20 @@ import { Button } from '@/components/ui/button';
 // Icons used throughout the UI
 import {
   FileText, Clock, MessageSquare, Save, Upload,
-  CheckCircle, AlertCircle, Calendar, Video, BookOpen
+  CheckCircle, AlertCircle, Calendar, Video, BookOpen,
+  Plus, ExternalLink, X, CalendarDays, MapPin, Users
 } from 'lucide-react';
 
 const ApplicationTabs = () => {
   // State to hold the content of the essay textarea
   const [essayContent, setEssayContent] = useState("What matters most to you, and why?");
+  
+  // State for workspace popup
+  const [showWorkspacePopup, setShowWorkspacePopup] = useState(false);
+  
+  // State for add task/event modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalType, setAddModalType] = useState('task'); // 'task' or 'event'
 
   // Static essay prompts with progress and word limits
   const essayPrompts = [
@@ -32,6 +40,64 @@ const ApplicationTabs = () => {
       progress: 0
     }
   ];
+
+  // Sample tasks and events
+  const tasksAndEvents = [
+    { 
+      type: 'task',
+      task: "Submit GMAT Scores", 
+      date: "Apr 5, 2025", 
+      status: "pending", 
+      priority: "high", 
+      daysLeft: 15 
+    },
+    { 
+      type: 'task',
+      task: "Complete Essays", 
+      date: "Apr 7, 2025", 
+      status: "in-progress", 
+      priority: "high", 
+      daysLeft: 17 
+    },
+    { 
+      type: 'event',
+      task: "MBA Info Session - Harvard", 
+      date: "Apr 6, 2025", 
+      time: "2:00 PM - 4:00 PM",
+      location: "Virtual",
+      status: "upcoming", 
+      priority: "medium", 
+      daysLeft: 16 
+    },
+    { 
+      type: 'task',
+      task: "Request Recommendations", 
+      date: "Apr 6, 2025", 
+      status: "completed", 
+      priority: "medium", 
+      daysLeft: 16 
+    },
+    { 
+      type: 'event',
+      task: "Application Deadline - Stanford", 
+      date: "Apr 8, 2025", 
+      time: "11:59 PM",
+      status: "upcoming", 
+      priority: "high", 
+      daysLeft: 18 
+    }
+  ];
+
+  const openAddModal = (type) => {
+    setAddModalType(type);
+    setShowAddModal(true);
+  };
+
+  const handleWorkspaceRedirect = () => {
+    setShowWorkspacePopup(false);
+    // Here you would navigate to workspace page
+    window.open('/workspace', '_blank'); // Replace with your actual routing
+  };
 
   return (
     <div className="my-20">
@@ -89,8 +155,8 @@ const ApplicationTabs = () => {
           <div className="p-6 space-y-8">
             <Tabs defaultValue="essays" className="w-full">
 
-              {/* Tabs Header */}
-              <TabsList className="grid w-full grid-cols-3 bg-gray-50 p-1 rounded-xl border border-gray-200 h-14">
+              {/* Tabs Header - Updated for 2 tabs */}
+              <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 rounded-xl border border-gray-200 h-14">
                 
                 {/* Essay Tab */}
                 <TabsTrigger 
@@ -108,18 +174,8 @@ const ApplicationTabs = () => {
                   className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-12 font-semibold"
                 >
                   <Clock className="h-5 w-5 mr-2" />
-                  <span className="hidden sm:inline">Tasks & Deadlines</span>
+                  <span className="hidden sm:inline">Tasks & Events</span>
                   <span className="sm:hidden">Tasks</span>
-                </TabsTrigger>
-
-                {/* Interview Prep Tab */}
-                <TabsTrigger 
-                  value="interview"
-                  className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-12 font-semibold"
-                >
-                  <MessageSquare className="h-5 w-5 mr-2" />
-                  <span className="hidden sm:inline">Interview Prep</span>
-                  <span className="sm:hidden">Interview</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -127,12 +183,21 @@ const ApplicationTabs = () => {
               <TabsContent value="essays" className="mt-8">
                 <div className="space-y-6">
 
-                  {/* Essay Header */}
+                  {/* Essay Header with Workspace Access */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h3 className="text-2xl font-bold text-white">Essay Prompts</h3>
-                    <div className="flex items-center space-x-2 text-sm text-white">
-                      <Save className="h-4 w-4" />
-                      <span>Draft saved 2 hours ago</span>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2 text-sm text-white">
+                        <Save className="h-4 w-4" />
+                        <span>Draft saved 2 hours ago</span>
+                      </div>
+                      <Button
+                        onClick={() => setShowWorkspacePopup(true)}
+                        className="bg-[#3598FE] hover:bg-[#2485ed] text-white hover:shadow-lg transition-all duration-300"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Access All Essays
+                      </Button>
                     </div>
                   </div>
 
@@ -171,7 +236,7 @@ const ApplicationTabs = () => {
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-[#002147] h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${prompt.progress}%` }} // Dynamic width
+                              style={{ width: `${prompt.progress}%` }}
                             ></div>
                           </div>
                         </div>
@@ -187,10 +252,7 @@ const ApplicationTabs = () => {
                             />
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-4">
                               <span className="text-sm text-gray-500">
-                                {
-                                  // Word count calculation (excluding empty strings)
-                                  essayContent.split(' ').filter(word => word.length > 0).length
-                                } / {prompt.wordLimit} words
+                                {essayContent.split(' ').filter(word => word.length > 0).length} / {prompt.wordLimit} words
                               </span>
                               <div className="flex space-x-3">
                                 <Button size="sm" variant="outline" className="border-[#002147] text-[#002147] hover:bg-[#002147] hover:text-white">
@@ -211,29 +273,45 @@ const ApplicationTabs = () => {
                 </div>
               </TabsContent>
 
-              {/* 📅 Deadlines & Tasks Section */}
+              {/* 📅 Tasks & Events Section */}
               <TabsContent value="deadlines" className="mt-8">
                 <div className="space-y-6">
-                  <h3 className="text-2xl font-bold text-white">Upcoming Deadlines</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h3 className="text-2xl font-bold text-white">Tasks & Events</h3>
+                    <div className="flex space-x-3">
+                      <Button
+                        onClick={() => openAddModal('task')}
+                        className="bg-[#3598FE] hover:bg-[#2485ed] text-white hover:shadow-lg transition-all duration-300"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Task
+                      </Button>
+                      <Button
+                        onClick={() => openAddModal('event')}
+                        className="bg-purple-600 hover:bg-purple-700 text-white hover:shadow-lg transition-all duration-300"
+                      >
+                        <CalendarDays className="h-4 w-4 mr-2" />
+                        Add Event
+                      </Button>
+                    </div>
+                  </div>
 
                   <div className="grid gap-4">
-                    {[
-                      { task: "Submit GMAT Scores", date: "Apr 5, 2025", status: "pending", priority: "high", daysLeft: 15 },
-                      { task: "Complete Essays", date: "Apr 7, 2025", status: "in-progress", priority: "high", daysLeft: 17 },
-                      { task: "Request Recommendations", date: "Apr 6, 2025", status: "completed", priority: "medium", daysLeft: 16 },
-                      { task: "Final Application Review", date: "Apr 8, 2025", status: "pending", priority: "low", daysLeft: 18 }
-                    ].map((item, index) => (
+                    {tasksAndEvents.map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50">
 
-                        {/* Icon depending on status and priority */}
+                        {/* Icon depending on type and status */}
                         <div className="flex items-center space-x-4">
                           <div className={`p-3 rounded-xl ${
                             item.status === 'completed' ? 'bg-green-100' :
+                            item.type === 'event' ? 'bg-purple-100' :
                             item.priority === 'high' ? 'bg-red-100' :
                             item.priority === 'medium' ? 'bg-yellow-100' : 'bg-blue-100'
                           }`}>
                             {item.status === 'completed' ? (
-                              <CheckCircle className={`h-5 w-5 text-green-600`} />
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : item.type === 'event' ? (
+                              <CalendarDays className="h-5 w-5 text-purple-600" />
                             ) : (
                               <Calendar className={`h-5 w-5 ${
                                 item.priority === 'high' ? 'text-red-600' :
@@ -242,11 +320,22 @@ const ApplicationTabs = () => {
                             )}
                           </div>
 
-                          {/* Task details */}
+                          {/* Task/Event details */}
                           <div>
-                            <div className="font-bold text-[#002147] text-lg">{item.task}</div>
+                            <div className="font-bold text-[#002147] text-lg flex items-center space-x-2">
+                              <span>{item.task}</span>
+                              {item.type === 'event' && (
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">EVENT</span>
+                              )}
+                            </div>
                             <div className="text-sm text-gray-500 flex items-center space-x-4">
                               <span>{item.date}</span>
+                              {item.time && <span>• {item.time}</span>}
+                              {item.location && (
+                                <span className="flex items-center">
+                                  • <MapPin className="h-3 w-3 mr-1" /> {item.location}
+                                </span>
+                              )}
 
                               {/* Days left only shown if not completed */}
                               {item.status !== 'completed' && (
@@ -263,50 +352,13 @@ const ApplicationTabs = () => {
                         {/* Status badge */}
                         <span className={`px-4 py-2 text-sm rounded-full font-medium ${
                           item.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          item.status === 'upcoming' ? 'bg-purple-100 text-purple-700' :
                           item.status === 'in-progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                         }`}>
                           {item.status.replace('-', ' ')}
                         </span>
                       </div>
                     ))}
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* 🎤 Interview Prep Section */}
-              <TabsContent value="interview" className="mt-8">
-                <div className="space-y-6">
-                  <h3 className="text-2xl font-bold text-white">Interview Preparation</h3>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* Common Questions Card */}
-                    <div className="p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-blue-50">
-                      <div className="flex items-center mb-4">
-                        <div className="p-3 bg-[#002147] rounded-xl mr-4">
-                          <BookOpen className="h-6 w-6 text-white" />
-                        </div>
-                        <h4 className="font-bold text-[#002147] text-lg">Common Questions</h4>
-                      </div>
-                      <p className="text-gray-600 mb-4 leading-relaxed">Practice answers to frequently asked questions and improve your confidence</p>
-                      <Button className="w-full bg-[#3598FE] hover:bg-[#2485ed] text-white hover:shadow-lg transition-all duration-300">
-                        Start Practice Session
-                      </Button>
-                    </div>
-
-                    {/* Mock Interview Card */}
-                    <div className="p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-green-50">
-                      <div className="flex items-center mb-4">
-                        <div className="p-3 bg-[#002147] rounded-xl mr-4">
-                          <Video className="h-6 w-6 text-white" />
-                        </div>
-                        <h4 className="font-bold text-[#002147] text-lg">Mock Interview</h4>
-                      </div>
-                      <p className="text-gray-600 mb-4 leading-relaxed">Schedule a practice session with our admissions experts</p>
-                      <Button variant="outline" className="w-full border-2 border-[#002147] text-[#002147] hover:bg-[#002147] hover:text-white transition-all duration-300">
-                        Schedule Session
-                      </Button>
-                    </div>
                   </div>
                 </div>
               </TabsContent>
@@ -324,6 +376,129 @@ const ApplicationTabs = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* 🪟 Workspace Access Popup */}
+      {showWorkspacePopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-[#3598FE] rounded-full flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-[#002147] mb-2">Access Essay Workspace</h3>
+              <p className="text-gray-600">
+                You're about to access your comprehensive essay workspace where you can view and edit all your essays in one place.
+              </p>
+            </div>
+            
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowWorkspacePopup(false)}
+                className="flex-1 border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-50 transition-all duration-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleWorkspaceRedirect}
+                className="flex-1 bg-[#3598FE] text-white py-3 px-6 rounded-xl font-semibold hover:bg-[#2485ed] hover:shadow-lg transition-all duration-300"
+              >
+                Go to Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Add Task/Event Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-lg w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-[#002147]">
+                Add New {addModalType === 'task' ? 'Task' : 'Event'}
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {addModalType === 'task' ? 'Task' : 'Event'} Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent"
+                  placeholder={`Enter ${addModalType} name...`}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                  <input
+                    type="date"
+                    className="w-full p-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent"
+                  />
+                </div>
+                
+                {addModalType === 'event' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                    <input
+                      type="time"
+                      className="w-full p-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {addModalType === 'event' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                  <input
+                    type="text"
+                    className="w-full p-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent"
+                    placeholder="Enter location or 'Virtual'..."
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select className="w-full p-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex space-x-4 mt-8">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-50 transition-all duration-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className={`flex-1 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 ${
+                  addModalType === 'task' 
+                    ? 'bg-[#3598FE] hover:bg-[#2485ed]' 
+                    : 'bg-purple-600 hover:bg-purple-700'
+                }`}
+              >
+                Add {addModalType === 'task' ? 'Task' : 'Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

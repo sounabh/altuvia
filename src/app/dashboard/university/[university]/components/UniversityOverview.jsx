@@ -168,7 +168,7 @@ const UniversityOverview = () => {
           {/* Quick Actions Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button className="flex-1 bg-[#3598FE] text-white py-4 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-[1.02] text-center">
-              Schedule Campus Visit
+            Save additional Documents
             </button>
             <button className="flex-1 border-2 border-white text-white py-4 px-6 rounded-xl font-semibold bg-transparent hover:text-white transition-all duration-300 hover:scale-[1.02] outline-0 text-center">
               Download Brochure

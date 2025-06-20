@@ -18,7 +18,7 @@ const Header = () => {
               className="text-[#6C7280] hover:text-[#002147]"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Universities
+              Back to Dashboard
             </Button>
           </div>
 
