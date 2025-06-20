@@ -39,12 +39,6 @@ const Layout = ({ children }) => {
       href: '/calendar',
     },
     {
-      id: 'essay-editor',
-      label: 'Essay Editor',
-      icon: Edit3,
-      href: '/essay-editor',
-    },
-    {
       id: 'resource-hub',
       label: 'Resource Hub',
       icon: BookOpen,
