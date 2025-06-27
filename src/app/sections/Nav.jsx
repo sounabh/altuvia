@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 // Nav component: renders the top navigation bar
 const Nav = () => {
@@ -36,9 +37,11 @@ const Nav = () => {
 
 
         {/* Call-to-action button */}
-        <button className="px-3 py-3 md:px-4 md:py-3 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white font-inter font-medium text-balance text-[13px] flex items-center justify-center transform hover:rounded-3xl">
-          Get Started Today
+        <Link href={"/onboarding/signin"}>
+        <button className="px-3 py-3 md:px-5 md:py-3 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white  font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
+        Sign In
         </button>
+        </Link>
       </div>
     </nav>
   );

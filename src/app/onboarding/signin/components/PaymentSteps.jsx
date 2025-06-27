@@ -4,9 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 
-
-
+// -----------------------------------------------------------------------------
+// PaymentStep Component
+// Props:
+// - onNext: callback after successful form submission
+// - onBack: callback to navigate to the previous step
+// -----------------------------------------------------------------------------
 export const PaymentStep = ({ onNext, onBack }) => {
+  // Local form state for card details
   const [formData, setFormData] = useState({
     cardNumber: "",
     expiryDate: "",
@@ -15,12 +20,13 @@ export const PaymentStep = ({ onNext, onBack }) => {
     email: ""
   });
 
+  // Handle input change for any form field
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Handle submission (this is where you'd integrate with payment API)
   const handleSubmit = () => {
-    // Here you would normally process the payment
     console.log("Processing payment...", formData);
     onNext();
   };
@@ -28,6 +34,10 @@ export const PaymentStep = ({ onNext, onBack }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-2xl mx-auto space-y-8 animate-fade-in">
+
+        {/* ---------------------------- */}
+        {/* Header Section              */}
+        {/* ---------------------------- */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-gray-800">
             Start Your 7-Day Free Trial
@@ -35,14 +45,22 @@ export const PaymentStep = ({ onNext, onBack }) => {
           <p className="text-xl text-gray-600">
             Enter card details - you won't be charged today
           </p>
+
+          {/* Security badge */}
           <div className="inline-flex items-center bg-green-100 text-green-800 px-4 py-2 rounded-full font-medium">
             🔒 Secure & Encrypted
           </div>
         </div>
 
+        {/* ---------------------------- */}
+        {/* Payment Form Card           */}
+        {/* ---------------------------- */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-lg">
           <div className="space-y-6">
+
+            {/* Full Name & Email - Grid 2 columns */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Full Name */}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-gray-700">
                   Full Name
@@ -55,6 +73,8 @@ export const PaymentStep = ({ onNext, onBack }) => {
                   className="text-lg p-4 rounded-xl border-2 border-gray-200 focus:border-green-400"
                 />
               </div>
+
+              {/* Email Address */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Email Address
@@ -70,6 +90,7 @@ export const PaymentStep = ({ onNext, onBack }) => {
               </div>
             </div>
 
+            {/* Card Number */}
             <div className="space-y-2">
               <Label htmlFor="cardNumber" className="text-sm font-medium text-gray-700">
                 Card Number
@@ -83,7 +104,9 @@ export const PaymentStep = ({ onNext, onBack }) => {
               />
             </div>
 
+            {/* Expiry Date and CVV */}
             <div className="grid grid-cols-2 gap-4">
+              {/* Expiry */}
               <div className="space-y-2">
                 <Label htmlFor="expiryDate" className="text-sm font-medium text-gray-700">
                   Expiry Date
@@ -96,6 +119,8 @@ export const PaymentStep = ({ onNext, onBack }) => {
                   className="text-lg p-4 rounded-xl border-2 border-gray-200 focus:border-green-400"
                 />
               </div>
+
+              {/* CVV */}
               <div className="space-y-2">
                 <Label htmlFor="cvv" className="text-sm font-medium text-gray-700">
                   CVV
@@ -110,8 +135,11 @@ export const PaymentStep = ({ onNext, onBack }) => {
               </div>
             </div>
 
+            {/* Included Trial Features */}
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <h3 className="font-semibold text-blue-900 mb-2">What's included in your trial:</h3>
+              <h3 className="font-semibold text-blue-900 mb-2">
+                What's included in your trial:
+              </h3>
               <ul className="text-blue-800 space-y-1 text-sm">
                 <li>✓ Unlimited university recommendations</li>
                 <li>✓ Detailed match analysis</li>
@@ -122,7 +150,11 @@ export const PaymentStep = ({ onNext, onBack }) => {
             </div>
           </div>
 
+          {/* ---------------------------- */}
+          {/* Navigation Buttons           */}
+          {/* ---------------------------- */}
           <div className="flex justify-between mt-8">
+            {/* Back Button */}
             <Button
               variant="outline"
               onClick={onBack}
@@ -131,6 +163,8 @@ export const PaymentStep = ({ onNext, onBack }) => {
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
+
+            {/* Submit / Start Trial Button */}
             <Button
               onClick={handleSubmit}
               className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 font-semibold"
