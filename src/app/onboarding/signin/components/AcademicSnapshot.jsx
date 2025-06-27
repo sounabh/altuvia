@@ -158,7 +158,7 @@ export const AcademicSnapshotStep = ({
                 onClick={handleSubmit}
                 className="bg-[#002147] text-white px-8 py-3 rounded-xl transition-all duration-300"
               >
-                Enter Details
+              Continue
               </Button>
             </div>
           </div>
