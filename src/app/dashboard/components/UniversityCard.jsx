@@ -6,6 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import Link from 'next/link';
 
 
 
@@ -45,6 +46,7 @@ export const UniversityCard  = ({ university, onRemove }) => {
   };
 
   return (
+    <Link href={`/dashboard/university/1`} >
     <div className="bg-white/70 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group">
       {/* University Image */}
       <div className="relative h-48 overflow-hidden">
@@ -133,5 +135,6 @@ export const UniversityCard  = ({ university, onRemove }) => {
         </div>
       </div>
     </div>
+    </Link>
   );
 };

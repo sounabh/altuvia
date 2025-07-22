@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 const Layout = ({ children }) => {
   const [activeItem, setActiveItem] = useState('dashboard'); // Tracks which menu item is currently active
   const [isCollapsed, setIsCollapsed] = useState(false); // Controls sidebar collapse state
-  //const router = useRouter();
+  const router = useRouter();
 
   // Sidebar navigation items
   const menuItems = [
@@ -36,13 +36,13 @@ const Layout = ({ children }) => {
       id: 'calendar',
       label: 'Calendar',
       icon: Calendar,
-      href: '/calendar',
+      href: '/dashboard/calender',
     },
     {
       id: 'resource-hub',
       label: 'Resource Hub',
       icon: BookOpen,
-      href: '/resource-hub',
+      href: '/resourcehub',
     },
     {
       id: 'settings',
