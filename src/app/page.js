@@ -13,7 +13,8 @@ import ProductShowcase from "./sections/Products";
 
 const page = () => {
   return (
-    <div className="w-full  max-w-[1130px] mx-auto px-4">
+    <div className="w-full  max-w-[1130px] mx-auto px-5"> 
+      {/* The main page component that includes all sections px-4*/}
       <Nav></Nav>
       <Hero></Hero>
       <Marquee></Marquee>
