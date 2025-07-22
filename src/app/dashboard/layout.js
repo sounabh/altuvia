@@ -42,7 +42,7 @@ const Layout = ({ children }) => {
       id: 'resource-hub',
       label: 'Resource Hub',
       icon: BookOpen,
-      href: '/resourcehub',
+      href: '/resources-hub',
     },
     {
       id: 'settings',
