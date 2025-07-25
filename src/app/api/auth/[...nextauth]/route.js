@@ -1,62 +1,108 @@
-// Import NextAuth core
+// =============================================================================
+// NEXTAUTH CONFIGURATION WITH GOOGLE & LINKEDIN OAUTH PROVIDERS
+// =============================================================================
+// This file configures NextAuth.js for authentication with Google and LinkedIn
+// providers, including token management, session handling, and comprehensive
+// error handling with detailed logging.
+// =============================================================================
+
+// Import NextAuth core library
 import NextAuth from 'next-auth'
 
 // Import the authentication providers you want to use
 import GoogleProvider from 'next-auth/providers/google'
 
-// Define the NextAuth configuration object
+// =============================================================================
+// MAIN NEXTAUTH CONFIGURATION OBJECT
+// =============================================================================
+// This object contains all the configuration settings for NextAuth including
+// providers, callbacks, session management, and error handling
+// =============================================================================
+
 export const authOptions = {
-  // 1. Set up providers (Google and LinkedIn)
+
+  // ===========================================================================
+  // 1. AUTHENTICATION PROVIDERS CONFIGURATION
+  // ===========================================================================
+  // Define which OAuth providers to support and their specific configurations
+  // ===========================================================================
+
   providers: [
+    
+    // -------------------------------------------------------------------------
+    // GOOGLE OAUTH PROVIDER
+    // -------------------------------------------------------------------------
+    // Standard Google OAuth configuration using the official NextAuth provider
+    // Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables
+    // -------------------------------------------------------------------------
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
-    // LinkedIn configuration using OpenID Connect (recommended approach)
+
+    // -------------------------------------------------------------------------
+    // LINKEDIN OAUTH PROVIDER (CUSTOM IMPLEMENTATION)
+    // -------------------------------------------------------------------------
+    // Custom LinkedIn provider using OpenID Connect approach since LinkedIn's
+    // API has specific requirements that need manual token exchange handling
+    // -------------------------------------------------------------------------
     {
+      // Provider identification
       id: "linkedin",
       name: "LinkedIn",
       type: "oauth",
+
+      // Authorization endpoint configuration
       authorization: {
         url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
-          scope: "openid profile", // Only use available scopes
-          response_type: "code",
+          scope: "openid profile", // Only use available scopes (email requires special permission)
+          response_type: "code",   // Authorization code flow
         },
       },
+
+      // Token exchange endpoint configuration
       token: {
         url: "https://www.linkedin.com/oauth/v2/accessToken",
         params: {
-          grant_type: "authorization_code",
+          grant_type: "authorization_code", // Standard OAuth2 authorization code grant
         },
-        // Add custom token request to ensure client_secret is included
+
+        // Custom token request handler to ensure proper token exchange
+        // This is needed because LinkedIn has specific requirements for token requests
         async request({ client, params, checks, provider }) {
+          
           // Construct the redirect URI manually since it's not being passed correctly
+          // This ensures the redirect URI matches exactly what was registered with LinkedIn
           const redirectUri = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/auth/callback/linkedin`;
           
+          // Log the token exchange attempt for debugging purposes
           console.log('🔄 LinkedIn token exchange request:', {
             code: params.code ? 'present' : 'missing',
             redirect_uri: redirectUri,
             client_id: process.env.LINKEDIN_CLIENT_ID ? 'present' : 'missing'
           });
 
+          // Make the token exchange request to LinkedIn's API
           const response = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
             method: "POST",
             headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "Accept": "application/json",
+              "Content-Type": "application/x-www-form-urlencoded", // LinkedIn requires form-encoded data
+              "Accept": "application/json", // Expect JSON response
             },
             body: new URLSearchParams({
               grant_type: "authorization_code",
               client_id: process.env.LINKEDIN_CLIENT_ID,
               client_secret: process.env.LINKEDIN_CLIENT_SECRET,
-              code: params.code,
-              redirect_uri: redirectUri,
+              code: params.code, // Authorization code from the callback
+              redirect_uri: redirectUri, // Must match registered redirect URI
             }),
           });
 
+          // Parse the response from LinkedIn
           const tokens = await response.json();
 
+          // Handle token exchange errors
           if (!response.ok) {
             console.error('❌ LinkedIn token exchange failed:', tokens);
             console.error('❌ Request details:', {
@@ -71,19 +117,25 @@ export const authOptions = {
           return { tokens };
         },
       },
+
+      // User information endpoint configuration
       userinfo: {
         url: "https://api.linkedin.com/v2/userinfo", // OpenID Connect userinfo endpoint
+
+        // Custom userinfo request handler
         async request({ tokens, provider }) {
           try {
             console.log('🔍 Fetching LinkedIn user info...')
             
+            // Fetch user profile data from LinkedIn using the access token
             const response = await fetch("https://api.linkedin.com/v2/userinfo", {
               headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
+                Authorization: `Bearer ${tokens.access_token}`, // Bearer token authentication
                 "Content-Type": "application/json",
               },
             })
 
+            // Handle API request errors
             if (!response.ok) {
               console.error('❌ LinkedIn userinfo request failed:', response.status, response.statusText)
               throw new Error(`LinkedIn API request failed: ${response.status}`)
@@ -93,35 +145,56 @@ export const authOptions = {
             console.log('✅ LinkedIn profile fetched successfully')
             
             return profile
+
           } catch (error) {
             console.error('❌ Error fetching LinkedIn profile:', error)
             throw error
           }
         },
       },
+
+      // Profile data transformation function
+      // Converts LinkedIn's profile data to NextAuth's expected user object format
       profile(profile) {
         console.log('🔄 Processing LinkedIn profile data')
         
         return {
-          id: profile.sub || profile.id,
+          id: profile.sub || profile.id, // Use OpenID Connect 'sub' field or fallback to 'id'
           name: profile.name || `${profile.given_name || ''} ${profile.family_name || ''}`.trim(),
-          email: profile.email || null, // May be null if not available
-          image: profile.picture || null,
-          provider: 'linkedin'
+          email: profile.email || null, // May be null if not available or not requested
+          image: profile.picture || null, // Profile picture URL
+          provider: 'linkedin' // Custom field to identify the provider
         }
       },
+
+      // OAuth client credentials from environment variables
       clientId: process.env.LINKEDIN_CLIENT_ID,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
-      checks: ["state"], // Enable state parameter for security
+
+      // Security checks configuration
+      checks: ["state"], // Enable state parameter for CSRF protection
       protection: "state", // Additional CSRF protection
     },
   ],
 
-  // 2. Define callback functions
+  // ===========================================================================
+  // 2. CALLBACK FUNCTIONS CONFIGURATION
+  // ===========================================================================
+  // These callbacks are triggered at various points in the authentication flow
+  // and allow you to customize the behavior of NextAuth
+  // ===========================================================================
+
   callbacks: {
-    // Triggered when a user signs in
+
+    // -------------------------------------------------------------------------
+    // SIGN IN CALLBACK
+    // -------------------------------------------------------------------------
+    // Triggered when a user attempts to sign in
+    // Return true to allow sign in, false to deny
+    // -------------------------------------------------------------------------
     async signIn({ user, account, profile }) {
       try {
+        // Log the sign-in attempt for monitoring and debugging
         console.log('🔐 Sign In Attempt:', {
           provider: account?.provider,
           userId: user?.id,
@@ -130,23 +203,33 @@ export const authOptions = {
         })
 
         // Handle OAuth errors gracefully - don't prevent sign-in
+        // This allows the user to still sign in even if there are minor OAuth issues
         if (account?.error) {
           console.warn('⚠️ OAuth error during sign-in:', account.error)
           // Still allow sign-in to continue, error will be handled in session
         }
 
         // Always allow sign-in for valid OAuth responses
+        // Additional validation logic can be added here if needed
         return true
+
       } catch (error) {
         console.error('❌ Sign in error:', error)
         // Return true to prevent redirect to error page
+        // This ensures users aren't stuck on error pages for recoverable issues
         return true
       }
     },
 
+    // -------------------------------------------------------------------------
+    // SESSION CALLBACK
+    // -------------------------------------------------------------------------
     // Called whenever a session is checked or created
+    // This is where you can modify the session object that's returned to the client
+    // -------------------------------------------------------------------------
     async session({ session, token }) {
       try {
+        // Log session creation for monitoring
         console.log('📋 Session Created:', {
           provider: token?.provider,
           userId: token?.sub,
@@ -154,29 +237,40 @@ export const authOptions = {
         })
 
         // Add custom properties to the session object
+        // These properties will be available on the client side
         if (token) {
-          session.provider = token.provider
-          session.userId = token.sub
-          session.accessToken = token.accessToken
-          session.error = token.error
+          session.provider = token.provider      // Which OAuth provider was used
+          session.userId = token.sub            // User ID from the provider
+          session.accessToken = token.accessToken // Access token for API calls
+          session.error = token.error           // Any errors that occurred
           
           // Flag if user needs to provide email separately
+          // This is useful for providers that don't always return email addresses
           session.needsEmail = !session.user?.email || 
                               session.user.email.includes('placeholder') ||
                               !session.user.email.includes('@')
         }
 
         return session
+
       } catch (error) {
         console.error('❌ Session callback error:', error)
+        // Return the original session even if there's an error
+        // This prevents breaking the user's session
         return session
       }
     },
 
+    // -------------------------------------------------------------------------
+    // JWT CALLBACK
+    // -------------------------------------------------------------------------
     // Called when a new JWT token is created or updated
+    // This handles token lifecycle including refresh logic
+    // -------------------------------------------------------------------------
     async jwt({ token, user, account, profile }) {
       try {
-        // Initial sign in
+        
+        // Initial sign in - when user first authenticates
         if (account && user) {
           console.log('🔑 JWT Token Created:', {
             provider: account.provider,
@@ -186,12 +280,13 @@ export const authOptions = {
             timestamp: new Date().toISOString(),
           })
 
+          // Return the initial token with all necessary data
           return {
             ...token,
-            provider: account.provider,
-            accessToken: account.access_token,
-            refreshToken: account.refresh_token,
-            accessTokenExpires: account.expires_at ? account.expires_at * 1000 : null,
+            provider: account.provider,                    // OAuth provider name
+            accessToken: account.access_token,             // Access token from provider
+            refreshToken: account.refresh_token,           // Refresh token (if available)
+            accessTokenExpires: account.expires_at ? account.expires_at * 1000 : null, // Token expiry time
             user: {
               id: user.id,
               name: user.name,
@@ -207,17 +302,20 @@ export const authOptions = {
           return token
         }
 
-        // Access token has expired, try to update it
+        // Access token has expired, try to update it using refresh token
         if (token.refreshToken) {
           console.log('🔄 Attempting to refresh access token')
           return await refreshAccessToken(token)
         }
 
+        // No refresh token available, return existing token
+        // The user may need to re-authenticate
         console.log('⚠️ No refresh token available, returning existing token')
         return token
 
       } catch (error) {
         console.error('❌ JWT callback error:', error)
+        // Return token with error flag if something goes wrong
         return {
           ...token,
           error: "RefreshAccessTokenError",
@@ -225,12 +323,18 @@ export const authOptions = {
       }
     },
 
-    // Add redirect callback to handle redirects properly
+    // -------------------------------------------------------------------------
+    // REDIRECT CALLBACK
+    // -------------------------------------------------------------------------
+    // Handles redirects after authentication
+    // This determines where users go after signing in or encountering errors
+    // -------------------------------------------------------------------------
     async redirect({ url, baseUrl }) {
       try {
         console.log('🔄 Redirect requested:', { url, baseUrl })
         
         // Don't redirect on error - stay on current page
+        // This prevents users from being bounced around on authentication errors
         if (url.includes('/auth/error') || url.includes('error=')) {
           console.log('⚠️ Error detected, not redirecting')
           return url // Return the current URL to stay on same page
@@ -243,18 +347,19 @@ export const authOptions = {
           return successUrl
         }
         
-        // Handle relative URLs
+        // Handle relative URLs by making them absolute
         if (url.startsWith("/")) {
           const redirectUrl = `${baseUrl}${url}`
           console.log('✅ Redirecting to relative URL:', redirectUrl)
           return redirectUrl
         }
         
-        // Handle same-origin URLs
+        // Handle same-origin URLs for security
         try {
           const urlObj = new URL(url)
           const baseUrlObj = new URL(baseUrl)
           
+          // Only allow redirects to the same origin for security
           if (urlObj.origin === baseUrlObj.origin) {
             console.log('✅ Redirecting to same-origin URL:', url)
             return url
@@ -269,13 +374,22 @@ export const authOptions = {
         
       } catch (error) {
         console.error('❌ Redirect callback error:', error)
+        // Fallback to base URL if redirect logic fails
         return baseUrl
       }
     },
   },
 
-  // 3. Add comprehensive event logging
+  // ===========================================================================
+  // 3. EVENT HANDLERS CONFIGURATION
+  // ===========================================================================
+  // Event handlers for comprehensive logging and monitoring
+  // These don't affect the authentication flow but provide visibility
+  // ===========================================================================
+
   events: {
+
+    // Sign in event handler
     async signIn({ user, account, profile, isNewUser }) {
       console.log('📝 Authentication Event - Sign In:', {
         event: 'signIn',
@@ -287,6 +401,7 @@ export const authOptions = {
       })
     },
     
+    // Sign out event handler
     async signOut({ token }) {
       console.log('📝 Authentication Event - Sign Out:', {
         event: 'signOut',
@@ -296,6 +411,7 @@ export const authOptions = {
       })
     },
     
+    // User creation event handler (first-time sign in)
     async createUser({ user }) {
       console.log('📝 Authentication Event - User Created:', {
         event: 'createUser',
@@ -304,8 +420,8 @@ export const authOptions = {
       })
     },
     
+    // Session event handler (only log in development to avoid spam)
     async session({ session, token }) {
-      // Only log in development to avoid spam
       if (process.env.NODE_ENV === 'development') {
         console.log('📝 Session Event:', {
           provider: token?.provider,
@@ -316,36 +432,67 @@ export const authOptions = {
     },
   },
 
-  // 4. Session configuration (JWT strategy)
+  // ===========================================================================
+  // 4. SESSION CONFIGURATION
+  // ===========================================================================
+  // Configure how sessions are managed and stored
+  // ===========================================================================
+
   session: {
-    strategy: 'jwt', // Use JWT instead of database sessions
-    maxAge: 30 * 24 * 60 * 60, // Session valid for 30 days
-    updateAge: 24 * 60 * 60, // Update session every 24 hours
+    strategy: 'jwt',              // Use JWT instead of database sessions (stateless)
+    maxAge: 30 * 24 * 60 * 60,    // Session valid for 30 days (in seconds)
+    updateAge: 24 * 60 * 60,      // Update session every 24 hours (in seconds)
   },
 
-  // 5. JWT configuration
+  // ===========================================================================
+  // 5. JWT CONFIGURATION
+  // ===========================================================================
+  // Configure JWT token settings
+  // ===========================================================================
+
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // JWT valid for 30 days
+    maxAge: 30 * 24 * 60 * 60,    // JWT valid for 30 days (in seconds)
   },
 
-  // 6. Enable debug logging in development only
+  // ===========================================================================
+  // 6. DEVELOPMENT SETTINGS
+  // ===========================================================================
+  // Enable debug logging in development environment only
+  // ===========================================================================
+
   debug: process.env.NODE_ENV === 'development',
 
-  // 7. Remove custom error page to prevent redirects on error
+  // ===========================================================================
+  // 7. CUSTOM PAGES CONFIGURATION
+  // ===========================================================================
+  // Define custom pages for authentication flow
+  // Note: error page is commented out to prevent error redirects
+  // ===========================================================================
+
   pages: {
-    signIn: '/auth/signin',
-    // error: '/auth/error', // Commented out to prevent error redirects
-    signOut: '/auth/signout',
+    signIn: '/auth/signin',         // Custom sign-in page
+    // error: '/auth/error',        // Commented out to prevent error redirects
+    signOut: '/auth/signout',       // Custom sign-out page
   },
 
-  // 8. Add error handling
+  // ===========================================================================
+  // 8. CUSTOM LOGGER CONFIGURATION
+  // ===========================================================================
+  // Custom logging for NextAuth events and errors
+  // ===========================================================================
+
   logger: {
+    // Error logging
     error(code, metadata) {
       console.error('🚨 NextAuth Error:', { code, metadata })
     },
+    
+    // Warning logging
     warn(code) {
       console.warn('⚠️ NextAuth Warning:', code)
     },
+    
+    // Debug logging (development only)
     debug(code, metadata) {
       if (process.env.NODE_ENV === 'development') {
         console.log('🐛 NextAuth Debug:', { code, metadata })
@@ -354,11 +501,20 @@ export const authOptions = {
   },
 }
 
-// Helper function to refresh access tokens
+// =============================================================================
+// HELPER FUNCTION: REFRESH ACCESS TOKENS
+// =============================================================================
+// This function handles refreshing expired access tokens for different providers
+// It's called automatically by the JWT callback when tokens expire
+// =============================================================================
+
 async function refreshAccessToken(token) {
   try {
     console.log('🔄 Refreshing access token for provider:', token.provider)
 
+    // -------------------------------------------------------------------------
+    // LINKEDIN TOKEN REFRESH
+    // -------------------------------------------------------------------------
     if (token.provider === 'linkedin') {
       const response = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
         headers: {
@@ -375,6 +531,7 @@ async function refreshAccessToken(token) {
 
       const refreshedTokens = await response.json()
 
+      // Handle refresh failure
       if (!response.ok) {
         console.error('❌ Token refresh failed:', refreshedTokens)
         throw new Error(`Token refresh failed: ${response.status}`)
@@ -382,15 +539,19 @@ async function refreshAccessToken(token) {
 
       console.log('✅ Access token refreshed successfully')
       
+      // Return updated token with new access token and expiry
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
         accessTokenExpires: Date.now() + (refreshedTokens.expires_in * 1000),
-        refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+        refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Keep old refresh token if new one not provided
         error: undefined, // Clear any previous errors
       }
     }
 
+    // -------------------------------------------------------------------------
+    // GOOGLE TOKEN REFRESH
+    // -------------------------------------------------------------------------
     if (token.provider === 'google') {
       const response = await fetch('https://oauth2.googleapis.com/token', {
         headers: {
@@ -407,6 +568,7 @@ async function refreshAccessToken(token) {
 
       const refreshedTokens = await response.json()
 
+      // Handle refresh failure
       if (!response.ok) {
         console.error('❌ Google token refresh failed:', refreshedTokens)
         throw new Error(`Google token refresh failed: ${response.status}`)
@@ -414,15 +576,19 @@ async function refreshAccessToken(token) {
 
       console.log('✅ Google access token refreshed successfully')
       
+      // Return updated token with new access token and expiry
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
         accessTokenExpires: Date.now() + (refreshedTokens.expires_in * 1000),
-        refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
-        error: undefined,
+        refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Keep old refresh token if new one not provided
+        error: undefined, // Clear any previous errors
       }
     }
 
+    // -------------------------------------------------------------------------
+    // FALLBACK FOR UNSUPPORTED PROVIDERS
+    // -------------------------------------------------------------------------
     // For providers without refresh capability, return the existing token
     console.log('⚠️ No refresh logic for provider:', token.provider)
     return token
@@ -430,6 +596,7 @@ async function refreshAccessToken(token) {
   } catch (error) {
     console.error('❌ Error refreshing access token:', error)
 
+    // Return token with error flag if refresh fails
     return {
       ...token,
       error: 'RefreshAccessTokenError',
@@ -437,13 +604,26 @@ async function refreshAccessToken(token) {
   }
 }
 
-// Wrap the config in a handler using NextAuth
+// =============================================================================
+// NEXTAUTH HANDLER SETUP
+// =============================================================================
+// Wrap the configuration in a handler using NextAuth
+// This creates the actual authentication endpoints
+// =============================================================================
+
 const handler = NextAuth(authOptions)
 
 // Export the handler for GET and POST methods (required in App Router)
+// These exports create the API routes at /api/auth/*
 export { handler as GET, handler as POST }
 
+// =============================================================================
+// UTILITY FUNCTION: EMAIL COLLECTION CHECK
+// =============================================================================
 // Additional utility function to check if user needs email collection
+// This is useful for providers that don't always return email addresses
+// =============================================================================
+
 export function needsEmailCollection(session) {
   return session?.needsEmail || 
          !session?.user?.email || 

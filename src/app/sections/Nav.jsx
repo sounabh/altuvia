@@ -37,9 +37,9 @@ const Nav = () => {
 
 
         {/* Call-to-action button */}
-        <Link href={"/onboarding/signin"}>
+        <Link href={"/onboarding/signup"}>
         <button className="px-3 py-3 md:px-5 md:py-3 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white  font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
-        Sign In
+        Sign Up
         </button>
         </Link>
       </div>

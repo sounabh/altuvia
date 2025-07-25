@@ -28,7 +28,7 @@ export const WelcomeStep = ({ onNext, user }) => {
    * Safely calls the onNext callback if it exists
    */
   const handleGetStartedClick = () => {
-    console.log('🚀 Starting onboarding journey');
+   // console.log('🚀 Starting onboarding journey');
     
     if (typeof onNext === 'function') {
       onNext();
