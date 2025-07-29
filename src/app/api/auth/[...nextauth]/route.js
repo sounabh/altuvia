@@ -56,7 +56,7 @@ export const authOptions = {
       authorization: {
         url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
-          scope: "openid profile", // Only use available scopes (email requires special permission)
+          scope: "openid profile email", // Only use available scopes (email requires special permission)
           response_type: "code",   // Authorization code flow
         },
       },
