@@ -125,6 +125,10 @@ export const CountrySelectionStep = ({
     }
   };
 
+  console.log('====================================');
+  console.log(user.user.image);
+  console.log('====================================');
+
   // Get user initials for fallback avatar
   const getUserInitials = () => {
     if (user?.user.name) {
@@ -139,6 +143,8 @@ export const CountrySelectionStep = ({
     return 'U';
   };
 
+  // API Base URL - this is how you should access it in Next.js
+ 
 
   return (
     <div className="min-h-screen w-fit max-w-none">
@@ -149,10 +155,10 @@ export const CountrySelectionStep = ({
           
           {/* User Avatar with blue border */}
           <div className="relative">
-            {user?.image ? (
+            {user?.user.image ? (
               <img
-                src={user.user.image}
-                alt={`${user.name || 'User'} avatar`}
+                src={user?.user.image}
+                alt={`${user?.user.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
                   // Fallback to initials if image fails to load
@@ -164,7 +170,7 @@ export const CountrySelectionStep = ({
             
             {/* Fallback avatar with user initials */}
             <div 
-              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.image ? 'hidden' : 'flex'}`}
+              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.user.image ? 'hidden' : 'flex'}`}
             >
               {getUserInitials()}
             </div>
@@ -178,7 +184,7 @@ export const CountrySelectionStep = ({
         {/* Welcome text section */}
         <div className="text-center flex flex-col gap-5 items-center justify-center space-y-4 mb-6 mt-6 w-[80%] mx-auto">
           <h1 className="text-[2.2rem] tracking-normal font-normal leading-12 font-roboto text-black z-10">
-            <span className="text-[#8a99aa]"> Welcome </span> Martin! We are
+            <span className="text-[#8a99aa]"> Welcome </span> {user?.user.name} ! We are
             thrilled to have you here. Discover the world's leading universities
             to shape your academic journey.
           </h1>

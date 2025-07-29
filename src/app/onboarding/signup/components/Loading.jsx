@@ -50,7 +50,7 @@ export const LoadingStep = ({ userData, user, onComplete }) => {
       const payload = prepareSubmissionData();
       
       // Use your actual API base URL here - replace with your backend URL
- const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000'; // or your production URL
+ const API_BASE_URL =  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000'; // or your production URL
       
       const response = await fetch(`${API_BASE_URL}/api/user/complete-profile`, {
         method: 'POST',

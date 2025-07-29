@@ -56,15 +56,15 @@ export const CourseSelectionStep = ({
 
 
  // Get user initials for fallback avatar
-  const getUserInitials = () => {
-    if (user?.name) {
-      const names = user.name.split(' ');
+ const getUserInitials = () => {
+    if (user?.user.name) {
+      const names = user?.user.name.split(' ');
       return names.length > 1 
         ? `${names[0][0]}${names[1][0]}`.toUpperCase()
         : names[0][0].toUpperCase();
     }
-    if (user?.email) {
-      return user.email[0].toUpperCase();
+    if (user?.user.email) {
+      return user?.user.name[0].toUpperCase();
     }
     return 'U';
   };
@@ -73,15 +73,15 @@ export const CourseSelectionStep = ({
     <div className="min-h-screen w-fit max-w-none">
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
         {/* Header - Fixed width to match StudyLevelStep */}
-        <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
+         <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
           <div className="text-white text-xl font-semibold">Logo</div>
           
           {/* User Avatar with blue border */}
           <div className="relative">
-            {user?.image ? (
+            {user?.user.image ? (
               <img
-                src={user.image}
-                alt={`${user.name || 'User'} avatar`}
+                src={user?.user.image}
+                alt={`${user?.user.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
                   // Fallback to initials if image fails to load
@@ -93,13 +93,12 @@ export const CourseSelectionStep = ({
             
             {/* Fallback avatar with user initials */}
             <div 
-              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.image ? 'hidden' : 'flex'}`}
+              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.user.image ? 'hidden' : 'flex'}`}
             >
               {getUserInitials()}
             </div>
           </div>
         </header>
-
         {/* Decorative background blobs */}
         <div className="absolute top-[30%] right-[10%] w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
         <div className="absolute top-[18%] left-0 w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
@@ -107,7 +106,7 @@ export const CourseSelectionStep = ({
         {/* Welcome text section */}
         <div className="text-center flex flex-col gap-5 items-center justify-center space-y-4 mb-6 mt-6 w-[80%] mx-auto">
          <h1 className="text-[2.2rem] tracking-normal font-normal leading-12 font-roboto text-black z-10">
-            <span className="text-[#8a99aa]"> Welcome </span> Martin! We are
+            <span className="text-[#8a99aa]"> Welcome </span> {user?.user.name} ! We are
             thrilled to have you here. Discover the world's leading universities
             to shape your academic journey.
           </h1>

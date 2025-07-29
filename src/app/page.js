@@ -12,6 +12,11 @@ import Marquee from "./sections/Marqueee";
 import ProductShowcase from "./sections/Products";
 
 const page = () => {
+
+  
+  
+ 
+
   return (
     <div className="w-full  max-w-[1130px] mx-auto px-5"> 
       {/* The main page component that includes all sections px-4*/}
