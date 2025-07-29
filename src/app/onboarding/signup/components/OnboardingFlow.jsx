@@ -2,40 +2,27 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation"; // Add this import
 
 // Step Components
 import { AuthModal } from "./AuthModal";
-import { WelcomeStep } from "./Welcome";
 import { CountrySelectionStep } from "./CountrySelection";
 import { CourseSelectionStep } from "./CourseSelection";
 import { StudyLevelStep } from "./StudyLevel";
 import { AcademicSnapshotStep } from "./AcademicSnapshot";
 import { PaymentStep } from "./PaymentSteps";
 import { LoadingStep } from "./Loading";
-import { ProgressIndicator } from "./ProgressIndicator";
-
-// -----------------------------------------------------------------------------
-// OnboardingFlow: Handles multi-step user onboarding with authentication,
-// data collection, and optional payment step.
-// -----------------------------------------------------------------------------
 
 export const OnboardingFlow = () => {
-  // Get session from NextAuth
   const { data: session, status } = useSession();
-
-  // Track current step index
+  const router = useRouter(); // Add router for navigation
+  
   const [currentStep, setCurrentStep] = useState(-1);
-
-  // Auth Modal visibility state
   const [showAuthModal, setShowAuthModal] = useState(false);
-
-  // Store user information from authentication
   const [user, setUser] = useState(null);
-
-  // Add a force render counter to help with state issues
   const [renderKey, setRenderKey] = useState(0);
 
-  // Centralized data state for user input across all steps
+  // Centralized data state
   const [data, setData] = useState({
     countries: [],
     courses: [],
@@ -44,7 +31,6 @@ export const OnboardingFlow = () => {
     paymentInfo: {}  
   });
 
-  // List of step names for ProgressIndicator
   const steps = [
     "Countries", 
     "Courses",
@@ -56,89 +42,85 @@ export const OnboardingFlow = () => {
 
   // Initialize the flow based on authentication status
   useEffect(() => {
-    if (status === "loading") {
-      // Still checking authentication status
-      return;
-    }
+    if (status === "loading") return;
 
     if (session && session.user) {
-      // User is already logged in - skip auth modal and welcome step
-      console.log('✅ User already authenticated, skipping to Country selection');
-      console.log('👤 Session user data:', session.user);
-      setUser(session.user);
+      console.log('✅ User already authenticated, starting onboarding');
+      setUser(session);
       setShowAuthModal(false);
-      setCurrentStep(1); // Start at Country Selection (index 1)
+      setCurrentStep(0);
     } else {
-      // User is not logged in - show auth modal
       console.log('🔐 No session found, showing auth modal');
       setShowAuthModal(true);
       setCurrentStep(-1);
-      setUser(null); // Explicitly set user to null
+      setUser(null);
     }
   }, [session, status]);
 
-  // Called when authentication is successful (only for new logins)
+  // Handle successful authentication
   const handleAuthSuccess = useCallback((sessionData) => {
-    console.log('🔐 handleAuthSuccess called with:', sessionData);
-    
+    console.log('🔐 Authentication successful');
     setShowAuthModal(false);
-    setUser(sessionData?.user || null);
-    setCurrentStep(0); // New users go to Welcome step first
+    setUser(sessionData || null);
+    setCurrentStep(0);
     setRenderKey(prev => prev + 1);
-    
-    console.log('✅ New authentication successful, moving to Welcome step');
   }, []);
 
-  // Move to the next step - using useCallback to prevent recreation
+  // Navigation functions
   const handleNext = useCallback(() => {
-    console.log('🚀 handleNext called - Current step:', currentStep);
-    
     setCurrentStep(prevStep => {
       const nextStep = prevStep + 1;
-      console.log('📍 Moving from step:', prevStep, 'to step:', nextStep);
-      
       if (nextStep < steps.length) {
-        console.log('✅ Step transition allowed');
         setRenderKey(prev => prev + 1);
         return nextStep;
-      } else {
-        console.log('❌ Cannot proceed - already at last step');
-        return prevStep;
       }
+      return prevStep;
     });
   }, [steps.length]);
 
-  // Move to the previous step
   const handleBack = useCallback(() => {
-    console.log('⬅️ handleBack called');
-    
     setCurrentStep(prevStep => {
-      // For existing users, don't go back past Country Selection (step 1)
-      const minStep = session && session.user ? 1 : 0;
-      
-      if (prevStep > minStep) {
+      if (prevStep > 0) {
         const backStep = prevStep - 1;
-        console.log('📍 Moving back to step:', backStep);
         setRenderKey(prev => prev + 1);
         return backStep;
-      } else {
-        console.log('❌ Cannot go back - already at minimum step');
-        return prevStep;
       }
-    });
-  }, [session]);
-
-  // Update the shared user data
-  const updateData = useCallback((newData) => {
-    console.log('💾 Updating data with:', newData);
-    setData(prev => {
-      const updated = { ...prev, ...newData };
-      console.log('📋 Updated data state:', updated);
-      return updated;
+      return prevStep;
     });
   }, []);
 
-  // Show loading while checking authentication status
+  // Update shared data
+  const updateData = useCallback((newData) => {
+    setData(prev => ({ ...prev, ...newData }));
+  }, []);
+
+  // Handle onboarding completion with redirect
+  const handleOnboardingComplete = useCallback((responseData) => {
+    console.log('🎉 Onboarding completed successfully!');
+    console.log('📊 Response data:', responseData);
+    
+    // Save token to localStorage (won't work in Claude artifacts)
+    if (responseData?.token) {
+      try {
+        localStorage.setItem('authToken', responseData.token);
+        console.log('✅ Token saved successfully');
+      } catch (error) {
+        console.warn('⚠️ LocalStorage not available:', error);
+      }
+    }
+    
+    // Redirect to dashboard
+    setTimeout(() => {
+      try {
+        router.push('/dashboard');
+      } catch (error) {
+        // Fallback if router is not available
+        window.location.href = '/dashboard';
+      }
+    }, 500);
+  }, [router]);
+
+  // Loading state
   if (status === "loading") {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -150,25 +132,10 @@ export const OnboardingFlow = () => {
     );
   }
 
-  // Add debug logging for current state
-  console.log('🎬 OnboardingFlow render - Current step:', currentStep, 'User:', user, 'Session:', !!session);
-
   return (
     <div className="h-screen" key={renderKey}>
-
-      {/* --------------------------- */}
-      {/* Progress Indicator Bar     */}
-      {/* Hidden for last step       */}
-      {/* --------------------------- */}
-      
-     
-
-      {/* --------------------------- */}
-      {/* Step Components Rendered   */}
-      {/* --------------------------- */}
-
       <div className="pt-20">
-        {/* Authentication Modal - Only shown for new users */}
+        {/* Authentication Modal */}
         {showAuthModal && !session && (
           <AuthModal 
             isOpen={showAuthModal}
@@ -177,46 +144,33 @@ export const OnboardingFlow = () => {
             onSuccess={handleAuthSuccess}
           />
         )}
-        {/* Welcome Step - Only for new users */}
+
+        {/* Step 0: Country Selection */}
         {currentStep === 0 && user && (
-          <div key="welcome-step">
-            <WelcomeStep 
-              user={user}
-              onNext={handleNext}
-            />
-          </div>
+          <CountrySelectionStep 
+            selectedCountries={data.countries}
+            user={user}
+            onNext={handleNext}
+            onBack={handleBack}
+            onUpdate={(countries) => updateData({ countries })}
+            step={1}
+          />
         )}
 
-        {/* Country Selection Step - Only render if user is available */}
+        {/* Step 1: Course Selection */}
         {currentStep === 1 && user && (
-          <div key="country-step">
-            <CountrySelectionStep 
-              selectedCountries={data.countries}
-              user={user}
-              onNext={handleNext}
-              onBack={handleBack}
-              onUpdate={(countries) => updateData({ countries })}
-              step={1}
-            />
-          </div>
+          <CourseSelectionStep 
+            selectedCourses={data.courses}
+            user={user}
+            onNext={handleNext}
+            onBack={handleBack}
+            onUpdate={(courses) => updateData({ courses })}
+            step={2}
+          />
         )}
 
-        {/* Course Selection Step */}
+        {/* Step 2: Study Level */}
         {currentStep === 2 && user && (
-          <div key="course-step">
-            <CourseSelectionStep 
-              selectedCourses={data.courses}
-              user={user}
-              onNext={handleNext}
-              onBack={handleBack}
-              onUpdate={(courses) => updateData({ courses })}
-              step={2}
-            />
-          </div>
-        )}
-
-        {/* Study Level Step */}
-        {currentStep === 3 && user && (
           <StudyLevelStep 
             selectedLevel={data.studyLevel}
             user={user}
@@ -227,8 +181,8 @@ export const OnboardingFlow = () => {
           />
         )}
 
-        {/* Academic Snapshot Step */}
-        {currentStep === 4 && user && (
+        {/* Step 3: Academic Snapshot */}
+        {currentStep === 3 && user && (
           <AcademicSnapshotStep 
             academicInfo={data.academicInfo}
             user={user}
@@ -239,8 +193,8 @@ export const OnboardingFlow = () => {
           />
         )}
 
-        {/* Payment Step */}
-        {currentStep === 5 && user && (
+        {/* Step 4: Payment */}
+        {currentStep === 4 && user && (
           <PaymentStep 
             paymentInfo={data.paymentInfo}
             user={user}
@@ -251,17 +205,16 @@ export const OnboardingFlow = () => {
           />
         )}
 
-        {/* Loading Step */}
-        {currentStep === 6 && user && (
+        {/* Step 5: Loading */}
+        {currentStep === 5 && user && (
           <LoadingStep 
             userData={data}
             user={user}
+            onComplete={handleOnboardingComplete}
           />
         )}
 
-        {/* Auth Modal also gets user data when available */}
-
-        {/* Show loading if we're waiting for user state to be set */}
+        {/* Loading state for user data */}
         {currentStep >= 0 && !user && (
           <div className="h-screen flex items-center justify-center">
             <div className="text-center">
@@ -271,23 +224,26 @@ export const OnboardingFlow = () => {
           </div>
         )}
 
-        {/* Fallback for unexpected states */}
+        {/* Error fallback */}
         {currentStep < 0 && !showAuthModal && (
           <div className="text-center p-8">
             <div className="text-red-600 font-bold mb-4">⚠️ UNEXPECTED STATE</div>
-            <p className="mb-4">Current step: {currentStep}, User: {user ? 'exists' : 'null'}, Session: {session ? 'exists' : 'null'}</p>
+            <p className="mb-4">
+              Current step: {currentStep}, User: {user ? 'exists' : 'null'}, 
+              Session: {session ? 'exists' : 'null'}
+            </p>
             <button 
               onClick={() => {
-                if (session && session.user) {
-                  setUser(session.user);
-                  setCurrentStep(1);
-                } else {
+                if (session?.user) {
+                  setUser(session);
                   setCurrentStep(0);
+                } else {
+                  setShowAuthModal(true);
                 }
               }}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >
-              {session ? 'Go to Country Selection' : 'Go to Welcome Step'}
+              Reset Flow
             </button>
           </div>
         )}

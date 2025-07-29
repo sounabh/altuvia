@@ -19,6 +19,8 @@ export const PaymentStep = ({
     email: paymentInfo.email || "",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleInputChange = (field, value) => {
     const updatedData = { ...formData, [field]: value };
     setFormData(updatedData);
@@ -35,14 +37,31 @@ export const PaymentStep = ({
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isFormValid()) {
       alert("Please fill in all required fields");
       return;
     }
 
     console.log("Processing payment...", formData);
-    onNext();
+    setIsSubmitting(true);
+    
+    try {
+      // Update the payment info first
+      onUpdate(formData);
+      
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Then proceed to next step
+      console.log("Payment processed, moving to next step");
+      onNext();
+    } catch (error) {
+      console.error("Payment processing error:", error);
+      alert("Payment processing failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
    // Get user initials for fallback avatar
@@ -58,7 +77,6 @@ export const PaymentStep = ({
     }
     return 'U';
   };
-
 
   return (
     <div className="min-h-screen w-fit max-w-none">
@@ -98,7 +116,7 @@ export const PaymentStep = ({
         {/* Welcome text section */}
         <div className="text-center flex flex-col gap-5 items-center justify-center space-y-4 mb-6 mt-6 w-[80%] mx-auto">
           <h1 className="text-[2.2rem] tracking-normal font-normal leading-12 font-roboto text-black z-10">
-            <span className="text-[#8a99aa]"> Welcome </span> Martin! We are
+            <span className="text-[#8a99aa]"> Welcome </span> {user?.name || 'Martin'}! We are
             thrilled to have you here. Discover the world's leading universities
             to shape your academic journey.
           </h1>
@@ -142,6 +160,7 @@ export const PaymentStep = ({
                     value={formData.name}
                     onChange={(e) => handleInputChange("name", e.target.value)}
                     className="p-3 h-10 w-full rounded-md border border-gray-400 focus:border-[#002147] focus:ring-1 focus:ring-[#e1f0ff]"
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -155,6 +174,7 @@ export const PaymentStep = ({
                     value={formData.email}
                     onChange={(e) => handleInputChange("email", e.target.value)}
                     className="p-3 h-10 w-full rounded-md border border-gray-400 focus:border-[#002147] focus:ring-1 focus:ring-[#e1f0ff]"
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -169,6 +189,7 @@ export const PaymentStep = ({
                   value={formData.cardNumber}
                   onChange={(e) => handleInputChange("cardNumber", e.target.value)}
                   className="p-3 h-10 w-full rounded-md border border-gray-400 focus:border-[#002147] focus:ring-1 focus:ring-[#e1f0ff]"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -183,6 +204,7 @@ export const PaymentStep = ({
                     value={formData.expiryDate}
                     onChange={(e) => handleInputChange("expiryDate", e.target.value)}
                     className="p-3 h-10 w-full rounded-md border border-gray-400 focus:border-[#002147] focus:ring-1 focus:ring-[#e1f0ff]"
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -195,6 +217,7 @@ export const PaymentStep = ({
                     value={formData.cvv}
                     onChange={(e) => handleInputChange("cvv", e.target.value)}
                     className="p-3 h-10 w-full rounded-md border border-gray-400 focus:border-[#002147] focus:ring-1 focus:ring-[#e1f0ff]"
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -228,19 +251,30 @@ export const PaymentStep = ({
         <div className="flex justify-between items-center w-full max-w-6xl px-4 mt-8 z-10 pb-20">
           <Button
             onClick={onBack}
+            disabled={isSubmitting}
             className="bg-[#002147] hover:bg-[#003366] text-white px-11 py-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-normal font-roboto shadow-lg ml-14"
           >
-            Backk
+            Back
             <span className="ml-2">←</span>
           </Button>
           
           <div>
             <Button
               onClick={handleSubmit}
+              disabled={isSubmitting || !isFormValid()}
               className="bg-[#002147] hover:bg-[#003366] text-white px-11 py-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-normal font-roboto shadow-lg mr-14"
             >
-              Start Free Trial
-              <span className="ml-2">→</span>
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Start Free Trial
+                  <span className="ml-2">→</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -251,13 +285,39 @@ export const PaymentStep = ({
 
 export default function PaymentStepDemo() {
   const [paymentInfo, setPaymentInfo] = useState({});
+  const [currentStep, setCurrentStep] = useState(5);
+
+  const mockUser = {
+    name: "Martin Johnson",
+    email: "martin@example.com",
+    image: null
+  };
+
+  const handleNext = () => {
+    console.log("Moving to loading step...");
+    setCurrentStep(6);
+  };
+
+  if (currentStep === 6) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Processing Your Information</h2>
+          <p className="text-gray-600">Please wait while we set up your account...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <PaymentStep
       paymentInfo={paymentInfo}
       onUpdate={setPaymentInfo}
-      onNext={() => console.log("Payment completed with:", paymentInfo)}
+      onNext={handleNext}
       onBack={() => console.log("Back clicked")}
+      step={5}
+      user={mockUser}
     />
   );
 }

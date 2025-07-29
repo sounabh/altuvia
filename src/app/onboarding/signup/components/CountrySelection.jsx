@@ -127,14 +127,14 @@ export const CountrySelectionStep = ({
 
   // Get user initials for fallback avatar
   const getUserInitials = () => {
-    if (user?.name) {
-      const names = user.name.split(' ');
+    if (user?.user.name) {
+      const names = user?.user.name.split(' ');
       return names.length > 1 
         ? `${names[0][0]}${names[1][0]}`.toUpperCase()
         : names[0][0].toUpperCase();
     }
-    if (user?.email) {
-      return user.email[0].toUpperCase();
+    if (user?.user.email) {
+      return user?.user.name[0].toUpperCase();
     }
     return 'U';
   };
@@ -151,7 +151,7 @@ export const CountrySelectionStep = ({
           <div className="relative">
             {user?.image ? (
               <img
-                src={user.image}
+                src={user.user.image}
                 alt={`${user.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
