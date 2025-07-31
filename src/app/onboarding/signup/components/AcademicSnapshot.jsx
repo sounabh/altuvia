@@ -4,9 +4,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // AcademicSnapshotStep Component
-// -----------------------------------------------------------------------------
+// =============================================================================
+/**
+ * AcademicSnapshotStep - Form step for collecting academic information during onboarding
+ * 
+ * @param {Object} props - Component properties
+ * @param {Object} [props.academicInfo={}] - Initial academic information
+ * @param {Function} [props.onNext=() => {}] - Callback when proceeding to next step
+ * @param {Function} [props.onBack=() => {}] - Callback when returning to previous step
+ * @param {Function} [props.onUpdate=() => {}] - Callback when updating form data
+ * @param {number} props.step - Current step number
+ * @param {Object} props.user - User data object
+ * @returns {JSX.Element} Academic information form interface
+ */
 export const AcademicSnapshotStep = ({
   academicInfo = {},
   onNext = () => {},
@@ -15,51 +27,93 @@ export const AcademicSnapshotStep = ({
   step,
   user
 }) => {
+  // ===========================================================================
+  // STATE MANAGEMENT
+  // ===========================================================================
+  /**
+   * Form data state with initial values from props
+   * @type {[Object, Function]} Tuple containing form data and setter
+   */
   const [formData, setFormData] = useState(academicInfo);
 
+  // ===========================================================================
+  // EVENT HANDLERS
+  // ===========================================================================
+  /**
+   * Handles input field changes and updates form state
+   * 
+   * @param {string} field - Field name to update
+   * @param {string} value - New value for the field
+   */
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  /**
+   * Handles skip action - proceeds without saving data
+   */
   const handleSkip = () => {
     onNext();
   };
 
+  /**
+   * Handles form submission:
+   * 1. Updates parent component with current form data
+   * 2. Proceeds to next step
+   */
   const handleSubmit = () => {
     onUpdate(formData);
     onNext();
   };
 
+  /**
+   * Handles back navigation - returns to previous step
+   */
   const handleBack = () => {
     onBack();
   };
 
-
- // Get user initials for fallback avatar
- const getUserInitials = () => {
+  // ===========================================================================
+  // UTILITY FUNCTIONS
+  // ===========================================================================
+  /**
+   * Generates user initials for avatar fallback
+   * Fallback hierarchy:
+   * 1. First letters of first and last name
+   * 2. First letter of email
+   * 3. Default 'U' if no user data
+   * 
+   * @returns {string} User initials in uppercase
+   */
+  const getUserInitials = () => {
+    // Handle full name if available
     if (user?.user.name) {
       const names = user?.user.name.split(' ');
       return names.length > 1 
         ? `${names[0][0]}${names[1][0]}`.toUpperCase()
         : names[0][0].toUpperCase();
     }
+    
+    // Fallback to email if name not available
     if (user?.user.email) {
       return user?.user.name[0].toUpperCase();
     }
+    
+    // Ultimate fallback
     return 'U';
   };
 
-  // ---------------------------------------------------------------------------
-  // Render - Updated to match StudyLevelStep styling
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // RENDER COMPONENT
+  // ===========================================================================
   return (
     <div className="min-h-screen w-fit max-w-none">
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
-        {/* Header - logo and avatar */}
-         <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
+        {/* HEADER SECTION: Logo and user avatar */}
+        <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
           <div className="text-white text-xl font-semibold">Logo</div>
           
-          {/* User Avatar with blue border */}
+          {/* USER AVATAR: With fallback to initials */}
           <div className="relative">
             {user?.user.image ? (
               <img
@@ -67,14 +121,14 @@ export const AcademicSnapshotStep = ({
                 alt={`${user?.user.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
-                  // Fallback to initials if image fails to load
+                  // Fallback mechanism: Hide broken image and show initials
                   e.target.style.display = 'none';
                   e.target.nextSibling.style.display = 'flex';
                 }}
               />
             ) : null}
             
-            {/* Fallback avatar with user initials */}
+            {/* FALLBACK AVATAR: Shows user initials */}
             <div 
               className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.user.image ? 'hidden' : 'flex'}`}
             >
@@ -83,11 +137,11 @@ export const AcademicSnapshotStep = ({
           </div>
         </header>
 
-        {/* Decorative background blobs - Same as StudyLevelStep */}
+        {/* DECORATIVE BACKGROUND ELEMENTS */}
         <div className="absolute top-[30%] right-[10%] w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
         <div className="absolute top-[18%] left-0 w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
 
-        {/* Welcome text section */}
+        {/* WELCOME MESSAGE SECTION */}
         <div className="text-center flex flex-col gap-5 items-center justify-center space-y-4 mb-6 mt-6 w-[80%] mx-auto">
           <h1 className="text-[2.2rem] tracking-normal font-normal leading-12 font-roboto text-black z-10">
             <span className="text-[#8a99aa]"> Welcome </span> {user?.user.name} ! We are
@@ -100,7 +154,7 @@ export const AcademicSnapshotStep = ({
           </p>
         </div>
 
-        {/* Step indicator - Same as StudyLevelStep */}
+        {/* STEP INDICATOR */}
         <div className="text-center mb-8 mt-10">
           <div className="inline-flex items-center bg-blue-100 text-black px-4 py-2 rounded-lg font-semibold text-sm mb-4">
              Step {`0${step}`} 
@@ -110,11 +164,11 @@ export const AcademicSnapshotStep = ({
           </p>
         </div>
 
-        {/* Form card - Styled to match StudyLevelStep cards */}
+        {/* FORM SECTION: Academic information inputs */}
         <div className="mb-8 flex justify-center z-10 w-full">
           <div className="bg-white p-8 rounded-2xl  shadow-xl w-full max-w-4xl">
             <div className="space-y-6">
-              {/* GPA */}
+              {/* GPA INPUT */}
               <div className="space-y-2">
                 <Label
                   htmlFor="gpa"
@@ -131,7 +185,7 @@ export const AcademicSnapshotStep = ({
                 />
               </div>
 
-              {/* Test Scores */}
+              {/* TEST SCORES INPUT */}
               <div className="space-y-2">
                 <Label
                   htmlFor="testScores"
@@ -148,7 +202,7 @@ export const AcademicSnapshotStep = ({
                 />
               </div>
 
-              {/* Work Experience */}
+              {/* WORK EXPERIENCE TEXTAREA */}
               <div className="space-y-2">
                 <Label
                   htmlFor="workExperience"
@@ -170,7 +224,7 @@ export const AcademicSnapshotStep = ({
           </div>
         </div>
 
-        {/* Navigation buttons - Fixed to match StudyLevelStep */}
+        {/* NAVIGATION BUTTONS */}
         <div className="flex justify-between items-center w-full max-w-6xl px-4 mt-8 z-10 pb-20">
           <Button
             onClick={handleBack}
@@ -201,9 +255,9 @@ export const AcademicSnapshotStep = ({
   );
 };
 
-// -----------------------------------------------------------------------------
-// Demo Wrapper Component
-// -----------------------------------------------------------------------------
+// =============================================================================
+// Demo Wrapper Component (For development/testing)
+// =============================================================================
 export default function AcademicSnapshotDemo() {
   const [academicInfo, setAcademicInfo] = useState({});
 

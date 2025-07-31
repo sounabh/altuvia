@@ -3,6 +3,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// =============================================================================
+// PaymentStep Component
+// =============================================================================
+/**
+ * PaymentStep - Form step for collecting payment information during onboarding
+ * 
+ * Features:
+ * - Collects credit card details (card number, expiry, CVV)
+ * - Collects name and email for payment processing
+ * - Includes a 7-day trial benefits display
+ * - Handles form validation and submission
+ * 
+ * Security Note: 
+ *   This is a frontend-only implementation. In production:
+ *   - Never handle raw credit card numbers on frontend
+ *   - Use PCI-compliant payment processors (Stripe, Braintree)
+ *   - Implement tokenization to avoid handling sensitive data
+ * 
+ * @param {Object} props - Component properties
+ * @param {Object} [props.paymentInfo={}] - Initial payment information
+ * @param {Function} [props.onNext=() => {}] - Callback when proceeding to next step
+ * @param {Function} [props.onBack=() => {}] - Callback when returning to previous step
+ * @param {Function} [props.onUpdate=() => {}] - Callback when updating payment info
+ * @param {number} props.step - Current step number
+ * @param {Object} props.user - User data object
+ * @returns {JSX.Element} Payment information form interface
+ */
 export const PaymentStep = ({
   paymentInfo = {},
   onNext = () => {},
@@ -11,22 +38,49 @@ export const PaymentStep = ({
   step,
   user
 }) => {
+  // ===========================================================================
+  // STATE MANAGEMENT
+  // ===========================================================================
+  /**
+   * Form data state with initial values from props
+   * @type {[Object, Function]} Tuple containing form data and setter
+   */
   const [formData, setFormData] = useState({
-    cardNumber: paymentInfo.cardNumber || "",
-    expiryDate: paymentInfo.expiryDate || "",
-    cvv: paymentInfo.cvv || "",
-    name: paymentInfo.name || "",
-    email: paymentInfo.email || "",
+    cardNumber: paymentInfo.cardNumber || "",      // Fallback: empty string
+    expiryDate: paymentInfo.expiryDate || "",      // Fallback: empty string
+    cvv: paymentInfo.cvv || "",                    // Fallback: empty string
+    name: paymentInfo.name || "",                  // Fallback: empty string
+    email: paymentInfo.email || "",                // Fallback: empty string
   });
 
+  /**
+   * Submission state
+   * @type {[boolean, Function]} Tuple indicating if form is submitting
+   */
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ===========================================================================
+  // EVENT HANDLERS
+  // ===========================================================================
+  /**
+   * Handles input field changes:
+   * 1. Updates local form state
+   * 2. Propagates changes to parent component
+   * 
+   * @param {string} field - Field name to update
+   * @param {string} value - New value for the field
+   */
   const handleInputChange = (field, value) => {
     const updatedData = { ...formData, [field]: value };
     setFormData(updatedData);
     onUpdate(updatedData);
   };
 
+  /**
+   * Validates required form fields
+   * 
+   * @returns {boolean} True if all required fields are filled
+   */
   const isFormValid = () => {
     return (
       formData.cardNumber.trim() !== "" &&
@@ -37,7 +91,18 @@ export const PaymentStep = ({
     );
   };
 
+  /**
+   * Handles form submission:
+   * 1. Validates form
+   * 2. Updates parent with payment info
+   * 3. Proceeds to next step after delay
+   * 
+   * Error Handling:
+   * - Shows alert for validation errors
+   * - Catches processing errors and shows alert
+   */
   const handleSubmit = async () => {
+    // Validate required fields
     if (!isFormValid()) {
       alert("Please fill in all required fields");
       return;
@@ -47,13 +112,13 @@ export const PaymentStep = ({
     setIsSubmitting(true);
     
     try {
-      // Update the payment info first
+      // Propagate updated payment info to parent
       onUpdate(formData);
       
-      // Small delay to ensure state is updated
+      // Small delay to ensure state updates propagate
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Then proceed to next step
+      // Proceed to next step
       console.log("Payment processed, moving to next step");
       onNext();
     } catch (error) {
@@ -64,27 +129,48 @@ export const PaymentStep = ({
     }
   };
 
-   // Get user initials for fallback avatar
+  // ===========================================================================
+  // UTILITY FUNCTIONS
+  // ===========================================================================
+  /**
+   * Generates user initials for avatar fallback
+   * 
+   * Fallback hierarchy:
+   * 1. First letters of first and last name
+   * 2. First letter of email
+   * 3. Default 'U' if no user data
+   * 
+   * @returns {string} User initials in uppercase
+   */
   const getUserInitials = () => {
+    // Handle full name if available
     if (user?.user.name) {
       const names = user?.user.name.split(' ');
       return names.length > 1 
         ? `${names[0][0]}${names[1][0]}`.toUpperCase()
         : names[0][0].toUpperCase();
     }
+    
+    // Fallback to email if name not available
     if (user?.user.email) {
       return user?.user.name[0].toUpperCase();
     }
+    
+    // Ultimate fallback
     return 'U';
   };
+
+  // ===========================================================================
+  // RENDER COMPONENT
+  // ===========================================================================
   return (
     <div className="min-h-screen w-fit max-w-none">
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
-        {/* Header - logo and avatar */}
-           <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
+        {/* HEADER SECTION: Logo and user avatar */}
+        <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
           <div className="text-white text-xl font-semibold">Logo</div>
           
-          {/* User Avatar with blue border */}
+          {/* USER AVATAR: With fallback to initials */}
           <div className="relative">
             {user?.user.image ? (
               <img
@@ -92,14 +178,14 @@ export const PaymentStep = ({
                 alt={`${user?.user.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
-                  // Fallback to initials if image fails to load
+                  // Fallback mechanism: Hide broken image and show initials
                   e.target.style.display = 'none';
                   e.target.nextSibling.style.display = 'flex';
                 }}
               />
             ) : null}
             
-            {/* Fallback avatar with user initials */}
+            {/* FALLBACK AVATAR: Shows user initials */}
             <div 
               className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.user.image ? 'hidden' : 'flex'}`}
             >
@@ -108,11 +194,11 @@ export const PaymentStep = ({
           </div>
         </header>
 
-        {/* Decorative background blobs */}
+        {/* DECORATIVE BACKGROUND ELEMENTS */}
         <div className="absolute top-[30%] right-[10%] w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
         <div className="absolute top-[18%] left-0 w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
 
-        {/* Welcome text section */}
+        {/* WELCOME MESSAGE SECTION */}
         <div className="text-center flex flex-col gap-5 items-center justify-center space-y-4 mb-6 mt-6 w-[80%] mx-auto">
           <h1 className="text-[2.2rem] tracking-normal font-normal leading-12 font-roboto text-black z-10">
             <span className="text-[#8a99aa]"> Welcome </span> {user?.user.name} ! We are
@@ -124,18 +210,19 @@ export const PaymentStep = ({
           </p>
         </div>
 
-        {/* Step Label */}
+        {/* STEP INDICATOR */}
         <div className="text-center mb-4 mt-6">
           <div className="inline-flex items-center bg-blue-100 text-black px-3 py-1.5 rounded-lg font-semibold text-sm mb-2">
             Step {`0${step}`} 
           </div>
           <p className="text-sm text-black font-medium z-10 mt-4 mb-8">
-         Enter card details - you wont be charged today
+            Enter card details - you wont be charged today
           </p>
         </div>
 
-        {/* Main Card */}
+        {/* PAYMENT FORM CARD */}
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl py-10 px-16 border-2 border-gray-200 shadow-xl mb-6 w-full max-w-[1000px] z-10">
+          {/* SECURITY BADGE AND TRIAL NOTE */}
           <div className="flex items-center justify-between mb-8">
             <div className="inline-flex items-center bg-green-50 text-green-700 px-4 py-2 rounded-full font-medium text-sm border border-green-200">
               🔒 Secure Payment
@@ -146,9 +233,11 @@ export const PaymentStep = ({
           </div>
 
           <div className="w-full">
-            {/* Form Fields */}
+            {/* FORM FIELDS */}
             <div className="space-y-6 w-full">
+              {/* NAME AND EMAIL - Responsive grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Full Name Field */}
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-[13px] font-normal font-roboto text-black">
                     Full Name
@@ -162,6 +251,8 @@ export const PaymentStep = ({
                     disabled={isSubmitting}
                   />
                 </div>
+                
+                {/* Email Field */}
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-[13px] font-normal font-roboto text-black">
                     Email Address
@@ -178,6 +269,7 @@ export const PaymentStep = ({
                 </div>
               </div>
 
+              {/* Card Number Field */}
               <div className="space-y-2">
                 <Label htmlFor="cardNumber" className="text-[13px] font-normal font-roboto text-black">
                   Card Number
@@ -192,7 +284,9 @@ export const PaymentStep = ({
                 />
               </div>
 
+              {/* Expiry and CVV - Responsive grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Expiry Date Field */}
                 <div className="space-y-2">
                   <Label htmlFor="expiryDate" className="text-[13px] font-normal font-roboto text-black">
                     Expiry Date
@@ -206,6 +300,8 @@ export const PaymentStep = ({
                     disabled={isSubmitting}
                   />
                 </div>
+                
+                {/* CVV Field */}
                 <div className="space-y-2">
                   <Label htmlFor="cvv" className="text-[13px] font-normal font-roboto text-black">
                     CVV
@@ -222,7 +318,7 @@ export const PaymentStep = ({
               </div>
             </div>
 
-            {/* Benefits Box - Now below form fields with full width */}
+            {/* BENEFITS DISPLAY */}
             <div className="bg-[#e1f0ff]/40 p-6 rounded-xl border border-[#e1f0ff]/60 mt-8 w-full">
               <h3 className="font-medium text-[#002147] text-base mb-4">
                 Your 7-day trial includes:
@@ -246,8 +342,9 @@ export const PaymentStep = ({
           </div>
         </div>
 
-        {/* Navigation Buttons */}
+        {/* NAVIGATION BUTTONS */}
         <div className="flex justify-between items-center w-full max-w-6xl px-4 mt-8 z-10 pb-20">
+          {/* BACK BUTTON */}
           <Button
             onClick={onBack}
             disabled={isSubmitting}
@@ -257,6 +354,7 @@ export const PaymentStep = ({
             <span className="ml-2">←</span>
           </Button>
           
+          {/* SUBMIT BUTTON */}
           <div>
             <Button
               onClick={handleSubmit}
@@ -282,41 +380,3 @@ export const PaymentStep = ({
   );
 };
 
-export default function PaymentStepDemo() {
-  const [paymentInfo, setPaymentInfo] = useState({});
-  const [currentStep, setCurrentStep] = useState(5);
-
-  const mockUser = {
-    name: "Martin Johnson",
-    email: "martin@example.com",
-    image: null
-  };
-
-  const handleNext = () => {
-    console.log("Moving to loading step...");
-    setCurrentStep(6);
-  };
-
-  if (currentStep === 6) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Processing Your Information</h2>
-          <p className="text-gray-600">Please wait while we set up your account...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <PaymentStep
-      paymentInfo={paymentInfo}
-      onUpdate={setPaymentInfo}
-      onNext={handleNext}
-      onBack={() => console.log("Back clicked")}
-      step={5}
-      user={mockUser}
-    />
-  );
-}

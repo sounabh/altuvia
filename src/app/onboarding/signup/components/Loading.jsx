@@ -1,15 +1,26 @@
 import { useEffect, useState, useRef } from "react";
 
+/**
+ * LoadingStep component - Handles the profile submission and loading visualization
+ * 
+ * @param {Object} props - Component properties
+ * @param {Object} props.userData - User data collected during onboarding
+ * @param {Function} props.onComplete - Callback invoked when submission completes
+ * @returns {JSX.Element} Loading interface with progress visualization
+ */
 export const LoadingStep = ({ userData, onComplete }) => {
-  const [progress, setProgress] = useState(0);
-  const [currentMessage, setCurrentMessage] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
-  const [isComplete, setIsComplete] = useState(false);
-  const [dots, setDots] = useState("");
+  // State management
+  const [progress, setProgress] = useState(0);              // Progress percentage (0-100)
+  const [currentMessage, setCurrentMessage] = useState(0);   // Index of current loading message
+  const [isSubmitting, setIsSubmitting] = useState(false);   // API submission status
+  const [submitError, setSubmitError] = useState(null);      // Submission error message
+  const [isComplete, setIsComplete] = useState(false);      // Completion status
+  const [dots, setDots] = useState("");                     // Animated dots for loading text
 
+  // Ref to prevent duplicate submissions
   const hasSubmittedRef = useRef(false);
 
+  // Loading messages displayed during the process
   const messages = [
     "Analyzing your preferences",
     "Matching you with universities",
@@ -19,140 +30,45 @@ export const LoadingStep = ({ userData, onComplete }) => {
     "Almost ready",
   ];
 
-  const authData =
-    typeof window !== "undefined" ? localStorage.getItem("authData") : null;
+  // Retrieve authentication token from localStorage
+  const authData = typeof window !== "undefined" 
+    ? localStorage.getItem("authData") 
+    : null;
   const token = authData ? JSON.parse(authData).token : null;
 
-  // Animated dots effect
+  // ================================================================
+  // ANIMATION EFFECTS
+  // ================================================================
+
+  /**
+   * Animated dots effect for loading indicators
+   * Cycles through "...", "..", ".", "" every 500ms
+   */
   useEffect(() => {
     const dotsInterval = setInterval(() => {
-      setDots((prev) => {
-        if (prev === "...") return "";
-        return prev + ".";
-      });
+      setDots((prev) => (prev === "..." ? "" : prev + "."));
     }, 500);
 
     return () => clearInterval(dotsInterval);
   }, []);
 
-  // Prepare data for submission
-  const prepareSubmissionData = () => {
-    return {
-      preferences: {
-        countries: userData?.countries || [],
-        courses: userData?.courses || [],
-        studyLevel: userData?.studyLevel || "",
-      },
-      academicInfo: userData?.academicInfo || {},
-      paymentInfo: {
-        name: userData?.paymentInfo?.name || "",
-        email: userData?.paymentInfo?.email || "",
-        cardNumber: userData?.paymentInfo?.cardNumber
-          ? "****" + userData.paymentInfo.cardNumber.slice(-4)
-          : "",
-      },
-    };
-  };
-
-  // Submit data to backend
-  const submitData = async () => {
-    if (hasSubmittedRef.current) return;
-
-    setIsSubmitting(true);
-    setSubmitError(null);
-    hasSubmittedRef.current = true;
-
-    try {
-      const payload = prepareSubmissionData();
-
-      // Use your actual API base URL here - replace with your backend URL
-     const API_BASE_URL =
-        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/user/complete-profile`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json", // THIS WAS MISSING!
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success !== false) {
-        setIsComplete(true);
-
-        if (data.token) {
-          try {
-            const authData = {
-              token: data.token,
-              userId: data.data.userId,
-              name: data.data.name,
-              email: data.data.email,
-            };
-
-            localStorage.setItem("authData", JSON.stringify(authData));
-            console.log("✅ Token saved to localStorage");
-          } catch (error) {
-            console.warn("⚠️ Could not save token to localStorage:", error);
-          }
-        }
-
-        // Complete the onboarding after a delay
-        if (onComplete && typeof onComplete === "function") {
-          setTimeout(() => {
-            onComplete(data);
-          }, 2000);
-        }
-      } else {
-        throw new Error(data?.message || "Submission failed");
-      }
-    } catch (error) {
-      hasSubmittedRef.current = false;
-
-      let errorMessage = "Failed to submit data. Please try again.";
-
-      if (error.name === "TypeError" && error.message.includes("fetch")) {
-        errorMessage =
-          "Network error: Could not reach server. Check if backend is running.";
-      } else {
-        errorMessage = error.message;
-      }
-
-      setSubmitError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRetry = () => {
-    hasSubmittedRef.current = false;
-    setSubmitError(null);
-    submitData();
-  };
-
-  // Progress animation
+  /**
+   * Progress animation and message rotation
+   * - Progress increases by 4% every 100ms until 100%
+   * - Messages rotate every 1500ms
+   */
   useEffect(() => {
-    let progressInterval;
-    let messageInterval;
-
-    progressInterval = setInterval(() => {
+    let progressInterval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(progressInterval);
-          clearInterval(messageInterval);
           return 100;
         }
         return prev + 4;
       });
     }, 100);
 
-    messageInterval = setInterval(() => {
+    let messageInterval = setInterval(() => {
       setCurrentMessage((prev) => (prev + 1) % messages.length);
     }, 1500);
 
@@ -162,22 +78,153 @@ export const LoadingStep = ({ userData, onComplete }) => {
     };
   }, []);
 
-  // Submit when progress complete
-  useEffect(() => {
-    if (
-      progress === 100 &&
-      !isSubmitting &&
-      !submitError &&
-      !hasSubmittedRef.current
-    ) {
-      const submitTimer = setTimeout(() => {
-        submitData();
-      }, 1000);
+  // ================================================================
+  // DATA SUBMISSION LOGIC
+  // ================================================================
 
+  /**
+   * Prepares user data for submission with fallbacks
+   * 
+   * Security Note: Masks credit card details before sending to backend
+   * 
+   * @returns {Object} Structured submission payload
+   */
+  const prepareSubmissionData = () => ({
+    preferences: {
+      countries: userData?.countries || [],  // Fallback: empty array
+      courses: userData?.courses || [],      // Fallback: empty array
+      studyLevel: userData?.studyLevel || "", // Fallback: empty string
+    },
+    academicInfo: userData?.academicInfo || {}, // Fallback: empty object
+    paymentInfo: {
+      name: userData?.paymentInfo?.name || "",
+      email: userData?.paymentInfo?.email || "",
+      // Mask card number: show only last 4 digits
+      cardNumber: userData?.paymentInfo?.cardNumber
+        ? "****" + userData.paymentInfo.cardNumber.slice(-4)
+        : "",
+    },
+  });
+
+  /**
+   * Submits user data to backend API
+   * 
+   * Security Features:
+   * - Uses JWT token from localStorage for authorization
+   * - Implements credentials: "include" for cookie handling
+   * - Handles token refresh by updating localStorage
+   * 
+   * Error Handling:
+   * - Catches network errors (e.g., backend unreachable)
+   * - Handles API error responses
+   * - Provides user-friendly error messages
+   */
+  const submitData = async () => {
+    // Prevent duplicate submissions
+    if (hasSubmittedRef.current) return;
+    hasSubmittedRef.current = true;
+    
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const payload = prepareSubmissionData();
+      
+      // Get API base URL with fallback to localhost
+      const API_BASE_URL = 
+        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/user/complete-profile`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json", // Required for JSON payloads
+            Authorization: `Bearer ${token}`,    // JWT authentication
+          },
+          credentials: "include",                // Include cookies in request
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+
+      // Handle successful response
+      if (response.ok && data.success !== false) {
+        setIsComplete(true);
+
+        // Update auth token if new one provided
+        if (data.token) {
+          try {
+            const authData = {
+              token: data.token,
+              userId: data.data.userId,
+              name: data.data.name,
+              email: data.data.email,
+            };
+            localStorage.setItem("authData", JSON.stringify(authData));
+            console.log("✅ Token saved to localStorage");
+          } catch (error) {
+            console.warn("⚠️ Could not save token to localStorage:", error);
+          }
+        }
+
+        // Trigger completion callback after delay
+        if (onComplete) setTimeout(() => onComplete(data), 2000);
+      } 
+      // Handle API errors
+      else {
+        throw new Error(data?.message || "Submission failed");
+      }
+    } catch (error) {
+      // Reset submission lock on error
+      hasSubmittedRef.current = false;
+      
+      let errorMessage = "Failed to submit data. Please try again.";
+      
+      // Detect network errors
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
+        errorMessage = "Network error: Could not reach server. Check if backend is running.";
+      } else {
+        errorMessage = error.message;
+      }
+      
+      setSubmitError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /** Retry handler for failed submissions */
+  const handleRetry = () => {
+    hasSubmittedRef.current = false;
+    setSubmitError(null);
+    submitData();
+  };
+
+  // ================================================================
+  // SUBMISSION TRIGGER
+  // ================================================================
+
+  /**
+   * Auto-submit when progress reaches 100%
+   * Conditions:
+   * - Progress is 100%
+   * - Not currently submitting
+   * - No existing errors
+   * - Haven't already submitted
+   */
+  useEffect(() => {
+    if (progress === 100 && !isSubmitting && !submitError && !hasSubmittedRef.current) {
+      const submitTimer = setTimeout(submitData, 1000);
       return () => clearTimeout(submitTimer);
     }
   }, [progress, isSubmitting, submitError]);
 
+  // ================================================================
+  // RENDER COMPONENT
+  // ================================================================
+  
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 overflow-y-auto">
       <div className="max-w-6xl mx-auto space-y-6">

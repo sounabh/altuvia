@@ -4,7 +4,7 @@
 // This file configures NextAuth.js for authentication with Google, LinkedIn
 // and Credentials providers, including token management, session handling, 
 // and comprehensive error handling with detailed logging.
-// ALL TOKENS SET TO 10 MINUTES EXPIRATION
+// ALL TOKENS SET TO 30 DAYS EXPIRATION
 // =============================================================================
 
 // Import NextAuth core library
@@ -323,13 +323,13 @@ export const authOptions = {
           })
 
           // Return the initial token with all necessary data
-          // Set access token expiry to 10 minutes from now
+          // Set access token expiry to 30 days from now
           return {
             ...token,
             provider: account.provider,                    // OAuth provider name
             accessToken: account.access_token,             // Access token from provider
             refreshToken: account.refresh_token,           // Refresh token (if available)
-            accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
+            accessTokenExpires: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days from now
             user: {
               id: user.id,
               name: user.name,
@@ -351,7 +351,7 @@ export const authOptions = {
             ...token,
             provider: user.provider,                    // 'credentials' provider
             accessToken: null,                          // No access token for credentials
-            accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
+            accessTokenExpires: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days from now
             user: {
               id: user.id,
               name: user.name,
@@ -497,25 +497,25 @@ export const authOptions = {
   },
 
   // ===========================================================================
-  // 4. SESSION CONFIGURATION - CHANGED TO 10 MINUTES
+  // 4. SESSION CONFIGURATION - CHANGED TO 30 DAYS
   // ===========================================================================
   // Configure how sessions are managed and stored
   // ===========================================================================
 
   session: {
     strategy: 'jwt',              // Use JWT instead of database sessions (stateless)
-    maxAge: 10 * 60,              // Session valid for 10 minutes (in seconds)
-    updateAge: 5 * 60,            // Update session every 5 minutes (in seconds)
+    maxAge: 30 * 24 * 60 * 60,    // Session valid for 30 days (in seconds)
+    updateAge: 24 * 60 * 60,      // Update session every 24 hours (in seconds)
   },
 
   // ===========================================================================
-  // 5. JWT CONFIGURATION - CHANGED TO 10 MINUTES
+  // 5. JWT CONFIGURATION - CHANGED TO 30 DAYS
   // ===========================================================================
   // Configure JWT token settings
   // ===========================================================================
 
   jwt: {
-    maxAge: 10 * 60,              // JWT valid for 10 minutes (in seconds)
+    maxAge: 30 * 24 * 60 * 60,    // JWT valid for 30 days (in seconds)
   },
 
   // ===========================================================================
@@ -566,7 +566,7 @@ export const authOptions = {
 }
 
 // =============================================================================
-// HELPER FUNCTION: REFRESH ACCESS TOKENS - UPDATED FOR 10 MINUTE EXPIRY
+// HELPER FUNCTION: REFRESH ACCESS TOKENS - UPDATED FOR 30 DAY EXPIRY
 // =============================================================================
 // This function handles refreshing expired access tokens for different providers
 // It's called automatically by the JWT callback when tokens expire
@@ -603,11 +603,11 @@ async function refreshAccessToken(token) {
 
       console.log('✅ Access token refreshed successfully')
       
-      // Return updated token with new access token and 10-minute expiry
+      // Return updated token with new access token and 30-day expiry
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
-        accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
+        accessTokenExpires: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days from now
         refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Keep old refresh token if new one not provided
         error: undefined, // Clear any previous errors
       }
@@ -640,11 +640,11 @@ async function refreshAccessToken(token) {
 
       console.log('✅ Google access token refreshed successfully')
       
-      // Return updated token with new access token and 10-minute expiry
+      // Return updated token with new access token and 30-day expiry
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
-        accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
+        accessTokenExpires: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days from now
         refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Keep old refresh token if new one not provided
         error: undefined, // Clear any previous errors
       }

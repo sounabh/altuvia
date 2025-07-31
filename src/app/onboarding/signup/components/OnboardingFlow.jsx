@@ -1,4 +1,4 @@
-"use client";
+"use client"; // Indicates this is a Client Component in Next.js
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -14,31 +14,34 @@ import { PaymentStep } from "./PaymentSteps";
 import { LoadingStep } from "./Loading";
 
 export const OnboardingFlow = () => {
+  // NextAuth session hook to get authentication status
   const { data: session, status } = useSession();
-  const router = useRouter();
+  const router = useRouter(); // Router for navigation
 
-  const [currentStep, setCurrentStep] = useState(-1);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [user, setUser] = useState(null);
-  const [renderKey, setRenderKey] = useState(0);
-  const [studentId, setStudentId] = useState(null);
-  const [tokenexpired, setTokenExpired] = useState(false);
-  const [isCheckingUser, setIsCheckingUser] = useState(false);
-  const [userHasProfile, setUserHasProfile] = useState(false);
+  // State variables for managing onboarding flow
+  const [currentStep, setCurrentStep] = useState(-1); // Current step in onboarding (-1 = not started)
+  const [showAuthModal, setShowAuthModal] = useState(false); // Controls visibility of authentication modal
+  const [user, setUser] = useState(null); // Stores authenticated user data
+  const [renderKey, setRenderKey] = useState(0); // Key to force re-renders when needed
+  const [studentId, setStudentId] = useState(null); // ID of authenticated student
+  const [tokenexpired, setTokenExpired] = useState(false); // Flag for expired tokens
+  const [isCheckingUser, setIsCheckingUser] = useState(false); // Loading state for user checks
+  const [userHasProfile, setUserHasProfile] = useState(false); // Tracks if user has complete profile
 
-  // Add new state to track OAuth processing
+  // OAuth processing states
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true); // Initial loading state
 
-  // Centralized data state
+  // Centralized state for storing onboarding data across steps
   const [data, setData] = useState({
-    countries: [],
-    courses: [],
-    studyLevel: "",
-    academicInfo: {},
-    paymentInfo: {},
+    countries: [],    // Selected countries
+    courses: [],      // Selected courses
+    studyLevel: "",   // Chosen study level
+    academicInfo: {}, // Academic details
+    paymentInfo: {},  // Payment information
   });
 
+  // Ordered list of onboarding steps
   const steps = [
     "Countries",
     "Courses",
@@ -48,28 +51,30 @@ export const OnboardingFlow = () => {
     "Loading",
   ];
 
-  // Handle session-based authentication (OAuth)
+  /**
+   * Handles OAuth session authentication
+   * - Sends session data to backend
+   * - Stores authentication token
+   * - Checks if user needs onboarding
+   */
   const handleSessionAuth = useCallback(async (sessionData) => {
-    console.log("📨 Session detected, sending to backend:", sessionData);
-
-    setIsProcessingOAuth(true); // Set processing state
+    setIsProcessingOAuth(true); // Set processing flag
 
     try {
-     const API_BASE_URL =
+      const API_BASE_URL =
         process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      // Prepare session data for backend
+      // Prepare payload for backend authentication
       const sessionPayload = {
         email: sessionData.user.email,
         name: sessionData.user.name || sessionData.user.email?.split("@")[0],
         image: sessionData.user.image || null,
         provider: sessionData.provider || "google",
         emailVerified: sessionData.user.emailVerified !== false,
-        oauthId: sessionData.user.id || sessionData.user.sub || null,
+   
       };
 
-      console.log("🔄 Sending session data to backend:", sessionPayload);
-
+      // Send authentication request to backend
       const response = await fetch(`${API_BASE_URL}/api/user/oauth-signin`, {
         method: "POST",
         headers: {
@@ -79,10 +84,9 @@ export const OnboardingFlow = () => {
       });
 
       const data = await response.json();
-      console.log("📥 Backend OAuth response:", data);
 
       if (response.ok && data.success) {
-        // Store auth data in localStorage
+        // Store authentication data in localStorage
         const authData = {
           token: data.token,
           userId: data.data.userId,
@@ -93,7 +97,7 @@ export const OnboardingFlow = () => {
         };
         localStorage.setItem("authData", JSON.stringify(authData));
 
-        // Create session object for internal use
+        // Create session object for frontend use
         const sessionObject = {
           user: {
             id: data.data.userId,
@@ -108,23 +112,19 @@ export const OnboardingFlow = () => {
         setUser(sessionObject);
         setShowAuthModal(false);
 
-        // Check if user has complete profile
+        // Determine if user needs onboarding
         if (data.data.hasCompleteProfile) {
-          console.log(
-            "✅ OAuth user has complete profile, redirecting to dashboard"
-          );
           setStudentId(data.data.userId);
           setUserHasProfile(true);
         } else {
-          console.log("🚀 OAuth user needs onboarding");
           setStudentId(null);
           setUserHasProfile(false);
-          setCurrentStep(0);
+          setCurrentStep(0); // Start onboarding
         }
 
         return true;
       } else {
-        console.error("❌ OAuth backend auth failed:", data.error);
+        // Handle authentication failure
         localStorage.removeItem("authData");
         setShowAuthModal(true);
         setCurrentStep(-1);
@@ -134,7 +134,7 @@ export const OnboardingFlow = () => {
         return false;
       }
     } catch (error) {
-      console.error("❌ Session auth error:", error);
+      // Handle network errors
       localStorage.removeItem("authData");
       setShowAuthModal(true);
       setCurrentStep(-1);
@@ -143,29 +143,38 @@ export const OnboardingFlow = () => {
       setUserHasProfile(false);
       return false;
     } finally {
-      setIsProcessingOAuth(false); // Clear processing state
-      setIsInitializing(false); // Clear initial loading
+      // Reset processing flags
+      setIsProcessingOAuth(false);
+      setIsInitializing(false);
     }
   }, []);
 
+  
+  /**
+   * Fetches user data using stored authentication token
+   * - Validates token with backend
+   * - Checks profile completion status
+   */
   const fetchUserData = useCallback(async () => {
+    // Retrieve authentication data from localStorage
     const authData =
       typeof window !== "undefined" ? localStorage.getItem("authData") : null;
     const token = authData ? JSON.parse(authData).token : null;
 
     if (!token) {
-      console.warn("⚠️ No auth token found in localStorage");
       setShowAuthModal(true);
       setCurrentStep(-1);
       setIsInitializing(false);
       return;
     }
 
-    setIsCheckingUser(true);
+    setIsCheckingUser(true); // Set loading state
 
     try {
       const API_BASE_URL =
         process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+      
+      // Request user data from backend
       const response = await fetch(`${API_BASE_URL}/api/user/me`, {
         method: "GET",
         headers: {
@@ -173,10 +182,8 @@ export const OnboardingFlow = () => {
         },
       });
 
+      // Handle token expiration
       if (response.status === 401) {
-        console.warn(
-          "⚠️ Token expired or invalid, clearing localStorage and showing auth modal"
-        );
         localStorage.removeItem("authData");
         setTokenExpired(true);
         setShowAuthModal(true);
@@ -184,29 +191,20 @@ export const OnboardingFlow = () => {
         setUser(null);
         setStudentId(null);
         setUserHasProfile(false);
-        setIsCheckingUser(false);
-        setIsInitializing(false);
-        return;
-      } else if (response.status === 200) {
+      } 
+      // Handle successful response
+      else if (response.status === 200) {
         setTokenExpired(false);
-        console.log("✅ User data fetched successfully");
-
         const userData = await response.json();
-        console.log("====================================");
-        console.log("userData:", userData);
-        console.log("====================================");
 
+        // Check if user has complete profile
         const hasCompleteProfile =
           userData.data?.profile && userData.data?.subscription;
 
         if (hasCompleteProfile) {
-          console.log(
-            "✅ User has complete profile, should redirect to dashboard"
-          );
           setStudentId(userData.id);
           setUserHasProfile(true);
         } else {
-          console.log("🚀 User exists but needs to complete onboarding");
           setStudentId(null);
           setUserHasProfile(false);
           setUser({
@@ -221,7 +219,7 @@ export const OnboardingFlow = () => {
         }
       }
     } catch (error) {
-      console.error("⚠️ Error fetching user data:", error);
+      // Handle fetch errors
       localStorage.removeItem("authData");
       setShowAuthModal(true);
       setCurrentStep(-1);
@@ -229,30 +227,37 @@ export const OnboardingFlow = () => {
       setStudentId(null);
       setUserHasProfile(false);
     } finally {
+      // Reset loading states
       setIsCheckingUser(false);
       setIsInitializing(false);
     }
   }, []);
 
-  // Initialize the flow based on authentication status
+  /**
+   * Initialization Effect
+   * 
+   * Determines initial authentication state:
+   * 1. Checks NextAuth session
+   * 2. Falls back to localStorage token
+   * 3. Shows auth modal if no credentials
+   */
   useEffect(() => {
-    if (status === "loading") return;
+    if (status === "loading") return; // Wait for session loading
 
+    // Handle authenticated session
     if (session?.user) {
-      console.log("✅ Session exists:", session.user);
       handleSessionAuth(session);
-    } else {
+    } 
+    // Check localStorage for existing auth
+    else {
       const authData =
         typeof window !== "undefined" ? localStorage.getItem("authData") : null;
 
       if (authData) {
-        console.log("🔍 Found auth data in localStorage, validating...");
-        const load = async () => {
-          await fetchUserData();
-        };
-        load();
-      } else {
-        console.log("🔐 No session or localStorage found, showing auth modal");
+        fetchUserData();
+      } 
+      // No credentials found
+      else {
         setShowAuthModal(true);
         setCurrentStep(-1);
         setUser(null);
@@ -261,22 +266,24 @@ export const OnboardingFlow = () => {
     }
   }, [session, status, handleSessionAuth, fetchUserData]);
 
-  // Effect to handle navigation after user status is determined
+  /**
+   * Navigation Effect
+   * 
+   * Determines where to send user after authentication:
+   * - Dashboard if profile complete
+   * - Onboarding if profile incomplete
+   */
   useEffect(() => {
+    // Only run when all checks are complete
     if (!isCheckingUser && !isProcessingOAuth && user) {
+      // Redirect to dashboard if profile complete
       if (studentId && userHasProfile) {
-        console.log("✅ User has complete profile, redirecting to dashboard");
         setTimeout(() => {
-          try {
-            router.push("/dashboard");
-          } catch (error) {
-            window.location.href = "/dashboard";
-          }
+          router.push("/dashboard");
         }, 500);
-      } else if (!studentId && !userHasProfile) {
-        console.log(
-          "🚀 Starting onboarding for user who needs to complete profile"
-        );
+      } 
+      // Start onboarding if profile incomplete
+      else if (!studentId && !userHasProfile) {
         setCurrentStep(0);
       }
     }
@@ -289,39 +296,39 @@ export const OnboardingFlow = () => {
     router,
   ]);
 
-  // Handle successful authentication from AuthModal (manual auth)
+  /**
+   * Manual Authentication Handler
+   * 
+   * @param {Object} sessionData - User session data
+   * @param {boolean} shouldStartOnboarding - Whether to start onboarding immediately
+   */
   const handleAuthSuccess = useCallback(
     (sessionData, shouldStartOnboarding = false) => {
-      console.log(
-        "🔐 Manual authentication successful, shouldStartOnboarding:",
-        shouldStartOnboarding
-      );
       setShowAuthModal(false);
       setUser(sessionData || null);
-      setRenderKey((prev) => prev + 1);
+      setRenderKey((prev) => prev + 1); // Force re-render
 
+      // Start onboarding for new users
       if (shouldStartOnboarding) {
-        console.log("🆕 New user, starting onboarding immediately");
         setStudentId(null);
         setUserHasProfile(false);
         setCurrentStep(0);
         setIsInitializing(false);
-      } else {
-        const load = async () => {
-          await fetchUserData();
-        };
-        load();
+      } 
+      // Check existing users
+      else {
+        fetchUserData();
       }
     },
     [fetchUserData]
   );
 
-  // Navigation functions
+  // Step navigation functions
   const handleNext = useCallback(() => {
     setCurrentStep((prevStep) => {
       const nextStep = prevStep + 1;
       if (nextStep < steps.length) {
-        setRenderKey((prev) => prev + 1);
+        setRenderKey((prev) => prev + 1); // Force re-render
         return nextStep;
       }
       return prevStep;
@@ -332,24 +339,33 @@ export const OnboardingFlow = () => {
     setCurrentStep((prevStep) => {
       if (prevStep > 0) {
         const backStep = prevStep - 1;
-        setRenderKey((prev) => prev + 1);
+        setRenderKey((prev) => prev + 1); // Force re-render
         return backStep;
       }
       return prevStep;
     });
   }, []);
 
-  // Update shared data
+  /**
+   * Data Update Handler
+   * 
+   * Merges new data into central onboarding state
+   * @param {Object} newData - Partial data to merge
+   */
   const updateData = useCallback((newData) => {
     setData((prev) => ({ ...prev, ...newData }));
   }, []);
 
-  // Handle onboarding completion with redirect
+  /**
+   * Onboarding Completion Handler
+   * 
+   * - Stores final auth token
+   * - Redirects to dashboard
+   * @param {Object} responseData - Final response from backend
+   */
   const handleOnboardingComplete = useCallback(
     (responseData) => {
-      console.log("🎉 Onboarding completed successfully!");
-      console.log("📊 Response data:", responseData);
-
+      // Store authentication token if provided
       if (responseData && responseData.token) {
         const authData = {
           token: responseData.token,
@@ -362,37 +378,28 @@ export const OnboardingFlow = () => {
         localStorage.setItem("authData", JSON.stringify(authData));
       }
 
+      // Redirect to dashboard
       setTimeout(() => {
-        try {
-          router.push("/dashboard");
-        } catch (error) {
-          window.location.href = "/dashboard";
-        }
+        router.push("/dashboard");
       }, 500);
     },
     [router]
   );
 
-  // Combined loading states
+  // Composite loading state
   const isLoading =
     status === "loading" ||
     isCheckingUser ||
     isProcessingOAuth ||
     isInitializing;
 
-  // Loading state for any authentication/initialization process
+  // Show loading spinner during initial checks
   if (isLoading) {
     let loadingMessage = "Checking authentication...";
-
-    if (status === "loading") {
-      loadingMessage = "Initializing session...";
-    } else if (isProcessingOAuth) {
-      loadingMessage = "Processing login...";
-    } else if (isCheckingUser) {
-      loadingMessage = "Checking user status...";
-    } else if (isInitializing) {
-      loadingMessage = "Setting up your experience...";
-    }
+    if (status === "loading") loadingMessage = "Initializing session...";
+    if (isProcessingOAuth) loadingMessage = "Processing login...";
+    if (isCheckingUser) loadingMessage = "Checking user status...";
+    if (isInitializing) loadingMessage = "Setting up your experience...";
 
     return (
       <div className="h-screen flex items-center justify-center">
@@ -404,7 +411,7 @@ export const OnboardingFlow = () => {
     );
   }
 
-  // If user has complete profile, show loading message before redirect
+  // Show loading spinner before redirecting to dashboard
   if (user && studentId && userHasProfile) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -418,6 +425,7 @@ export const OnboardingFlow = () => {
     );
   }
 
+  // Main component render
   return (
     <div className="h-screen" key={renderKey}>
       <div className="pt-20">
@@ -434,6 +442,7 @@ export const OnboardingFlow = () => {
         {/* Onboarding Steps */}
         {user && !studentId && !userHasProfile && currentStep >= 0 && (
           <>
+            {/* Step 1: Country Selection */}
             {currentStep === 0 && (
               <CountrySelectionStep
                 selectedCountries={data.countries}
@@ -445,6 +454,7 @@ export const OnboardingFlow = () => {
               />
             )}
 
+            {/* Step 2: Course Selection */}
             {currentStep === 1 && (
               <CourseSelectionStep
                 selectedCourses={data.courses}
@@ -456,6 +466,7 @@ export const OnboardingFlow = () => {
               />
             )}
 
+            {/* Step 3: Study Level */}
             {currentStep === 2 && (
               <StudyLevelStep
                 selectedLevel={data.studyLevel}
@@ -467,6 +478,7 @@ export const OnboardingFlow = () => {
               />
             )}
 
+            {/* Step 4: Academic Info */}
             {currentStep === 3 && (
               <AcademicSnapshotStep
                 academicInfo={data.academicInfo}
@@ -478,6 +490,7 @@ export const OnboardingFlow = () => {
               />
             )}
 
+            {/* Step 5: Payment */}
             {currentStep === 4 && (
               <PaymentStep
                 paymentInfo={data.paymentInfo}
@@ -489,6 +502,7 @@ export const OnboardingFlow = () => {
               />
             )}
 
+            {/* Step 6: Loading/Submission */}
             {currentStep === 5 && (
               <LoadingStep
                 userData={data}
@@ -499,7 +513,7 @@ export const OnboardingFlow = () => {
           </>
         )}
 
-        {/* Fallback - only show if something is genuinely wrong */}
+        {/* Error Fallback */}
         {!isLoading &&
           currentStep < 0 &&
           !showAuthModal &&
