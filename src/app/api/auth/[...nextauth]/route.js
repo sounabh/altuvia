@@ -1,9 +1,10 @@
 // =============================================================================
-// NEXTAUTH CONFIGURATION WITH GOOGLE & LINKEDIN OAUTH PROVIDERS
+// NEXTAUTH CONFIGURATION WITH GOOGLE, LINKEDIN & CREDENTIALS OAUTH PROVIDERS
 // =============================================================================
-// This file configures NextAuth.js for authentication with Google and LinkedIn
-// providers, including token management, session handling, and comprehensive
-// error handling with detailed logging.
+// This file configures NextAuth.js for authentication with Google, LinkedIn
+// and Credentials providers, including token management, session handling, 
+// and comprehensive error handling with detailed logging.
+// ALL TOKENS SET TO 10 MINUTES EXPIRATION
 // =============================================================================
 
 // Import NextAuth core library
@@ -11,6 +12,7 @@ import NextAuth from 'next-auth'
 
 // Import the authentication providers you want to use
 import GoogleProvider from 'next-auth/providers/google'
+import CredentialsProvider from 'next-auth/providers/credentials';
 
 // =============================================================================
 // MAIN NEXTAUTH CONFIGURATION OBJECT
@@ -28,6 +30,46 @@ export const authOptions = {
   // ===========================================================================
 
   providers: [
+    // -------------------------------------------------------------------------
+    // CREDENTIALS PROVIDER (EMAIL/PASSWORD)
+    // -------------------------------------------------------------------------
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        try {
+          console.log('🔐 Credentials sign-in attempt:', credentials.email);
+          
+          const res = await fetch(`${process.env.BACKEND_URL}/api/user/signin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(credentials)
+          });
+
+          const userData = await res.json();
+          
+          if (res.ok && userData.success) {
+            console.log('✅ Credentials authentication successful');
+            return {
+              id: userData.data.userId,
+              email: userData.data.email,
+              name: userData.data.name,
+              provider: 'credentials' // Custom provider identifier
+            };
+          }
+          
+          console.error('❌ Credentials authentication failed:', userData);
+          return null;
+          
+        } catch (error) {
+          console.error('❌ Credentials authentication error:', error);
+          return null;
+        }
+      }
+    }),
     
     // -------------------------------------------------------------------------
     // GOOGLE OAUTH PROVIDER
@@ -281,17 +323,39 @@ export const authOptions = {
           })
 
           // Return the initial token with all necessary data
+          // Set access token expiry to 10 minutes from now
           return {
             ...token,
             provider: account.provider,                    // OAuth provider name
             accessToken: account.access_token,             // Access token from provider
             refreshToken: account.refresh_token,           // Refresh token (if available)
-            accessTokenExpires: account.expires_at ? account.expires_at * 1000 : null, // Token expiry time
+            accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
             user: {
               id: user.id,
               name: user.name,
               email: user.email,
               image: user.image,
+            }
+          }
+        }
+        
+        // Handle credentials provider sign-in (no account object)
+        if (user) {
+          console.log('🔑 JWT Token Created (Credentials):', {
+            provider: user.provider,
+            userId: user.id,
+            timestamp: new Date().toISOString(),
+          })
+
+          return {
+            ...token,
+            provider: user.provider,                    // 'credentials' provider
+            accessToken: null,                          // No access token for credentials
+            accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
+            user: {
+              id: user.id,
+              name: user.name,
+              email: user.email,
             }
           }
         }
@@ -433,25 +497,25 @@ export const authOptions = {
   },
 
   // ===========================================================================
-  // 4. SESSION CONFIGURATION
+  // 4. SESSION CONFIGURATION - CHANGED TO 10 MINUTES
   // ===========================================================================
   // Configure how sessions are managed and stored
   // ===========================================================================
 
   session: {
     strategy: 'jwt',              // Use JWT instead of database sessions (stateless)
-    maxAge: 30 * 24 * 60 * 60,    // Session valid for 30 days (in seconds)
-    updateAge: 24 * 60 * 60,      // Update session every 24 hours (in seconds)
+    maxAge: 10 * 60,              // Session valid for 10 minutes (in seconds)
+    updateAge: 5 * 60,            // Update session every 5 minutes (in seconds)
   },
 
   // ===========================================================================
-  // 5. JWT CONFIGURATION
+  // 5. JWT CONFIGURATION - CHANGED TO 10 MINUTES
   // ===========================================================================
   // Configure JWT token settings
   // ===========================================================================
 
   jwt: {
-    maxAge: 30 * 24 * 60 * 60,    // JWT valid for 30 days (in seconds)
+    maxAge: 10 * 60,              // JWT valid for 10 minutes (in seconds)
   },
 
   // ===========================================================================
@@ -502,7 +566,7 @@ export const authOptions = {
 }
 
 // =============================================================================
-// HELPER FUNCTION: REFRESH ACCESS TOKENS
+// HELPER FUNCTION: REFRESH ACCESS TOKENS - UPDATED FOR 10 MINUTE EXPIRY
 // =============================================================================
 // This function handles refreshing expired access tokens for different providers
 // It's called automatically by the JWT callback when tokens expire
@@ -539,11 +603,11 @@ async function refreshAccessToken(token) {
 
       console.log('✅ Access token refreshed successfully')
       
-      // Return updated token with new access token and expiry
+      // Return updated token with new access token and 10-minute expiry
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
-        accessTokenExpires: Date.now() + (refreshedTokens.expires_in * 1000),
+        accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
         refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Keep old refresh token if new one not provided
         error: undefined, // Clear any previous errors
       }
@@ -576,11 +640,11 @@ async function refreshAccessToken(token) {
 
       console.log('✅ Google access token refreshed successfully')
       
-      // Return updated token with new access token and expiry
+      // Return updated token with new access token and 10-minute expiry
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
-        accessTokenExpires: Date.now() + (refreshedTokens.expires_in * 1000),
+        accessTokenExpires: Date.now() + (10 * 60 * 1000), // 10 minutes from now
         refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Keep old refresh token if new one not provided
         error: undefined, // Clear any previous errors
       }

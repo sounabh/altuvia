@@ -8,7 +8,9 @@ const Nav = () => {
 
   // Check for token on mount (client-side only)
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
+    const {token} =  JSON.parse(localStorage.getItem("authData")) || {};
+    //console.log(token, "Token from localStorage");
+    
     setIsLoggedIn(!!token); // true if token exists
   }, []);
 

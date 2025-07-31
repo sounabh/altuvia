@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
+
 // -----------------------------------------------------------------------------
 // List of countries with their flags and map links
 // -----------------------------------------------------------------------------
@@ -129,6 +130,9 @@ export const CountrySelectionStep = ({
   console.log(user.user.image);
   console.log('====================================');
 
+  console.log('====================================');
+  console.log(selectedCountries);
+  console.log('====================================');
   // Get user initials for fallback avatar
   const getUserInitials = () => {
     if (user?.user.name) {
@@ -144,7 +148,11 @@ export const CountrySelectionStep = ({
   };
 
   // API Base URL - this is how you should access it in Next.js
+ console.log('====================================');
+ console.log(user.user.email);
+ console.log(process.env.NEXT_PUBLIC_API_BASE_URL);
  
+ console.log('====================================');
 
   return (
     <div className="min-h-screen w-fit max-w-none">
@@ -284,3 +292,25 @@ export default function CountrySelectionDemo() {
     />
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
