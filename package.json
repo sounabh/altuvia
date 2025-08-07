@@ -2,14 +2,15 @@
   "name": "altuvia",
   "version": "0.1.0",
   "private": true,
-   "prisma": {
+  "prisma": {
     "schema": "prisma/schema.prisma"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
