@@ -1,31 +1,21 @@
 "use client"
 
 import React, { useState } from 'react';
-
-// UI Components from your design system
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-
-// Icons used throughout the UI
 import {
   FileText, Clock, MessageSquare, Save, Upload,
   CheckCircle, AlertCircle, Calendar, Video, BookOpen,
   Plus, ExternalLink, X, CalendarDays, MapPin, Users
 } from 'lucide-react';
 
-const ApplicationTabs = () => {
-  // State to hold the content of the essay textarea
+const ApplicationTabs = ({ university }) => {
   const [essayContent, setEssayContent] = useState("What matters most to you, and why?");
-  
-  // State for workspace popup
   const [showWorkspacePopup, setShowWorkspacePopup] = useState(false);
-  
-  // State for add task/event modal
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addModalType, setAddModalType] = useState('task'); // 'task' or 'event'
+  const [addModalType, setAddModalType] = useState('task');
 
-  // Static essay prompts with progress and word limits
   const essayPrompts = [
     {
       title: "Essay A: What matters most to you, and why?",
@@ -34,14 +24,13 @@ const ApplicationTabs = () => {
       progress: 65
     },
     {
-      title: "Essay B: Why Stanford? How does Stanford align with your goals?",
+      title: `Essay B: Why ${university.name}? How does it align with your goals?`,
       wordLimit: 650,
       status: "not-started",
       progress: 0
     }
   ];
 
-  // Sample tasks and events
   const tasksAndEvents = [
     { 
       type: 'task',
@@ -61,7 +50,7 @@ const ApplicationTabs = () => {
     },
     { 
       type: 'event',
-      task: "MBA Info Session - Harvard", 
+      task: `${university.name} Info Session`, 
       date: "Apr 6, 2025", 
       time: "2:00 PM - 4:00 PM",
       location: "Virtual",
@@ -79,8 +68,9 @@ const ApplicationTabs = () => {
     },
     { 
       type: 'event',
-      task: "Application Deadline - Stanford", 
-      date: "Apr 8, 2025", 
+      task: `${university.name} Application Deadline`, 
+      date: university.additionalData.averageDeadlines ? 
+        university.additionalData.averageDeadlines.split(',')[0].trim() : "TBD", 
       time: "11:59 PM",
       status: "upcoming", 
       priority: "high", 
@@ -95,16 +85,13 @@ const ApplicationTabs = () => {
 
   const handleWorkspaceRedirect = () => {
     setShowWorkspacePopup(false);
-    // Here you would navigate to workspace page
-    window.open('/workspace', '_blank'); // Replace with your actual routing
+    window.open('/workspace', '_blank');
   };
 
   return (
     <div className="my-20">
       <Card className="bg-[#002147] shadow-xl hover:shadow-2xl transition-all duration-500 border-0 overflow-hidden">
         <CardContent className="p-0">
-          
-          {/* 🔷 Premium Header Section */}
           <div className="bg-[#002147] p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
@@ -112,27 +99,23 @@ const ApplicationTabs = () => {
                   <div className="w-1 h-8 bg-white rounded-full mr-4 opacity-80"></div>
                   <h2 className="text-2xl font-semibold tracking-tight">Application Workspace</h2>
                 </div>
-                <p className="text-white text-sm font-medium">Your personalized application center</p>
+                <p className="text-white text-sm font-medium">Your personalized application center for {university.name}</p>
               </div>
 
-              {/* 📊 Progress Circle – Only visible on medium+ screens */}
               <div className="hidden md:flex items-center space-x-4">
                 <div className="text-right text-sm">
                   <div className="text-white font-semibold">Application Progress</div>
                   <div className="text-white">65% Complete</div>
                 </div>
 
-                {/* Circular progress bar using SVG */}
                 <div className="w-16 h-16 relative">
                   <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
-                    {/* Background Circle */}
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
                       stroke="rgba(255,255,255,0.2)"
                       strokeWidth="3"
                     />
-                    {/* Foreground Progress (65%) */}
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
@@ -142,7 +125,6 @@ const ApplicationTabs = () => {
                     />
                   </svg>
 
-                  {/* Center Text */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-white font-bold text-sm">65%</span>
                   </div>
@@ -151,14 +133,9 @@ const ApplicationTabs = () => {
             </div>
           </div>
 
-          {/* 🔽 Tabs Section */}
           <div className="p-6 space-y-8">
             <Tabs defaultValue="essays" className="w-full">
-
-              {/* Tabs Header - Updated for 2 tabs */}
-              <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 rounded-xl border border-gray-200 h-14">
-                
-                {/* Essay Tab */}
+              <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 rounded-xl border border-gray-100 h-14">
                 <TabsTrigger 
                   value="essays" 
                   className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-12 font-semibold"
@@ -167,8 +144,7 @@ const ApplicationTabs = () => {
                   <span className="hidden sm:inline">Essay Workspace</span>
                   <span className="sm:hidden">Essays</span>
                 </TabsTrigger>
-
-                {/* Tasks & Deadlines Tab */}
+                
                 <TabsTrigger 
                   value="deadlines"
                   className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-12 font-semibold"
@@ -179,11 +155,8 @@ const ApplicationTabs = () => {
                 </TabsTrigger>
               </TabsList>
 
-              {/* 📝 Essay Workspace Content */}
               <TabsContent value="essays" className="mt-8">
                 <div className="space-y-6">
-
-                  {/* Essay Header with Workspace Access */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h3 className="text-2xl font-bold text-white">Essay Prompts</h3>
                     <div className="flex items-center space-x-4">
@@ -201,12 +174,9 @@ const ApplicationTabs = () => {
                     </div>
                   </div>
 
-                  {/* Mapping through each essay prompt */}
                   <div className="space-y-6">
                     {essayPrompts.map((prompt, index) => (
                       <div key={index} className="border-2 border-gray-100 rounded-2xl p-6 bg-gradient-to-br from-white to-gray-50 hover:shadow-lg transition-all duration-300">
-
-                        {/* Essay title and status */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                           <h4 className="font-bold text-[#002147] text-lg">{prompt.title}</h4>
                           <div className="flex items-center space-x-4 text-sm">
@@ -216,7 +186,6 @@ const ApplicationTabs = () => {
                                 ? 'bg-blue-100 text-blue-700' 
                                 : 'bg-gray-100 text-gray-600'
                             }`}>
-                              {/* Icon depends on status */}
                               {prompt.status === 'in-progress' ? (
                                 <AlertCircle className="h-3 w-3 mr-1" />
                               ) : (
@@ -227,7 +196,6 @@ const ApplicationTabs = () => {
                           </div>
                         </div>
 
-                        {/* Essay Progress Bar */}
                         <div className="mb-4">
                           <div className="flex justify-between text-xs text-gray-500 mb-1">
                             <span>Progress</span>
@@ -241,7 +209,6 @@ const ApplicationTabs = () => {
                           </div>
                         </div>
 
-                        {/* First prompt only has a textarea input */}
                         {index === 0 && (
                           <>
                             <textarea 
@@ -273,7 +240,6 @@ const ApplicationTabs = () => {
                 </div>
               </TabsContent>
 
-              {/* 📅 Tasks & Events Section */}
               <TabsContent value="deadlines" className="mt-8">
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -299,8 +265,6 @@ const ApplicationTabs = () => {
                   <div className="grid gap-4">
                     {tasksAndEvents.map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50">
-
-                        {/* Icon depending on type and status */}
                         <div className="flex items-center space-x-4">
                           <div className={`p-3 rounded-xl ${
                             item.status === 'completed' ? 'bg-green-100' :
@@ -320,7 +284,6 @@ const ApplicationTabs = () => {
                             )}
                           </div>
 
-                          {/* Task/Event details */}
                           <div>
                             <div className="font-bold text-[#002147] text-lg flex items-center space-x-2">
                               <span>{item.task}</span>
@@ -337,7 +300,6 @@ const ApplicationTabs = () => {
                                 </span>
                               )}
 
-                              {/* Days left only shown if not completed */}
                               {item.status !== 'completed' && (
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                   item.daysLeft <= 7 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
@@ -349,7 +311,6 @@ const ApplicationTabs = () => {
                           </div>
                         </div>
 
-                        {/* Status badge */}
                         <span className={`px-4 py-2 text-sm rounded-full font-medium ${
                           item.status === 'completed' ? 'bg-green-100 text-green-700' :
                           item.status === 'upcoming' ? 'bg-purple-100 text-purple-700' :
@@ -364,7 +325,6 @@ const ApplicationTabs = () => {
               </TabsContent>
             </Tabs>
 
-            {/* ⚡ Quick Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button className="flex-1 bg-[#3598FE] text-white py-4 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-[1.02] text-center">
                 Save All Progress
@@ -377,7 +337,6 @@ const ApplicationTabs = () => {
         </CardContent>
       </Card>
 
-      {/* 🪟 Workspace Access Popup */}
       {showWorkspacePopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
@@ -387,7 +346,7 @@ const ApplicationTabs = () => {
               </div>
               <h3 className="text-2xl font-bold text-[#002147] mb-2">Access Essay Workspace</h3>
               <p className="text-gray-600">
-                You're about to access your comprehensive essay workspace where you can view and edit all your essays in one place.
+                You're about to access your comprehensive essay workspace for {university.name}.
               </p>
             </div>
             
@@ -409,7 +368,6 @@ const ApplicationTabs = () => {
         </div>
       )}
 
-      {/* 🆕 Add Task/Event Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full shadow-2xl">

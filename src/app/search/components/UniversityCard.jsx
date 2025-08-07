@@ -1,45 +1,118 @@
-"use client"
-import React, { useState } from 'react';
-import { MapPin } from 'lucide-react';
+"use client";
+import React, { useState ,useEffect} from "react";
+import { MapPin } from "lucide-react";
 
 // University Card Component
 const UniversityCard = ({ university }) => {
   const [isAdded, setIsAdded] = useState(university?.isAdded);
+  const [isLoading, setIsLoading] = useState(false);
+
+console.log(university.savedByUsers);
+
+
+  useEffect(() => {
+  try {
+    const authData = localStorage.getItem("authData");
+    if (!authData) return;
+
+    const parsedData = JSON.parse(authData);
+    const userId = parsedData.userId;
+
+    // ✅ FIXED: Check if user's id is inside savedByUsers array of objects
+    const isSaved = Array.isArray(university.savedByUsers) &&
+      university.savedByUsers.some((user) => user.id === userId);
+
+    setIsAdded(isSaved);
+  } catch (error) {
+    console.error("Error initializing saved status:", error);
+  }
+}, [university.savedByUsers]);
+
 
   // Toggle Add/Added state
-  const toggleAdd = () => {
-    setIsAdded(!isAdded);
+  const toggleAdd = async (e) => {
+    e.stopPropagation(); // Prevent event bubbling
+    console.log("Button clicked!"); // Add this to confirm click is working
+    console.log(university?.id, "university id");
+    
+    // Get auth data inside the function to ensure it's fresh
+    const authData = typeof window !== "undefined" ? localStorage.getItem("authData") : null;
+    
+    if (!authData) {
+      console.warn("⚠️ No auth data found in localStorage");
+      return;
+    }
+
+    const parsedData = JSON.parse(authData);
+    console.log(parsedData.token, "token");
+
+    setIsLoading(true); // Show loading state
+    
+    try {
+      const API_BASE_URL =
+        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/university/toggleSaved`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${parsedData.token}`,
+          },
+          body: JSON.stringify({ universityId: university?.id }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdded(data.isAdded); // update state from response
+        console.log("Successfully toggled:", data.isAdded);
+      } else {
+        console.error("Failed to update status:", response.status);
+      }
+    } catch (error) {
+      console.error("Error toggling add:", error);
+    } finally {
+      setIsLoading(false); // Hide loading state
+    }
   };
+
+  // Early return if no university data
+  if (!university) {
+    console.warn("⚠️ No university data provided");
+    return null;
+  }
 
   return (
     <div className="group relative mt-14 bg-white rounded-3xl shadow-sm hover:shadow-2xl border border-slate-200/60 hover:border-slate-300/60 transition-all duration-500 overflow-hidden">
-
       {/* ---------- Image Section with Rank Badge and Add Button ---------- */}
       <div className="relative overflow-hidden">
         {/* University Image */}
         <div className="aspect-[4/3] bg-slate-100">
-          <img 
-            src={university?.image} 
+          <img
+            src={university?.image}
             alt={university?.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
         </div>
 
         {/* University Rank Badge */}
-        <div className="absolute top-4 left-4 bg-slate-900/80 text-white text-sm font-bold px-3 py-1 rounded-full backdrop-blur-sm">
+        <div className="absolute top-4 left-4 z-10 bg-slate-900/80 text-white text-sm font-bold px-3 py-1 rounded-full backdrop-blur-sm">
           {university?.rank}
         </div>
 
-        {/* Add/Added Button */}
+        {/* Add/Added Button - FIXED WITH HIGHER Z-INDEX */}
         <button
           onClick={toggleAdd}
-          className={`absolute top-4 right-4 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 backdrop-blur-sm ${
-            isAdded 
-              ? 'bg-blue-500 text-white hover:bg-blue-600' 
-              : 'bg-white/90 text-slate-700 hover:bg-white border border-slate-200'
-          }`}
+          disabled={isLoading}
+          className={`absolute top-4 right-4 z-20 px-4 py-2 rounded-full cursor-pointer text-sm font-semibold transition-all duration-300 backdrop-blur-sm ${
+            isAdded
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-white/90 text-slate-700 hover:bg-white border border-slate-200"
+          } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          {isAdded ? 'Added' : 'Add'}
+          {isLoading ? "..." : isAdded ? "Added" : "Add"}
         </button>
       </div>
 
@@ -80,13 +153,17 @@ const UniversityCard = ({ university }) => {
           {/* Tuition Fee */}
           <div className="flex items-center justify-between py-2 border-b border-slate-100">
             <span className="text-slate-600">📅</span>
-            <span className="text-slate-700 font-medium">{university?.tuitionFee}</span>
+            <span className="text-slate-700 font-medium">
+              {university?.tuitionFee}
+            </span>
           </div>
 
           {/* Application Fee */}
           <div className="flex items-center justify-between py-2 border-b border-slate-100">
             <span className="text-slate-600">💰</span>
-            <span className="text-slate-700 font-medium">{university?.applicationFee}</span>
+            <span className="text-slate-700 font-medium">
+              {university?.applicationFee}
+            </span>
           </div>
         </div>
 
@@ -96,11 +173,16 @@ const UniversityCard = ({ university }) => {
           <div>
             <div className="flex items-center mb-2">
               <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-              <span className="text-sm font-medium text-slate-700">Advantages</span>
+              <span className="text-sm font-medium text-slate-700">
+                Advantages
+              </span>
             </div>
             <ul className="space-y-1 ml-4">
               {university?.pros?.map((pro, index) => (
-                <li key={index} className="text-sm text-slate-600 flex items-center">
+                <li
+                  key={index}
+                  className="text-sm text-slate-600 flex items-center"
+                >
                   <span className="w-1 h-1 bg-slate-400 rounded-full mr-2"></span>
                   {pro}
                 </li>
@@ -112,11 +194,16 @@ const UniversityCard = ({ university }) => {
           <div>
             <div className="flex items-center mb-2">
               <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-              <span className="text-sm font-medium text-slate-700">Considerations</span>
+              <span className="text-sm font-medium text-slate-700">
+                Considerations
+              </span>
             </div>
             <ul className="space-y-1 ml-4">
-              {university?.cons.map((con, index) => (
-                <li key={index} className="text-sm text-slate-600 flex items-center">
+              {university?.cons?.map((con, index) => (
+                <li
+                  key={index}
+                  className="text-sm text-slate-600 flex items-center"
+                >
                   <span className="w-1 h-1 bg-slate-400 rounded-full mr-2"></span>
                   {con}
                 </li>
@@ -126,8 +213,8 @@ const UniversityCard = ({ university }) => {
         </div>
       </div>
 
-      {/* ---------- Hover Effect Border Overlay ---------- */}
-      <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-slate-900/5 group-hover:ring-blue-500/20 group-hover:ring-2 transition-all duration-300"></div>
+      {/* ---------- Hover Effect Border Overlay - FIXED WITH POINTER-EVENTS-NONE ---------- */}
+      <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-slate-900/5 group-hover:ring-blue-500/20 group-hover:ring-2 transition-all duration-300 pointer-events-none"></div>
     </div>
   );
 };

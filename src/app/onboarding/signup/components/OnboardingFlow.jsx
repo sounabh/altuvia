@@ -1,4 +1,4 @@
-"use client"; // Indicates this is a Client Component in Next.js
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -14,37 +14,32 @@ import { PaymentStep } from "./PaymentSteps";
 import { LoadingStep } from "./Loading";
 
 export const OnboardingFlow = () => {
-  // NextAuth session hook to get authentication status
   const { data: session, status } = useSession();
-  const router = useRouter(); // Router for navigation
+  const router = useRouter();
 
   // State variables for managing onboarding flow
-  const [currentStep, setCurrentStep] = useState(-1); // Current step in onboarding (-1 = not started)
-  const [showAuthModal, setShowAuthModal] = useState(false); // Controls visibility of authentication modal
-  const [user, setUser] = useState(null); // Stores authenticated user data
-  const [renderKey, setRenderKey] = useState(0); // Key to force re-renders when needed
-  const [studentId, setStudentId] = useState(null); // ID of authenticated student
-  const [tokenexpired, setTokenExpired] = useState(false); // Flag for expired tokens
-  const [isCheckingUser, setIsCheckingUser] = useState(false); // Loading state for user checks
-  const [userHasProfile, setUserHasProfile] = useState(false); // Tracks if user has complete profile
-
-  // OAuth processing states
+  const [currentStep, setCurrentStep] = useState(-1);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [user, setUser] = useState(null);
+  const [renderKey, setRenderKey] = useState(0);
+  const [studentId, setStudentId] = useState(null);
+  const [isCheckingUser, setIsCheckingUser] = useState(false);
+  const [userHasProfile, setUserHasProfile] = useState(false);
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true); // Initial loading state
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Centralized state for storing onboarding data across steps
   const [data, setData] = useState({
-    countries: [],    // Selected countries
-    courses: [],      // Selected courses
-    studyLevel: "",   // Chosen study level
-    academicInfo: {}, // Academic details
-    paymentInfo: {},  // Payment information
+    countries: [],
+    courses: [],
+    studyLevel: "",
+    academicInfo: {},
+    paymentInfo: {},
   });
 
-  // Ordered list of onboarding steps
   const steps = [
     "Countries",
-    "Courses",
+    "Courses", 
     "Study Level",
     "Academic Info",
     "Payment",
@@ -52,29 +47,33 @@ export const OnboardingFlow = () => {
   ];
 
   /**
+   * Utility function to check if token is expired or old
+   */
+ const isTokenExpired = useCallback((authData) => {
+  // ✅ Always return false - let backend handle token validation
+  // The JWT token itself has a 30-day expiry built-in
+  if (!authData || !authData.token) return true; // Only check if token exists
+  
+  return false; // Let backend validate actual JWT expiration
+}, []);
+  /**
    * Handles OAuth session authentication
-   * - Sends session data to backend
-   * - Stores authentication token
-   * - Checks if user needs onboarding
    */
   const handleSessionAuth = useCallback(async (sessionData) => {
-    setIsProcessingOAuth(true); // Set processing flag
+    setIsProcessingOAuth(true);
 
     try {
       const API_BASE_URL =
         process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      // Prepare payload for backend authentication
       const sessionPayload = {
         email: sessionData.user.email,
         name: sessionData.user.name || sessionData.user.email?.split("@")[0],
         image: sessionData.user.image || null,
         provider: sessionData.provider || "google",
         emailVerified: sessionData.user.emailVerified !== false,
-   
       };
 
-      // Send authentication request to backend
       const response = await fetch(`${API_BASE_URL}/api/user/oauth-signin`, {
         method: "POST",
         headers: {
@@ -86,13 +85,14 @@ export const OnboardingFlow = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Store authentication data in localStorage
+        // Store complete auth data with profile completion flag
         const authData = {
           token: data.token,
           userId: data.data.userId,
           email: data.data.email,
           name: data.data.name,
           provider: data.data.provider,
+          hasCompleteProfile: data.data.hasCompleteProfile,
           lastLogin: new Date().toISOString(),
         };
         localStorage.setItem("authData", JSON.stringify(authData));
@@ -112,10 +112,14 @@ export const OnboardingFlow = () => {
         setUser(sessionObject);
         setShowAuthModal(false);
 
-        // Determine if user needs onboarding
+        // Use the hasCompleteProfile flag from response
         if (data.data.hasCompleteProfile) {
           setStudentId(data.data.userId);
           setUserHasProfile(true);
+          // Direct redirect to dashboard
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 500);
         } else {
           setStudentId(null);
           setUserHasProfile(false);
@@ -143,83 +147,100 @@ export const OnboardingFlow = () => {
       setUserHasProfile(false);
       return false;
     } finally {
-      // Reset processing flags
       setIsProcessingOAuth(false);
       setIsInitializing(false);
     }
-  }, []);
+  }, [router]);
 
-  
   /**
-   * Fetches user data using stored authentication token
-   * - Validates token with backend
-   * - Checks profile completion status
+   * Fetches user data only when necessary (token validation)
    */
   const fetchUserData = useCallback(async () => {
-    // Retrieve authentication data from localStorage
-    const authData =
-      typeof window !== "undefined" ? localStorage.getItem("authData") : null;
-    const token = authData ? JSON.parse(authData).token : null;
-
-    if (!token) {
-      setShowAuthModal(true);
-      setCurrentStep(-1);
-      setIsInitializing(false);
-      return;
-    }
-
-    setIsCheckingUser(true); // Set loading state
-
+    setIsCheckingUser(true);
+    
     try {
-      const API_BASE_URL =
-        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+      const authDataStr = localStorage.getItem("authData");
+      if (!authDataStr) {
+        setShowAuthModal(true);
+        setCurrentStep(-1);
+        setIsInitializing(false);
+        return;
+      }
+
+      const authData = JSON.parse(authDataStr);
       
-      // Request user data from backend
+      // If token is not expired and has complete profile flag, redirect directly
+      if (!isTokenExpired(authData) && authData.hasCompleteProfile) {
+        setStudentId(authData.userId);
+        setUserHasProfile(true);
+        setUser({
+          user: {
+            id: authData.userId,
+            name: authData.name,
+            email: authData.email,
+            provider: authData.provider,
+          },
+        });
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 500);
+        return;
+      }
+
+      // Only validate with server if token is old or profile status unknown
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+      
       const response = await fetch(`${API_BASE_URL}/api/user/me`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authData.token}`,
         },
       });
 
-      // Handle token expiration
-      if (response.status === 401) {
+      if (response.ok) {
+        const userData = await response.json();
+        
+        // Update localStorage with fresh data including profile status
+        const updatedAuthData = {
+          ...authData,
+          hasCompleteProfile: userData.data.hasCompleteProfile,
+          lastLogin: new Date().toISOString(),
+        };
+        localStorage.setItem("authData", JSON.stringify(updatedAuthData));
+
+        const sessionObject = {
+          user: {
+            id: userData.data.userId,
+            name: userData.data.name,
+            email: userData.data.email,
+            provider: userData.data.provider || authData.provider,
+          },
+        };
+
+        setUser(sessionObject);
+
+        if (userData.data.hasCompleteProfile) {
+          setStudentId(userData.data.userId);
+          setUserHasProfile(true);
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 500);
+        } else {
+          setStudentId(null);
+          setUserHasProfile(false);
+          setCurrentStep(0);
+        }
+      } else if (response.status === 401) {
+        // Token expired, clear localStorage and show auth
         localStorage.removeItem("authData");
-        setTokenExpired(true);
         setShowAuthModal(true);
         setCurrentStep(-1);
         setUser(null);
         setStudentId(null);
         setUserHasProfile(false);
-      } 
-      // Handle successful response
-      else if (response.status === 200) {
-        setTokenExpired(false);
-        const userData = await response.json();
-
-        // Check if user has complete profile
-        const hasCompleteProfile =
-          userData.data?.profile && userData.data?.subscription;
-
-        if (hasCompleteProfile) {
-          setStudentId(userData.id);
-          setUserHasProfile(true);
-        } else {
-          setStudentId(null);
-          setUserHasProfile(false);
-          setUser({
-            user: {
-              id: userData.id,
-              name: userData.data?.name,
-              email: userData.data?.email,
-              image: userData.data?.image,
-              provider: userData.data?.provider,
-            },
-          });
-        }
       }
     } catch (error) {
-      // Handle fetch errors
+      console.error("Error fetching user data:", error);
       localStorage.removeItem("authData");
       setShowAuthModal(true);
       setCurrentStep(-1);
@@ -227,100 +248,114 @@ export const OnboardingFlow = () => {
       setStudentId(null);
       setUserHasProfile(false);
     } finally {
-      // Reset loading states
       setIsCheckingUser(false);
       setIsInitializing(false);
     }
-  }, []);
+  }, [isTokenExpired, router]);
 
   /**
-   * Initialization Effect
-   * 
-   * Determines initial authentication state:
-   * 1. Checks NextAuth session
-   * 2. Falls back to localStorage token
-   * 3. Shows auth modal if no credentials
+   * Initialization Effect - Improved logic to minimize API calls
    */
   useEffect(() => {
-    if (status === "loading") return; // Wait for session loading
+    if (status === "loading") return;
 
-    // Handle authenticated session
+    // Priority 1: Handle NextAuth session
     if (session?.user) {
       handleSessionAuth(session);
-    } 
-    // Check localStorage for existing auth
-    else {
-      const authData =
-        typeof window !== "undefined" ? localStorage.getItem("authData") : null;
+      return;
+    }
 
-      if (authData) {
+    // Priority 2: Check localStorage
+    const authDataStr = localStorage.getItem("authData");
+    if (authDataStr) {
+      try {
+        const authData = JSON.parse(authDataStr);
+        
+        // Priority 2a: If has complete profile and token not old, redirect directly
+        if (authData.hasCompleteProfile && !isTokenExpired(authData)) {
+          setStudentId(authData.userId);
+          setUserHasProfile(true);
+          setUser({
+            user: {
+              id: authData.userId,
+              name: authData.name,
+              email: authData.email,
+              provider: authData.provider,
+            },
+          });
+          setIsInitializing(false);
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 500);
+          return;
+        }
+
+        // Priority 2b: If no complete profile and token valid, start onboarding
+        if (!authData.hasCompleteProfile && !isTokenExpired(authData)) {
+          setUser({
+            user: {
+              id: authData.userId,
+              name: authData.name,
+              email: authData.email,
+              provider: authData.provider,
+            },
+          });
+          setStudentId(null);
+          setUserHasProfile(false);
+          setCurrentStep(0);
+          setIsInitializing(false);
+          return;
+        }
+
+        // Priority 2c: Token is old or status unclear, validate with server
         fetchUserData();
-      } 
-      // No credentials found
-      else {
+      } catch (error) {
+        localStorage.removeItem("authData");
         setShowAuthModal(true);
         setCurrentStep(-1);
-        setUser(null);
         setIsInitializing(false);
       }
+    } else {
+      // Priority 3: No credentials found
+      setShowAuthModal(true);
+      setCurrentStep(-1);
+      setUser(null);
+      setIsInitializing(false);
     }
-  }, [session, status, handleSessionAuth, fetchUserData]);
-
-  /**
-   * Navigation Effect
-   * 
-   * Determines where to send user after authentication:
-   * - Dashboard if profile complete
-   * - Onboarding if profile incomplete
-   */
-  useEffect(() => {
-    // Only run when all checks are complete
-    if (!isCheckingUser && !isProcessingOAuth && user) {
-      // Redirect to dashboard if profile complete
-      if (studentId && userHasProfile) {
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 500);
-      } 
-      // Start onboarding if profile incomplete
-      else if (!studentId && !userHasProfile) {
-        setCurrentStep(0);
-      }
-    }
-  }, [
-    user,
-    studentId,
-    userHasProfile,
-    isCheckingUser,
-    isProcessingOAuth,
-    router,
-  ]);
+  }, [session, status, handleSessionAuth, fetchUserData, isTokenExpired, router]);
 
   /**
    * Manual Authentication Handler
-   * 
-   * @param {Object} sessionData - User session data
-   * @param {boolean} shouldStartOnboarding - Whether to start onboarding immediately
    */
   const handleAuthSuccess = useCallback(
     (sessionData, shouldStartOnboarding = false) => {
       setShowAuthModal(false);
       setUser(sessionData || null);
-      setRenderKey((prev) => prev + 1); // Force re-render
+      setRenderKey((prev) => prev + 1);
 
-      // Start onboarding for new users
       if (shouldStartOnboarding) {
         setStudentId(null);
         setUserHasProfile(false);
         setCurrentStep(0);
         setIsInitializing(false);
-      } 
-      // Check existing users
-      else {
+      } else {
+        // For existing users, check localStorage first
+        const authDataStr = localStorage.getItem("authData");
+        if (authDataStr) {
+          const authData = JSON.parse(authDataStr);
+          if (authData.hasCompleteProfile && !isTokenExpired(authData)) {
+            setStudentId(authData.userId);
+            setUserHasProfile(true);
+            setTimeout(() => {
+              router.push("/dashboard");
+            }, 500);
+            return;
+          }
+        }
         fetchUserData();
       }
     },
-    [fetchUserData]
+    [fetchUserData, isTokenExpired, router]
   );
 
   // Step navigation functions
@@ -328,7 +363,7 @@ export const OnboardingFlow = () => {
     setCurrentStep((prevStep) => {
       const nextStep = prevStep + 1;
       if (nextStep < steps.length) {
-        setRenderKey((prev) => prev + 1); // Force re-render
+        setRenderKey((prev) => prev + 1);
         return nextStep;
       }
       return prevStep;
@@ -339,33 +374,22 @@ export const OnboardingFlow = () => {
     setCurrentStep((prevStep) => {
       if (prevStep > 0) {
         const backStep = prevStep - 1;
-        setRenderKey((prev) => prev + 1); // Force re-render
+        setRenderKey((prev) => prev + 1);
         return backStep;
       }
       return prevStep;
     });
   }, []);
 
-  /**
-   * Data Update Handler
-   * 
-   * Merges new data into central onboarding state
-   * @param {Object} newData - Partial data to merge
-   */
   const updateData = useCallback((newData) => {
     setData((prev) => ({ ...prev, ...newData }));
   }, []);
 
   /**
-   * Onboarding Completion Handler
-   * 
-   * - Stores final auth token
-   * - Redirects to dashboard
-   * @param {Object} responseData - Final response from backend
+   * Onboarding Completion Handler - Updates localStorage with complete profile flag
    */
   const handleOnboardingComplete = useCallback(
     (responseData) => {
-      // Store authentication token if provided
       if (responseData && responseData.token) {
         const authData = {
           token: responseData.token,
@@ -373,12 +397,24 @@ export const OnboardingFlow = () => {
           email: responseData.data?.email,
           name: responseData.data?.name,
           provider: responseData.data?.provider,
+          hasCompleteProfile: true, // Set to true after completion
           lastLogin: new Date().toISOString(),
         };
         localStorage.setItem("authData", JSON.stringify(authData));
+      } else {
+        // Update existing localStorage to mark profile as complete
+        const existingAuthStr = localStorage.getItem("authData");
+        if (existingAuthStr) {
+          const existingAuth = JSON.parse(existingAuthStr);
+          const updatedAuth = {
+            ...existingAuth,
+            hasCompleteProfile: true,
+            lastLogin: new Date().toISOString(),
+          };
+          localStorage.setItem("authData", JSON.stringify(updatedAuth));
+        }
       }
 
-      // Redirect to dashboard
       setTimeout(() => {
         router.push("/dashboard");
       }, 500);
@@ -442,7 +478,6 @@ export const OnboardingFlow = () => {
         {/* Onboarding Steps */}
         {user && !studentId && !userHasProfile && currentStep >= 0 && (
           <>
-            {/* Step 1: Country Selection */}
             {currentStep === 0 && (
               <CountrySelectionStep
                 selectedCountries={data.countries}
@@ -454,7 +489,6 @@ export const OnboardingFlow = () => {
               />
             )}
 
-            {/* Step 2: Course Selection */}
             {currentStep === 1 && (
               <CourseSelectionStep
                 selectedCourses={data.courses}
@@ -466,7 +500,6 @@ export const OnboardingFlow = () => {
               />
             )}
 
-            {/* Step 3: Study Level */}
             {currentStep === 2 && (
               <StudyLevelStep
                 selectedLevel={data.studyLevel}
@@ -478,7 +511,6 @@ export const OnboardingFlow = () => {
               />
             )}
 
-            {/* Step 4: Academic Info */}
             {currentStep === 3 && (
               <AcademicSnapshotStep
                 academicInfo={data.academicInfo}
@@ -490,7 +522,6 @@ export const OnboardingFlow = () => {
               />
             )}
 
-            {/* Step 5: Payment */}
             {currentStep === 4 && (
               <PaymentStep
                 paymentInfo={data.paymentInfo}
@@ -502,7 +533,6 @@ export const OnboardingFlow = () => {
               />
             )}
 
-            {/* Step 6: Loading/Submission */}
             {currentStep === 5 && (
               <LoadingStep
                 userData={data}

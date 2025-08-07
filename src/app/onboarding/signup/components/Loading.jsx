@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 
 /**
- * LoadingStep component - Handles the profile submission and loading visualization
+ * LoadingStep component - Handles profile submission with improved localStorage management
  * 
  * @param {Object} props - Component properties
  * @param {Object} props.userData - User data collected during onboarding
@@ -10,17 +10,17 @@ import { useEffect, useState, useRef } from "react";
  */
 export const LoadingStep = ({ userData, onComplete }) => {
   // State management
-  const [progress, setProgress] = useState(0);              // Progress percentage (0-100)
-  const [currentMessage, setCurrentMessage] = useState(0);   // Index of current loading message
-  const [isSubmitting, setIsSubmitting] = useState(false);   // API submission status
-  const [submitError, setSubmitError] = useState(null);      // Submission error message
-  const [isComplete, setIsComplete] = useState(false);      // Completion status
-  const [dots, setDots] = useState("");                     // Animated dots for loading text
+  const [progress, setProgress] = useState(0);
+  const [currentMessage, setCurrentMessage] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [isComplete, setIsComplete] = useState(false);
+  const [dots, setDots] = useState("");
 
   // Ref to prevent duplicate submissions
   const hasSubmittedRef = useRef(false);
 
-  // Loading messages displayed during the process
+  // Loading messages
   const messages = [
     "Analyzing your preferences",
     "Matching you with universities",
@@ -30,20 +30,65 @@ export const LoadingStep = ({ userData, onComplete }) => {
     "Almost ready",
   ];
 
-  // Retrieve authentication token from localStorage
-  const authData = typeof window !== "undefined" 
-    ? localStorage.getItem("authData") 
-    : null;
-  const token = authData ? JSON.parse(authData).token : null;
+  /**
+   * Get authentication token from localStorage with validation
+   */
+  const getAuthToken = () => {
+    try {
+      const authData = typeof window !== "undefined" 
+        ? localStorage.getItem("authData") 
+        : null;
+      
+      if (!authData) {
+        console.warn("⚠️ No auth data found in localStorage");
+        return null;
+      }
 
-  // ================================================================
-  // ANIMATION EFFECTS
-  // ================================================================
+      const parsedData = JSON.parse(authData);
+      
+      if (!parsedData.token) {
+        console.warn("⚠️ No token found in auth data");
+        return null;
+      }
+
+      return parsedData.token;
+    } catch (error) {
+      console.error("❌ Error parsing auth data:", error);
+      return null;
+    }
+  };
 
   /**
-   * Animated dots effect for loading indicators
-   * Cycles through "...", "..", ".", "" every 500ms
+   * Update localStorage with new token and profile completion flag
    */
+  const updateAuthData = (newToken, additionalData = {}) => {
+    try {
+      const existingAuthStr = localStorage.getItem("authData");
+      
+      if (existingAuthStr) {
+        const existingAuth = JSON.parse(existingAuthStr);
+        const updatedAuth = {
+          ...existingAuth,
+          token: newToken || existingAuth.token,
+          hasCompleteProfile: true, // Mark profile as complete
+          lastLogin: new Date().toISOString(),
+          ...additionalData
+        };
+        
+        localStorage.setItem("authData", JSON.stringify(updatedAuth));
+        console.log("✅ Updated localStorage with profile completion flag");
+        return true;
+      } else {
+        console.warn("⚠️ No existing auth data to update");
+        return false;
+      }
+    } catch (error) {
+      console.error("❌ Error updating localStorage:", error);
+      return false;
+    }
+  };
+
+  // Animation effects
   useEffect(() => {
     const dotsInterval = setInterval(() => {
       setDots((prev) => (prev === "..." ? "" : prev + "."));
@@ -52,11 +97,6 @@ export const LoadingStep = ({ userData, onComplete }) => {
     return () => clearInterval(dotsInterval);
   }, []);
 
-  /**
-   * Progress animation and message rotation
-   * - Progress increases by 4% every 100ms until 100%
-   * - Messages rotate every 1500ms
-   */
   useEffect(() => {
     let progressInterval = setInterval(() => {
       setProgress((prev) => {
@@ -78,28 +118,20 @@ export const LoadingStep = ({ userData, onComplete }) => {
     };
   }, []);
 
-  // ================================================================
-  // DATA SUBMISSION LOGIC
-  // ================================================================
-
   /**
-   * Prepares user data for submission with fallbacks
-   * 
-   * Security Note: Masks credit card details before sending to backend
-   * 
-   * @returns {Object} Structured submission payload
+   * Prepare submission data with security considerations
    */
   const prepareSubmissionData = () => ({
     preferences: {
-      countries: userData?.countries || [],  // Fallback: empty array
-      courses: userData?.courses || [],      // Fallback: empty array
-      studyLevel: userData?.studyLevel || "", // Fallback: empty string
+      countries: userData?.countries || [],
+      courses: userData?.courses || [],
+      studyLevel: userData?.studyLevel || "",
     },
-    academicInfo: userData?.academicInfo || {}, // Fallback: empty object
+    academicInfo: userData?.academicInfo || {},
     paymentInfo: {
       name: userData?.paymentInfo?.name || "",
       email: userData?.paymentInfo?.email || "",
-      // Mask card number: show only last 4 digits
+      // Mask card number for security
       cardNumber: userData?.paymentInfo?.cardNumber
         ? "****" + userData.paymentInfo.cardNumber.slice(-4)
         : "",
@@ -107,30 +139,30 @@ export const LoadingStep = ({ userData, onComplete }) => {
   });
 
   /**
-   * Submits user data to backend API
-   * 
-   * Security Features:
-   * - Uses JWT token from localStorage for authorization
-   * - Implements credentials: "include" for cookie handling
-   * - Handles token refresh by updating localStorage
-   * 
-   * Error Handling:
-   * - Catches network errors (e.g., backend unreachable)
-   * - Handles API error responses
-   * - Provides user-friendly error messages
+   * Submit user data with improved error handling and localStorage management
    */
   const submitData = async () => {
     // Prevent duplicate submissions
-    if (hasSubmittedRef.current) return;
-    hasSubmittedRef.current = true;
+    if (hasSubmittedRef.current) {
+      console.log("⚠️ Submission already in progress, skipping...");
+      return;
+    }
     
+    hasSubmittedRef.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      const payload = prepareSubmissionData();
+      // Get fresh token
+      const token = getAuthToken();
       
-      // Get API base URL with fallback to localhost
+      if (!token) {
+        throw new Error("Authentication token not found. Please sign in again.");
+      }
+
+      const payload = prepareSubmissionData();
+      console.log("📤 Submitting profile data:", payload);
+      
       const API_BASE_URL = 
         process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
@@ -139,53 +171,76 @@ export const LoadingStep = ({ userData, onComplete }) => {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json", // Required for JSON payloads
-            Authorization: `Bearer ${token}`,    // JWT authentication
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-          credentials: "include",                // Include cookies in request
+          credentials: "include",
           body: JSON.stringify(payload),
         }
       );
 
       const data = await response.json();
+      console.log("📥 Server response:", data);
 
-      // Handle successful response
       if (response.ok && data.success !== false) {
         setIsComplete(true);
-
-        // Update auth token if new one provided
+        
+        // Update localStorage with new token and completion flag
         if (data.token) {
-          try {
-            const authData = {
-              token: data.token,
-              userId: data.data.userId,
-              name: data.data.name,
-              email: data.data.email,
-            };
-            localStorage.setItem("authData", JSON.stringify(authData));
-            console.log("✅ Token saved to localStorage");
-          } catch (error) {
-            console.warn("⚠️ Could not save token to localStorage:", error);
-          }
+          updateAuthData(data.token, {
+            userId: data.data?.userId,
+            name: data.data?.name,
+            email: data.data?.email,
+            provider: data.data?.provider
+          });
+        } else {
+          // No new token provided, just update completion flag
+          updateAuthData(null);
         }
 
         // Trigger completion callback after delay
-        if (onComplete) setTimeout(() => onComplete(data), 2000);
+        if (onComplete) {
+          setTimeout(() => {
+            onComplete(data);
+          }, 2000);
+        }
       } 
-      // Handle API errors
+      else if (response.status === 401) {
+        // Handle expired token
+        localStorage.removeItem("authData");
+        throw new Error("Your session has expired. Please sign in again.");
+      }
+      else if (response.status === 409 && data.userExists) {
+        // Profile already completed - update localStorage and proceed
+        console.log("✅ Profile already completed, updating localStorage");
+        updateAuthData(data.token || getAuthToken());
+        setIsComplete(true);
+        
+        if (onComplete) {
+          setTimeout(() => {
+            onComplete(data);
+          }, 2000);
+        }
+      }
       else {
-        throw new Error(data?.message || "Submission failed");
+        throw new Error(data?.error || data?.message || "Profile submission failed");
       }
     } catch (error) {
+      console.error("❌ Profile submission error:", error);
+      
       // Reset submission lock on error
       hasSubmittedRef.current = false;
       
-      let errorMessage = "Failed to submit data. Please try again.";
+      let errorMessage = "Failed to submit profile. Please try again.";
       
-      // Detect network errors
-      if (error.name === "TypeError" && error.message.includes("fetch")) {
-        errorMessage = "Network error: Could not reach server. Check if backend is running.";
-      } else {
+      // Handle specific error types
+      if (error.message.includes("Authentication token")) {
+        errorMessage = error.message;
+      } else if (error.message.includes("session has expired")) {
+        errorMessage = error.message;
+      } else if (error.name === "TypeError" && error.message.includes("fetch")) {
+        errorMessage = "Network error: Cannot reach server. Please check your connection.";
+      } else if (error.message) {
         errorMessage = error.message;
       }
       
@@ -195,65 +250,102 @@ export const LoadingStep = ({ userData, onComplete }) => {
     }
   };
 
-  /** Retry handler for failed submissions */
+  /**
+   * Retry handler for failed submissions
+   */
   const handleRetry = () => {
+    console.log("🔄 Retrying profile submission...");
     hasSubmittedRef.current = false;
     setSubmitError(null);
-    submitData();
+    setProgress(0);
+    
+    // Restart progress animation
+    let progressInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 4;
+      });
+    }, 100);
   };
-
-  // ================================================================
-  // SUBMISSION TRIGGER
-  // ================================================================
 
   /**
    * Auto-submit when progress reaches 100%
-   * Conditions:
-   * - Progress is 100%
-   * - Not currently submitting
-   * - No existing errors
-   * - Haven't already submitted
    */
   useEffect(() => {
-    if (progress === 100 && !isSubmitting && !submitError && !hasSubmittedRef.current) {
+    if (progress === 100 && !isSubmitting && !submitError && !hasSubmittedRef.current && !isComplete) {
+      console.log("🚀 Progress complete, submitting data...");
       const submitTimer = setTimeout(submitData, 1000);
       return () => clearTimeout(submitTimer);
     }
-  }, [progress, isSubmitting, submitError]);
+  }, [progress, isSubmitting, submitError, isComplete]);
 
-  // ================================================================
-  // RENDER COMPONENT
-  // ================================================================
-  
+  // Token expiration handler
+  useEffect(() => {
+    const token = getAuthToken();
+    if (!token) {
+      setSubmitError("Authentication required. Please sign in again.");
+    }
+  }, []);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 overflow-y-auto">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Main Content */}
         <div className="text-center space-y-8">
-          {/* Spinner */}
+          {/* Animated spinner */}
           <div className="space-y-6">
             <div className="relative">
-              <div className="w-32 h-32 mx-auto rounded-full bg-[#002147] flex items-center justify-center animate-pulse">
+              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center transition-all duration-500 ${
+                isComplete 
+                  ? 'bg-green-600 animate-pulse' 
+                  : submitError 
+                    ? 'bg-red-600 animate-pulse' 
+                    : 'bg-[#002147] animate-pulse'
+              }`}>
                 <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center">
-                  <span className="text-4xl">🎓</span>
+                  <span className="text-4xl">
+                    {isComplete ? '🎉' : submitError ? '⚠️' : '🎓'}
+                  </span>
                 </div>
               </div>
+              
+              {/* Loading ring animation */}
+              {(isSubmitting && !isComplete) && (
+                <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
+              )}
             </div>
 
-            <h1 className="text-4xl font-bold text-[#002147]">
-              Building Your Profile
+            <h1 className={`text-4xl font-bold transition-colors duration-500 ${
+              isComplete 
+                ? 'text-green-600' 
+                : submitError 
+                  ? 'text-red-600' 
+                  : 'text-[#002147]'
+            }`}>
+              {isComplete 
+                ? 'Profile Complete!' 
+                : submitError 
+                  ? 'Submission Failed' 
+                  : 'Building Your Profile'
+              }
             </h1>
 
-            {/* Dynamic message with animated dots */}
+            {/* Dynamic message */}
             <div className="text-xl text-gray-600 min-h-[28px]">
-              {isSubmitting ? (
+              {submitError ? (
+                <span className="text-red-600">
+                  Please try again or contact support
+                </span>
+              ) : isSubmitting ? (
                 <span className="inline-flex items-center">
                   Submitting your profile
                   <span className="inline-block w-8 text-left">{dots}</span>
                 </span>
               ) : isComplete ? (
                 <span className="inline-flex items-center text-green-600">
-                  <span className="mr-2 text-2xl animate-bounce">⏳</span>
+                  <span className="mr-2 text-2xl animate-bounce">🎊</span>
                   Redirecting to dashboard
                   <span className="inline-block w-8 text-left">{dots}</span>
                 </span>
@@ -271,19 +363,31 @@ export const LoadingStep = ({ userData, onComplete }) => {
             <div className="space-y-4">
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
-                  className="bg-[#002147] h-3 rounded-full transition-all duration-300 ease-out relative overflow-hidden"
-                  style={{ width: `${progress}%` }}
+                  className={`h-3 rounded-full transition-all duration-300 ease-out relative overflow-hidden ${
+                    isComplete 
+                      ? 'bg-green-500' 
+                      : submitError 
+                        ? 'bg-red-500' 
+                        : 'bg-[#002147]'
+                  }`}
+                  style={{ width: `${isComplete ? 100 : progress}%` }}
                 >
-                  {/* Loading shimmer effect */}
-                  {(isSubmitting || progress < 100) && (
+                  {/* Shimmer effect */}
+                  {(isSubmitting || (progress < 100 && !submitError)) && (
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
                   )}
                 </div>
               </div>
 
               <div className="flex items-center justify-center space-x-2">
-                <p className="text-lg font-medium text-gray-700">
-                  {progress}% Complete
+                <p className={`text-lg font-medium transition-colors duration-500 ${
+                  isComplete 
+                    ? 'text-green-600' 
+                    : submitError 
+                      ? 'text-red-600' 
+                      : 'text-gray-700'
+                }`}>
+                  {isComplete ? '100% Complete' : `${progress}% Complete`}
                 </p>
                 {isSubmitting && (
                   <div className="flex space-x-1">
@@ -322,23 +426,34 @@ export const LoadingStep = ({ userData, onComplete }) => {
                   className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center transition-all duration-500 ${
                     isComplete
                       ? "bg-green-500"
-                      : progress >= 100
-                      ? "bg-[#002147]"
-                      : isSubmitting
-                      ? "bg-blue-500 animate-spin"
-                      : "bg-blue-500 animate-pulse"
+                      : submitError
+                        ? "bg-red-500"
+                        : progress >= 100
+                          ? "bg-[#002147]"
+                          : isSubmitting
+                            ? "bg-blue-500 animate-spin"
+                            : "bg-blue-500 animate-pulse"
                   }`}
                 >
                   <span className="text-white text-sm">
                     {isComplete
                       ? "✓"
-                      : progress >= 100 || isSubmitting
-                      ? "⟳"
-                      : "⏳"}
+                      : submitError
+                        ? "✕"
+                        : progress >= 100 || isSubmitting
+                          ? "⟳"
+                          : "⏳"}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {isSubmitting ? "Submitting" : "Matching"}
+                  {isComplete 
+                    ? "Complete!" 
+                    : submitError 
+                      ? "Failed" 
+                      : isSubmitting 
+                        ? "Submitting" 
+                        : "Processing"
+                  }
                 </p>
               </div>
             </div>
@@ -346,31 +461,53 @@ export const LoadingStep = ({ userData, onComplete }) => {
             {/* Error Display */}
             {submitError && (
               <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-sm mb-3">❌ {submitError}</p>
-                <button
-                  onClick={handleRetry}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                >
-                  Retry
-                </button>
+                <div className="flex items-center mb-3">
+                  <span className="text-red-600 text-sm mr-2">❌</span>
+                  <p className="text-red-600 text-sm font-medium">Submission Error</p>
+                </div>
+                <p className="text-red-600 text-sm mb-3">{submitError}</p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleRetry}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem("authData");
+                      window.location.reload();
+                    }}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm font-medium"
+                  >
+                    Sign In Again
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Success Display */}
-            {isComplete && (
+            {isComplete && !submitError && (
               <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-green-600 text-sm">
-                    ✅ Profile created successfully!
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                  <span className="text-green-600 text-sm">✅</span>
+                  <span className="text-green-600 text-sm font-medium">
+                    Profile created successfully!
                   </span>
-                  <span className="text-2xl animate-bounce">⏳</span>
+                  <span className="text-2xl animate-bounce">🎊</span>
                 </div>
-                <p className="text-green-600 text-sm mt-2 text-center">
-                  Redirecting to dashboard
+                <p className="text-green-600 text-sm text-center">
+                  Preparing your personalized dashboard
                   <span className="inline-block w-8 text-left font-mono">
                     {dots}
                   </span>
                 </p>
+                <div className="mt-3 text-center">
+                  <div className="inline-flex items-center space-x-2 text-xs text-green-700 bg-green-100 rounded-full px-3 py-1">
+                    <span>🔒</span>
+                    <span>Your data is secure and encrypted</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>

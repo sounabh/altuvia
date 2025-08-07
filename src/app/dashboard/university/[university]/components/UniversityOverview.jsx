@@ -1,14 +1,16 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, Users, Clock, DollarSign, Award, Calendar, Target, BarChart, Sparkles } from 'lucide-react';
+import { 
+  TrendingUp, Users, Clock, DollarSign, Award, 
+  Calendar, Target, BarChart, Sparkles 
+} from 'lucide-react';
 
-const UniversityOverview = () => {
-  // Key stats for the university, with icons and styles
+const UniversityOverview = ({ university, savedStatus, toggleSaved }) => {
   const stats = [
     { 
       icon: Award, 
       label: "FT RANKING 2024", 
-      value: "#2", 
+      value: university.additionalData.ftGlobalRanking ? `#${university.additionalData.ftGlobalRanking}` : 'N/A', 
       color: "text-[#002147]",
       bgColor: "bg-white",
       borderColor: "border-yellow-200",
@@ -17,7 +19,7 @@ const UniversityOverview = () => {
     { 
       icon: TrendingUp, 
       label: "GMAT AVERAGE", 
-      value: "738", 
+      value: university.additionalData.gmatAverageScore || 'N/A',
       color: "text-[#002147]",
       bgColor: "bg-white",
       borderColor: "border-green-200",
@@ -35,7 +37,8 @@ const UniversityOverview = () => {
     { 
       icon: Calendar, 
       label: "APPLICATION DEADLINE", 
-      value: "Apr 9", 
+      value: university.additionalData.averageDeadlines ? 
+        university.additionalData.averageDeadlines.split(',')[0].trim() : 'TBD',
       color: "text-[#002147]",
       bgColor: "bg-white",
       borderColor: "border-red-200",
@@ -44,7 +47,8 @@ const UniversityOverview = () => {
     { 
       icon: Users, 
       label: "ACCEPTANCE RATE", 
-      value: "6.1%", 
+      value: university.additionalData.acceptanceRate ? 
+        `${(university.additionalData.acceptanceRate * 100).toFixed(1)}%` : 'N/A',
       color: "text-[#002147]",
       bgColor: "bg-white",
       borderColor: "border-purple-200",
@@ -53,7 +57,8 @@ const UniversityOverview = () => {
     { 
       icon: DollarSign, 
       label: "TOTAL PROGRAM COST", 
-      value: "$223,000", 
+      value: university.additionalData.tuitionFees ? 
+        `$${university.additionalData.tuitionFees}` : 'N/A',
       color: "text-[#002147]",
       bgColor: "bg-white",
       borderColor: "border-gray-200",
@@ -61,65 +66,59 @@ const UniversityOverview = () => {
     }
   ];
 
-  // Highlighted features of the university
-  const highlights = [
-    {
-      icon: Target,
-      title: "World-Class Faculty",
-      description: "Learn from renowned professors and industry experts who shape global business thinking"
-    },
-    {
-      icon: BarChart,
-      title: "Career Advancement",
-      description: "95% employment rate within 3 months of graduation with top-tier companies"
-    },
-    {
-      icon: Sparkles,
-      title: "Innovation Hub",
-      description: "Located in Silicon Valley, the global center of technology and entrepreneurship"
-    }
-  ];
+  const highlights = university.whyChooseHighlights.length > 0 
+    ? university.whyChooseHighlights.map((text, index) => ({
+        icon: index === 0 ? Target : index === 1 ? BarChart : Sparkles,
+        title: text.split(':')[0],
+        description: text.split(':')[1] || text
+      }))
+    : [
+        {
+          icon: Target,
+          title: "World-Class Faculty",
+          description: "Learn from renowned professors and industry experts"
+        },
+        {
+          icon: BarChart,
+          title: "Career Advancement",
+          description: "95% employment rate within 3 months of graduation"
+        },
+        {
+          icon: Sparkles,
+          title: "Innovation Hub",
+          description: "Located in the global center of technology"
+        }
+      ];
 
   return (
     <Card className="bg-[#002147] shadow-xl hover:shadow-2xl transition-all duration-500 border-0 overflow-hidden">
       <CardContent className="p-0">
-
-        {/* ======================== Header Section ======================== */}
         <div className="bg-[#002147] p-6 text-white">
           <div className="flex items-center justify-between">
-            
-            {/* Title and description */}
             <div>
               <div className="flex items-center mb-3">
                 <div className="w-1 h-8 bg-white rounded-full mr-4 opacity-80"></div>
                 <h2 className="text-2xl font-semibold tracking-tight">University Overview</h2>
               </div>
               <p className="text-white text-sm font-medium">
-                Stanford Graduate School of Business Excellence
+                {university.name} Excellence
               </p>
             </div>
-
-            {/* Optional: Right side icon */}
             <div className="hidden md:flex items-center space-x-2">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
                 <Award className="h-6 w-6 text-white" />
               </div>
             </div>
-
           </div>
         </div>
 
-        {/* ======================== Content Section ======================== */}
         <div className="p-6 space-y-8">
-
-          {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {stats.map((stat, index) => (
               <div 
                 key={index} 
                 className={`group relative p-6 rounded-2xl bg-gradient-to-br ${stat.bgColor} border ${stat.borderColor} hover:shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer`}
               >
-                {/* Icon and Value */}
                 <div className="flex items-start justify-between mb-4">
                   <div className={`p-3 rounded-xl ${stat.iconBg} group-hover:scale-110 transition-transform duration-200`}>
                     <stat.icon className="h-6 w-6 text-white" />
@@ -131,21 +130,18 @@ const UniversityOverview = () => {
                   </div>
                 </div>
 
-                {/* Label */}
                 <div className="text-sm text-gray-600 font-semibold leading-tight">
                   {stat.label}
                 </div>
 
-                {/* Hover Overlay */}
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
             ))}
           </div>
 
-          {/* Highlights Section */}
           <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-2xl border border-gray-100 shadow-inner">
             <h3 className="text-xl font-bold text-[#002147] mb-6 text-center">
-              Why Choose Stanford GSB?
+              Why Choose {university.name}?
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -165,16 +161,21 @@ const UniversityOverview = () => {
             </div>
           </div>
 
-          {/* Quick Actions Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button className="flex-1 bg-[#3598FE] text-white py-4 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-[1.02] text-center">
-            Save additional Documents
+              Save additional Documents
             </button>
-            <button className="flex-1 border-2 border-white text-white py-4 px-6 rounded-xl font-semibold bg-transparent hover:text-white transition-all duration-300 hover:scale-[1.02] outline-0 text-center">
-              Download Brochure
+            <button 
+              onClick={toggleSaved}
+              className={`flex-1 py-4 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-[1.02] text-center ${
+                savedStatus 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-transparent border-2 border-white text-white hover:bg-white hover:text-[#002147]'
+              }`}
+            >
+              {savedStatus ? 'University Saved ✓' : 'Save to My Universities'}
             </button>
           </div>
-
         </div>
       </CardContent>
     </Card>
