@@ -6,13 +6,26 @@ import { UniversityCard } from './components/UniversityCard';
 import { AddUniversityModal } from './components/AddUniversityModal';
 import { FloatingAddButton } from './components/FloatingAddButton';
 
+/**
+ * Main dashboard component for managing saved universities
+ * @returns {JSX.Element} Dashboard with:
+ * - Statistics overview
+ * - Saved university cards
+ * - Add/remove functionality
+ * - Loading and error states
+ */
 const Index = () => {
+  // State management
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [universities, setUniversities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch saved universities from backend
+  /**
+   * Fetches saved universities from backend API
+   * Adds default values for UI components
+   * Handles authentication and error states
+   */
   useEffect(() => {
     const fetchSavedUniversities = async () => {
       try {
@@ -36,17 +49,15 @@ const Index = () => {
 
         if (response.ok) {
           const savedUniversities = await response.json();
-          console.log('Fetched saved universities:', savedUniversities);
           
-          // Add default values for UI components
+          // Enhance university data with UI defaults
           const universitiesWithDefaults = savedUniversities.map(university => ({
             ...university,
-            // Set default values for missing fields needed by UI
-            status: 'not-started', // Default status
-            essayProgress: 0, // Default progress
-            tasks: 0, // Default completed tasks
-            totalTasks: 5, // Default total tasks
-            name: university.universityName, // Ensure name field exists
+            status: 'not-started',
+            essayProgress: 0,
+            tasks: 0,
+            totalTasks: 5,
+            name: university.universityName,
           }));
           
           setUniversities(universitiesWithDefaults);
@@ -65,7 +76,10 @@ const Index = () => {
     fetchSavedUniversities();
   }, []);
 
-  // Handle removing a university from the list
+  /**
+   * Handles removing a university from saved list
+   * @param {string} universityId - ID of university to remove
+   */
   const handleRemoveUniversity = async (universityId) => {
     try {
       const authData = localStorage.getItem("authData");
@@ -87,7 +101,6 @@ const Index = () => {
       });
 
       if (response.ok) {
-        // Remove from local state
         setUniversities(universities.filter(u => u.id !== universityId));
       } else {
         console.error('Failed to remove university');
@@ -97,7 +110,7 @@ const Index = () => {
     }
   };
 
-  // Compute overview statistics
+  // Compute dashboard statistics
   const stats = {
     total: universities.length,
     inProgress: universities.filter(u => u.status === 'in-progress').length,
@@ -105,7 +118,7 @@ const Index = () => {
     upcomingDeadlines: universities.filter(u => u.status !== 'submitted').length
   };
 
-  // Loading state
+  // Loading state UI
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -117,7 +130,7 @@ const Index = () => {
     );
   }
 
-  // Error state
+  // Error state UI
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -137,7 +150,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <div className="px-4 py-8 max-w-7xl mx-auto">
-        {/* Header Section */}
+        {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-center text-[40px] tracking-[0.2px] -mt-10">
             My Saved Universities
@@ -147,7 +160,7 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Stats Overview */}
+        {/* Statistics Overview Component */}
         <StatsOverview stats={stats} />
 
         {/* University Cards Grid */}
@@ -179,7 +192,7 @@ const Index = () => {
           </div>
         )}
 
-        {/* Floating Add Button */}
+        {/* Floating Action Button (Conditional) */}
         {universities.length > 0 && (
           <FloatingAddButton onClick={() => setIsModalOpen(true)} />
         )}
@@ -189,6 +202,7 @@ const Index = () => {
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)}
           onAdd={(newUniversity) => {
+            // Add new university with required defaults
             const universityWithDefaults = {
               ...newUniversity,
               id: Date.now(),

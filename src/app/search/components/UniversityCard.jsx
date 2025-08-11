@@ -1,41 +1,64 @@
 "use client";
-import React, { useState ,useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import { MapPin } from "lucide-react";
 
-// University Card Component
+/**
+ * University card component displaying university information with interactive features
+ * @param {Object} props - Component props
+ * @param {Object} props.university - University data object containing:
+ *   @param {string} id - University identifier
+ *   @param {string} name - University name
+ *   @param {string} image - URL of university image
+ *   @param {string} rank - University ranking
+ *   @param {string} location - University location
+ *   @param {number} gmatAvg - Average GMAT score
+ *   @param {number} acceptRate - Acceptance rate percentage
+ *   @param {string} tuitionFee - Tuition fee information
+ *   @param {string} applicationFee - Application fee information
+ *   @param {Array} pros - List of advantages
+ *   @param {Array} cons - List of considerations
+ *   @param {Array} savedByUsers - Array of users who saved this university
+ *   @param {boolean} isAdded - Initial saved status (optional)
+ * @returns {JSX.Element} Interactive university card component
+ */
 const UniversityCard = ({ university }) => {
   const [isAdded, setIsAdded] = useState(university?.isAdded);
   const [isLoading, setIsLoading] = useState(false);
 
-console.log(university.savedByUsers);
+  console.log(university.savedByUsers);
 
-
+  /**
+   * Effect to initialize saved status by checking if current user has saved this university
+   * Checks localStorage for auth data and compares with savedByUsers array
+   */
   useEffect(() => {
-  try {
-    const authData = localStorage.getItem("authData");
-    if (!authData) return;
+    try {
+      const authData = localStorage.getItem("authData");
+      if (!authData) return;
 
-    const parsedData = JSON.parse(authData);
-    const userId = parsedData.userId;
+      const parsedData = JSON.parse(authData);
+      const userId = parsedData.userId;
 
-    // ✅ FIXED: Check if user's id is inside savedByUsers array of objects
-    const isSaved = Array.isArray(university.savedByUsers) &&
-      university.savedByUsers.some((user) => user.id === userId);
+      // Check if user's id is inside savedByUsers array of objects
+      const isSaved = Array.isArray(university.savedByUsers) &&
+        university.savedByUsers.some((user) => user.id === userId);
 
-    setIsAdded(isSaved);
-  } catch (error) {
-    console.error("Error initializing saved status:", error);
-  }
-}, [university.savedByUsers]);
+      setIsAdded(isSaved);
+    } catch (error) {
+      console.error("Error initializing saved status:", error);
+    }
+  }, [university.savedByUsers]);
 
-
-  // Toggle Add/Added state
+  /**
+   * Toggle university saved status
+   * @param {Event} e - Click event
+   */
   const toggleAdd = async (e) => {
     e.stopPropagation(); // Prevent event bubbling
-    console.log("Button clicked!"); // Add this to confirm click is working
+    console.log("Button clicked!");
     console.log(university?.id, "university id");
     
-    // Get auth data inside the function to ensure it's fresh
+    // Get fresh auth data from localStorage
     const authData = typeof window !== "undefined" ? localStorage.getItem("authData") : null;
     
     if (!authData) {
@@ -66,7 +89,7 @@ console.log(university.savedByUsers);
 
       if (response.ok) {
         const data = await response.json();
-        setIsAdded(data.isAdded); // update state from response
+        setIsAdded(data.isAdded); // Update state from response
         console.log("Successfully toggled:", data.isAdded);
       } else {
         console.error("Failed to update status:", response.status);
@@ -102,7 +125,7 @@ console.log(university.savedByUsers);
           {university?.rank}
         </div>
 
-        {/* Add/Added Button - FIXED WITH HIGHER Z-INDEX */}
+        {/* Add/Added Button */}
         <button
           onClick={toggleAdd}
           disabled={isLoading}
@@ -213,7 +236,7 @@ console.log(university.savedByUsers);
         </div>
       </div>
 
-      {/* ---------- Hover Effect Border Overlay - FIXED WITH POINTER-EVENTS-NONE ---------- */}
+      {/* Hover Effect Border Overlay */}
       <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-slate-900/5 group-hover:ring-blue-500/20 group-hover:ring-2 transition-all duration-300 pointer-events-none"></div>
     </div>
   );

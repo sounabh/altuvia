@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { X, Upload } from 'lucide-react';
 
-
-// Modal component to add a new university
+/**
+ * Modal component for adding new universities to the dashboard
+ * @param {Object} props - Component props
+ * @param {boolean} props.isOpen - Controls modal visibility
+ * @param {function} props.onClose - Callback to close modal
+ * @param {function} props.onAdd - Callback to add new university (receives form data)
+ * @returns {JSX.Element} Modal form with:
+ * - Input fields for university details
+ * - Form validation
+ * - Animated transitions
+ * - Gradient submit button
+ */
 export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
-
-  // Local state to handle form inputs
+  // Form state management
   const [formData, setFormData] = useState({
     name: '',               // University name
     location: '',           // University location
@@ -14,22 +23,31 @@ export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
     image: '/placeholder.svg' // Default image
   });
 
-
-  // Function to handle form submission
+  /**
+   * Handles form submission
+   * @param {Event} e - Form submit event
+   */
   const handleSubmit = (e) => {
-    e.preventDefault(); // Prevent default form reload
+    e.preventDefault();
 
-    // Call the onAdd prop with form data + default fields
-    onAdd({
+    // Prepare data with defaults and proper types
+    const universityData = {
       ...formData,
-      gmatAverage: parseInt(formData.gmatAverage) || 0, // Ensure GMAT is a number
-      essayProgress: 0,       // New university starts with 0% essay progress
-      tasks: 0,               // No tasks added yet
-      totalTasks: 10,         // Assume default 10 tasks
-      status: 'not-started'   // Status for newly added university
-    });
+      gmatAverage: parseInt(formData.gmatAverage) || 0,
+      essayProgress: 0,
+      tasks: 0,
+      totalTasks: 10,
+      status: 'not-started'
+    };
 
-    // Reset the form fields after submission
+    onAdd(universityData);
+    resetForm();
+  };
+
+  /**
+   * Resets form fields to initial state
+   */
+  const resetForm = () => {
     setFormData({
       name: '',
       location: '',
@@ -39,14 +57,11 @@ export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
     });
   };
 
-
-  // If modal is not open, return nothing (don’t render modal)
   if (!isOpen) return null;
-
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      
+      {/* Modal Container */}
       <div className="bg-white/90 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/20">
         
         {/* Modal Header */}
@@ -54,18 +69,16 @@ export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
           <h2 className="text-2xl font-bold text-slate-900">
             Add University
           </h2>
-
-          {/* Close button (X icon) */}
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5 text-slate-600" />
           </button>
         </div>
 
-
-        {/* Form Begins */}
+        {/* Form Content */}
         <form onSubmit={handleSubmit} className="space-y-6">
           
           {/* University Name Field */}
@@ -128,11 +141,8 @@ export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
             />
           </div>
 
-
           {/* Action Buttons */}
           <div className="flex space-x-4 pt-4">
-
-            {/* Cancel Button - closes the modal */}
             <button
               type="button"
               onClick={onClose}
@@ -140,16 +150,12 @@ export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
             >
               Cancel
             </button>
-
-
-            {/* Submit Button - adds university */}
             <button
               type="submit"
               className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Add University
             </button>
-
           </div>
         </form>
       </div>
@@ -157,64 +163,26 @@ export const AddUniversityModal = ({ isOpen, onClose, onAdd }) => {
   );
 };
 
-
-
-
-
-
-
-
-
-
-
-
 /**
- * 🧠 COMPONENT: <AddUniversityModal />
+ * COMPONENT PURPOSE:
+ * Provides a controlled modal form for adding new universities to the dashboard.
  * 
- * This modal is used to collect form input when a user wants to add a new university.
- * It receives 3 props from the parent:
+ * DATA FLOW:
+ * 1. Parent manages modal state (isOpen)
+ * 2. User submits form → data sent to parent via onAdd()
+ * 3. Parent adds university to list with generated ID
  * 
- * 1. isOpen         → Boolean → controls whether modal is visible or not
- * 2. onClose        → Function → closes the modal (used on Cancel or X button)
- * 3. onAdd          → Function → triggered when user submits the form
+ * KEY FEATURES:
+ * - Form validation (required fields)
+ * - Type conversion (GMAT score to number)
+ * - Default values for new entries
+ * - Accessibility (focus states, labels)
+ * - Visual feedback (hover states, transitions)
  * 
- * -------------------------------------------------------------------
- * 🧩 HOW IT WORKS (Step-by-step):
- * 
- * 1. Parent component has state: `isModalOpen`
- *    - When user clicks "Add University" button → setIsModalOpen(true)
- * 
- * 2. Modal opens because: `isOpen={isModalOpen}`
- * 
- * 3. User fills out the form and clicks "Add University"
- * 
- * 4. Inside the modal, onSubmit:
- *    - Calls `onAdd(newUniversityData)`
- *    - This passes the new university object to the parent
- * 
- * 5. In the parent:
- *    - We use: 
- *        setUniversities([
- *          ...universities, 
- *          { ...newUniversity, id: Date.now() }
- *        ])
- *    - This adds the new university to the list and includes a unique `id` using `Date.now()`
- * 
- * 6. Why ID is needed?
- *    - Every university in the list must have a unique ID
- *    - This is important for operations like `.map()` (rendering), `.filter()` (deleting), etc.
- * 
- * 7. After adding, modal is closed using: `setIsModalOpen(false)`
- * 
- * -------------------------------------------------------------------
- * 🧺 REAL LIFE ANALOGY:
- * 
- * Think of a Grocery List app:
- * - You have a list of items (universities)
- * - You click "Add Item" → a popup form opens
- * - You enter "Milk", quantity, price
- * - On Submit → item is added to the list and popup closes
- * - Each item gets a unique ID so you can edit/remove them individually
- * 
- * That’s exactly what’s happening here.
+ * USAGE EXAMPLE:
+ * <AddUniversityModal
+ *   isOpen={isModalOpen}
+ *   onClose={() => setIsModalOpen(false)}
+ *   onAdd={(uni) => setUniversities([...universities, {...uni, id: Date.now()}])}
+ * />
  */

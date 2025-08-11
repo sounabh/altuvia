@@ -3,17 +3,30 @@
 import React, { useState, useEffect } from 'react';
 import UniversityCard from './UniversityCard';
 
+/**
+ * University grid component that displays filtered universities based on search and filter criteria
+ * @param {Object} props - Component props
+ * @param {string} props.searchQuery - Search query string for filtering by name/location
+ * @param {string} props.selectedGmat - Selected GMAT score range filter
+ * @param {string} props.selectedRanking - Selected university ranking filter
+ * @returns {JSX.Element} Responsive grid of university cards with loading and error states
+ */
 const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   const [universities, setUniversities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  /**
+   * Effect hook to fetch universities based on current filters
+   * Implements debouncing to prevent excessive API calls
+   */
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         
+        // Construct query parameters from current filters
         const params = new URLSearchParams({
           search: searchQuery,
           gmat: selectedGmat,
@@ -28,17 +41,16 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
         
         const result = await response.json();
         
-        // FIXED: Extract the data array from the response
         console.log('API Response:', result);
         
-        // Handle both success and error responses
+        // Handle API response data
         if (result.data && Array.isArray(result.data)) {
           setUniversities(result.data);
         } else if (result.error) {
           setError(result.error);
           setUniversities([]);
         } else {
-          // Fallback if data structure is unexpected
+          // Fallback for unexpected response structure
           setUniversities([]);
         }
         
@@ -51,11 +63,14 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       }
     };
 
-    // Add debounce to prevent excessive requests
+    // Debounce API calls to prevent excessive requests
     const handler = setTimeout(fetchData, 300);
     return () => clearTimeout(handler);
   }, [searchQuery, selectedGmat, selectedRanking]);
 
+  /**
+   * Loading state skeleton UI
+   */
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
@@ -76,6 +91,9 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     );
   }
 
+  /**
+   * Error state UI
+   */
   if (error) {
     return (
       <div className="col-span-full text-center py-16">
@@ -89,6 +107,9 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     );
   }
 
+  /**
+   * Main grid rendering
+   */
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
       {universities && universities.length > 0 ? (

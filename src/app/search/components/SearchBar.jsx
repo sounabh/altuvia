@@ -1,15 +1,26 @@
 import { Search } from 'lucide-react';
 
+/**
+ * Search bar component with interactive effects and clear functionality
+ * @param {Object} props - Component props
+ * @param {string} props.searchQuery - Current search query value
+ * @param {function} props.setSearchQuery - Handler for search query changes
+ * @returns {JSX.Element} Search bar component with gradient effects and clear button
+ */
 const SearchBar = ({ searchQuery, setSearchQuery }) => {
   return (
     <div className="relative max-w-2xl mx-auto">
       <div className="relative group">
+        {/* Gradient background effect that appears on hover */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300 opacity-0 group-hover:opacity-100"></div>
         
+        {/* Main search bar container */}
         <div className="relative bg-white/90 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-lg shadow-slate-900/5 group-hover:shadow-xl group-hover:shadow-slate-900/10 transition-all duration-300">
           <div className="flex items-center px-6 py-4">
+            {/* Search icon */}
             <Search className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors duration-200" />
             
+            {/* Search input field */}
             <input
               type="text"
               placeholder="Search universities, locations, or programs..."
@@ -18,6 +29,7 @@ const SearchBar = ({ searchQuery, setSearchQuery }) => {
               className="flex-1 ml-4 bg-transparent border-0 outline-none text-slate-900 placeholder-black font-inter text-lg font-light"
             />
             
+            {/* Clear button (visible only when there's text in the search) */}
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}

@@ -1,9 +1,25 @@
 import React from 'react';
 import { BookOpen, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 
-
-
+/**
+ * Statistics overview component displaying key metrics in card format
+ * @param {Object} props - Component props
+ * @param {Object} props.stats - Statistics data containing:
+ *   @param {number} total - Total applications
+ *   @param {number} inProgress - Applications in progress
+ *   @param {number} submitted - Submitted applications
+ *   @param {number} upcomingDeadlines - Applications with upcoming deadlines
+ * @returns {JSX.Element} Responsive grid of statistic cards with:
+ * - Icon indicators
+ * - Color-coded categories
+ * - Hover animations
+ * - Gradient text values
+ */
 export const StatsOverview = ({ stats }) => {
+  /**
+   * Stat card configuration array
+   * Defines the appearance and data mapping for each statistic card
+   */
   const statCards = [
     {
       title: "Total Applications",
@@ -48,14 +64,20 @@ export const StatsOverview = ({ stats }) => {
             key={index}
             className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
           >
+            {/* Card Header with Icon and Value */}
             <div className="flex items-center justify-between mb-4">
+              {/* Icon Container */}
               <div className={`p-3 rounded-xl ${stat.bgColor}`}>
                 <Icon className={`w-6 h-6 ${stat.textColor}`} />
               </div>
+              
+              {/* Gradient Text Value */}
               <div className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
                 {stat.value}
               </div>
             </div>
+            
+            {/* Card Title */}
             <h3 className="text-slate-600 font-medium text-sm uppercase tracking-wide">
               {stat.title}
             </h3>
