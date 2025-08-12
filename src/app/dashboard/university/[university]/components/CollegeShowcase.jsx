@@ -9,15 +9,53 @@ import {
 const CollegeShowcase = ({ university }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // Get images array - handle both old and new data structures
+  const getImages = () => {
+    if (!university.images) return [];
+    
+    // If images is array of objects with url property (new structure)
+    if (university.images.length > 0 && typeof university.images[0] === 'object' && university.images[0].url) {
+      return university.images.map(img => ({
+        url: img.url,
+        alt: img.alt || img.imageAltText || university.name,
+        title: img.title || img.imageTitle,
+        caption: img.caption || img.imageCaption,
+        isPrimary: img.isPrimary
+      }));
+    }
+    
+    // If images is array of strings (old structure)
+    if (university.images.length > 0 && typeof university.images[0] === 'string') {
+      return university.images.map(url => ({
+        url,
+        alt: university.name,
+        title: university.name,
+        caption: null,
+        isPrimary: false
+      }));
+    }
+    
+    return [];
+  };
+
+  const images = getImages();
+  
+  // Fallback to single image or primary image if images array is empty
+  const getFallbackImage = () => {
+    if (university.primaryImage) return university.primaryImage;
+    if (university.image) return university.image;
+    return "/default-university.jpg";
+  };
+
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
-      prev === 0 ? university.images.length - 1 : prev - 1
+      prev === 0 ? images.length - 1 : prev - 1
     );
   };
 
   const handleNextImage = () => {
     setCurrentImageIndex((prev) => 
-      prev === university.images.length - 1 ? 0 : prev + 1
+      prev === images.length - 1 ? 0 : prev + 1
     );
   };
 
@@ -27,7 +65,7 @@ const CollegeShowcase = ({ university }) => {
         {/* Header Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#002147] mb-4">
-            {university.name}
+            {university.name || university.universityName}
           </h1>
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center">
@@ -66,22 +104,27 @@ const CollegeShowcase = ({ university }) => {
           {/* Image Section */}
           <div className="space-y-4">
             <div className="relative overflow-hidden shadow-xl rounded-2xl">
-              {university.images && university.images.length > 0 ? (
+              {images.length > 0 ? (
                 <img 
-                  src={university.images[currentImageIndex]} 
-                  alt={university.name}
+                  src={images[currentImageIndex].url} 
+                  alt={images[currentImageIndex].alt}
+                  title={images[currentImageIndex].title}
                   className="w-full h-80 md:h-96 object-cover transition-transform duration-500 hover:scale-105"
                 />
               ) : (
-                <div className="w-full h-80 md:h-96 bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-500">No image available</span>
-                </div>
+                <img 
+                  src={getFallbackImage()} 
+                  alt={university.imageAlt || university.name || university.universityName}
+                  className="w-full h-80 md:h-96 object-cover transition-transform duration-500 hover:scale-105"
+                />
               )}
 
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
 
               <div className="absolute bottom-6 left-6 text-white">
-                <h3 className="text-2xl md:text-3xl font-bold mb-2 leading-tight">{university.name}</h3>
+                <h3 className="text-2xl md:text-3xl font-bold mb-2 leading-tight">
+                  {university.name || university.universityName}
+                </h3>
                 <div className="flex items-center text-sm opacity-90 mb-3">
                   <MapPin className="h-4 w-4 mr-2" />
                   {university.city}, {university.country}
@@ -102,11 +145,12 @@ const CollegeShowcase = ({ university }) => {
                 </div>
               </div>
 
-              {university.images && university.images.length > 1 && (
+              {/* Navigation buttons - only show if multiple images */}
+              {images.length > 1 && (
                 <>
                   <div className="absolute top-6 right-6 bg-white/90 px-3 py-2 backdrop-blur-sm rounded-full">
                     <span className="text-xs font-semibold text-[#002147]">
-                      {currentImageIndex + 1} / {university.images.length}
+                      {currentImageIndex + 1} / {images.length}
                     </span>
                   </div>
                   
@@ -131,9 +175,10 @@ const CollegeShowcase = ({ university }) => {
               )}
             </div>
 
-            {university.images && university.images.length > 1 && (
+            {/* Image dots indicator - only show if multiple images */}
+            {images.length > 1 && (
               <div className="flex space-x-2 justify-center">
-                {university.images.map((_, idx) => (
+                {images.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setCurrentImageIndex(idx)}
@@ -145,6 +190,13 @@ const CollegeShowcase = ({ university }) => {
                   />
                 ))}
               </div>
+            )}
+
+            {/* Image caption - show if available */}
+            {images.length > 0 && images[currentImageIndex].caption && (
+              <p className="text-sm text-gray-600 text-center italic">
+                {images[currentImageIndex].caption}
+              </p>
             )}
           </div>
 
@@ -239,7 +291,9 @@ const CollegeShowcase = ({ university }) => {
                       key={index} 
                       className="px-4 py-3 bg-[#3598FE]/10 text-[#002147] rounded-xl text-center font-medium hover:bg-[#3598FE] hover:text-white transition-colors cursor-pointer border border-[#3598FE]/20 hover:shadow-md"
                     >
-                      <span className="text-sm leading-tight block">{program}</span>
+                      <span className="text-sm leading-tight block">
+                        {typeof program === 'object' ? program.name || program.programName : program}
+                      </span>
                     </div>
                   ))}
                   {university.programs.length > 12 && (

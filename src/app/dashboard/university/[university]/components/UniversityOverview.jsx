@@ -348,33 +348,35 @@ const UniversityOverview = ({ university }) => {
           )}
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-            {university.brochureUrl && (
-              <Button 
-                onClick={() => window.open(university.brochureUrl, '_blank')}
-                className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Brochure
-              </Button>
-            )}
-            
-            <Button
-              onClick={() => window.location.href = `/university/${university.slug}/departments`}
-              className="bg-[#002147] hover:bg-[#001a36] text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-            >
-              <Building2 className="h-4 w-4 mr-2" />
-              View Departments
-            </Button>
-            
-            <Button
-              onClick={() => window.location.href = `/university/${university.slug}/programs`}
-              className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-            >
-              <GraduationCap className="h-4 w-4 mr-2" />
-              View Programs
-            </Button>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+  {/* Apply Now */}
+  <Button 
+    onClick={() => window.open('/apply', '_blank')}
+    className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+  >
+    <Download className="h-4 w-4 mr-2" />
+    Apply Now
+  </Button>
+  
+  {/* Scholarships */}
+  <Button
+    onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
+    className="bg-[#002147] hover:bg-[#001a36] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+  >
+    <Building2 className="h-4 w-4 mr-2" />
+    Scholarships
+  </Button>
+  
+  {/* View More Photos / Gallery */}
+  <Button
+    onClick={() => window.location.href = `/university/${university.slug}/gallery`}
+    className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+  >
+    <GraduationCap className="h-4 w-4 mr-2" />
+    View More Photos / Gallery
+  </Button>
+</div>
+
         </div>
       </CardContent>
     </Card>
