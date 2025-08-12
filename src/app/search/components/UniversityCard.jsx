@@ -25,7 +25,7 @@ const UniversityCard = ({ university }) => {
   const [isAdded, setIsAdded] = useState(university?.isAdded);
   const [isLoading, setIsLoading] = useState(false);
 
-  console.log(university.savedByUsers);
+ console.log(university,"card page");
 
   /**
    * Effect to initialize saved status by checking if current user has saved this university
