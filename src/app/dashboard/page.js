@@ -5,6 +5,7 @@ import { StatsOverview } from './components/StatsOverview';
 import { UniversityCard } from './components/UniversityCard';
 import { AddUniversityModal } from './components/AddUniversityModal';
 import { FloatingAddButton } from './components/FloatingAddButton';
+import Link from 'next/link';
 
 /**
  * Main dashboard component for managing saved universities
@@ -185,12 +186,14 @@ const Index = () => {
             <p className="text-slate-600 mb-6">
               Start by saving some universities to track your applications
             </p>
+            <Link href={"/search"}>
             <button 
-              onClick={() => setIsModalOpen(true)}
+              
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Add Your First University
             </button>
+            </Link>
           </div>
         )}
 

@@ -66,6 +66,7 @@ export async function GET(request) {
      */
     const transformed = universities.map(u => ({
       id: u.id,
+      slug:u.slug,
       name: u.universityName,
       location: `${u.city}, ${u.country}`,
       image: u.images[0]?.imageUrl || '/default-university.jpg',

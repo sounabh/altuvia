@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { MapPin } from "lucide-react";
+import Link from "next/link";
 
 /**
  * University card component displaying university information with interactive features
@@ -26,6 +27,12 @@ const UniversityCard = ({ university }) => {
   const [isLoading, setIsLoading] = useState(false);
 
  console.log(university,"card page");
+
+  // Determine URL using slug or fallback to ID
+   const universityUrl = university.slug 
+     ? `/dashboard/university/${university.slug}`
+     : `/dashboard/university/${university.id}`;
+ 
 
   /**
    * Effect to initialize saved status by checking if current user has saved this university
@@ -108,6 +115,7 @@ const UniversityCard = ({ university }) => {
   }
 
   return (
+     <Link href={universityUrl}>
     <div className="group relative mt-14 bg-white rounded-3xl shadow-sm hover:shadow-2xl border border-slate-200/60 hover:border-slate-300/60 transition-all duration-500 overflow-hidden">
       {/* ---------- Image Section with Rank Badge and Add Button ---------- */}
       <div className="relative overflow-hidden">
@@ -239,6 +247,7 @@ const UniversityCard = ({ university }) => {
       {/* Hover Effect Border Overlay */}
       <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-slate-900/5 group-hover:ring-blue-500/20 group-hover:ring-2 transition-all duration-300 pointer-events-none"></div>
     </div>
+    </Link>
   );
 };
 

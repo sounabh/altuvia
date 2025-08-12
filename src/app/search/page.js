@@ -19,6 +19,8 @@ const Index = () => {
   const [selectedGmat, setSelectedGmat] = useState('all');
   const [selectedRanking, setSelectedRanking] = useState('all');
 
+  
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero/Header Section */}

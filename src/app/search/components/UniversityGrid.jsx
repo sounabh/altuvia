@@ -19,7 +19,11 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   /**
    * Effect hook to fetch universities based on current filters
    * Implements debouncing to prevent excessive API calls
+   * 
+   * 
    */
+
+ 
   useEffect(() => {
     const fetchData = async () => {
       try {

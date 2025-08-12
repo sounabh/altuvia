@@ -16,7 +16,7 @@ const Header = ({ university }) => {
               onClick={() => window.history.back()}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="hidden sm:inline">Back</span>
               <span className="sm:hidden">Back</span>
             </Button>
           </div>
