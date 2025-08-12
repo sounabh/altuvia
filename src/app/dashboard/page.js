@@ -49,9 +49,11 @@ const Index = () => {
 
         if (response.ok) {
           const savedUniversities = await response.json();
+          //console.log(savedUniversities,"client");
+          
           
           // Enhance university data with UI defaults
-          const universitiesWithDefaults = savedUniversities.map(university => ({
+          const universitiesWithDefaults = savedUniversities?.universities.map(university => ({
             ...university,
             status: 'not-started',
             essayProgress: 0,
