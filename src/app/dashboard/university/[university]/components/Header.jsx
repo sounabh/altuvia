@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Bell, Settings, Heart, HeartOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useParams, useRouter } from "next/navigation";
 
 const Header = ({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [previousState, setPreviousState] = useState(null);
+
+  const router = useRouter();
 
   /**
    * Effect to initialize saved status by checking if current user has saved this university
@@ -102,7 +105,7 @@ const Header = ({ university }) => {
               variant="ghost"
               size="sm"
               className="text-gray-600 hover:text-[#002147]"
-              onClick={() => window.history.back()}
+             onClick={() => router.push(`/dashboard`)}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Back</span>
