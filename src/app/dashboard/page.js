@@ -8,12 +8,58 @@ import { FloatingAddButton } from './components/FloatingAddButton';
 import Link from 'next/link';
 
 /**
+ * Skeleton loading component for stats overview
+ * Mimics the structure of the actual stats cards
+ */
+const StatsOverviewSkeleton = () => (
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div key={index} className="bg-white p-6 rounded-lg shadow-sm border">
+        {/* Skeleton for stat number */}
+        <div className="h-8 bg-slate-200 rounded animate-pulse mb-2"></div>
+        {/* Skeleton for stat label */}
+        <div className="h-4 bg-slate-200 rounded animate-pulse w-3/4"></div>
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * Skeleton loading component for university cards
+ * Replicates the university card layout with placeholders
+ */
+const UniversityCardSkeleton = () => (
+  <div className="bg-white rounded-lg shadow-sm border p-6">
+    {/* University name skeleton */}
+    <div className="h-6 bg-slate-200 rounded animate-pulse mb-4 w-3/4"></div>
+    
+    {/* Location skeleton */}
+    <div className="h-4 bg-slate-200 rounded animate-pulse mb-3 w-1/2"></div>
+    
+    {/* Status badge skeleton */}
+    <div className="h-6 bg-slate-200 rounded-full animate-pulse mb-4 w-24"></div>
+    
+    {/* Progress bar skeleton */}
+    <div className="mb-4">
+      <div className="h-3 bg-slate-200 rounded animate-pulse mb-2 w-full"></div>
+      <div className="h-3 bg-slate-200 rounded animate-pulse w-16"></div>
+    </div>
+    
+    {/* Action buttons skeleton */}
+    <div className="flex gap-2">
+      <div className="h-9 bg-slate-200 rounded animate-pulse flex-1"></div>
+      <div className="h-9 bg-slate-200 rounded animate-pulse w-9"></div>
+    </div>
+  </div>
+);
+
+/**
  * Main dashboard component for managing saved universities
  * @returns {JSX.Element} Dashboard with:
  * - Statistics overview
  * - Saved university cards
  * - Add/remove functionality
- * - Loading and error states
+ * - Loading and error states with skeleton UI
  */
 const Index = () => {
   // State management
@@ -51,7 +97,6 @@ const Index = () => {
         if (response.ok) {
           const savedUniversities = await response.json();
           //console.log(savedUniversities,"client");
-          
           
           // Enhance university data with UI defaults
           const universitiesWithDefaults = savedUniversities?.universities.map(university => ({
@@ -121,13 +166,36 @@ const Index = () => {
     upcomingDeadlines: universities.filter(u => u.status !== 'submitted').length
   };
 
-  // Loading state UI
+  // Loading state UI with skeleton components
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-lg text-slate-600">Loading your saved universities...</p>
+      <div className="min-h-screen">
+        <div className="px-4 py-8 max-w-7xl mx-auto">
+          {/* Dashboard Header - Same as original */}
+          <div className="mb-8">
+            <h1 className="text-center text-[40px] tracking-[0.2px] -mt-10">
+              My Saved Universities
+            </h1>
+            <p className="text-center text-slate-600">
+              Track your saved universities and manage your applications
+            </p>
+          </div>
+
+          {/* Statistics Overview Skeleton */}
+          <StatsOverviewSkeleton />
+
+          {/* University Cards Grid Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Generate 6 skeleton cards to simulate loading state */}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <UniversityCardSkeleton key={index} />
+            ))}
+          </div>
+
+          {/* Loading indicator text */}
+          <div className="text-center mt-8">
+            <p className="text-slate-500">Loading your saved universities...</p>
+          </div>
         </div>
       </div>
     );
@@ -178,6 +246,7 @@ const Index = () => {
             ))}
           </div>
         ) : (
+          /* Empty state when no universities are saved */
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🏫</div>
             <h3 className="text-xl font-semibold text-slate-800 mb-2">
@@ -187,40 +256,18 @@ const Index = () => {
               Start by saving some universities to track your applications
             </p>
             <Link href={"/search"}>
-            <button 
-              
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Add Your First University
-            </button>
+              <button 
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Add Your First University
+              </button>
             </Link>
           </div>
         )}
 
-        {/* Floating Action Button (Conditional) */}
-        {universities.length > 0 && (
-          <FloatingAddButton onClick={() => setIsModalOpen(true)} />
-        )}
+       
 
-        {/* Add University Modal */}
-        <AddUniversityModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)}
-          onAdd={(newUniversity) => {
-            // Add new university with required defaults
-            const universityWithDefaults = {
-              ...newUniversity,
-              id: Date.now(),
-              name: newUniversity.universityName || newUniversity.name,
-              status: 'not-started',
-              essayProgress: 0,
-              tasks: 0,
-              totalTasks: 5,
-            };
-            setUniversities([...universities, universityWithDefaults]);
-            setIsModalOpen(false);
-          }}
-        />
+      
       </div>
     </div>
   );

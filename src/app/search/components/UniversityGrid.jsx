@@ -45,7 +45,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
         
         const result = await response.json();
         
-        console.log('API Response:', result);
+        //console.log('API Response:', result);
         
         // Handle API response data
         if (result.data && Array.isArray(result.data)) {

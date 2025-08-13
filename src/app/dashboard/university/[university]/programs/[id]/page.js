@@ -12,6 +12,173 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+// Skeleton Components
+const Skeleton = ({ className = "" }) => (
+  <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
+);
+
+const SkeletonText = ({ lines = 1, className = "" }) => (
+  <div className={`space-y-2 ${className}`}>
+    {Array.from({ length: lines }).map((_, i) => (
+      <Skeleton 
+        key={i} 
+        className={`h-4 ${i === lines - 1 ? 'w-3/4' : 'w-full'}`} 
+      />
+    ))}
+  </div>
+);
+
+const HeaderSkeleton = () => (
+  <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    {/* Header Skeleton */}
+    <header className="bg-white shadow-sm border-b">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-9 w-24" />
+        </div>
+      </div>
+    </header>
+
+    {/* Hero Section Skeleton */}
+    <div className="bg-gradient-to-r from-[#002147] to-[#3598FE] text-white py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center space-x-4 mb-4">
+              <Skeleton className="w-16 h-16 rounded-xl bg-white/20" />
+              <div className="flex-1">
+                <Skeleton className="h-8 w-96 mb-2 bg-white/20" />
+                <div className="flex flex-wrap items-center gap-4">
+                  <Skeleton className="h-4 w-32 bg-white/20" />
+                  <Skeleton className="h-4 w-24 bg-white/20" />
+                  <Skeleton className="h-4 w-28 bg-white/20" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <Skeleton className="h-8 w-20 rounded-full bg-white/20" />
+              <Skeleton className="h-8 w-16 rounded-full bg-white/20" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Stats Skeleton */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-10">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="bg-white shadow-lg">
+            <CardContent className="p-4 text-center">
+              <Skeleton className="h-6 w-6 mx-auto mb-2" />
+              <Skeleton className="h-4 w-16 mx-auto mb-1" />
+              <Skeleton className="h-5 w-20 mx-auto" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+
+    {/* Main Content Skeleton */}
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Navigation Tabs Skeleton */}
+      <div className="mb-8">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center space-x-2 py-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Content Area Skeleton */}
+        <div className="lg:col-span-2 space-y-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Skeleton className="h-5 w-5 mr-2" />
+                  <Skeleton className="h-5 w-32" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SkeletonText lines={4} />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Sidebar Skeleton */}
+        <div className="space-y-6">
+          {/* Quick Apply Card Skeleton */}
+          <Card className="bg-gradient-to-br from-[#002147] to-[#3598FE]">
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-32 mb-4 bg-white/20" />
+              <Skeleton className="h-4 w-48 mb-4 bg-white/20" />
+              <Skeleton className="h-10 w-full bg-white/20 rounded" />
+            </CardContent>
+          </Card>
+
+          {/* University Info Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Skeleton className="h-5 w-5 mr-2" />
+                <Skeleton className="h-5 w-32" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Skeleton className="h-5 w-40 mb-1" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <div>
+                <Skeleton className="h-3 w-16 mb-1" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+              <Skeleton className="h-8 w-full rounded" />
+            </CardContent>
+          </Card>
+
+          {/* Contact Info Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Skeleton className="h-5 w-5 mr-2" />
+                <Skeleton className="h-5 w-24" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <SkeletonText lines={2} />
+              <Skeleton className="h-8 w-full rounded" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Related Programs Skeleton */}
+      <div className="mt-12">
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-9 w-32" />
+        </div>
+        
+        <div className="text-center py-8 bg-gray-50 rounded-lg">
+          <Skeleton className="h-4 w-48 mx-auto mb-4" />
+          <Skeleton className="h-9 w-32 mx-auto" />
+        </div>
+      </div>
+    </main>
+  </div>
+);
+
 const ProgramDetailsPage = () => {
   const params = useParams();
   const router = useRouter();
@@ -68,16 +235,7 @@ const ProgramDetailsPage = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#002147] mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading program details...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <HeaderSkeleton />;
   }
 
   if (error) {
@@ -88,7 +246,7 @@ const ProgramDetailsPage = () => {
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Program Not Found</h2>
             <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={() => router.push(`/university/${slug}/programs`)}>
+            <Button onClick={() => router.push(`/dashboard/university/${slug}/programs`)}>
               Back to Programs
             </Button>
           </div>
@@ -116,7 +274,7 @@ const ProgramDetailsPage = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push(`/university/${slug}/programs`)}
+              onClick={() => router.push(`/dashboard/university/${slug}/programs`)}
               className="text-[#6C7280] hover:text-[#002147]"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />

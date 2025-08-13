@@ -268,7 +268,7 @@ const CollegeShowcase = ({ university }) => {
               
               <Button 
                 className="bg-white hover:bg-gray-50 text-[#002147] py-6 px-8 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-[1.02] flex items-center justify-center space-x-3 border-none text-lg h-auto"
-                onClick={() => window.location.href = `/university/${university.slug}/programs`}
+                onClick={() => window.location.href = `/dashboard/university/${university.slug}/programs`}
               >
                 <GraduationCap className="h-7 w-7" />
                 <div className="text-left">

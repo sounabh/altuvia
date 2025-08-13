@@ -10,26 +10,142 @@ import {
   Filter, Grid, List, MapPin, Award
 } from 'lucide-react';
 
+// Skeleton component for individual department cards
+const DepartmentCardSkeleton = ({ viewMode }) => (
+  <Card className={`animate-pulse border-0 bg-white ${viewMode === 'grid' ? '' : ''}`}>
+    <CardContent className="p-6">
+      <div className={`${viewMode === 'list' ? 'flex items-start justify-between' : ''}`}>
+        <div className={`${viewMode === 'list' ? 'flex-1 pr-6' : ''}`}>
+          {/* Department header skeleton */}
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-gray-200 rounded-lg mr-4"></div>
+            <div>
+              <div className="h-5 bg-gray-200 rounded mb-1 w-32"></div>
+              <div className="h-3 bg-gray-100 rounded w-24"></div>
+            </div>
+          </div>
+
+          {/* Description skeleton */}
+          <div className="space-y-2 mb-4">
+            <div className="h-3 bg-gray-100 rounded w-full"></div>
+            <div className="h-3 bg-gray-100 rounded w-5/6"></div>
+            <div className="h-3 bg-gray-100 rounded w-4/6"></div>
+          </div>
+
+          {/* Programs preview skeleton */}
+          <div className="mb-4">
+            <div className="h-4 bg-gray-200 rounded mb-2 w-20"></div>
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: viewMode === 'grid' ? 3 : 5 }, (_, index) => (
+                <div key={index} className="h-6 bg-gray-100 rounded-full w-16"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons skeleton */}
+        <div className={`${viewMode === 'list' ? 'flex flex-col space-y-2' : 'flex justify-between items-center pt-4 space-x-2'}`}>
+          <div className={`h-9 bg-gray-200 rounded ${viewMode === 'list' ? 'w-24' : 'w-28'}`}></div>
+          <div className={`h-9 bg-gray-100 rounded ${viewMode === 'list' ? 'w-24' : 'w-28'}`}></div>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+// Skeleton component for the entire departments page
+const DepartmentsPageSkeleton = ({ viewMode = "grid" }) => (
+  <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    {/* Header skeleton */}
+    <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="h-8 bg-gray-200 rounded w-36 animate-pulse"></div>
+          </div>
+          
+          <div className="text-center flex-1 mx-4">
+            <div className="h-7 bg-gray-200 rounded mb-2 w-72 mx-auto animate-pulse"></div>
+            <div className="h-4 bg-gray-100 rounded w-40 mx-auto animate-pulse"></div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <div className="h-8 w-8 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-8 w-8 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {/* Main content skeleton */}
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Search and filter bar skeleton */}
+      <div className="mb-8 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+        <div className="relative flex-1 max-w-md">
+          <div className="h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          <div className="h-10 bg-gray-200 rounded-lg w-36 animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Departments grid/list skeleton */}
+      <div className={`${viewMode === 'grid' 
+        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+        : 'space-y-4'
+      }`}>
+        {/* Generate 6 skeleton cards */}
+        {Array.from({ length: 6 }, (_, index) => (
+          <DepartmentCardSkeleton key={index} viewMode={viewMode} />
+        ))}
+      </div>
+
+      {/* Quick navigation skeleton */}
+      <div className="mt-12 bg-gray-200 rounded-2xl p-8 animate-pulse">
+        <div className="text-center mb-8">
+          <div className="h-7 bg-gray-300 rounded mb-2 w-32 mx-auto"></div>
+          <div className="h-4 bg-gray-300 rounded w-48 mx-auto"></div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className="bg-gray-300 rounded py-14 px-4 flex flex-col items-center space-y-2">
+              <div className="h-8 w-8 bg-gray-400 rounded"></div>
+              <div className="h-4 bg-gray-400 rounded w-24"></div>
+              <div className="h-3 bg-gray-400 rounded w-32"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+  </div>
+);
+
 const DepartmentsPage = () => {
   const params = useParams();
   const router = useRouter();
   const slug = params?.university;
   
+  // State management for departments data and filters
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState("grid"); // grid or list
-  const [filterBy, setFilterBy] = useState("all");
+  const [viewMode, setViewMode] = useState("grid"); // Toggle between grid and list view
+  const [filterBy, setFilterBy] = useState("all"); // Filter departments by program availability
 
+  // Effect hook to fetch departments data when component mounts
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
         setLoading(true);
         
+        // Get API base URL from environment or use localhost as fallback
         const API_BASE_URL =
           process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
         
+        // Fetch departments data from API
         const response = await fetch(`${API_BASE_URL}/api/university/${slug}/departments`);
         
         if (!response.ok) {
@@ -47,15 +163,19 @@ const DepartmentsPage = () => {
       }
     };
 
+    // Only fetch if we have a university slug
     if (slug) {
       fetchDepartments();
     }
   }, [slug]);
 
+  // Filter departments based on search term and filter criteria
   const filteredDepartments = data?.departments?.filter(dept => {
+    // Search matching logic - check name and description
     const matchesSearch = dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (dept.description && dept.description.toLowerCase().includes(searchTerm.toLowerCase()));
     
+    // Filter matching logic - check program availability
     const matchesFilter = filterBy === "all" || 
                          (filterBy === "with-programs" && dept.programs.length > 0) ||
                          (filterBy === "no-programs" && dept.programs.length === 0);
@@ -63,27 +183,22 @@ const DepartmentsPage = () => {
     return matchesSearch && matchesFilter;
   }) || [];
 
+  // Navigation handler for department details page
   const handleDepartmentClick = (departmentId) => {
-    router.push(`/university/${slug}/departments/${departmentId}`);
+    router.push(`/dashboard/university/${slug}/departments/${departmentId}`);
   };
 
+  // Navigation handler for program details page
   const handleProgramClick = (programId) => {
-    router.push(`/university/${slug}/programs/${programId}`);
+    router.push(`/dashboard/university/${slug}/programs/${programId}`);
   };
 
+  // Show skeleton loader while data is being fetched
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#002147] mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading departments...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <DepartmentsPageSkeleton viewMode={viewMode} />;
   }
 
+  // Show error state if data fetching failed
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -101,17 +216,19 @@ const DepartmentsPage = () => {
     );
   }
 
+  // Main component render
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
+      {/* Header section with navigation and view toggles */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
+            {/* Back button */}
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push(`/university/${slug}`)}
+                onClick={() => router.push(`/dashboard/university/${slug}`)}
                 className="text-[#6C7280] hover:text-[#002147]"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -119,6 +236,7 @@ const DepartmentsPage = () => {
               </Button>
             </div>
             
+            {/* Page title and department count */}
             <div className="text-center flex-1 mx-4">
               <h1 className="text-xl md:text-2xl font-bold text-[#002147]">
                 {data?.university?.name} - Departments
@@ -129,6 +247,7 @@ const DepartmentsPage = () => {
               </div>
             </div>
             
+            {/* View mode toggle buttons (grid/list) */}
             <div className="flex items-center space-x-2">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
@@ -149,10 +268,11 @@ const DepartmentsPage = () => {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main content area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Filter Bar */}
+        {/* Search and filter controls */}
         <div className="mb-8 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+          {/* Search input */}
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
@@ -164,9 +284,11 @@ const DepartmentsPage = () => {
             />
           </div>
           
+          {/* Filter controls */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Filter className="h-4 w-4 text-gray-500" />
+              {/* Filter dropdown for department availability */}
               <select
                 value={filterBy}
                 onChange={(e) => setFilterBy(e.target.value)}
@@ -180,8 +302,9 @@ const DepartmentsPage = () => {
           </div>
         </div>
 
-        {/* Departments Grid/List */}
+        {/* Departments display section */}
         {filteredDepartments.length === 0 ? (
+          // Empty state when no departments are found
           <div className="text-center py-12">
             <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No Departments Found</h3>
@@ -190,6 +313,7 @@ const DepartmentsPage = () => {
             </p>
           </div>
         ) : (
+          // Departments grid or list display
           <div className={`${viewMode === 'grid' 
             ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
             : 'space-y-4'
@@ -204,6 +328,7 @@ const DepartmentsPage = () => {
                 <CardContent className="p-6">
                   <div className={`${viewMode === 'list' ? 'flex items-start justify-between' : ''}`}>
                     <div className={`${viewMode === 'list' ? 'flex-1 pr-6' : ''}`}>
+                      {/* Department header with icon, name, and program count */}
                       <div className="flex items-center mb-4">
                         <div className="w-12 h-12 bg-[#002147] rounded-lg flex items-center justify-center mr-4">
                           <Building2 className="h-6 w-6 text-white" />
@@ -217,17 +342,19 @@ const DepartmentsPage = () => {
                         </div>
                       </div>
 
+                      {/* Department description */}
                       {department.description && (
                         <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-3">
                           {department.description}
                         </p>
                       )}
 
-                      {/* Programs Preview */}
+                      {/* Programs preview section */}
                       {department.programs.length > 0 && (
                         <div className="mb-4">
                           <h4 className="text-sm font-semibold text-[#002147] mb-2">Programs:</h4>
                           <div className="flex flex-wrap gap-2">
+                            {/* Show limited number of programs based on view mode */}
                             {department.programs.slice(0, viewMode === 'grid' ? 3 : 5).map((program) => (
                               <span
                                 key={program.id}
@@ -237,6 +364,7 @@ const DepartmentsPage = () => {
                                 {program.name}
                               </span>
                             ))}
+                            {/* Show count for additional programs */}
                             {department.programs.length > (viewMode === 'grid' ? 3 : 5) && (
                               <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
                                 +{department.programs.length - (viewMode === 'grid' ? 3 : 5)} more
@@ -247,16 +375,12 @@ const DepartmentsPage = () => {
                       )}
                     </div>
 
+                    {/* Action buttons section */}
                     <div className={`${viewMode === 'list' ? 'flex flex-col space-y-2' : 'flex justify-between items-center pt-4'}`}>
-                      <Button
-                        onClick={() => handleDepartmentClick(department.id)}
-                        className="bg-[#002147] hover:bg-[#001a36] text-white"
-                        size={viewMode === 'list' ? 'sm' : 'default'}
-                      >
-                        View Details
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
+                      {/* View department details button */}
+                    
                       
+                      {/* View programs button (only shown if department has programs) */}
                       {department.programs.length > 0 && (
                         <Button
                           variant="outline"
@@ -275,7 +399,7 @@ const DepartmentsPage = () => {
           </div>
         )}
 
-        {/* Quick Navigation */}
+        {/* Quick navigation section */}
         <div className="mt-12 bg-[#002147] rounded-2xl p-8 text-white">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold mb-2">Explore More</h2>
@@ -283,9 +407,10 @@ const DepartmentsPage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Navigate to all programs */}
             <Button
               variant="secondary"
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-6 flex flex-col items-center space-y-2"
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-14 flex flex-col items-center space-y-2"
               onClick={() => router.push(`/university/${slug}/programs`)}
             >
               <GraduationCap className="h-8 w-8" />
@@ -295,9 +420,10 @@ const DepartmentsPage = () => {
               </div>
             </Button>
             
+            {/* Navigate to university profile */}
             <Button
               variant="secondary"
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-6 flex flex-col items-center space-y-2"
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-14 flex flex-col items-center space-y-2"
               onClick={() => router.push(`/university/${slug}`)}
             >
               <Award className="h-8 w-8" />
@@ -307,9 +433,10 @@ const DepartmentsPage = () => {
               </div>
             </Button>
             
+            {/* Navigate to admissions */}
             <Button
               variant="secondary"
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-6 flex flex-col items-center space-y-2"
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-14 flex flex-col items-center space-y-2"
               onClick={() => router.push(`/university/${slug}/admissions`)}
             >
               <BookOpen className="h-8 w-8" />
