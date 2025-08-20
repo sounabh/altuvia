@@ -12,14 +12,20 @@ import {
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 
 /**
- * Comprehensive search and filter component for university search functionality
+ * Comprehensive search and filter component for university search functionality.
+ * Provides:
+ * - Search bar
+ * - University ranking filter
+ * - GMAT score filter
+ * - "Clear all" option with active filter count
+ *
  * @param {Object} props - Component props
  * @param {string} props.searchTerm - Current search query value
- * @param {function} props.onSearchChange - Handler for search term changes
+ * @param {(value: string) => void} props.onSearchChange - Handler for search term changes
  * @param {string} props.selectedRankFilter - Currently selected university rank filter
- * @param {function} props.onRankFilterChange - Handler for rank filter changes
+ * @param {(value: string) => void} props.onRankFilterChange - Handler for rank filter changes
  * @param {string} props.selectedGmatFilter - Currently selected GMAT score filter
- * @param {function} props.onGmatFilterChange - Handler for GMAT filter changes
+ * @param {(value: string) => void} props.onGmatFilterChange - Handler for GMAT filter changes
  * @returns {JSX.Element} Interactive search and filter component with modern UI
  */
 export const SearchFilters = ({
@@ -30,12 +36,19 @@ export const SearchFilters = ({
   selectedGmatFilter,
   onGmatFilterChange,
 }) => {
+  // ----------------------------
+  // State
+  // ----------------------------
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeFilters, setActiveFilters] = useState(0);
 
+  // ----------------------------
+  // Effects
+  // ----------------------------
+
   /**
-   * Effect to count and update the number of active filters
-   * Counts filters that are selected and not set to 'all'
+   * Updates the active filter count
+   * (filters are active if not set to "all")
    */
   useEffect(() => {
     let count = 0;
@@ -44,8 +57,12 @@ export const SearchFilters = ({
     setActiveFilters(count);
   }, [selectedRankFilter, selectedGmatFilter]);
 
+  // ----------------------------
+  // Handlers
+  // ----------------------------
+
   /**
-   * Clears all active filters and search term
+   * Clears all filters and resets the search term
    */
   const clearAllFilters = () => {
     onRankFilterChange('all');
@@ -53,13 +70,18 @@ export const SearchFilters = ({
     onSearchChange('');
   };
 
+  // ----------------------------
+  // Render
+  // ----------------------------
   return (
     <div className="rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border p-6 sm:p-8 mb-8 transition-all duration-500 hover:shadow-[0_16px_50px_rgb(0,0,0,0.15)] bg-[#002147] backdrop-blur-sm">
       
-      {/* Header Section with Title and Clear Button */}
+      {/* ----------------------------
+          Header Section
+         ---------------------------- */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         
-        {/* Icon and Title Group */}
+        {/* Icon + Title */}
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE] rounded-3xl flex items-center justify-center shadow-lg">
             <SlidersHorizontal className="h-6 w-6 text-white" />
@@ -74,7 +96,7 @@ export const SearchFilters = ({
           </div>
         </div>
 
-        {/* Clear All Filters Button (Conditionally Rendered) */}
+        {/* Clear All Filters Button */}
         {(activeFilters > 0 || searchTerm) && (
           <button
             onClick={clearAllFilters}
@@ -86,15 +108,17 @@ export const SearchFilters = ({
         )}
       </div>
 
-      {/* Search and Filter Controls Grid */}
+      {/* ----------------------------
+          Search & Filter Controls
+         ---------------------------- */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-center sm:gap-6">
 
-        {/* Search Input Field */}
+        {/* Search Input */}
         <div className="xl:col-span-6 relative w-full max-w-2xl mx-auto">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              // Search logic can be handled externally
+              // Search handled externally
             }}
             className="flex items-center relative"
           >
@@ -116,7 +140,7 @@ export const SearchFilters = ({
           </form>
         </div>
 
-        {/* University Ranking Filter Dropdown */}
+        {/* University Ranking Filter */}
         <div className="lg:col-span-2">
           <Select value={selectedRankFilter} onValueChange={onRankFilterChange}>
             <SelectTrigger className="h-14 bg-white backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">
@@ -131,7 +155,7 @@ export const SearchFilters = ({
           </Select>
         </div>
 
-        {/* GMAT Score Filter Dropdown */}
+        {/* GMAT Score Filter */}
         <div className="lg:col-span-2">
           <Select value={selectedGmatFilter} onValueChange={onGmatFilterChange}>
             <SelectTrigger className="h-14 bg-white/95 backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">

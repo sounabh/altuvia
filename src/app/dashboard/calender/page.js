@@ -1,873 +1,1506 @@
 "use client"
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
-import { Plus, Filter, Bell, Clock, MapPin, Edit2, Trash2, X, Users, BookOpen, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  Plus, Filter, Bell, Clock, MapPin, Edit2, Trash2, X, Users, 
+  BookOpen, AlertCircle, CheckCircle, ChevronLeft, ChevronRight,
+  Calendar as CalendarIcon, Eye, EyeOff, Loader2, Sparkles, Star
+} from 'lucide-react';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 // Initialize the localizer for the calendar component
 const localizer = momentLocalizer(moment);
 
-//console.log(localizer);
+// Loading Skeleton Components
+const CalendarSkeleton = () => (
+  <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+    <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"></div>
+          <div className="w-20 h-10 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"></div>
+          <div className="w-12 h-12 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"></div>
+          <div className="w-40 h-8 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg animate-pulse"></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-20 h-10 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"></div>
+          <div className="w-20 h-10 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"></div>
+          <div className="w-16 h-10 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+    <div className="p-6">
+      <div className="h-[600px] bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 rounded-xl animate-pulse"></div>
+    </div>
+  </div>
+);
 
+const EventCardSkeleton = () => (
+  <div className="p-5 bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl border border-gray-100 shadow-sm animate-pulse">
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <div className="h-5 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg w-3/4 mb-3"></div>
+        <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg w-1/2 mb-3"></div>
+        <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg w-1/3"></div>
+      </div>
+      <div className="ml-3 flex flex-col items-end gap-2">
+        <div className="w-8 h-8 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full"></div>
+        <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-300 rounded w-16"></div>
+      </div>
+    </div>
+  </div>
+);
+
+const SidebarSkeleton = () => (
+  <div className="space-y-6">
+    <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-2xl shadow-xl border border-gray-100 p-6">
+      <div className="h-7 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg w-1/2 mb-5 animate-pulse"></div>
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <EventCardSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 const SmartCalendar = () => {
   // ========================================
   // STATE MANAGEMENT
   // ========================================
   
-  // Event selection and modal state
   const [selectedEvent, setSelectedEvent] = useState(null);
-
   const [showEventModal, setShowEventModal] = useState(false);
-
   const [editingEvent, setEditingEvent] = useState(null);
-  
-  // Filter and view state
   const [filterSchool, setFilterSchool] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [view, setView] = useState('month');
   const [date, setDate] = useState(new Date());
+  const [events, setEvents] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [universities, setUniversities] = useState([]);
+  const [savedUniversities, setSavedUniversities] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Loading states for operations
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [operatingEventId, setOperatingEventId] = useState(null);
 
-  // Main events data
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      title: 'MIT Application Deadline',
-      start: new Date(2025, 5, 15, 23, 59),
-      end: new Date(2025, 5, 15, 23, 59),
-      type: 'deadline',
-      school: 'MIT',
-      priority: 'high',
-      reminder: 3,
-      description: 'Submit final application materials',
-      status: 'pending'
-    },
-    {
-      id: 2,
-      title: 'Stanford Interview',
-      start: new Date(2025, 5, 12, 14, 0),
-      end: new Date(2025, 5, 12, 15, 0),
-      type: 'interview',
-      school: 'Stanford',
-      priority: 'high',
-      reminder: 1,
-      description: 'Virtual interview with admissions committee',
-      status: 'scheduled'
-    },
-    {
-      id: 3,
-      title: 'Essay Review Session',
-      start: new Date(2025, 5, 18, 16, 0),
-      end: new Date(2025, 5, 18, 17, 0),
-      type: 'task',
-      school: 'Harvard',
-      priority: 'medium',
-      reminder: 2,
-      description: 'Review personal statement with counselor',
-      status: 'in-progress'
-    },
-    {
-      id: 4,
-      title: 'UC Berkeley Deadline',
-      start: new Date(2025, 5, 20, 23, 59),
-      end: new Date(2025, 5, 20, 23, 59),
-      type: 'deadline',
-      school: 'UC Berkeley',
-      priority: 'high',
-      reminder: 7,
-      description: 'Submit supplemental essays',
-      status: 'pending'
-    },
-    {
-      id: 5,
-      title: 'Financial Aid Workshop',
-      start: new Date(2025, 5, 25, 10, 0),
-      end: new Date(2025, 5, 25, 12, 0),
-      type: 'workshop',
-      school: 'General',
-      priority: 'medium',
-      reminder: 2,
-      description: 'Learn about financial aid opportunities',
-      status: 'registered'
-    }
-  ]);
-
-
-  // Form state for new/editing events
   const [newEvent, setNewEvent] = useState({
     title: '',
     start: new Date(),
-    end: new Date(),
-    type: 'task',
-    school: '',
+    end: new Date(new Date().getTime() + 60 * 60 * 1000), // 1 hour later
+    eventType: 'task',
+    universityId: '',
     priority: 'medium',
-    reminder: 1,
     description: '',
-    status: 'pending'
+    eventStatus: 'pending',
+    location: ''
   });
 
   // ========================================
-  // CONFIGURATION DATA
+  // CALENDAR CONFIGURATION
   // ========================================
-  
-  // Available options for dropdowns
-  const schools = ['MIT', 'Stanford', 'Harvard', 'UC Berkeley', 'Yale', 'Princeton', 'General'];
-  const eventTypes = ['deadline', 'interview', 'task', 'workshop', 'meeting'];
-  const priorities = ['low', 'medium', 'high'];
-  const statuses = ['pending', 'scheduled', 'in-progress', 'completed', 'cancelled'];
 
+  const eventTypes = [
+    { value: 'deadline', label: 'Deadline', color: '#ef4444', icon: '⏰', gradient: 'from-red-500 to-red-600' },
+    { value: 'interview', label: 'Interview', color: '#3b82f6', icon: '👥', gradient: 'from-blue-500 to-blue-600' },
+    { value: 'task', label: 'Task', color: '#10b981', icon: '✅', gradient: 'from-emerald-500 to-emerald-600' },
+    { value: 'workshop', label: 'Workshop', color: '#f59e0b', icon: '🎓', gradient: 'from-amber-500 to-amber-600' },
+    { value: 'meeting', label: 'Meeting', color: '#8b5cf6', icon: '📅', gradient: 'from-purple-500 to-purple-600' }
+  ];
 
-  // Color schemes for different event types
-  const typeStyles = {
-    deadline: {
-      backgroundColor: '#ef4444',
-      borderColor: '#dc2626',
-      color: 'white'
-    },
-    interview: {
-      backgroundColor: '#3b82f6',
-      borderColor: '#2563eb',
-      color: 'white'
-    },
-    task: {
-      backgroundColor: '#10b981',
-      borderColor: '#059669',
-      color: 'white'
-    },
-    workshop: {
-      backgroundColor: '#f59e0b',
-      borderColor: '#d97706',
-      color: 'white'
-    },
-    meeting: {
-      backgroundColor: '#8b5cf6',
-      borderColor: '#7c3aed',
-      color: 'white'
+  const priorities = [
+    { value: 'low', label: 'Low', color: '#10b981', gradient: 'from-emerald-400 to-emerald-500' },
+    { value: 'medium', label: 'Medium', color: '#f59e0b', gradient: 'from-amber-400 to-amber-500' },
+    { value: 'high', label: 'High', color: '#ef4444', gradient: 'from-red-400 to-red-500' }
+  ];
+
+  const statuses = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'scheduled', label: 'Scheduled' },
+    { value: 'in-progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ];
+
+  // ========================================
+  // API FUNCTIONS
+  // ========================================
+
+  const fetchSavedUniversities = useCallback(async () => {
+    try {
+      const response = await fetch('/api/universities');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.data) {
+        return;
+      }
+
+      // Filter universities that are saved by the current user
+      // Similar to UniversityCard logic
+      const savedUnis = result.data.filter(university => {
+        if (Array.isArray(university.savedByUsers)) {
+          return university.savedByUsers.length > 0;
+        } else if (typeof university.isAdded === 'boolean') {
+          return university.isAdded;
+        }
+        return false;
+      });
+
+      // Transform to match the format expected by the calendar
+      const transformedSavedUnis = savedUnis.map(uni => ({
+        id: uni.id,
+        universityName: uni.name
+      }));
+
+      setSavedUniversities(transformedSavedUnis);
+    } catch (err) {
+      console.error('Error fetching saved universities:', err);
+    }
+  }, []);
+
+  const buildApiUrl = useCallback((params = {}) => {
+    const searchParams = new URLSearchParams();
+    
+    // Add parameters
+    Object.keys(params).forEach(key => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== 'all') {
+        searchParams.append(key, params[key]);
+      }
+    });
+    
+    const queryString = searchParams.toString();
+    return `/api/calendar${queryString ? `?${queryString}` : ''}`;
+  }, []);
+
+  const fetchEvents = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Build URL with current filter parameters
+      const params = {
+        ...(filterSchool !== 'all' && filterSchool !== 'general' && { universityId: filterSchool }),
+        ...(filterType !== 'all' && { eventType: filterType }),
+        includeSystemEvents: true
+      };
+
+      const url = buildApiUrl(params);
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to fetch events');
+      }
+
+      // Transform API data for calendar
+      const transformedEvents = result.data.map(event => ({
+        id: event.id,
+        title: event.title,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        type: event.type || event.eventType,
+        eventType: event.eventType || event.type,
+        priority: event.priority,
+        status: event.status || event.eventStatus,
+        eventStatus: event.eventStatus || event.status,
+        completionStatus: event.completionStatus,
+        school: event.school,
+        universityId: event.universityId,
+        programId: event.programId,
+        description: event.description,
+        location: event.location,
+        color: event.color,
+        isSystemGenerated: event.isSystemGenerated,
+        hasReminders: event.hasReminders,
+        reminders: event.reminders || [],
+        createdAt: event.createdAt,
+        updatedAt: event.updatedAt
+      }));
+
+      setEvents(transformedEvents);
+      
+      // Extract unique universities from events
+      const uniqueUniversities = [];
+      const universityMap = new Map();
+      
+      transformedEvents.forEach(event => {
+        if (event.universityId && event.school && !universityMap.has(event.universityId)) {
+          universityMap.set(event.universityId, {
+            id: event.universityId,
+            universityName: event.school
+          });
+          uniqueUniversities.push({
+            id: event.universityId,
+            universityName: event.school
+          });
+        }
+      });
+      
+      setUniversities(uniqueUniversities);
+    } catch (err) {
+      setError(`Failed to fetch events: ${err.message}`);
+      console.error('Error fetching events:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [buildApiUrl, filterSchool, filterType]);
+
+  const saveEvent = async (eventData) => {
+    try {
+      const apiData = {
+        title: eventData.title,
+        description: eventData.description,
+        location: eventData.location,
+        start: eventData.start.toISOString(),
+        end: eventData.end.toISOString(),
+        eventType: eventData.eventType,
+        eventStatus: eventData.eventStatus,
+        priority: eventData.priority,
+        universityId: eventData.universityId || null,
+        timezone: 'UTC',
+        isAllDay: false,
+        color: eventTypes.find(t => t.value === eventData.eventType)?.color
+      };
+
+      if (editingEvent) {
+        // Update existing event
+        const response = await fetch('/api/calendar', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id: editingEvent.id, ...apiData }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to update event');
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to update event');
+        }
+      } else {
+        // Create new event
+        const response = await fetch('/api/calendar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(apiData),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to create event');
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to create event');
+        }
+      }
+
+      return { success: true };
+    } catch (err) {
+      throw new Error(err.message || 'Failed to save event');
     }
   };
 
-
-  // Color schemes for different schools
-  const schoolStyles = {
-    MIT: { backgroundColor: '#8b5cf6', color: 'white' },
-    Stanford: { backgroundColor: '#dc2626', color: 'white' },
-    Harvard: { backgroundColor: '#991b1b', color: 'white' },
-    'UC Berkeley': { backgroundColor: '#ca8a04', color: 'white' },
-    Yale: { backgroundColor: '#1e40af', color: 'white' },
-    Princeton: { backgroundColor: '#ea580c', color: 'white' },
-    General: { backgroundColor: '#6b7280', color: 'white' }
-  };
-
-  // Icons for different priority levels
-  const priorityIcons = {
-    low: <CheckCircle size={16} className="text-green-500" />,
-    medium: <Clock size={16} className="text-yellow-500" />,
-    high: <AlertCircle size={16} className="text-red-500" />
-  };
-
-  // ========================================
-  // COMPUTED VALUES
-  // ========================================
-  
-
-  // Filter events based on selected school and type
-  const filteredEvents = useMemo(() => {
-    return events.filter(event => {
-      const matchesSchool = filterSchool === 'all' || event.school === filterSchool;
-      const matchesType = filterType === 'all' || event.type === filterType;
-      return matchesSchool && matchesType;
-    });
-  }, [events, filterSchool, filterType]);
-
-
-
-  // Style getter for calendar events
-  const eventStyleGetter = useCallback((event) => {
-    const baseStyle = typeStyles[event.type] || typeStyles.task;
-    return {
-      style: {
-        ...baseStyle,
-        borderRadius: '6px',
-        border: 'none',
-        fontSize: '12px',
-        fontWeight: '500',
-        padding: '2px 6px',
-        opacity: event.status === 'completed' ? 0.6 : 1,
-        textDecoration: event.status === 'completed' ? 'line-through' : 'none'
+  const deleteEvent = async (eventId) => {
+    try {
+      const response = await fetch(`/api/calendar?id=${eventId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete event');
       }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to delete event');
+      }
+
+      return { success: true };
+    } catch (err) {
+      throw new Error(err.message || 'Failed to delete event');
+    }
+  };
+
+  const completeEvent = async (eventId) => {
+    try {
+      const eventToUpdate = events.find(e => e.id === eventId);
+      if (!eventToUpdate) return;
+
+      const response = await fetch('/api/calendar', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: eventId,
+          completionStatus: 'completed',
+          eventStatus: 'completed'
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to complete event');
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to complete event');
+      }
+
+      return { success: true };
+    } catch (err) {
+      throw new Error(err.message || 'Failed to complete event');
+    }
+  };
+
+  // Fetch saved universities when component mounts
+  useEffect(() => {
+    fetchSavedUniversities();
+  }, [fetchSavedUniversities]);
+
+  // Fetch events when component mounts or filters change
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
 
   // ========================================
   // EVENT HANDLERS
   // ========================================
-  
 
-  // Handle clicking on an existing event
   const handleSelectEvent = useCallback((event) => {
-    setSelectedEvent(event);
-  }, []);
-
-
-  // Handle clicking on empty calendar slot to create new event
-  const handleSelectSlot = useCallback(({ start, end }) => {
-    setNewEvent({
-      ...newEvent,
-      start,
-      end
-    });
-    setShowEventModal(true);
-  }, [newEvent]);
-
-
-  // Save new event or update existing event
-  const handleSaveEvent = () => {
-    if (editingEvent) {
-      // Update existing event
-      setEvents(events.map(event => 
-        event.id === editingEvent.id ? { ...newEvent, id: editingEvent.id } : event
-      ));
-      setEditingEvent(null);
-    } else {
-      // Create new event
-      setEvents([...events, { ...newEvent, id: Date.now() }]);
+    if (!isDeleting && !isCompleting && !isUpdating) {
+      setSelectedEvent(event);
     }
-    resetForm();
+  }, [isDeleting, isCompleting, isUpdating]);
+
+  const handleSelectSlot = useCallback(({ start, end }) => {
+    if (isCreating || isUpdating) return;
+    
+    const endTime = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour default
+    setNewEvent(prev => ({
+      ...prev,
+      start,
+      end: endTime
+    }));
+    setShowEventModal(true);
+  }, [isCreating, isUpdating]);
+
+  const handleSaveEvent = async () => {
+    setSaveError(null);
+    
+    if (!newEvent.title.trim()) {
+      setSaveError('Title is required');
+      return;
+    }
+    
+    if (newEvent.start >= newEvent.end) {
+      setSaveError('End time must be after start time');
+      return;
+    }
+
+    if (editingEvent) {
+      setIsUpdating(true);
+      setOperatingEventId(editingEvent.id);
+    } else {
+      setIsCreating(true);
+    }
+
+    try {
+      const eventData = {
+        title: newEvent.title.trim(),
+        start: newEvent.start,
+        end: newEvent.end,
+        eventType: newEvent.eventType,
+        eventStatus: newEvent.eventStatus,
+        priority: newEvent.priority,
+        description: newEvent.description.trim(),
+        location: newEvent.location.trim(),
+        universityId: newEvent.universityId || null
+      };
+
+      await saveEvent(eventData);
+      resetForm();
+      
+      // Refresh events after successful save
+      await fetchEvents();
+    } catch (err) {
+      setSaveError(err.message);
+    } finally {
+      setIsCreating(false);
+      setIsUpdating(false);
+      setOperatingEventId(null);
+    }
   };
 
-
-  // Prepare event for editing
   const handleEditEvent = (event) => {
-    setNewEvent(event);
+    if (isDeleting || isCompleting || isUpdating) return;
+    
+    setNewEvent({
+      title: event.title,
+      start: new Date(event.start),
+      end: new Date(event.end),
+      eventType: event.eventType || event.type,
+      universityId: event.universityId || '',
+      description: event.description || '',
+      eventStatus: event.eventStatus || event.status,
+      priority: event.priority,
+      location: event.location || ''
+    });
     setEditingEvent(event);
     setSelectedEvent(null);
     setShowEventModal(true);
   };
 
-  // Delete an event
-  const handleDeleteEvent = (eventId) => {
-    setEvents(events.filter(event => event.id !== eventId));
-    setSelectedEvent(null);
+  const handleDeleteEvent = async (eventId) => {
+    if (isDeleting || isCompleting) return;
+    
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      setIsDeleting(true);
+      setOperatingEventId(eventId);
+      
+      try {
+        await deleteEvent(eventId);
+        setSelectedEvent(null);
+        
+        // Refresh events after successful delete
+        await fetchEvents();
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsDeleting(false);
+        setOperatingEventId(null);
+      }
+    }
   };
 
+  const handleCompleteEvent = async (eventId) => {
+    if (isDeleting || isCompleting) return;
+    
+    setIsCompleting(true);
+    setOperatingEventId(eventId);
+    
+    try {
+      await completeEvent(eventId);
+      setSelectedEvent(null);
+      
+      // Refresh events after successful completion
+      await fetchEvents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsCompleting(false);
+      setOperatingEventId(null);
+    }
+  };
 
-  // Reset form to initial state
   const resetForm = () => {
     setNewEvent({
       title: '',
       start: new Date(),
-      end: new Date(),
-      type: 'task',
-      school: '',
+      end: new Date(new Date().getTime() + 60 * 60 * 1000),
+      eventType: 'task',
+      universityId: '',
       priority: 'medium',
-      reminder: 1,
       description: '',
-      status: 'pending'
+      eventStatus: 'pending',
+      location: ''
     });
     setShowEventModal(false);
     setEditingEvent(null);
+    setSaveError(null);
   };
 
+  // ========================================
+  // UI HELPERS AND COMPUTED DATA
+  // ========================================
+
+  const getEventStyle = useCallback((event) => {
+    const eventTypeConfig = eventTypes.find(t => t.value === (event.eventType || event.type));
+    const baseColor = event.color || eventTypeConfig?.color || '#6b7280';
+    
+    let opacity = 1;
+    if (event.completionStatus === 'completed' || event.status === 'completed') {
+      opacity = 0.7;
+    }
+    if (event.isSystemGenerated) {
+      opacity = 0.85;
+    }
+
+    return {
+      style: {
+        backgroundColor: baseColor,
+        borderColor: baseColor,
+        color: 'white',
+        borderRadius: '8px',
+        border: '2px solid rgba(255,255,255,0.2)',
+        fontSize: '13px',
+        fontWeight: '600',
+        padding: '4px 8px',
+        opacity,
+        textDecoration: (event.completionStatus === 'completed' || event.status === 'completed') ? 'line-through' : 'none',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)',
+        textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+      }
+    };
+  }, []);
+
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesSchool = filterSchool === 'all' || event.universityId === filterSchool || 
+                            (filterSchool === 'general' && (!event.universityId || event.universityId === ''));
+      const matchesType = filterType === 'all' || event.eventType === filterType || event.type === filterType;
+      const matchesStatus = filterStatus === 'all' || event.eventStatus === filterStatus || 
+                           event.status === filterStatus || event.completionStatus === filterStatus;
+      return matchesSchool && matchesType && matchesStatus;
+    });
+  }, [events, filterSchool, filterType, filterStatus]);
+
+  const upcomingEvents = useMemo(() => {
+    const now = new Date();
+    return filteredEvents
+      .filter(event => new Date(event.start) >= now)
+      .sort((a, b) => new Date(a.start) - new Date(b.start))
+      .slice(0, 5);
+  }, [filteredEvents]);
+
+  const overdueEvents = useMemo(() => {
+    const now = new Date();
+    return filteredEvents
+      .filter(event => 
+        new Date(event.start) < now && 
+        event.completionStatus !== 'completed' && 
+        event.status !== 'completed' &&
+        ['deadline', 'task'].includes(event.eventType || event.type)
+      );
+  }, [filteredEvents]);
+
+  const eventStats = useMemo(() => {
+    const total = events.length;
+    const completed = events.filter(e => 
+      e.completionStatus === 'completed' || e.status === 'completed'
+    ).length;
+    const pending = events.filter(e => 
+      e.status === 'pending' || e.eventStatus === 'pending'
+    ).length;
+    const overdue = overdueEvents.length;
+
+    return { total, completed, pending, overdue };
+  }, [events, overdueEvents]);
+
+  // Calendar navigation
+  const handleNavigate = (newDate) => {
+    setDate(newDate);
+  };
+
+  const handleViewChange = (newView) => {
+    setView(newView);
+  };
+
+  const goToToday = () => {
+    setDate(new Date());
+  };
+
+  const goToPrevious = () => {
+    let newDate = new Date(date);
+    if (view === 'month') {
+      newDate.setMonth(date.getMonth() - 1);
+    } else if (view === 'week') {
+      newDate.setDate(date.getDate() - 7);
+    } else if (view === 'day') {
+      newDate.setDate(date.getDate() - 1);
+    }
+    setDate(newDate);
+  };
+
+  const goToNext = () => {
+    let newDate = new Date(date);
+    if (view === 'month') {
+      newDate.setMonth(date.getMonth() + 1);
+    } else if (view === 'week') {
+      newDate.setDate(date.getDate() + 7);
+    } else if (view === 'day') {
+      newDate.setDate(date.getDate() + 1);
+    }
+    setDate(newDate);
+  };
+
+  const formatDateTitle = () => {
+    if (view === 'month') {
+      return moment(date).format('MMMM YYYY');
+    } else if (view === 'week') {
+      const start = moment(date).startOf('week');
+      const end = moment(date).endOf('week');
+      return `${start.format('MMM D')} - ${end.format('MMM D, YYYY')}`;
+    } else {
+      return moment(date).format('MMMM D, YYYY');
+    }
+  };
 
   // ========================================
-  // DERIVED DATA
+  // RENDER
   // ========================================
-  
-  // Get upcoming events for sidebar display
-  const upcomingEvents = filteredEvents
-    .filter(event => event.start >= new Date())
-    .sort((a, b) => a.start - b.start)
-    .slice(0, 5);
 
-
-  // ========================================
-  // CUSTOM COMPONENTS
-  // ========================================
-  
-
-  // Custom toolbar component for calendar navigation and filters
-  const CustomToolbar = ({ label, onNavigate, onView }) => (
-    <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
-      {/* Navigation Controls */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => onNavigate('PREV')}
-          className="px-4 py-2 bg-white border border-[#d9e4f1] rounded-lg hover:bg-[#e6f0fa] transition-colors text-[#002147]"
-        >
-          Previous
-        </button>
-        
-        <h2 className="text-xl font-semibold text-[#002147]">{label}</h2>
-        
-        <button
-          onClick={() => onNavigate('NEXT')}
-          className="px-4 py-2 bg-white border border-[#d9e4f1] rounded-lg hover:bg-[#e6f0fa] transition-colors text-[#002147]"
-        >
-          Next
-        </button>
-      </div>
-      
-
-      {/* Filter Controls and View Toggle */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* School Filter */}
-        <select
-          value={filterSchool}
-          onChange={(e) => setFilterSchool(e.target.value)}
-          className="px-3 py-2 bg-white border border-[#d9e4f1] rounded-lg text-sm focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-        >
-          <option value="all">All Schools</option>
-          {schools.map(school => (
-            <option key={school} value={school}>{school}</option>
-          ))}
-        </select>
-        
-
-        {/* Event Type Filter */}
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="px-3 py-2 bg-white border border-[#d9e4f1] rounded-lg text-sm focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-        >
-          <option value="all">All Types</option>
-          {eventTypes.map(type => (
-            <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
-          ))}
-        </select>
-
-
-        {/* View Toggle Buttons */}
-        <div className="flex bg-white border border-[#d9e4f1] rounded-lg overflow-hidden">
-          {['month', 'week', 'day'].map(viewType => (
-            <button
-              key={viewType}
-              onClick={() => onView(viewType)}
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
-                view === viewType 
-                  ? 'bg-[#002147] text-white' 
-                  : 'text-[#002147] hover:bg-[#e6f0fa]'
-              }`}
-            >
-              {viewType.charAt(0).toUpperCase() + viewType.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-
+  const isAnyOperationInProgress = isCreating || isUpdating || isDeleting || isCompleting;
 
   return (
-    <div className="min-h-screen ">
-      <div className="max-w-7xl mx-auto  ">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-       {/* Header Section - Application Calendar Title and Add Event Button */}
-        <div className="bg-gradient-to-r from-[#002147] to-[#003a70] rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            
-            {/* Title and Description */}
+        <div className="bg-gradient-to-r from-white via-blue-50 to-indigo-50 rounded-2xl shadow-xl border border-white/50 p-8 mb-8 backdrop-blur-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-medium tracking-[0.2px] text-white  mb-2">
-                🎓 Application Calendar
-              </h1>
-              <p className="text-white/90 tracking-[0.1px] text-base mt-3 font-normal">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg">
+                  <CalendarIcon className="w-8 h-8 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  Application Calendar
+                </h1>
+                <Sparkles className="w-6 h-6 text-yellow-500" />
+              </div>
+              <p className="text-gray-600 text-lg mb-4">
                 Track deadlines, interviews, and tasks across all your applications
               </p>
+              
+              {/* Quick Stats */}
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="bg-white/70 backdrop-blur-sm px-4 py-2 rounded-xl border border-gray-200">
+                  <span className="font-bold text-gray-900 text-lg">{eventStats.total}</span>
+                  <span className="text-gray-600 ml-2">Total Events</span>
+                </div>
+                <div className="bg-emerald-50/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-emerald-200">
+                  <span className="font-bold text-emerald-700 text-lg">{eventStats.completed}</span>
+                  <span className="text-emerald-600 ml-2">Completed</span>
+                </div>
+                <div className="bg-amber-50/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-amber-200">
+                  <span className="font-bold text-amber-700 text-lg">{eventStats.pending}</span>
+                  <span className="text-amber-600 ml-2">Pending</span>
+                </div>
+                {eventStats.overdue > 0 && (
+                  <div className="bg-red-50/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-red-200">
+                    <span className="font-bold text-red-700 text-lg">{eventStats.overdue}</span>
+                    <span className="text-red-600 ml-2">Overdue</span>
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                disabled={isAnyOperationInProgress}
+                className={`flex items-center gap-2 px-6 py-3 border rounded-xl font-medium transition-all duration-200 shadow-lg backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  showFilters 
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-blue-200' 
+                    : 'bg-white/80 border-gray-200 text-gray-700 hover:bg-white hover:shadow-xl'
+                }`}
+              >
+                <Filter size={20} />
+                Filters
+              </button>
               <button
                 onClick={() => setShowEventModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-[#3598FE] text-white font-medium rounded-lg hover:bg-[#2a7ac8] transition-colors duration-200 shadow-lg"
+                disabled={isAnyOperationInProgress}
+                className="flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Plus size={20} />
+                {isCreating ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Plus size={20} />
+                )}
                 Add Event
               </button>
             </div>
           </div>
         </div>
 
-        {/* Main Content Grid - Calendar and Sidebar */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          
-          {/* Main Calendar Section (3/4 width on large screens) */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-lg border border-[#d9e4f1] overflow-hidden">
-              <div className="p-6">
-                
-                {/* Custom Calendar Toolbar */}
-                <CustomToolbar 
-                  label={moment(date).format('MMMM YYYY')}
-                  onNavigate={(action) => {
-                    // Handle navigation between months/periods
-                    if (action === 'PREV') {
-                      setDate(moment(date).subtract(1, view).toDate());
-                    } else if (action === 'NEXT') {
-                      setDate(moment(date).add(1, view).toDate());
-                    }
-                  }}
-                  onView={(newView) => setView(newView)}
-                />
-                
-                {/* Calendar Container */}
-                <div style={{ height: '600px' }} className="calendar-container">
-                  <Calendar
-                    localizer={localizer}
-                    events={filteredEvents}
-                    startAccessor="start"
-                    endAccessor="end"
-                    style={{ height: '100%' }}
-                    
-                    // Event styling and interaction handlers
-                    eventPropGetter={eventStyleGetter}
-                    onSelectEvent={handleSelectEvent}
-                    onSelectSlot={handleSelectSlot}
-                    selectable
-                    
-                    // View and date state management
-                    view={view}
-                    onView={setView}
-                    date={date}
-                    onNavigate={setDate}
-                    
-                    // Custom components configuration
-                    components={{
-                      toolbar: () => null // Hide default toolbar since we have custom one
-                    }}
-                    
-                    // Time format configuration
-                    formats={{
-                      eventTimeRangeFormat: ({ start, end }, culture, localizer) =>
-                        localizer.format(start, 'h:mm A', culture) + ' - ' + localizer.format(end, 'h:mm A', culture)
-                    }}
-                  />
-                </div>
+        {/* Error Display */}
+        {error && (
+          <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 text-red-800 px-6 py-4 rounded-xl mb-8 shadow-lg">
+            <div className="flex items-center">
+              <AlertCircle size={20} className="mr-3" />
+              <span className="font-medium">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="bg-gradient-to-r from-white via-gray-50 to-blue-50 rounded-2xl shadow-xl border border-white/50 p-6 mb-8 backdrop-blur-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Filter by School
+                </label>
+                <select
+                  value={filterSchool}
+                  onChange={(e) => setFilterSchool(e.target.value)}
+                  disabled={isAnyOperationInProgress}
+                  className="w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="all">All Schools</option>
+                  <option value="general">General/No School</option>
+                  {savedUniversities.map((uni) => (
+                    <option key={uni.id} value={uni.id}>
+                      {uni.universityName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Filter by Type
+                </label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  disabled={isAnyOperationInProgress}
+                  className="w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="all">All Types</option>
+                  {eventTypes.map(type => (
+                    <option key={type.value} value={type.value}>
+                      {type.icon} {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Filter by Status
+                </label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  disabled={isAnyOperationInProgress}
+                  className="w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="all">All Status</option>
+                  {statuses.map(status => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
+        )}
 
-
-          {/* Sidebar Section (1/4 width on large screens) */}
-          <div className="space-y-6">
-            
-            {/* Event Details Panel - Only shown when an event is selected */}
-            {selectedEvent && (
-              <div className="bg-white rounded-xl shadow-lg border border-[#d9e4f1] p-6">
-                
-                {/* Panel Header with Close Button */}
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-[#002147]">Event Details</h3>
-                  <button
-                    onClick={() => setSelectedEvent(null)}
-                    className="p-1 hover:bg-[#e6f0fa] rounded-lg transition-colors text-[#002147]"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                
-                {/* Event Information Display */}
-                <div className="space-y-4">
-                  <div>
-                    {/* Event Title */}
-                    <h4 className="font-medium text-[#002147] mb-2">{selectedEvent.title}</h4>
-                    
-                    {/* School and Type Tags */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <span 
-                        className="px-3 py-1 rounded-full text-xs font-medium"
-                        style={schoolStyles[selectedEvent.school]}
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Calendar */}
+          <div className="lg:col-span-3">
+            {isLoading ? (
+              <CalendarSkeleton />
+            ) : (
+              <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-2xl shadow-2xl border border-white/50 overflow-hidden backdrop-blur-sm">
+                {/* Custom Calendar Toolbar */}
+                <div className="p-6 border-b border-gray-200/50 bg-gradient-to-r from-gray-50 via-white to-blue-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={goToPrevious}
+                        disabled={isAnyOperationInProgress}
+                        className="p-3 hover:bg-white/80 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                       >
-                        {selectedEvent.school}
-                      </span>
-                      <span 
-                        className="px-3 py-1 rounded-full text-xs font-medium"
-                        style={typeStyles[selectedEvent.type]}
+                        <ChevronLeft size={22} className="text-gray-600" />
+                      </button>
+                      <button
+                        onClick={goToToday}
+                        disabled={isAnyOperationInProgress}
+                        className="px-6 py-2 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {selectedEvent.type}
-                      </span>
+                        Today
+                      </button>
+                      <button
+                        onClick={goToNext}
+                        disabled={isAnyOperationInProgress}
+                        className="p-3 hover:bg-white/80 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                      >
+                        <ChevronRight size={22} className="text-gray-600" />
+                      </button>
+                      <h2 className="text-xl font-bold text-gray-800 ml-2">
+                        {formatDateTitle()}
+                      </h2>
                     </div>
-                    
-
-                    {/* Event Date and Time */}
-                    <div className="flex items-center gap-2 text-sm text-[#002147] mb-2">
-                      <Clock size={16} className="text-[#3598FE]" />
-                      <span>{moment(selectedEvent.start).format('MMM DD, YYYY h:mm A')}</span>
-                    </div>
-                    
-                    {/* Priority Level */}
-                    <div className="flex items-center gap-2 text-sm text-[#002147] mb-3">
-                      {priorityIcons[selectedEvent.priority]}
-                      <span className="capitalize">{selectedEvent.priority} priority</span>
-                    </div>
-                    
-                    {/* Event Description (if exists) */}
-                    {selectedEvent.description && (
-                      <p className="text-sm text-gray-600 mb-4">{selectedEvent.description}</p>
-                    )}
-                    
-                    {/* Reminder Information */}
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-                      <Bell size={12} className="text-[#3598FE]" />
-                      <span>{selectedEvent.reminder} day{selectedEvent.reminder !== 1 ? 's' : ''} before</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleViewChange('month')}
+                        disabled={isAnyOperationInProgress}
+                        className={`px-5 py-2 text-sm rounded-xl transition-all duration-200 font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                          view === 'month' 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200' 
+                            : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg backdrop-blur-sm'
+                        }`}
+                      >
+                        Month
+                      </button>
+                      <button
+                        onClick={() => handleViewChange('week')}
+                        disabled={isAnyOperationInProgress}
+                        className={`px-5 py-2 text-sm rounded-xl transition-all duration-200 font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                          view === 'week' 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200' 
+                            : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg backdrop-blur-sm'
+                        }`}
+                      >
+                        Week
+                      </button>
+                      <button
+                        onClick={() => handleViewChange('day')}
+                        disabled={isAnyOperationInProgress}
+                        className={`px-5 py-2 text-sm rounded-xl transition-all duration-200 font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                          view === 'day' 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200' 
+                            : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg backdrop-blur-sm'
+                        }`}
+                      >
+                        Day
+                      </button>
                     </div>
                   </div>
-                  
+                </div>
 
-                  {/* Action Buttons - Edit and Delete */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditEvent(selectedEvent)}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#e6f0fa] text-[#002147] rounded-lg hover:bg-[#d0e0f5] transition-colors"
-                    >
-                      <Edit2 size={16} />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEvent(selectedEvent.id)}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </button>
+                <div className="p-6">
+                  <div style={{ height: '700px' }} className="calendar-container rounded-xl overflow-hidden shadow-inner">
+                    <Calendar
+                      localizer={localizer}
+                      events={filteredEvents}
+                      startAccessor="start"
+                      endAccessor="end"
+                      style={{ height: '100%', fontFamily: 'system-ui' }}
+                      eventPropGetter={getEventStyle}
+                      onSelectEvent={handleSelectEvent}
+                      onSelectSlot={handleSelectSlot}
+                      selectable={!isAnyOperationInProgress}
+                      view={view}
+                      onView={handleViewChange}
+                      date={date}
+                      onNavigate={handleNavigate}
+                      toolbar={false}
+                      formats={{
+                        timeGutterFormat: 'h A',
+                        eventTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                          localizer.format(start, 'h:mm A', culture) + ' - ' +
+                          localizer.format(end, 'h:mm A', culture),
+                        agendaTimeFormat: 'h:mm A',
+                        agendaTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                          localizer.format(start, 'h:mm A', culture) + ' - ' +
+                          localizer.format(end, 'h:mm A', culture)
+                      }}
+                    />
                   </div>
                 </div>
               </div>
             )}
+          </div>
 
-
-            {/* Upcoming Events Panel */}
-            <div className="bg-white rounded-xl shadow-lg border border-[#d9e4f1] p-6">
-              <h3 className="text-lg font-semibold text-[#002147] mb-4">Upcoming Events</h3>
-              
-              <div className="space-y-3">
-                {/* Render each upcoming event */}
-                {upcomingEvents.map(event => (
-                  <div
-                    key={event.id}
-                    className="p-4 bg-[#f5f9ff] rounded-lg border border-[#d9e4f1] hover:bg-[#e6f0fa] transition-colors cursor-pointer"
-                    onClick={() => setSelectedEvent(event)}
-                  >
-                    <div className="flex items-start justify-between">
-                      
-                      {/* Event Information */}
-                      <div className="flex-1">
-                        {/* Event Title */}
-                        <h4 className="font-medium text-[#002147] mb-1">{event.title}</h4>
-                        
-                        {/* School Tag */}
-                        <div className="flex items-center gap-2 mb-2">
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {isLoading ? (
+              <SidebarSkeleton />
+            ) : (
+              <>
+                {/* Selected Event Details */}
+                {selectedEvent && (
+                  <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-2xl shadow-2xl border border-white/50 p-6 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <Star className="w-5 h-5 text-yellow-500" />
+                        Event Details
+                      </h3>
+                      <button
+                        onClick={() => setSelectedEvent(null)}
+                        disabled={isAnyOperationInProgress}
+                        className="p-2 hover:bg-red-100 rounded-xl transition-all duration-200 text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <X size={22} />
+                      </button>
+                    </div>
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="font-bold text-gray-900 mb-3 text-lg">{selectedEvent.title}</h4>
+                        <div className="flex flex-wrap items-center gap-3 mb-4">
                           <span 
-                            className="px-2 py-1 rounded-full text-xs font-medium"
-                            style={schoolStyles[event.school]}
+                            className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-lg"
+                            style={{ backgroundColor: selectedEvent.color || eventTypes.find(t => t.value === (selectedEvent.eventType || selectedEvent.type))?.color }}
                           >
-                            {event.school}
+                            {eventTypes.find(t => t.value === (selectedEvent.eventType || selectedEvent.type))?.icon} {selectedEvent.eventType || selectedEvent.type}
+                          </span>
+                          <span className={`px-4 py-2 rounded-xl text-sm font-semibold shadow-lg ${
+                            selectedEvent.priority === 'high' ? 'bg-red-100 text-red-800' :
+                            selectedEvent.priority === 'medium' ? 'bg-amber-100 text-amber-800' :
+                            'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {selectedEvent.priority} priority
                           </span>
                         </div>
                         
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 text-gray-700 bg-white/60 p-3 rounded-xl">
+                            <Clock size={18} className="text-blue-600" />
+                            <span className="font-medium">{moment(selectedEvent.start).format('MMM DD, YYYY h:mm A')}</span>
+                          </div>
+                          
+                          {selectedEvent.location && (
+                            <div className="flex items-center gap-3 text-gray-700 bg-white/60 p-3 rounded-xl">
+                              <MapPin size={18} className="text-blue-600" />
+                              <span className="font-medium">{selectedEvent.location}</span>
+                            </div>
+                          )}
 
-                        {/* Event Date and Time */}
-                        <div className="flex items-center gap-2 text-sm text-[#002147]">
-                          <Clock size={14} className="text-[#3598FE]" />
-                          <span>{moment(event.start).format('MMM DD, h:mm A')}</span>
+                          {selectedEvent.school && (
+                            <div className="flex items-center gap-3 text-gray-700 bg-white/60 p-3 rounded-xl">
+                              <BookOpen size={18} className="text-blue-600" />
+                              <span className="font-medium">{selectedEvent.school}</span>
+                            </div>
+                          )}
+
+                          {selectedEvent.isSystemGenerated && (
+                            <div className="flex items-center gap-3 text-purple-700 bg-purple-50 p-3 rounded-xl">
+                              <Bell size={18} className="text-purple-600" />
+                              <span className="font-medium">System Generated Event</span>
+                            </div>
+                          )}
+
+                          {selectedEvent.hasReminders && (
+                            <div className="flex items-center gap-3 text-amber-700 bg-amber-50 p-3 rounded-xl">
+                              <Bell size={18} className="text-amber-600" />
+                              <span className="font-medium">{selectedEvent.reminders?.length || 0} Reminder(s) Set</span>
+                            </div>
+                          )}
+                          
+                          {selectedEvent.description && (
+                            <div className="bg-white/60 p-4 rounded-xl">
+                              <h5 className="text-sm font-bold text-gray-800 mb-2">Description</h5>
+                              <p className="text-gray-700 leading-relaxed">{selectedEvent.description}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
-                      {/* Priority Icon */}
-                      <div className="ml-2">
-                        {priorityIcons[event.priority]}
+                      <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+                        {(selectedEvent.completionStatus !== 'completed' && selectedEvent.status !== 'completed') && (
+                          <button
+                            onClick={() => handleCompleteEvent(selectedEvent.id)}
+                            disabled={isAnyOperationInProgress}
+                            className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isCompleting && operatingEventId === selectedEvent.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <CheckCircle size={18} />
+                            )}
+                            Mark Complete
+                          </button>
+                        )}
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleEditEvent(selectedEvent)}
+                            disabled={isAnyOperationInProgress}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isUpdating && operatingEventId === selectedEvent.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Edit2 size={18} />
+                            )}
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEvent(selectedEvent.id)}
+                            disabled={isAnyOperationInProgress || selectedEvent.isSystemGenerated}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isDeleting && operatingEventId === selectedEvent.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                ))}
-                
+                )}
 
-                {/* Empty State - No upcoming events */}
-                {upcomingEvents.length === 0 && (
-                  <div className="text-center py-8">
-                    <BookOpen size={48} className="mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-500">No upcoming events</p>
+                {/* Upcoming Events */}
+                <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-2xl shadow-2xl border border-white/50 p-6 backdrop-blur-sm">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
+                      <CalendarIcon className="w-5 h-5 text-white" />
+                    </div>
+                    Upcoming Events
+                  </h3>
+                  <div className="space-y-4">
+                    {upcomingEvents.length > 0 ? (
+                      upcomingEvents.map(event => (
+                        <div
+                          key={event.id}
+                          className={`p-5 bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-100 transition-all duration-200 cursor-pointer shadow-md hover:shadow-xl ${
+                            isAnyOperationInProgress ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'
+                          }`}
+                          onClick={() => !isAnyOperationInProgress && setSelectedEvent(event)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-bold text-gray-900 mb-2">{event.title}</h4>
+                              <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                                <Clock size={16} className="text-blue-500" />
+                                <span className="font-medium">{moment(event.start).format('MMM DD, h:mm A')}</span>
+                              </div>
+                              {event.school && (
+                                <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                                  <BookOpen size={16} />
+                                  <span>{event.school}</span>
+                                </div>
+                              )}
+                              {event.isSystemGenerated && (
+                                <div className="flex items-center gap-2 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
+                                  <Bell size={12} />
+                                  <span>System Generated</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-3 flex flex-col items-end gap-2">
+                              <span 
+                                className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg"
+                                style={{ backgroundColor: event.color || eventTypes.find(t => t.value === (event.eventType || event.type))?.color }}
+                              >
+                                {eventTypes.find(t => t.value === (event.eventType || event.type))?.icon}
+                              </span>
+                              <span className="text-xs text-gray-500 font-medium">
+                                {moment(event.start).fromNow()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <CalendarIcon size={32} className="text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 mb-3 font-medium">No upcoming events</p>
+                        <button
+                          onClick={() => !isAnyOperationInProgress && setShowEventModal(true)}
+                          disabled={isAnyOperationInProgress}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Create your first event
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Overdue Events (if any) */}
+                {overdueEvents.length > 0 && (
+                  <div className="bg-gradient-to-br from-red-50 via-red-25 to-orange-50 rounded-2xl shadow-2xl border border-red-200 p-6 backdrop-blur-sm">
+                    <h3 className="text-xl font-bold text-red-900 mb-6 flex items-center gap-2">
+                      <div className="p-2 bg-gradient-to-r from-red-500 to-orange-500 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-white" />
+                      </div>
+                      Overdue Events ({overdueEvents.length})
+                    </h3>
+                    <div className="space-y-4">
+                      {overdueEvents.map(event => (
+                        <div
+                          key={event.id}
+                          className={`p-5 bg-gradient-to-br from-red-100 to-orange-100 rounded-xl border border-red-200 transition-all duration-200 cursor-pointer shadow-md hover:shadow-xl ${
+                            isAnyOperationInProgress ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'
+                          }`}
+                          onClick={() => !isAnyOperationInProgress && setSelectedEvent(event)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-bold text-red-900 mb-2">{event.title}</h4>
+                              <div className="flex items-center gap-2 text-sm text-red-700 mb-2">
+                                <Clock size={16} />
+                                <span className="font-medium">{moment(event.start).format('MMM DD, h:mm A')}</span>
+                              </div>
+                              <div className="text-xs text-red-600 bg-red-200 px-2 py-1 rounded-lg font-medium">
+                                Overdue by {moment(event.start).fromNow(true)}
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCompleteEvent(event.id);
+                              }}
+                              disabled={isAnyOperationInProgress}
+                              className="p-2 bg-red-200 hover:bg-red-300 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isCompleting && operatingEventId === event.id ? (
+                                <Loader2 size={18} className="animate-spin text-red-700" />
+                              ) : (
+                                <CheckCircle size={18} className="text-red-700" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Event Modal */}
+      {showEventModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto backdrop-blur-sm border border-white/50">
+            <div className="p-8 border-b border-gray-200/50 flex justify-between items-center bg-gradient-to-r from-white to-blue-50">
+              <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
+                  <CalendarIcon className="w-6 h-6 text-white" />
+                </div>
+                {editingEvent ? 'Edit Event' : 'Create New Event'}
+              </h3>
+              <button
+                onClick={resetForm}
+                disabled={isCreating || isUpdating}
+                className="p-2 hover:bg-red-100 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={26} className="text-gray-500 hover:text-red-600" />
+              </button>
+            </div>
+            <div className="p-8 space-y-8">
+              {saveError && (
+                <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 text-red-800 p-4 rounded-xl shadow-lg">
+                  <div className="flex items-center">
+                    <AlertCircle size={20} className="mr-3" />
+                    <span className="font-medium">{saveError}</span>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  Event Title *
+                </label>
+                <input
+                  type="text"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  disabled={isCreating || isUpdating}
+                  className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Enter event title"
+                />
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Start Date & Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={moment(newEvent.start).format('YYYY-MM-DDTHH:mm')}
+                    onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
+                    disabled={isCreating || isUpdating}
+                    className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    End Date & Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={moment(newEvent.end).format('YYYY-MM-DDTHH:mm')}
+                    onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
+                    disabled={isCreating || isUpdating}
+                    className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Type *
+                  </label>
+                  <select
+                    value={newEvent.eventType}
+                    onChange={(e) => setNewEvent({ ...newEvent, eventType: e.target.value })}
+                    disabled={isCreating || isUpdating}
+                    className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {eventTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.icon} {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Priority
+                  </label>
+                  <select
+                    value={newEvent.priority}
+                    onChange={(e) => setNewEvent({ ...newEvent, priority: e.target.value })}
+                    disabled={isCreating || isUpdating}
+                    className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {priorities.map(priority => (
+                      <option key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Status
+                  </label>
+                  <select
+                    value={newEvent.eventStatus}
+                    onChange={(e) => setNewEvent({ ...newEvent, eventStatus: e.target.value })}
+                    disabled={isCreating || isUpdating}
+                    className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {statuses.map(status => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    School
+                  </label>
+                  <select
+                    value={newEvent.universityId || ''}
+                    onChange={(e) => setNewEvent({ ...newEvent, universityId: e.target.value || '' })}
+                    disabled={isCreating || isUpdating}
+                    className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">General/No School</option>
+                    {savedUniversities.map(uni => (
+                      <option key={uni.id} value={uni.id}>
+                        {uni.universityName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  disabled={isCreating || isUpdating}
+                  className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Enter location or online meeting link"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">
+                  Description
+                </label>
+                <textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  disabled={isCreating || isUpdating}
+                  className="w-full px-5 py-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                  rows={4}
+                  placeholder="Add event description"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4 p-8 border-t border-gray-200/50 bg-gradient-to-r from-white to-blue-50">
+              <button
+                onClick={resetForm}
+                disabled={isCreating || isUpdating}
+                className="px-8 py-3 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300 rounded-xl hover:bg-white hover:shadow-lg transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEvent}
+                disabled={!newEvent.title.trim() || isCreating || isUpdating}
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+              >
+                {(isCreating || isUpdating) && (
+                  <Loader2 size={20} className="animate-spin" />
+                )}
+                {editingEvent ? 'Update Event' : 'Create Event'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
-
-
-
-
-
-
-      {/* Event Modal */}
-     {/* Event Modal - Displayed when showEventModal is true */}
-{showEventModal && (
-  // Modal backdrop with overlay
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    
-    {/* Modal container with scrollable content */}
-    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      )}
       
-      {/* Modal header section */}
-      <div className="p-6 border-b border-[#d9e4f1]">
-        <h3 className="text-xl font-semibold text-[#002147]">
-          {editingEvent ? 'Edit Event' : 'Add New Event'}
-        </h3>
-      </div>
-      
-      {/* Modal body - Form fields container */}
-      <div className="p-6 space-y-6">
+      <style jsx>{`
+        .calendar-container .rbc-calendar {
+          font-family: 'system-ui', -apple-system, sans-serif;
+          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+        }
         
-        {/* Event Title Input Field */}
-        <div>
-          <label className="block text-sm font-medium text-[#002147] mb-2">
-            Event Title *
-          </label>
-          <input
-            type="text"
-            value={newEvent.title}
-            onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-            className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            placeholder="Enter event title"
-          />
-        </div>
-
-        {/* Date and Time Selection Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* Start Date & Time Field */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              Start Date & Time *
-            </label>
-            <input
-              type="datetime-local"
-              value={moment(newEvent.start).format('YYYY-MM-DDTHH:mm')}
-              onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            />
-          </div>
-          
-          {/* End Date & Time Field */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              End Date & Time *
-            </label>
-            <input
-              type="datetime-local"
-              value={moment(newEvent.end).format('YYYY-MM-DDTHH:mm')}
-              onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            />
-          </div>
-        </div>
-
-        {/* Event Type and School Selection Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* Event Type Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              Type *
-            </label>
-            <select
-              value={newEvent.type}
-              onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            >
-              {eventTypes.map(type => (
-                <option key={type} value={type}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          {/* School Selection Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              School *
-            </label>
-            <select
-              value={newEvent.school}
-              onChange={(e) => setNewEvent({ ...newEvent, school: e.target.value })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            >
-              <option value="">Select School</option>
-              {schools.map(school => (
-                <option key={school} value={school}>{school}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Event Properties Section - Priority, Status, and Reminder */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          {/* Priority Level Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              Priority
-            </label>
-            <select
-              value={newEvent.priority}
-              onChange={(e) => setNewEvent({ ...newEvent, priority: e.target.value })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            >
-              {priorities.map(priority => (
-                <option key={priority} value={priority}>
-                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-
-          {/* Event Status Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              Status
-            </label>
-            <select
-              value={newEvent.status}
-              onChange={(e) => setNewEvent({ ...newEvent, status: e.target.value })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            >
-              {statuses.map(status => (
-                <option key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          {/* Reminder Setting Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-[#002147] mb-2">
-              Reminder (days)
-            </label>
-            <select
-              value={newEvent.reminder}
-              onChange={(e) => setNewEvent({ ...newEvent, reminder: parseInt(e.target.value) })}
-              className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            >
-              <option value={1}>1 day</option>
-              <option value={2}>2 days</option>
-              <option value={3}>3 days</option>
-              <option value={7}>1 week</option>
-              <option value={14}>2 weeks</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Event Description Text Area */}
-        <div>
-          <label className="block text-sm font-medium text-[#002147] mb-2">
-            Description
-          </label>
-          <textarea
-            value={newEvent.description}
-            onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-            className="w-full px-4 py-3 border border-[#d9e4f1] rounded-lg focus:ring-2 focus:ring-[#3598FE] focus:border-transparent text-[#002147]"
-            rows={4}
-            placeholder="Add event description"
-          />
-        </div>
-      </div>
-
-      {/* Modal Footer - Action Buttons */}
-      <div className="flex justify-end gap-3 p-6 border-t border-[#d9e4f1]">
+        .calendar-container .rbc-header {
+          background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+          border-bottom: 2px solid #e2e8f0;
+          color: #374151;
+          font-weight: 700;
+          padding: 16px 12px;
+          text-align: center;
+          font-size: 14px;
+          letter-spacing: 0.5px;
+        }
         
-        {/* Cancel Button */}
-        <button
-          onClick={resetForm}
-          className="px-6 py-3 text-[#002147] border border-[#d9e4f1] rounded-lg hover:bg-[#e6f0fa] transition-colors font-medium"
-        >
-          Cancel
-        </button>
+        .calendar-container .rbc-month-view {
+          border: 2px solid #e2e8f0;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
         
-        {/* Save/Update Button - Disabled if required fields are empty */}
-        <button
-          onClick={handleSaveEvent}
-          className="px-6 py-3 bg-[#3598FE] text-white rounded-lg hover:bg-[#2a7ac8] transition-colors duration-200 font-medium shadow-lg"
-          disabled={!newEvent.title || !newEvent.school}
-        >
-          {editingEvent ? 'Update Event' : 'Save Event'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-{/* Custom Styles for React Big Calendar Component */}
-<style jsx>{`
-  /* Main calendar container styling */
-  .calendar-container .rbc-calendar {
-    font-family: inherit;
-  }
-
-  /* Event styling within calendar */
-  .rbc-event {
-    border-radius: 6px !important;
-    border: none !important;
-    font-weight: 500 !important;
-    font-size: 12px !important;
-  }
-
-  /* Today's date highlighting */
-  .rbc-today {
-    background-color: rgba(0, 33, 71, 0.1) !important;
-  }
-
-  /* Month view container styling */
-  .rbc-month-view {
-    border: 1px solid #d9e4f1 !important;
-    border-radius: 8px !important;
-    overflow: hidden;
-  }
-
-  /* Calendar header row styling */
-  .rbc-header {
-    background-color: #f5f9ff !important;
-    border-bottom: 1px solid #d9e4f1 !important;
-    padding: 12px 8px !important;
-    font-weight: 600 !important;
-    color: #002147 !important;
-  }
-
-  /* Date cell styling within calendar grid */
-  .rbc-date-cell {
-    padding: 8px !important;
-    color: #002147;
-  }
-
-  /* Background for dates outside current month range */
-  .rbc-off-range-bg {
-    background-color: #f5f9ff !important;
-  }
-
-  /* Text color for dates outside current month range */
-  .rbc-off-range .rbc-button-link {
-    color: #a0aec0 !important;
-  }
-
-  /* Hover effect for calendar day cells */
-  .rbc-day-bg:hover {
-    background-color: rgba(0, 33, 71, 0.05) !important;
-  }
-
-  /* General button link styling within calendar */
-  .rbc-button-link {
-    color: #002147 !important;
-  }
-`}</style>
-
+        .calendar-container .rbc-date-cell {
+          padding: 12px;
+          text-align: right;
+          font-weight: 600;
+          color: #4b5563;
+        }
+        
+        .calendar-container .rbc-today {
+          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #93c5fd 100%) !important;
+          box-shadow: inset 0 2px 4px rgba(59, 130, 246, 0.2);
+        }
+        
+        .calendar-container .rbc-off-range-bg {
+          background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+          opacity: 0.6;
+        }
+        
+        .calendar-container .rbc-event {
+          border-radius: 10px !important;
+          border: 2px solid rgba(255,255,255,0.3) !important;
+          padding: 4px 10px !important;
+          margin: 2px 0 !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          backdrop-filter: blur(8px) !important;
+          transition: all 0.2s ease !important;
+        }
+        
+        .calendar-container .rbc-event:hover {
+          transform: scale(1.02) !important;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.25) !important;
+        }
+        
+        .calendar-container .rbc-day-slot .rbc-time-slot {
+          border-top: 1px solid #f1f5f9;
+        }
+        
+        .calendar-container .rbc-time-view .rbc-header {
+          border-bottom: 2px solid #e2e8f0;
+          background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        
+        .calendar-container .rbc-time-gutter .rbc-time-slot {
+          border-top: 1px solid #f1f5f9;
+          color: #6b7280;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 4px 8px;
+        }
+        
+        .calendar-container .rbc-current-time-indicator {
+          background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+          height: 3px;
+          z-index: 3;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+          border-radius: 2px;
+        }
+        
+        .calendar-container .rbc-day-bg:hover,
+        .calendar-container .rbc-month-row .rbc-day-bg:hover {
+          background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+          transition: all 0.2s ease;
+        }
+        
+        .calendar-container .rbc-slot-selection {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(29, 78, 216, 0.15) 100%);
+          border: 3px solid #3b82f6;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+        
+        .calendar-container .rbc-month-row {
+          border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .calendar-container .rbc-date-cell.rbc-now {
+          font-weight: 800;
+          color: #1d4ed8;
+        }
+        
+        .calendar-container .rbc-show-more {
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+          color: white;
+          border-radius: 6px;
+          padding: 2px 8px;
+          font-size: 11px;
+          font-weight: 600;
+          border: none;
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+      `}</style>
     </div>
   );
 };

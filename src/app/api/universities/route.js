@@ -1,50 +1,97 @@
-// app/api/universities/route.js
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authOptions } from '../auth/[...nextauth]/route';
 
 /**
- * GET endpoint for fetching universities with filtering capabilities
- * @param {Request} request - The incoming request object
- * @returns {Promise<NextResponse>} JSON response containing:
- * - Filtered universities data
- * - Count of filtered results
- * - Total available universities count
- * - Error messages if applicable
+ * GET /api/universities
+ * 
+ * Fetches a filtered and optimized list of universities with search, GMAT, and ranking filters.
+ * Includes primary image and saved state for the current user.
+ * 
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} JSON response with university list
  */
 export async function GET(request) {
-  // Get current user session for saved status check
   const session = await getServerSession(authOptions);
-
+  
   try {
-    // Extract query parameters from URL
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || '';
+    const search = searchParams.get('search')?.trim() || '';
     const gmat = searchParams.get('gmat') || 'all';
     const ranking = searchParams.get('ranking') || 'all';
+    
+    // Build optimized WHERE clause - filter at DB level
+    const whereClause = { AND: [] };
+    
+    /**
+     * Search filter
+     * Matches against university name, city, or country (case-insensitive)
+     */
+    if (search) {
+      whereClause.AND.push({
+        OR: [
+          { universityName: { contains: search, mode: 'insensitive' } },
+          { city: { contains: search, mode: 'insensitive' } },
+          { country: { contains: search, mode: 'insensitive' } }
+        ]
+      });
+    }
 
     /**
-     * Fetch universities with:
-     * - Primary image
-     * - Saved status for current user
+     * GMAT filter
+     * Applies range-based filtering on gmatAverageScore
+     */
+    if (gmat !== 'all') {
+      const gmatFilter = {};
+      switch (gmat) {
+        case '700+': gmatFilter.gmatAverageScore = { gte: 700 }; break;
+        case '650-699': gmatFilter.gmatAverageScore = { gte: 650, lte: 699 }; break;
+        case '600-649': gmatFilter.gmatAverageScore = { gte: 600, lte: 649 }; break;
+        case 'below-600': gmatFilter.gmatAverageScore = { lt: 600, not: null }; break;
+      }
+      if (Object.keys(gmatFilter).length > 0) {
+        whereClause.AND.push(gmatFilter);
+      }
+    }
+
+    /**
+     * Ranking filter
+     * Filters by FT Global Ranking ranges
+     */
+    if (ranking !== 'all') {
+      const rankFilter = {};
+      switch (ranking) {
+        case 'top-10': rankFilter.ftGlobalRanking = { lte: 10, not: null }; break;
+        case 'top-50': rankFilter.ftGlobalRanking = { lte: 50, not: null }; break;
+        case 'top-100': rankFilter.ftGlobalRanking = { lte: 100, not: null }; break;
+        case '100+': rankFilter.ftGlobalRanking = { gt: 100 }; break;
+      }
+      if (Object.keys(rankFilter).length > 0) {
+        whereClause.AND.push(rankFilter);
+      }
+    }
+
+    /**
+     * Prisma query - fetch only needed fields and related data
      */
     const universities = await prisma.university.findMany({
+      where: whereClause.AND.length > 0 ? whereClause : undefined,
       include: {
         images: {
           where: { isPrimary: true },
           take: 1,
         },
         savedByUsers: {
-          where: {
-            email: session?.user.email,
-          },
-          select: {
-            id: true,
-          },
+          where: { email: session?.user?.email },
+          select: { id: true },
         },
       },
-      take: 100,
+      take: 50,
+      orderBy: [
+        { ftGlobalRanking: 'asc' },
+        { universityName: 'asc' }
+      ],
     });
 
     // Handle empty results
@@ -57,16 +104,14 @@ export async function GET(request) {
     }
 
     /**
-     * Transform university data for frontend consumption:
-     * - Format location strings
-     * - Handle default images
-     * - Format ranking display
-     * - Format financial values
-     * - Process pros/cons data
+     * Transform DB records to API response format
      */
+// In your /api/universities route
+
+
     const transformed = universities.map(u => ({
       id: u.id,
-      slug:u.slug,
+      slug: u.slug,
       name: u.universityName,
       location: `${u.city}, ${u.country}`,
       image: u.images[0]?.imageUrl || '/default-university.jpg',
@@ -76,60 +121,25 @@ export async function GET(request) {
       tuitionFee: u.tuitionFees ? `$${u.tuitionFees.toLocaleString()}` : 'N/A',
       applicationFee: u.additionalFees ? `$${u.additionalFees.toLocaleString()}` : 'N/A',
       pros: u.whyChooseHighlights || [],
-      cons: u.admissionRequirements?.split('.').filter(Boolean) || [],
+      cons: [], // No admissionRequirements in schema
       savedByUsers: u.savedByUsers
     }));
 
-    /**
-     * Filter universities based on query parameters:
-     * - Search term (name or location)
-     * - GMAT score range
-     * - University ranking range
-     */
-    const filtered = transformed.filter(u => {
-      // Search filter (name or location)
-      const matchesSearch = search === '' || 
-        u.name.toLowerCase().includes(search.toLowerCase()) ||
-        u.location.toLowerCase().includes(search.toLowerCase());
-        
-      // GMAT score filter
-      const matchesGmat = gmat === 'all' || (
-        gmat === '700+' ? u.gmatAvg >= 700 :
-        gmat === '650-699' ? u.gmatAvg >= 650 && u.gmatAvg <= 699 :
-        gmat === '600-649' ? u.gmatAvg >= 600 && u.gmatAvg <= 649 :
-        gmat === 'below-600' ? u.gmatAvg < 600 : true
-      );
-
-      // Ranking filter (convert string ranks to numbers)
-      const rankNum = u.rank === 'N/A' ? 999 : parseInt(u.rank.replace('#', ''));
-      const matchesRank = ranking === 'all' || (
-        ranking === 'top-10' ? rankNum <= 10 :
-        ranking === 'top-50' ? rankNum <= 50 :
-        ranking === 'top-100' ? rankNum <= 100 :
-        ranking === '100+' ? rankNum > 100 : true
-      );
-
-      return matchesSearch && matchesGmat && matchesRank;
-    });
-
-    // Return successful response with filtered data
+    // Return JSON response with caching headers
     return NextResponse.json({
-      data: filtered,
-      count: filtered.length,
-      total: universities.length
+      data: transformed,
+      count: transformed.length,
+      total: transformed.length
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+      }
     });
 
   } catch (error) {
     console.error("Database error:", error);
-    
-    // Return error response
     return NextResponse.json(
-      {
-        error: "Failed to fetch universities",
-        details: error.message,
-        data: [],
-        count: 0
-      },
+      { error: "Failed to fetch universities", data: [], count: 0 },
       { status: 500 }
     );
   }

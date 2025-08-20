@@ -32,7 +32,7 @@ import Link from 'next/link';
  * - Error handling for images
  */
 export const UniversityCard = ({ university, onRemove }) => {
-  console.log('University data in card:', university);
+//  console.log('University data in card:', university);
 
   /**
    * Determines gradient color based on application status

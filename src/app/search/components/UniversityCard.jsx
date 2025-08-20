@@ -1,145 +1,139 @@
 "use client";
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useCallback, memo } from "react";
 import { MapPin } from "lucide-react";
 import Link from "next/link";
 
 /**
- * University card component displaying university information with interactive features
- * @param {Object} props - Component props
- * @param {Object} props.university - University data object containing:
- *   @param {string} id - University identifier
- *   @param {string} name - University name
- *   @param {string} image - URL of university image
- *   @param {string} rank - University ranking
- *   @param {string} location - University location
- *   @param {number} gmatAvg - Average GMAT score
- *   @param {number} acceptRate - Acceptance rate percentage
- *   @param {string} tuitionFee - Tuition fee information
- *   @param {string} applicationFee - Application fee information
- *   @param {Array} pros - List of advantages
- *   @param {Array} cons - List of considerations
- *   @param {Array} savedByUsers - Array of users who saved this university
- *   @param {boolean} isAdded - Initial saved status (optional)
- * @returns {JSX.Element} Interactive university card component
+ * UniversityCard Component
+ *
+ * Renders a card UI for a university with:
+ * - Image, name, location, and ranking
+ * - GMAT average, acceptance rate, tuition & application fee
+ * - Advantages (pros) and Considerations (cons)
+ * - "Add / Added" button to save universities for the user
  */
-const UniversityCard = ({ university }) => {
-  const [isAdded, setIsAdded] = useState(university?.isAdded);
+const UniversityCard = memo(({ university }) => {
+  // Track if the university is already added/saved
+  const [isAdded, setIsAdded] = useState(false);
+  
+  // Track loading state for the "Add" button
   const [isLoading, setIsLoading] = useState(false);
-  const [previousState, setPreviousState] = useState(null); // Store previous state for rollback
 
- console.log(university,"card page");
-
-  // Determine URL using slug or fallback to ID
-   const universityUrl = university.slug 
-     ? `/dashboard/university/${university.slug}`
-     : `/dashboard/university/${university.id}`;
- 
+  // Generate clean university URL (slug > id fallback)
+  const universityUrl = university.slug
+    ? `/dashboard/university/${university.slug}`
+    : `/dashboard/university/${university.id}`;
 
   /**
-   * Effect to initialize saved status by checking if current user has saved this university
-   * Checks localStorage for auth data and compares with savedByUsers array
+   * Effect: Set initial saved state from API data
+   * Fixed logic to properly check if current user has saved this university
    */
   useEffect(() => {
-    try {
-      const authData = localStorage.getItem("authData");
-      if (!authData) return;
-
-      const parsedData = JSON.parse(authData);
-      const userId = parsedData.userId;
-
-      // Check if user's id is inside savedByUsers array of objects
-      const isSaved = Array.isArray(university.savedByUsers) &&
-        university.savedByUsers.some((user) => user.id === userId);
-
-      setIsAdded(isSaved);
-    } catch (error) {
-      console.error("Error initializing saved status:", error);
+    if (!university) return;
+    
+    // Check if savedByUsers exists and has data
+    if (Array.isArray(university.savedByUsers)) {
+      // If the array has any items, it means the current user has saved this university
+      // (because the API filters savedByUsers to only include current user's data)
+      setIsAdded(university.savedByUsers.length > 0);
+    } else if (typeof university.isAdded === 'boolean') {
+      // Fallback to isAdded property if it exists
+      setIsAdded(university.isAdded);
+    } else {
+      // Default to false if no saved state information is available
+      setIsAdded(false);
     }
-  }, [university.savedByUsers]);
+  }, [university?.savedByUsers, university?.isAdded, university?.id]);
 
   /**
-   * Toggle university saved status with optimistic updates
-   * @param {Event} e - Click event
+   * Handler: Toggle "Add / Added" state for the university
+   * - Optimistically updates UI
+   * - Sends request to backend
+   * - Handles errors with proper rollback
    */
-  const toggleAdd = async (e) => {
-    // Prevent event bubbling and navigation
-    e.stopPropagation();
-    e.preventDefault();
-    
-   // console.log("Button clicked!");
-    //console.log(university?.id, "university id");
-    
-    // Get fresh auth data from localStorage
-    const authData = typeof window !== "undefined" ? localStorage.getItem("authData") : null;
-    
-    if (!authData) {
-      console.warn("⚠️ No auth data found in localStorage");
-      return;
-    }
+  const toggleAdd = useCallback(
+    async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
 
-    const parsedData = JSON.parse(authData);
-    //console.log(parsedData.token, "token");
-
-    // Store current state for potential rollback
-    setPreviousState(isAdded);
-    
-    // Optimistic update - change UI immediately
-    setIsAdded(!isAdded);
-    setIsLoading(true);
-    
-    try {
-      const API_BASE_URL =
-        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/university/toggleSaved`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${parsedData.token}`,
-          },
-          body: JSON.stringify({ universityId: university?.id }),
+      // Get auth token from localStorage
+      let authData;
+      try {
+        authData = localStorage.getItem("authData");
+        if (!authData) {
+          console.error("No auth data found");
+          return;
         }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        // Confirm the optimistic update was correct
-        setIsAdded(data.isAdded);
-       // console.log("Successfully toggled:", data.isAdded);
-      } else {
-        // Rollback on error
-        console.error("Failed to update status:", response.status);
-        setIsAdded(previousState);
+      } catch (error) {
+        console.error("Failed to get auth data:", error);
+        return;
       }
-    } catch (error) {
-      // Rollback on error
-      console.error("Error toggling add:", error);
-      setIsAdded(previousState);
-    } finally {
-      setIsLoading(false);
-      setPreviousState(null);
-    }
-  };
 
-  // Early return if no university data
-  if (!university) {
-    console.warn("⚠️ No university data provided");
-    return null;
-  }
+      const { token } = JSON.parse(authData);
+      if (!token) {
+        console.error("No token found in auth data");
+        return;
+      }
+
+      const newState = !isAdded;
+
+      // Optimistic UI update
+      setIsAdded(newState);
+      setIsLoading(true);
+
+      try {
+        const API_BASE_URL =
+          process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/university/toggleSaved`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ universityId: university?.id }),
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Toggle response:", data); // For debugging
+          
+          // Always use the API response as the source of truth
+          setIsAdded(data.isAdded);
+        } else {
+          console.error("Toggle failed:", response.status, response.statusText);
+          // Rollback on error
+          setIsAdded(!newState);
+        }
+      } catch (error) {
+        console.error("Network error during toggle:", error);
+        // Rollback on network failure
+        setIsAdded(!newState);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAdded, university?.id]
+  );
+
+  // If no university data is passed, render nothing
+  if (!university) return null;
 
   return (
     <div className="group relative mt-14 bg-white rounded-3xl shadow-sm hover:shadow-2xl border border-slate-200/60 hover:border-slate-300/60 transition-all duration-500 overflow-hidden">
-      {/* ---------- Image Section with Rank Badge and Add Button ---------- */}
+      {/* University Image + Rank + Add Button */}
       <div className="relative overflow-hidden">
-        {/* University Image - Wrapped in Link for navigation */}
         <Link href={universityUrl}>
           <div className="aspect-[4/3] bg-slate-100 cursor-pointer">
             <img
               src={university?.image}
               alt={university?.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              loading="lazy"
             />
           </div>
         </Link>
@@ -149,34 +143,24 @@ const UniversityCard = ({ university }) => {
           {university?.rank}
         </div>
 
-        {/* Add/Added Button - Separate from Link to prevent navigation */}
+        {/* Add / Added Button */}
         <button
           onClick={toggleAdd}
           disabled={isLoading}
-          className={`absolute top-4 right-4 z-20 px-4 py-2 rounded-full cursor-pointer text-sm font-semibold transition-all duration-300 backdrop-blur-sm ${
+          className={`absolute top-4 right-4 z-20 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 backdrop-blur-sm ${
             isAdded
               ? "bg-blue-500 text-white hover:bg-blue-600"
               : "bg-white/90 text-slate-700 hover:bg-white border border-slate-200"
           } ${isLoading ? "opacity-75" : ""}`}
         >
-          {isLoading ? (
-            <span className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              {isAdded ? "Adding..." : "Removing..."}
-            </span>
-          ) : (
-            isAdded ? "Added" : "Add"
-          )}
+          {isLoading ? "..." : isAdded ? "Added" : "Add"}
         </button>
       </div>
 
-      {/* ---------- University Info Section - Wrapped in Link for navigation ---------- */}
+      {/* University Content Section */}
       <Link href={universityUrl}>
         <div className="p-6 cursor-pointer">
-          {/* University Name & Location */}
+          {/* Name + Location */}
           <div className="mb-6">
             <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors duration-300">
               {university?.name}
@@ -187,17 +171,14 @@ const UniversityCard = ({ university }) => {
             </div>
           </div>
 
-          {/* GMAT & Acceptance Rate Stats */}
+          {/* Stats: GMAT Avg + Acceptance Rate */}
           <div className="grid grid-cols-2 gap-6 mb-6">
-            {/* GMAT Average */}
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-600 mb-1">
                 {university?.gmatAvg}
               </div>
               <div className="text-sm text-slate-600">GMAT Avg</div>
             </div>
-
-            {/* Acceptance Rate */}
             <div className="text-center">
               <div className="text-3xl font-bold text-green-600 mb-1">
                 {university?.acceptRate}%
@@ -206,17 +187,14 @@ const UniversityCard = ({ university }) => {
             </div>
           </div>
 
-          {/* Tuition & Application Fees */}
+          {/* Fees Section */}
           <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-            {/* Tuition Fee */}
             <div className="flex items-center justify-between py-2 border-b border-slate-100">
               <span className="text-slate-600">📅</span>
               <span className="text-slate-700 font-medium">
                 {university?.tuitionFee}
               </span>
             </div>
-
-            {/* Application Fee */}
             <div className="flex items-center justify-between py-2 border-b border-slate-100">
               <span className="text-slate-600">💰</span>
               <span className="text-slate-700 font-medium">
@@ -225,9 +203,9 @@ const UniversityCard = ({ university }) => {
             </div>
           </div>
 
-          {/* ---------- Pros and Cons Section ---------- */}
+          {/* Pros & Cons */}
           <div className="space-y-3">
-            {/* Pros List */}
+            {/* Pros */}
             <div>
               <div className="flex items-center mb-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
@@ -236,7 +214,7 @@ const UniversityCard = ({ university }) => {
                 </span>
               </div>
               <ul className="space-y-1 ml-4">
-                {university?.pros?.map((pro, index) => (
+                {university?.pros?.slice(0, 2).map((pro, index) => (
                   <li
                     key={index}
                     className="text-sm text-slate-600 flex items-center"
@@ -248,7 +226,7 @@ const UniversityCard = ({ university }) => {
               </ul>
             </div>
 
-            {/* Cons List */}
+            {/* Cons */}
             <div>
               <div className="flex items-center mb-2">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
@@ -257,7 +235,7 @@ const UniversityCard = ({ university }) => {
                 </span>
               </div>
               <ul className="space-y-1 ml-4">
-                {university?.cons?.map((con, index) => (
+                {university?.cons?.slice(0, 2).map((con, index) => (
                   <li
                     key={index}
                     className="text-sm text-slate-600 flex items-center"
@@ -272,10 +250,13 @@ const UniversityCard = ({ university }) => {
         </div>
       </Link>
 
-      {/* Hover Effect Border Overlay */}
+      {/* Hover Ring Effect */}
       <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-slate-900/5 group-hover:ring-blue-500/20 group-hover:ring-2 transition-all duration-300 pointer-events-none"></div>
     </div>
   );
-};
+});
+
+// Set displayName for React DevTools
+UniversityCard.displayName = "UniversityCard";
 
 export default UniversityCard;
