@@ -6,14 +6,28 @@ import {
   ExternalLink, Target, TrendingUp
 } from 'lucide-react';
 
+/**
+ * CollegeShowcase component - Comprehensive university profile display
+ * Features image gallery, university information, academic programs, and statistics
+ * 
+ * @param {Object} props - Component props
+ * @param {Object} props.university - University data object containing details, images, and statistics
+ * @returns {JSX.Element} University showcase component with interactive elements
+ */
 const CollegeShowcase = ({ university }) => {
+  // State for managing current image index in gallery
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Get images array - handle both old and new data structures
+  /**
+   * Processes university images array to handle different data structures
+   * Supports both old (string array) and new (object array) data formats
+   * 
+   * @returns {Array} Processed array of image objects with consistent structure
+   */
   const getImages = () => {
     if (!university.images) return [];
     
-    // If images is array of objects with url property (new structure)
+    // Handle new structure: array of objects with url property
     if (university.images.length > 0 && typeof university.images[0] === 'object' && university.images[0].url) {
       return university.images.map(img => ({
         url: img.url,
@@ -24,7 +38,7 @@ const CollegeShowcase = ({ university }) => {
       }));
     }
     
-    // If images is array of strings (old structure)
+    // Handle old structure: array of strings
     if (university.images.length > 0 && typeof university.images[0] === 'string') {
       return university.images.map(url => ({
         url,
@@ -40,19 +54,30 @@ const CollegeShowcase = ({ university }) => {
 
   const images = getImages();
   
-  // Fallback to single image or primary image if images array is empty
+  /**
+   * Provides fallback image URL when images array is empty
+   * Prioritizes primaryImage, then image, then default image
+   * 
+   * @returns {string} URL for fallback image
+   */
   const getFallbackImage = () => {
     if (university.primaryImage) return university.primaryImage;
     if (university.image) return university.image;
     return "/default-university.jpg";
   };
 
+  /**
+   * Navigates to previous image in gallery with circular looping
+   */
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
       prev === 0 ? images.length - 1 : prev - 1
     );
   };
 
+  /**
+   * Navigates to next image in gallery with circular looping
+   */
   const handleNextImage = () => {
     setCurrentImageIndex((prev) => 
       prev === images.length - 1 ? 0 : prev + 1
@@ -62,7 +87,7 @@ const CollegeShowcase = ({ university }) => {
   return (
     <div className="max-w-7xl mx-auto rounded-2xl my-8">
       <div className="p-6">
-        {/* Header Section */}
+        {/* Header Section with University Name and Links */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#002147] mb-4">
             {university.name || university.universityName}
@@ -99,9 +124,9 @@ const CollegeShowcase = ({ university }) => {
           </div>
         </div>
 
-        {/* Upper Section - Images and Basic Info */}
+        {/* Upper Section - Images and Basic Info in Two Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Image Section */}
+          {/* Image Gallery Section */}
           <div className="space-y-4">
             <div className="relative overflow-hidden shadow-xl rounded-2xl">
               {images.length > 0 ? (
@@ -119,8 +144,10 @@ const CollegeShowcase = ({ university }) => {
                 />
               )}
 
+              {/* Image Overlay Gradient */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
 
+              {/* Image Overlay Content */}
               <div className="absolute bottom-6 left-6 text-white">
                 <h3 className="text-2xl md:text-3xl font-bold mb-2 leading-tight">
                   {university.name || university.universityName}
@@ -145,7 +172,7 @@ const CollegeShowcase = ({ university }) => {
                 </div>
               </div>
 
-              {/* Navigation buttons - only show if multiple images */}
+              {/* Gallery Navigation Controls - Only show for multiple images */}
               {images.length > 1 && (
                 <>
                   <div className="absolute top-6 right-6 bg-white/90 px-3 py-2 backdrop-blur-sm rounded-full">
@@ -175,7 +202,7 @@ const CollegeShowcase = ({ university }) => {
               )}
             </div>
 
-            {/* Image dots indicator - only show if multiple images */}
+            {/* Image Pagination Dots - Only show for multiple images */}
             {images.length > 1 && (
               <div className="flex space-x-2 justify-center">
                 {images.map((_, idx) => (
@@ -192,7 +219,7 @@ const CollegeShowcase = ({ university }) => {
               </div>
             )}
 
-            {/* Image caption - show if available */}
+            {/* Image Caption Display */}
             {images.length > 0 && images[currentImageIndex].caption && (
               <p className="text-sm text-gray-600 text-center italic">
                 {images[currentImageIndex].caption}
@@ -200,14 +227,14 @@ const CollegeShowcase = ({ university }) => {
             )}
           </div>
 
-          {/* Basic Info Section */}
+          {/* Basic Information Section */}
           <div className="space-y-6">
             <div>
               <p className="text-gray-700 text-lg leading-relaxed font-medium mb-6">
                 {university.shortDescription || university.description}
               </p>
 
-              {/* About Section */}
+              {/* About University Section */}
               <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
                 <h4 className="text-xl font-bold text-[#002147] mb-4 flex items-center">
                   <BookOpen className="h-5 w-5 mr-2 text-[#3598FE]" />
@@ -220,6 +247,7 @@ const CollegeShowcase = ({ university }) => {
                      "This prestigious institution has been at the forefront of higher education, combining academic excellence with innovative research. Our commitment to fostering critical thinking, creativity, and leadership has made us a preferred destination for students worldwide."}
                   </p>
 
+                  {/* Mission Statement Highlight */}
                   {university.missionStatement && (
                     <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-[#3598FE]">
                       <h5 className="font-semibold text-[#002147] mb-2 flex items-center">
@@ -230,6 +258,7 @@ const CollegeShowcase = ({ university }) => {
                     </div>
                   )}
 
+                  {/* Vision Statement Highlight */}
                   {university.visionStatement && (
                     <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-[#002147]">
                       <h5 className="font-semibold text-[#002147] mb-2 flex items-center">
@@ -247,7 +276,7 @@ const CollegeShowcase = ({ university }) => {
 
         {/* Lower Section - Full Width Academic Information */}
         <div className="space-y-8">
-          {/* Explore Academic Options - Full Width */}
+          {/* Academic Excellence Call-to-Action Section */}
           <div className="bg-gradient-to-r from-[#002147] to-[#003366] p-8 rounded-2xl text-white">
             <h4 className="text-3xl font-bold mb-4 text-center">Explore Academic Excellence</h4>
             <p className="text-center text-blue-100 mb-8 text-lg max-w-3xl mx-auto">
@@ -279,9 +308,9 @@ const CollegeShowcase = ({ university }) => {
             </div>
           </div>
 
-          {/* Programs and Statistics Section - Full Width */}
+          {/* Programs and Statistics Grid Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Programs Offered - Takes 2/3 width on large screens */}
+            {/* Programs Offered Section - 2/3 width on large screens */}
             {university.programs && university.programs.length > 0 && (
               <div className="lg:col-span-2 bg-white p-8 border border-gray-100 shadow-sm rounded-2xl">
                 <h4 className="text-2xl font-bold text-[#002147] mb-6 text-center">Programs Offered</h4>
@@ -305,7 +334,7 @@ const CollegeShowcase = ({ university }) => {
               </div>
             )}
 
-            {/* Key Statistics - Takes 1/3 width on large screens */}
+            {/* Key Statistics Section - 1/3 width on large screens */}
             <div>
               <h4 className="text-2xl font-bold text-[#002147] mb-6 text-center">Key Statistics</h4>
               

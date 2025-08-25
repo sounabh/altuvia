@@ -12,11 +12,23 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-// Skeleton Components
+// =============================================================================
+// SKELETON COMPONENTS
+// =============================================================================
+
+/**
+ * Skeleton component for loading state placeholder
+ * @param {string} className - Additional CSS classes for styling
+ */
 const Skeleton = ({ className = "" }) => (
   <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
 );
 
+/**
+ * Skeleton text component with multiple lines
+ * @param {number} lines - Number of text lines to display
+ * @param {string} className - Additional CSS classes for styling
+ */
 const SkeletonText = ({ lines = 1, className = "" }) => (
   <div className={`space-y-2 ${className}`}>
     {Array.from({ length: lines }).map((_, i) => (
@@ -28,6 +40,10 @@ const SkeletonText = ({ lines = 1, className = "" }) => (
   </div>
 );
 
+/**
+ * Complete skeleton loading component for the program details page
+ * Shows placeholder content while data is being fetched
+ */
 const HeaderSkeleton = () => (
   <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
     {/* Header Skeleton */}
@@ -179,16 +195,28 @@ const HeaderSkeleton = () => (
   </div>
 );
 
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+/**
+ * ProgramDetailsPage Component
+ * Displays detailed information about a specific university program
+ * Includes tabs for overview, curriculum, admissions, fees & aid, and rankings
+ */
 const ProgramDetailsPage = () => {
+  // Router and params for navigation and URL parameters
   const params = useParams();
   const router = useRouter();
   const { university: slug, id } = params;
   
+  // State management for program data, loading, and error handling
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Fetch program details on component mount
   useEffect(() => {
     const fetchProgramDetails = async () => {
       try {
@@ -219,6 +247,12 @@ const ProgramDetailsPage = () => {
     }
   }, [slug, id]);
 
+  /**
+   * Format currency amount with proper formatting
+   * @param {number} amount - The amount to format
+   * @param {string} currency - Currency code (default: USD)
+   * @returns {string} Formatted currency string
+   */
   const formatCurrency = (amount, currency = 'USD') => {
     if (!amount) return 'Contact university';
     return new Intl.NumberFormat('en-US', {
@@ -229,15 +263,22 @@ const ProgramDetailsPage = () => {
     }).format(amount);
   };
 
+  /**
+   * Format duration in years to readable text
+   * @param {number} years - Duration in years
+   * @returns {string} Formatted duration string
+   */
   const formatDuration = (years) => {
     if (!years) return 'Not specified';
     return years === 1 ? '1 year' : `${years} years`;
   };
 
+  // Show skeleton loading state while data is being fetched
   if (loading) {
     return <HeaderSkeleton />;
   }
 
+  // Show error state if data fetching fails
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -255,8 +296,10 @@ const ProgramDetailsPage = () => {
     );
   }
 
+  // Destructure data from API response
   const { program, university, department, rankings, scholarships, financialAids, externalLinks, syllabus, essayPrompts } = data;
 
+  // Tab configuration for program details navigation
   const tabs = [
     { id: "overview", label: "Overview", icon: Info },
     { id: "curriculum", label: "Curriculum", icon: BookOpen },
@@ -264,6 +307,10 @@ const ProgramDetailsPage = () => {
     { id: "fees", label: "Fees & Aid", icon: DollarSign },
     { id: "rankings", label: "Rankings", icon: TrendingUp }
   ];
+
+  // ===========================================================================
+  // RENDER
+  // ===========================================================================
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">

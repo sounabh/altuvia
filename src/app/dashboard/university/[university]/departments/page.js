@@ -10,7 +10,15 @@ import {
   Filter, Grid, List, MapPin, Award
 } from 'lucide-react';
 
-// Skeleton component for individual department cards
+/**
+ * Skeleton component for individual department cards
+ * Shows loading state while data is being fetched
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {string} props.viewMode - Current view mode ('grid' or 'list')
+ * @returns {React.ReactElement} Skeleton loading card
+ */
 const DepartmentCardSkeleton = ({ viewMode }) => (
   <Card className={`animate-pulse border-0 bg-white ${viewMode === 'grid' ? '' : ''}`}>
     <CardContent className="p-6">
@@ -53,7 +61,15 @@ const DepartmentCardSkeleton = ({ viewMode }) => (
   </Card>
 );
 
-// Skeleton component for the entire departments page
+/**
+ * Skeleton component for the entire departments page
+ * Shows loading state while data is being fetched
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {string} props.viewMode - Current view mode ('grid' or 'list')
+ * @returns {React.ReactElement} Complete page skeleton
+ */
 const DepartmentsPageSkeleton = ({ viewMode = "grid" }) => (
   <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
     {/* Header skeleton */}
@@ -122,6 +138,13 @@ const DepartmentsPageSkeleton = ({ viewMode = "grid" }) => (
   </div>
 );
 
+/**
+ * Main DepartmentsPage component
+ * Displays all departments for a university with search, filter, and view options
+ * 
+ * @component
+ * @returns {React.ReactElement} Departments listing page
+ */
 const DepartmentsPage = () => {
   const params = useParams();
   const router = useRouter();
@@ -378,13 +401,21 @@ const DepartmentsPage = () => {
                     {/* Action buttons section */}
                     <div className={`${viewMode === 'list' ? 'flex flex-col space-y-2' : 'flex justify-between items-center pt-4'}`}>
                       {/* View department details button */}
-                    
+                      <Button
+                        variant="default"
+                        onClick={() => handleDepartmentClick(department.id)}
+                        size={viewMode === 'list' ? 'sm' : 'default'}
+                        className="bg-[#3598FE] hover:bg-[#2485ed]"
+                      >
+                        View Details
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
                       
                       {/* View programs button (only shown if department has programs) */}
                       {department.programs.length > 0 && (
                         <Button
                           variant="outline"
-                          onClick={() => router.push(`/dashboard//university/${slug}/programs`)}
+                          onClick={() => router.push(`/dashboard/university/${slug}/programs`)}
                           size={viewMode === 'list' ? 'sm' : 'default'}
                           className="border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white"
                         >

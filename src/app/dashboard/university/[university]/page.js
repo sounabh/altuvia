@@ -124,7 +124,7 @@ const UniversityPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  console.log('University slug:', slug);
+  //console.log('University slug:', slug);
 
   useEffect(() => {
     const fetchUniversity = async () => {

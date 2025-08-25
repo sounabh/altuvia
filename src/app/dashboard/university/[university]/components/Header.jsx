@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 const Header = ({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [previousState, setPreviousState] = useState(null);
+  const [loadingAction, setLoadingAction] = useState(null); // Track what action is happening
 
   const router = useRouter();
 
@@ -35,9 +35,6 @@ const Header = ({ university }) => {
   /**
    * Toggle university saved status with optimistic updates
    */
-
-  console.log(university, "header");
-
   const toggleSaved = async (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -53,11 +50,16 @@ const Header = ({ university }) => {
 
     const parsedData = JSON.parse(authData);
 
-    // Store current state for potential rollback
-    setPreviousState(isAdded);
+    // Store what action we're performing BEFORE changing state
+    const currentState = isAdded;
+    const actionBeingPerformed = currentState ? "removing" : "saving";
+    
+    // Set loading action based on PREVIOUS state (what we're changing FROM)
+    setLoadingAction(actionBeingPerformed);
 
     // Optimistic update - change UI immediately
-    setIsAdded(!isAdded);
+    const newState = !isAdded;
+    setIsAdded(newState);
     setIsLoading(true);
 
     try {
@@ -83,16 +85,40 @@ const Header = ({ university }) => {
       } else {
         // Rollback on error
         console.error("Failed to update status:", response.status);
-        setIsAdded(previousState);
+        setIsAdded(currentState); // Use the stored previous state
       }
     } catch (error) {
       // Rollback on error
       console.error("Error toggling save:", error);
-      setIsAdded(previousState);
+      setIsAdded(currentState); // Use the stored previous state
     } finally {
       setIsLoading(false);
-      setPreviousState(null);
+      setLoadingAction(null); // Clear loading action
     }
+  };
+
+  // Helper function to get the correct loading text
+  const getLoadingText = () => {
+    if (!isLoading || !loadingAction) return null;
+    return loadingAction === "saving" ? "Saving..." : "Removing...";
+  };
+
+  // Helper function to get correct mobile loading text
+  const getMobileLoadingText = () => {
+    if (!isLoading || !loadingAction) return null;
+    return loadingAction === "saving" ? "Saving..." : "Removing...";
+  };
+
+  // Helper function to get loading state colors
+  const getLoadingStateColor = () => {
+    if (!isLoading || !loadingAction) {
+      return isAdded ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600";
+    }
+    
+    // During loading, show color based on the action being performed
+    return loadingAction === "saving" 
+      ? "bg-red-100 text-red-800"  // Saving = red (will become saved)
+      : "bg-gray-100 text-gray-600"; // Removing = gray (will become unsaved)
   };
 
   return (
@@ -105,7 +131,7 @@ const Header = ({ university }) => {
               variant="ghost"
               size="sm"
               className="text-gray-600 hover:text-[#002147]"
-             onClick={() => router.push(`/dashboard`)}
+             onClick={() => router.push(`/search`)}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Back</span>
@@ -160,16 +186,12 @@ const Header = ({ university }) => {
             {university && (
               <div className="mt-1 hidden sm:block">
                 <span
-                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                    isAdded
-                      ? "bg-red-100 text-red-800"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors ${getLoadingStateColor()}`}
                 >
                   {isLoading ? (
                     <>
                       <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin mr-1" />
-                      {isAdded ? "Saving..." : "removing..."}
+                      {getLoadingText()}
                     </>
                   ) : isAdded ? (
                     <>
@@ -216,16 +238,12 @@ const Header = ({ university }) => {
           {university && (
             <div className="flex items-center justify-center mb-3 sm:hidden">
               <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  isAdded
-                    ? "bg-red-100 text-red-800"
-                    : "bg-gray-100 text-gray-600"
-                }`}
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${getLoadingStateColor()}`}
               >
                 {isLoading ? (
                   <>
                     <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-2" />
-                    {isAdded ? "Removing..." : "Saving..."}
+                    {getMobileLoadingText()}
                   </>
                 ) : isAdded ? (
                   <>

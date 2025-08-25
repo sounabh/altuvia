@@ -7,8 +7,22 @@ import {
   CheckCircle, School, Building2, Phone, Mail, Download
 } from 'lucide-react';
 
+/**
+ * UniversityOverview Component
+ * 
+ * A comprehensive overview card displaying key information about a university.
+ * Shows statistics, rankings, requirements, financial information, and contact details.
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Object} props.university - University data object containing all university information
+ * @returns {React.ReactElement} University overview card component
+ */
 const UniversityOverview = ({ university }) => {
-  // Clean, simplified stats with consistent styling
+  /**
+   * Primary statistics array with formatted values and fallbacks
+   * Each stat object contains an icon, label, and formatted value
+   */
   const stats = [
     { 
       icon: Award, 
@@ -53,7 +67,9 @@ const UniversityOverview = ({ university }) => {
     }
   ];
 
-  // Additional stats
+  /**
+   * Additional statistics that are conditionally added if data exists
+   */
   const additionalStats = [];
   
   if (university.studentsPerYear) {
@@ -80,9 +96,16 @@ const UniversityOverview = ({ university }) => {
     });
   }
 
-  // Combine all stats
+  /**
+   * Combined statistics array with all available stats
+   * Filters out any stats with null or 'N/A' values
+   */
   const allStats = [...stats, ...additionalStats].filter(stat => stat.value && stat.value !== 'N/A');
 
+  /**
+   * Processed highlights data with icons and formatted text
+   * Uses university-provided highlights or falls back to default content
+   */
   const highlights = university.whyChooseHighlights && university.whyChooseHighlights.length > 0 
     ? university.whyChooseHighlights.slice(0, 3).map((text, index) => {
         const hasColon = text.includes(':');
@@ -113,7 +136,8 @@ const UniversityOverview = ({ university }) => {
   return (
     <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 overflow-hidden">
       <CardContent className="p-0">
-        {/* Header */}
+        
+        {/* Header Section */}
         <div className="bg-[#002147] p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -131,7 +155,8 @@ const UniversityOverview = ({ university }) => {
         </div>
 
         <div className="p-6 space-y-8">
-          {/* Main Statistics Grid - Clean and uniform */}
+          
+          {/* Main Statistics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {allStats.map((stat, index) => (
               <div 
@@ -154,7 +179,7 @@ const UniversityOverview = ({ university }) => {
             ))}
           </div>
 
-          {/* Rankings Section - Simplified */}
+          {/* Rankings Section - Conditionally rendered if ranking data exists */}
           {(university.ftGlobalRanking || university.usNewsRanking || university.qsRanking || university.timesRanking) && (
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
               <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
@@ -194,7 +219,7 @@ const UniversityOverview = ({ university }) => {
             </div>
           )}
 
-          {/* Academic Requirements */}
+          {/* Academic Requirements Section - Conditionally rendered */}
           {(university.languageTestRequirements || university.minimumGpa || university.gmatScoreMin) && (
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
               <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
@@ -242,7 +267,7 @@ const UniversityOverview = ({ university }) => {
             </div>
           )}
 
-          {/* Financial Information */}
+          {/* Financial Information Section - Conditionally rendered */}
           {(university.scholarshipInfo || university.financialAidDetails || university.tuitionFees) && (
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
               <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
@@ -288,7 +313,7 @@ const UniversityOverview = ({ university }) => {
             </div>
           )}
 
-          {/* Why Choose Section */}
+          {/* Why Choose Section - Always rendered */}
           <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
             <h3 className="text-xl font-bold text-[#002147] mb-6 text-center">
               Why Choose {university.name}?
@@ -311,7 +336,7 @@ const UniversityOverview = ({ university }) => {
             </div>
           </div>
 
-          {/* Contact Information */}
+          {/* Contact Information Section - Conditionally rendered */}
           {(university.admissionsOfficeContact || university.internationalOfficeContact || university.generalInquiriesContact) && (
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
               <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
@@ -347,35 +372,35 @@ const UniversityOverview = ({ university }) => {
             </div>
           )}
 
-          {/* Action Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-  {/* Apply Now */}
-  <Button 
-    onClick={() => window.open('/apply', '_blank')}
-    className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-  >
-    <Download className="h-4 w-4 mr-2" />
-    Apply Now
-  </Button>
-  
-  {/* Scholarships */}
-  <Button
-    onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
-    className="bg-[#002147] hover:bg-[#001a36] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-  >
-    <Building2 className="h-4 w-4 mr-2" />
-    Scholarships
-  </Button>
-  
-  {/* View More Photos / Gallery */}
-  <Button
-    onClick={() => window.location.href = `/university/${university.slug}/gallery`}
-    className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-  >
-    <GraduationCap className="h-4 w-4 mr-2" />
-    View More Photos / Gallery
-  </Button>
-</div>
+          {/* Action Buttons Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+            {/* Apply Now Button */}
+            <Button 
+              onClick={() => window.open('/apply', '_blank')}
+              className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Apply Now
+            </Button>
+            
+            {/* Scholarships Button */}
+            <Button
+              onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
+              className="bg-[#002147] hover:bg-[#001a36] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Scholarships
+            </Button>
+            
+            {/* Gallery Button */}
+            <Button
+              onClick={() => window.location.href = `/university/${university.slug}/gallery`}
+              className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+            >
+              <GraduationCap className="h-4 w-4 mr-2" />
+              View More Photos / Gallery
+            </Button>
+          </div>
 
         </div>
       </CardContent>

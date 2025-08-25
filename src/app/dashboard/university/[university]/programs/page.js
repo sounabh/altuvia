@@ -11,7 +11,14 @@ import {
   Building2, Calendar, TrendingUp, FileText
 } from 'lucide-react';
 
-// Skeleton component for individual program cards
+/**
+ * Skeleton component for individual program cards
+ * Displays a loading placeholder for program information
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.viewMode - Current view mode ('grid' or 'list')
+ * @returns {JSX.Element} Program card skeleton element
+ */
 const ProgramCardSkeleton = ({ viewMode }) => (
   <Card className={`animate-pulse border-0 bg-white ${viewMode === 'grid' ? '' : ''}`}>
     <CardContent className="p-6">
@@ -59,7 +66,14 @@ const ProgramCardSkeleton = ({ viewMode }) => (
   </Card>
 );
 
-// Skeleton component for the entire page
+/**
+ * Skeleton component for the entire programs page
+ * Displays loading placeholders for all page sections
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.viewMode - Current view mode ('grid' or 'list')
+ * @returns {JSX.Element} Programs page skeleton element
+ */
 const ProgramsPageSkeleton = ({ viewMode = "grid" }) => (
   <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
     {/* Header skeleton */}
@@ -139,7 +153,15 @@ const ProgramsPageSkeleton = ({ viewMode = "grid" }) => (
   </div>
 );
 
+/**
+ * Main Programs Page Component
+ * Displays a list of academic programs for a specific university
+ * with filtering, searching, and sorting capabilities
+ * 
+ * @returns {JSX.Element} Programs page component
+ */
 const ProgramsPage = () => {
+  // Router and params hooks for navigation and URL parameters
   const params = useParams();
   const router = useRouter();
   const slug = params?.university;
@@ -153,7 +175,10 @@ const ProgramsPage = () => {
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedDegreeType, setSelectedDegreeType] = useState("all");
 
-  // Effect hook to fetch programs data when component mounts or filters change
+  /**
+   * Effect hook to fetch programs data when component mounts or filters change
+   * Fetches program data from the API based on current filters and search term
+   */
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
@@ -197,12 +222,22 @@ const ProgramsPage = () => {
     }
   }, [slug, selectedDepartment, selectedDegreeType, searchTerm]);
 
-  // Navigation handler for program details page
+  /**
+   * Navigation handler for program details page
+   * 
+   * @param {string} programSlug - The slug of the program to navigate to
+   */
   const handleProgramClick = (programSlug) => {
     router.push(`/dashboard/university/${slug}/programs/${programSlug}`);
   };
 
-  // Utility function to format currency values
+  /**
+   * Utility function to format currency values
+   * 
+   * @param {number} amount - The amount to format
+   * @param {string} currency - The currency code (default: 'USD')
+   * @returns {string} Formatted currency string
+   */
   const formatCurrency = (amount, currency = 'USD') => {
     if (!amount) return 'Not specified';
     return new Intl.NumberFormat('en-US', {
@@ -213,7 +248,12 @@ const ProgramsPage = () => {
     }).format(amount);
   };
 
-  // Utility function to format program duration
+  /**
+   * Utility function to format program duration
+   * 
+   * @param {number} months - Duration in months
+   * @returns {string} Formatted duration string
+   */
   const formatDuration = (months) => {
     if (!months) return 'Not specified';
     if (months === 12) return '1 year';
