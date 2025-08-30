@@ -108,22 +108,26 @@ export async function GET(request) {
      */
 // In your /api/universities route
 
+console.log(universities.savedByUsers,"u");
 
-    const transformed = universities.map(u => ({
-      id: u.id,
-      slug: u.slug,
-      name: u.universityName,
-      location: `${u.city}, ${u.country}`,
-      image: u.images[0]?.imageUrl || '/default-university.jpg',
-      rank: u.ftGlobalRanking ? `#${u.ftGlobalRanking}` : 'N/A',
-      gmatAvg: u.gmatAverageScore || 0,
-      acceptRate: u.acceptanceRate || 0,
-      tuitionFee: u.tuitionFees ? `$${u.tuitionFees.toLocaleString()}` : 'N/A',
-      applicationFee: u.additionalFees ? `$${u.additionalFees.toLocaleString()}` : 'N/A',
-      pros: u.whyChooseHighlights || [],
-      cons: [], // No admissionRequirements in schema
-      savedByUsers: u.savedByUsers
-    }));
+    
+// OPTION 1: Transform to boolean in API (Recommended)
+const transformed = universities.map(u => ({
+  id: u.id,
+  slug: u.slug,
+  name: u.universityName,
+  location: `${u.city}, ${u.country}`,
+  image: u.images[0]?.imageUrl || '/default-university.jpg',
+  rank: u.ftGlobalRanking ? `#${u.ftGlobalRanking}` : 'N/A',
+  gmatAvg: u.gmatAverageScore || 0,
+  acceptRate: u.acceptanceRate || 0,
+  tuitionFee: u.tuitionFees ? `${u.tuitionFees.toLocaleString()}` : 'N/A',
+  applicationFee: u.additionalFees ? `${u.additionalFees.toLocaleString()}` : 'N/A',
+  pros: u.whyChooseHighlights || [],
+  cons: [], // No admissionRequirements in schema
+  isAdded: u.savedByUsers?.length > 0, // Transform to boolean with null check
+  savedByUsers: u.savedByUsers // Keep original for debugging if needed
+}));
 
     // Return JSON response with caching headers
     return NextResponse.json({

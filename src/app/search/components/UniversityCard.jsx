@@ -8,10 +8,9 @@ import Link from "next/link";
  * UniversityCard Component - FIXED VERSION
  * 
  * Changes:
- * - Removed Add/Added button
- * - Added heart icon (empty/filled based on saved state)
- * - Fixed toggle functionality
- * - Better state management
+ * - Simplified initialization using isAdded from API
+ * - Better error handling
+ * - Cleaner state management
  */
 const UniversityCard = memo(({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
@@ -24,18 +23,17 @@ const UniversityCard = memo(({ university }) => {
 
   /**
    * Initialize saved state from API data
+   * Now expects university.isAdded boolean from API
    */
   useEffect(() => {
     if (!university) return;
     
-    if (Array.isArray(university.savedByUsers)) {
-      setIsAdded(university.savedByUsers.length > 0);
-    } else if (typeof university.isAdded === 'boolean') {
-      setIsAdded(university.isAdded);
-    } else {
-      setIsAdded(false);
-    }
-  }, [university?.savedByUsers, university?.isAdded, university?.id]);
+    // Use the transformed isAdded boolean from API
+    setIsAdded(university.isAdded || false);
+    
+    // Debug logging
+    console.log(`University ${university.name} - isAdded: ${university.isAdded}`, university.savedByUsers);
+  }, [university?.isAdded, university?.id]);
 
   /**
    * Toggle heart/saved state
@@ -90,7 +88,7 @@ const UniversityCard = memo(({ university }) => {
         // Use API response as source of truth
         setIsAdded(data.isAdded);
       } else {
-        console.error("Toggle failed:", response.status);
+        console.error("Toggle failed:", response.status, await response.text());
         // Rollback on error
         setIsAdded(previousState);
       }
@@ -125,7 +123,7 @@ const UniversityCard = memo(({ university }) => {
           {university?.rank}
         </div>
 
-        {/* Heart Button - Replaced Add/Added button */}
+        {/* Heart Button */}
         <button
           onClick={toggleHeart}
           disabled={isLoading}
@@ -239,7 +237,7 @@ const UniversityCard = memo(({ university }) => {
                     </li>
                   ))}
                 </ul>
-                </div>
+              </div>
             )}
           </div>
         </div>
