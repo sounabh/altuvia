@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+/*import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
@@ -535,3 +535,4 @@ export async function getEssayAnalytics(essayId) {
 process.on('beforeExit', async () => {
   await prisma.$disconnect()
 })
+*/
