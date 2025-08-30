@@ -127,30 +127,51 @@ const UniversityPage = () => {
   //console.log('University slug:', slug);
 
   useEffect(() => {
-    const fetchUniversity = async () => {
-      try {
-        setLoading(true);
-        
-        const API_BASE_URL =
-          process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-        
-        const response = await fetch(`${API_BASE_URL}/api/university/${slug}`);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch university: ${response.status}`);
+   const fetchUniversity = async () => {
+  try {
+    setLoading(true);
+
+    // ✅ Get token from localStorage
+    let token = null;
+    if (typeof window !== "undefined") {
+      const authData = localStorage.getItem("authData");
+      if (authData) {
+        try {
+          const parsed = JSON.parse(authData);
+          token = parsed.token || null;
+        } catch (err) {
+          console.error("❌ Error parsing authData:", err);
         }
-        
-        const data = await response.json();
-        console.log('Fetched university data:', data);
-        setUniversity(data);
-        
-      } catch (err) {
-        console.error('Error fetching university:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
       }
-    };
+    }
+
+    const API_BASE_URL =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+    const response = await fetch(`${API_BASE_URL}/api/university/${slug}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ Attach token if available
+      },
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch university: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Fetched university data:", data);
+    setUniversity(data);
+  } catch (err) {
+    console.error("Error fetching university:", err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
     if (slug) {
       fetchUniversity();
