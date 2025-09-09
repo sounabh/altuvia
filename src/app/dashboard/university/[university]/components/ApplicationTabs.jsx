@@ -83,7 +83,7 @@ const ApplicationTabs = ({ university }) => {
    */
   const handleWorkspaceRedirect = () => {
     setShowWorkspacePopup(false);
-    window.open("/workspace", "_blank");
+    window.open(`/workspace/${university?.name}`, "_blank");
   };
 
   /**
