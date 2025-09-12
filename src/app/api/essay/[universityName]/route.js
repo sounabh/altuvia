@@ -648,12 +648,12 @@ async function saveVersion(data) {
     }
   }
 
-  return NextResponse.json({ 
+  return NextResponse.json({
     version: {
       ...version,
-      aiAnalysis
+      aiAnalysis,
     },
-    aiAnalysis 
+    aiAnalysis,
   });
 }
 
@@ -804,7 +804,9 @@ async function getEssayAnalytics(data) {
         autoSaves: essay.versions.filter((v) => v.isAutoSave).length,
         manualSaves: essay.versions.filter((v) => !v.isAutoSave).length,
         latestVersion: essay.versions[0] || null,
-        analyzedVersions: essay.versions.filter((v) => v.aiResults && v.aiResults.length > 0).length,
+        analyzedVersions: essay.versions.filter(
+          (v) => v.aiResults && v.aiResults.length > 0
+        ).length,
       },
       progress: {
         overall:
@@ -972,19 +974,22 @@ async function getVersionAnalyses(data) {
   }
 }
 
-// UPDATED AI Analysis Function - Now for specific versions
+// FIXED AI Analysis Function - Matches your component and database schema
 async function performAIAnalysis(data) {
-  const { 
-    essayId, 
-    versionId = null, // NEW: Specific version to analyze
-    content, 
-    prompt, 
-    analysisTypes = ["comprehensive"] 
+  const {
+    essayId,
+    versionId = null,
+    content,
+    prompt,
+    analysisTypes = ["comprehensive"],
   } = data;
 
-  console.log("Starting AI analysis for essay:", essayId, "version:", versionId);
-  console.log("Content length:", content?.length || 0);
-  console.log("Has API key:", !!process.env.GOOGLE_GEMINI_API_KEY);
+  console.log(
+    "Starting AI analysis for essay:",
+    essayId,
+    "version:",
+    versionId
+  );
 
   if (!essayId || !content) {
     return NextResponse.json(
@@ -993,11 +998,28 @@ async function performAIAnalysis(data) {
     );
   }
 
-  // Check if API key is configured
-  if (!process.env.GOOGLE_GEMINI_API_KEY) {
-    console.error("GOOGLE_GEMINI_API_KEY environment variable is not set");
+  if (content.length < 50) {
     return NextResponse.json(
-      { error: "AI service not configured. Please set GOOGLE_GEMINI_API_KEY environment variable." },
+      { error: "Content too short for analysis (minimum 50 characters)" },
+      { status: 400 }
+    );
+  }
+
+  // Check API key
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    console.error("GOOGLE_GEMINI_API_KEY not configured");
+    // Return stored analysis if available
+    const storedAnalysis = await getStoredAnalysis(essayId, versionId);
+    if (storedAnalysis) {
+      return NextResponse.json({
+        success: true,
+        analysis: storedAnalysis,
+        cached: true,
+        message: "Using stored analysis - AI service unavailable",
+      });
+    }
+    return NextResponse.json(
+      { error: "AI service not configured and no stored analysis available" },
       { status: 500 }
     );
   }
@@ -1019,217 +1041,162 @@ async function performAIAnalysis(data) {
       return NextResponse.json({ error: "Essay not found" }, { status: 404 });
     }
 
-    // If analyzing a specific version, get version details
-    let version = null;
-    if (versionId) {
-      version = await prisma.essayVersion.findUnique({
-        where: { id: versionId },
-      });
-      
-      if (!version) {
-        return NextResponse.json({ error: "Version not found" }, { status: 404 });
-      }
-    }
-
-    // Check if analysis already exists for this version
-    if (versionId) {
-      const existingAnalysis = await prisma.aIResult.findFirst({
-        where: {
-          essayId,
-          essayVersionId: versionId,
+    // Check for recent existing analysis (within last hour)
+    const recentAnalysis = await prisma.aIResult.findFirst({
+      where: {
+        essayId,
+        essayVersionId: versionId,
+        status: "completed",
+        createdAt: {
+          gte: new Date(Date.now() - 60 * 60 * 1000), // Last hour
         },
-        orderBy: { createdAt: "desc" },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (recentAnalysis) {
+      const transformedAnalysis =
+        transformStoredAnalysisToComponentFormat(recentAnalysis);
+      return NextResponse.json({
+        success: true,
+        analysis: transformedAnalysis,
+        aiResult: recentAnalysis,
+        cached: true,
+        processingTime: Date.now() - startTime,
       });
-
-      if (existingAnalysis) {
-        // Return existing analysis
-        const analysisData = {
-          overallScore: existingAnalysis.overallScore,
-          suggestions: JSON.parse(existingAnalysis.suggestions || "[]"),
-          strengths: JSON.parse(existingAnalysis.strengths || "[]"),
-          improvements: JSON.parse(existingAnalysis.improvements || "[]"),
-          warnings: JSON.parse(existingAnalysis.warnings || "[]"),
-          readabilityScore: existingAnalysis.readabilityScore,
-          sentenceCount: existingAnalysis.sentenceCount,
-          paragraphCount: existingAnalysis.paragraphCount,
-          avgSentenceLength: existingAnalysis.avgSentenceLength,
-          complexWordCount: existingAnalysis.complexWordCount,
-          passiveVoiceCount: existingAnalysis.passiveVoiceCount,
-          structureScore: existingAnalysis.structureScore || 50,
-          contentRelevance: existingAnalysis.contentRelevance || 50,
-          narrativeFlow: existingAnalysis.narrativeFlow || 50,
-          leadershipEmphasis: existingAnalysis.leadershipEmphasis || 50,
-          specificityScore: existingAnalysis.specificityScore || 50,
-          grammarIssues: existingAnalysis.grammarIssues || 0,
-        };
-
-        return NextResponse.json({
-          success: true,
-          analysis: analysisData,
-          aiResult: existingAnalysis,
-          processingTime: Date.now() - startTime,
-          cached: true,
-        });
-      }
     }
 
-    // Initialize Gemini model with error handling
+    // Initialize Gemini
     let model;
     try {
-      model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     } catch (initError) {
-      console.error("Failed to initialize Gemini model:", initError);
+      console.error("Failed to initialize Gemini:", initError);
+      const storedAnalysis = await getStoredAnalysis(essayId, versionId);
+      if (storedAnalysis) {
+        return NextResponse.json({
+          success: true,
+          analysis: storedAnalysis,
+          cached: true,
+          message: "Using stored analysis - AI initialization failed",
+        });
+      }
       return NextResponse.json(
-        { error: "Failed to initialize AI model. Please check API key." },
+        { error: "AI service initialization failed" },
         { status: 500 }
       );
     }
 
-    // Enhanced AI prompt for all types of educational essays
+    // Enhanced prompt that returns exactly what your component expects
     const analysisPrompt = `
-You are an expert educational consultant specializing in admissions essays for universities, graduate schools, MBA programs, and all academic programs. Analyze this essay and provide comprehensive feedback.
+You are an expert essay analyst. Analyze this essay and return ONLY a valid JSON response with the exact structure shown below.
 
 ESSAY CONTEXT:
 - Institution: ${essay.program.university.universityName}
 - Program: ${essay.program.programName} (${essay.program.degreeType})
 - Essay Prompt: ${prompt || essay.essayPrompt.promptText}
 - Word Limit: ${essay.essayPrompt.wordLimit}
-- Current Word Count: ${essay.wordCount}
-- Analysis Target: ${versionId ? `Version: ${version.label}` : 'Current Draft'}
+- Current Word Count: ${content.split(" ").length}
 
-ESSAY CONTENT TO ANALYZE:
+ESSAY CONTENT:
 ${content}
 
-ANALYSIS REQUIREMENTS:
-Provide detailed feedback in this exact JSON structure. Tailor your analysis to the specific program type (MBA, undergraduate, graduate, professional school, etc.):
-
+RETURN ONLY THIS JSON STRUCTURE (no additional text):
 {
   "overallScore": 85,
+  "structureScore": 78,
+  "contentRelevance": 82,
+  "narrativeFlow": 76,
+  "leadershipEmphasis": 80,
+  "specificityScore": 74,
+  "readabilityScore": 88,
+  "sentenceCount": 25,
+  "paragraphCount": 5,
+  "avgSentenceLength": 18.2,
+  "complexWordCount": 12,
+  "passiveVoiceCount": 3,
+  "grammarIssues": 2,
   "suggestions": [
     {
       "id": "1",
-      "type": "critical|warning|improvement|strength",
-      "priority": "high|medium|low",
-      "title": "Brief descriptive title (max 60 chars)",
-      "description": "Detailed explanation of the issue or strength (100-200 words)",
-      "action": "Specific, actionable recommendation the student should implement",
-      "impact": "high|medium|low"
+      "type": "critical",
+      "priority": "high",
+      "title": "Clear actionable title",
+      "description": "Detailed explanation of the issue with specific examples",
+      "action": "Step-by-step instructions for improvement"
+    },
+    {
+      "id": "2", 
+      "type": "warning",
+      "priority": "medium",
+      "title": "Another suggestion",
+      "description": "Another detailed explanation",
+      "action": "How to fix this"
+    },
+    {
+      "id": "3",
+      "type": "improvement", 
+      "priority": "medium",
+      "title": "Enhancement opportunity",
+      "description": "What could be better",
+      "action": "How to improve"
+    },
+    {
+      "id": "4",
+      "type": "strength",
+      "priority": "medium", 
+      "title": "What's working well",
+      "description": "Why this is a strength",
+      "action": "How to leverage this further"
     }
-  ],
-  "strengths": [
-    "Specific strength with examples from the essay",
-    "Another strength with concrete details"
-  ],
-  "improvements": [
-    "Specific area needing improvement with actionable guidance",
-    "Another improvement area with clear next steps"
-  ],
-  "warnings": [
-    "Critical issues that must be addressed",
-    "Urgent concerns about content or approach"
-  ],
-  "readabilityScore": 78,
-  "sentenceCount": 25,
-  "paragraphCount": 5,
-  "avgSentenceLength": 18.5,
-  "complexWordCount": 12,
-  "passiveVoiceCount": 3,
-  "structureScore": 82,
-  "contentRelevance": 90,
-  "narrativeFlow": 75,
-  "leadershipEmphasis": 85,
-  "specificityScore": 70,
-  "grammarIssues": 2
+  ]
 }
 
-FOCUS AREAS FOR ALL EDUCATIONAL ESSAYS:
-1. **Content Relevance & Prompt Response**: How well does the essay directly address the specific prompt? Does it stay on topic?
+ANALYSIS GUIDELINES:
+- Scores 0-100 (realistic assessment)
+- 3-8 suggestions total
+- Types: critical, warning, improvement, strength
+- Priorities: high, medium, low
+- Specific, actionable feedback
+- Include at least one strength if possible
 
-2. **Personal Story & Authenticity**: Is the narrative compelling, genuine, and uniquely personal? Does it reveal character and values?
+Return only the JSON, no other text.`;
 
-3. **Academic/Professional Fit**: Does the essay demonstrate strong fit with the institution and program? Clear career goals?
-
-4. **Structure & Flow**: Logical organization, smooth transitions, engaging opening and strong conclusion?
-
-5. **Specific Examples & Evidence**: Concrete details, quantifiable achievements, specific anecdotes rather than generic statements?
-
-6. **Voice & Writing Quality**: Appropriate tone, grammar, word choice, sentence variety, readability?
-
-7. **Differentiation**: What makes this applicant unique? Clear value proposition?
-
-8. **Growth & Reflection**: Evidence of self-awareness, learning from experiences, personal development?
-
-PROGRAM-SPECIFIC CONSIDERATIONS:
-- MBA: Leadership examples, quantifiable impact, career progression, teamwork, innovation
-- Undergraduate: Intellectual curiosity, extracurricular engagement, future potential, character development
-- Graduate/PhD: Research interests, academic preparation, contribution to field, faculty fit
-- Professional Schools (Law, Medicine, etc.): Service orientation, relevant experience, ethical foundation
-- International Programs: Cultural awareness, global perspective, language considerations
-
-SCORING CRITERIA (0-100):
-- 90-100: Exceptional, admission-ready essay with compelling narrative and perfect execution
-- 80-89: Strong essay with minor areas for improvement
-- 70-79: Good foundation but needs significant enhancement
-- 60-69: Adequate content but requires substantial revision
-- Below 60: Major issues requiring complete restructuring
-
-Provide constructive, specific, and actionable feedback that helps the student create an outstanding essay for their target program.
-`;
-
+    // Make API call
     let result;
     try {
-      console.log("Sending request to Gemini API...");
       result = await model.generateContent(analysisPrompt);
-      console.log("Received response from Gemini API");
     } catch (apiError) {
       console.error("Gemini API error:", apiError);
-      
-      // Use fallback analysis
-      console.log("Using fallback analysis due to API error");
+      // Fallback to stored analysis
+      const storedAnalysis = await getStoredAnalysis(essayId, versionId);
+      if (storedAnalysis) {
+        return NextResponse.json({
+          success: true,
+          analysis: storedAnalysis,
+          cached: true,
+          message: "Using stored analysis - API request failed",
+        });
+      }
+      // Generate fallback analysis
       const fallbackAnalysis = generateAdvancedFallbackAnalysis(
         content,
-        essay.wordCount,
+        content.split(" ").length,
         essay.essayPrompt.wordLimit,
         prompt,
         essay.program.degreeType
       );
-      
-      // Save fallback result to database
-      const aiResult = await prisma.aIResult.create({
-        data: {
-          essayId,
-          essayVersionId: versionId,
-          analysisType: analysisTypes.join(","),
-          overallScore: fallbackAnalysis.overallScore,
-          suggestions: JSON.stringify(fallbackAnalysis.suggestions),
-          strengths: JSON.stringify(fallbackAnalysis.strengths),
-          improvements: JSON.stringify(fallbackAnalysis.improvements),
-          warnings: JSON.stringify(fallbackAnalysis.warnings),
-          aiProvider: "fallback",
-          modelUsed: "local-analysis",
-          promptVersion: "2.0",
-          status: "completed",
-          processingTime: Date.now() - startTime,
-          readabilityScore: fallbackAnalysis.readabilityScore,
-          sentenceCount: fallbackAnalysis.sentenceCount,
-          paragraphCount: fallbackAnalysis.paragraphCount,
-          avgSentenceLength: fallbackAnalysis.avgSentenceLength,
-          complexWordCount: fallbackAnalysis.complexWordCount,
-          passiveVoiceCount: fallbackAnalysis.passiveVoiceCount,
-          structureScore: fallbackAnalysis.structureScore,
-          contentRelevance: fallbackAnalysis.contentRelevance,
-          narrativeFlow: fallbackAnalysis.narrativeFlow,
-          leadershipEmphasis: fallbackAnalysis.leadershipEmphasis,
-          specificityScore: fallbackAnalysis.specificityScore,
-          grammarIssues: fallbackAnalysis.grammarIssues,
-          errorMessage: `API Error: ${apiError.message}`,
-        },
-      });
-
+      await saveAnalysisToDatabase(
+        essayId,
+        versionId,
+        fallbackAnalysis,
+        startTime,
+        "fallback",
+        apiError.message
+      );
       return NextResponse.json({
         success: true,
         analysis: fallbackAnalysis,
-        aiResult,
         processingTime: Date.now() - startTime,
         usedFallback: true,
       });
@@ -1238,65 +1205,292 @@ Provide constructive, specific, and actionable feedback that helps the student c
     const processingTime = Date.now() - startTime;
     const responseText = result.response.text();
 
-    console.log("Raw AI response length:", responseText.length);
-
+    // Parse AI response
     let analysisData;
     try {
-      // Clean the response text to extract JSON
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         analysisData = JSON.parse(jsonMatch[0]);
-        console.log("Successfully parsed JSON from AI response");
       } else {
         throw new Error("No valid JSON found in AI response");
       }
     } catch (parseError) {
-      console.warn("JSON parsing failed, using fallback analysis:", parseError);
+      console.warn("JSON parsing failed:", parseError);
+      // Try stored analysis first
+      const storedAnalysis = await getStoredAnalysis(essayId, versionId);
+      if (storedAnalysis) {
+        return NextResponse.json({
+          success: true,
+          analysis: storedAnalysis,
+          cached: true,
+          message: "Using stored analysis - AI response parsing failed",
+        });
+      }
+      // Use fallback
       analysisData = generateAdvancedFallbackAnalysis(
         content,
-        essay.wordCount,
+        content.split(" ").length,
         essay.essayPrompt.wordLimit,
         prompt,
         essay.program.degreeType
       );
     }
 
-    // Ensure all required fields exist with defaults
-    analysisData = {
-      overallScore: analysisData.overallScore || 50,
-      suggestions: analysisData.suggestions || [],
-      strengths: analysisData.strengths || [],
-      improvements: analysisData.improvements || [],
-      warnings: analysisData.warnings || [],
-      readabilityScore: analysisData.readabilityScore || 50,
-      sentenceCount: analysisData.sentenceCount || 0,
-      paragraphCount: analysisData.paragraphCount || 0,
-      avgSentenceLength: analysisData.avgSentenceLength || 0,
-      complexWordCount: analysisData.complexWordCount || 0,
-      passiveVoiceCount: analysisData.passiveVoiceCount || 0,
-      structureScore: analysisData.structureScore || 50,
-      contentRelevance: analysisData.contentRelevance || 50,
-      narrativeFlow: analysisData.narrativeFlow || 50,
-      leadershipEmphasis: analysisData.leadershipEmphasis || 50,
-      specificityScore: analysisData.specificityScore || 50,
-      grammarIssues: analysisData.grammarIssues || 0,
-    };
+    // Validate and normalize
+    analysisData = validateAndNormalizeAnalysis(
+      analysisData,
+      content,
+      essay.essayPrompt.wordLimit
+    );
 
-    // Save comprehensive AI result to database
-    const aiResult = await prisma.aIResult.create({
+    // Save to database
+    const aiResult = await saveAnalysisToDatabase(
+      essayId,
+      versionId,
+      analysisData,
+      processingTime,
+      "gemini"
+    );
+
+    return NextResponse.json({
+      success: true,
+      analysis: analysisData,
+      aiResult,
+      processingTime,
+      versionId,
+    });
+  } catch (error) {
+    console.error("Error performing AI analysis:", error);
+
+    // Log error
+    try {
+      await prisma.aIResult.create({
+        data: {
+          essayId,
+          essayVersionId: versionId,
+          analysisType: "comprehensive",
+          status: "failed",
+          errorMessage: error.message,
+          aiProvider: "gemini",
+          suggestions: JSON.stringify([]),
+          processingTime: Date.now() - startTime,
+        },
+      });
+    } catch (dbError) {
+      console.error("Failed to log error:", dbError);
+    }
+
+    // Final fallback - try stored analysis
+    const storedAnalysis = await getStoredAnalysis(essayId, versionId);
+    if (storedAnalysis) {
+      return NextResponse.json({
+        success: true,
+        analysis: storedAnalysis,
+        cached: true,
+        message: "Using stored analysis - Analysis failed",
+      });
+    }
+
+    return NextResponse.json(
+      { error: "Analysis failed and no stored analysis available" },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper: Get stored analysis
+async function getStoredAnalysis(essayId, versionId = null) {
+  try {
+    const storedResult = await prisma.aIResult.findFirst({
+      where: {
+        essayId,
+        essayVersionId: versionId,
+        status: "completed",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!storedResult) return null;
+    return transformStoredAnalysisToComponentFormat(storedResult);
+  } catch (error) {
+    console.error("Error fetching stored analysis:", error);
+    return null;
+  }
+}
+
+// Helper: Transform stored analysis to component format
+function transformStoredAnalysisToComponentFormat(aiResult) {
+  try {
+    const suggestions = JSON.parse(aiResult.suggestions || "[]");
+    const strengths = JSON.parse(aiResult.strengths || "[]");
+    const improvements = JSON.parse(aiResult.improvements || "[]");
+    const warnings = JSON.parse(aiResult.warnings || "[]");
+
+    // If suggestions already contain mixed types, use directly
+    let allSuggestions = [];
+    if (suggestions.length > 0 && suggestions.some((s) => s.type)) {
+      allSuggestions = suggestions;
+    } else {
+      // Combine separate arrays (legacy format)
+      allSuggestions = [
+        ...suggestions.map((s, idx) => ({
+          id: s.id || `suggestion_${idx}`,
+          type: s.type || "improvement",
+          title: typeof s === "string" ? s : s.title || "Suggestion",
+          description: typeof s === "string" ? s : s.description || s,
+          action: typeof s === "object" ? s.action : undefined,
+          priority: "medium",
+        })),
+        ...strengths.map((s, idx) => ({
+          id: `strength_${idx}`,
+          type: "strength",
+          title: typeof s === "string" ? s : s.title || "Strength",
+          description: typeof s === "string" ? s : s.description || s,
+          action: typeof s === "object" ? s.action : undefined,
+          priority: "medium",
+        })),
+        ...improvements.map((s, idx) => ({
+          id: `improvement_${idx}`,
+          type: "improvement",
+          title: typeof s === "string" ? s : s.title || "Improvement",
+          description: typeof s === "string" ? s : s.description || s,
+          action: typeof s === "object" ? s.action : undefined,
+          priority: "medium",
+        })),
+        ...warnings.map((s, idx) => ({
+          id: `warning_${idx}`,
+          type: s.severity === "critical" ? "critical" : "warning",
+          title: typeof s === "string" ? s : s.title || "Warning",
+          description: typeof s === "string" ? s : s.description || s,
+          action: typeof s === "object" ? s.action : undefined,
+          priority: s.severity === "critical" ? "high" : "medium",
+        })),
+      ];
+    }
+
+    return {
+      overallScore: aiResult.overallScore || 50,
+      suggestions: allSuggestions,
+      structureScore: aiResult.structureScore || 50,
+      contentRelevance: aiResult.contentRelevance || 50,
+      narrativeFlow: aiResult.narrativeFlow || 50,
+      leadershipEmphasis: aiResult.leadershipEmphasis || 50,
+      specificityScore: aiResult.specificityScore || 50,
+      readabilityScore: aiResult.readabilityScore || 50,
+      sentenceCount: aiResult.sentenceCount || 0,
+      paragraphCount: aiResult.paragraphCount || 0,
+      avgSentenceLength: aiResult.avgSentenceLength || 0,
+      complexWordCount: aiResult.complexWordCount || 0,
+      passiveVoiceCount: aiResult.passiveVoiceCount || 0,
+      grammarIssues: aiResult.grammarIssues || 0,
+      createdAt: aiResult.createdAt,
+      processingTime: aiResult.processingTime,
+    };
+  } catch (error) {
+    console.error("Error transforming stored analysis:", error);
+    return null;
+  }
+}
+
+// Helper: Validate and normalize analysis
+function validateAndNormalizeAnalysis(analysisData, content, wordLimit) {
+  const wordCount = content.split(" ").length;
+  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const paragraphs = content.split("\n").filter((p) => p.trim().length > 0);
+
+  return {
+    overallScore: Math.max(0, Math.min(100, analysisData.overallScore || 50)),
+    suggestions: Array.isArray(analysisData.suggestions)
+      ? analysisData.suggestions.map((s, idx) => ({
+          id: s.id || `suggestion_${idx}`,
+          type: ["critical", "warning", "improvement", "strength"].includes(
+            s.type
+          )
+            ? s.type
+            : "improvement",
+          priority: ["high", "medium", "low"].includes(s.priority)
+            ? s.priority
+            : "medium",
+          title: (s.title || "Suggestion").substring(0, 80),
+          description: s.description || "No description provided",
+          action: s.action || undefined,
+        }))
+      : [],
+    structureScore: Math.max(
+      0,
+      Math.min(100, analysisData.structureScore || 50)
+    ),
+    contentRelevance: Math.max(
+      0,
+      Math.min(100, analysisData.contentRelevance || 50)
+    ),
+    narrativeFlow: Math.max(0, Math.min(100, analysisData.narrativeFlow || 50)),
+    leadershipEmphasis: Math.max(
+      0,
+      Math.min(100, analysisData.leadershipEmphasis || 50)
+    ),
+    specificityScore: Math.max(
+      0,
+      Math.min(100, analysisData.specificityScore || 50)
+    ),
+    readabilityScore: Math.max(
+      0,
+      Math.min(100, analysisData.readabilityScore || 50)
+    ),
+    sentenceCount: analysisData.sentenceCount || sentences.length,
+    paragraphCount:
+      analysisData.paragraphCount || Math.max(1, paragraphs.length),
+    avgSentenceLength:
+      analysisData.avgSentenceLength ||
+      (sentences.length > 0
+        ? Math.round((wordCount / sentences.length) * 10) / 10
+        : 0),
+    complexWordCount:
+      analysisData.complexWordCount ||
+      content.split(" ").filter((w) => w.length > 6).length,
+    passiveVoiceCount:
+      analysisData.passiveVoiceCount ||
+      sentences.filter(
+        (s) =>
+          s.includes(" was ") || s.includes(" were ") || s.includes(" been ")
+      ).length,
+    grammarIssues: analysisData.grammarIssues || 0,
+  };
+}
+
+// Helper: Save to database
+async function saveAnalysisToDatabase(
+  essayId,
+  versionId,
+  analysisData,
+  processingTime,
+  provider = "gemini",
+  errorMessage = null
+) {
+  try {
+    return await prisma.aIResult.create({
       data: {
         essayId,
-        essayVersionId: versionId, // NEW: Link to specific version
-        analysisType: analysisTypes.join(","),
+        essayVersionId: versionId,
+        analysisType: "comprehensive",
         overallScore: analysisData.overallScore,
         suggestions: JSON.stringify(analysisData.suggestions),
-        strengths: JSON.stringify(analysisData.strengths),
-        improvements: JSON.stringify(analysisData.improvements),
-        warnings: JSON.stringify(analysisData.warnings),
-        aiProvider: "gemini",
-        modelUsed: "gemini-1.5-flash",
-        promptVersion: "2.0",
-        status: "completed",
+        strengths: JSON.stringify(
+          analysisData.suggestions.filter((s) => s.type === "strength")
+        ),
+        improvements: JSON.stringify(
+          analysisData.suggestions.filter((s) => s.type === "improvement")
+        ),
+        warnings: JSON.stringify(
+          analysisData.suggestions.filter((s) =>
+            ["critical", "warning"].includes(s.type)
+          )
+        ),
+        aiProvider: provider,
+        modelUsed:
+          provider === "gemini" ? "gemini-1.5-flash" : "local-analysis",
+        promptVersion: "3.0",
+        status: errorMessage ? "failed" : "completed",
         processingTime,
         readabilityScore: analysisData.readabilityScore,
         sentenceCount: analysisData.sentenceCount,
@@ -1310,80 +1504,170 @@ Provide constructive, specific, and actionable feedback that helps the student c
         leadershipEmphasis: analysisData.leadershipEmphasis,
         specificityScore: analysisData.specificityScore,
         grammarIssues: analysisData.grammarIssues,
+        errorMessage,
       },
     });
-
-    console.log("AI analysis completed successfully for version:", versionId);
-
-    return NextResponse.json({
-      success: true,
-      analysis: analysisData,
-      aiResult,
-      processingTime,
-      versionId,
-    });
   } catch (error) {
-    console.error("Error performing AI analysis:", error);
-
-    // Log failed analysis
-    try {
-      await prisma.aIResult.create({
-        data: {
-          essayId,
-          essayVersionId: versionId,
-          analysisType: "comprehensive",
-          status: "failed",
-          errorMessage: error.message,
-          aiProvider: "gemini",
-        },
-      });
-    } catch (dbError) {
-      console.error("Failed to log error to database:", dbError);
-    }
-
-    // Return fallback analysis instead of complete failure
-    const fallbackAnalysis = generateAdvancedFallbackAnalysis(
-      content,
-      essay?.wordCount || content.split(' ').length,
-      essay?.essayPrompt?.wordLimit || 500,
-      prompt,
-      essay?.program?.degreeType || "Unknown"
-    );
-
-    return NextResponse.json({
-      success: true,
-      analysis: fallbackAnalysis,
-      processingTime: Date.now() - startTime,
-      usedFallback: true,
-      error: "AI service unavailable, using local analysis",
-      versionId,
-    });
+    console.error("Error saving analysis:", error);
+    return null;
   }
 }
 
+// Enhanced fallback analysis
+function generateAdvancedFallbackAnalysiss(
+  content,
+  wordCount,
+  wordLimit,
+  prompt,
+  degreeType = "Unknown"
+) {
+  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const paragraphs = content.split("\n").filter((p) => p.trim().length > 0);
+  const sentenceCount = sentences.length;
+  const paragraphCount = Math.max(1, paragraphs.length);
+  const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0;
+  const completionRatio = wordLimit > 0 ? wordCount / wordLimit : 0;
+
+  const suggestions = [];
+  let suggestionId = 1;
+
+  // Generate smart suggestions
+  if (completionRatio < 0.7) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "warning",
+      priority: "high",
+      title: "Essay Length Below Target",
+      description: `Your essay is ${Math.round(
+        completionRatio * 100
+      )}% of the recommended length (${wordCount}/${wordLimit} words). Admissions officers expect essays that fully utilize the word limit.`,
+      action:
+        "Expand your examples with specific details and add more supporting evidence to reach the target length.",
+    });
+  } else if (completionRatio > 1.05) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "critical",
+      priority: "high",
+      title: "Essay Exceeds Word Limit",
+      description: `Your essay exceeds the ${wordLimit} word limit by ${
+        wordCount - wordLimit
+      } words, which may result in automatic rejection.`,
+      action:
+        "Edit ruthlessly to remove redundant phrases and focus on your strongest examples while staying within the limit.",
+    });
+  }
+
+  if (paragraphCount < 3) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "improvement",
+      priority: "medium",
+      title: "Improve Paragraph Structure",
+      description:
+        "Your essay would benefit from clearer paragraph breaks to improve readability and logical flow.",
+      action:
+        "Organize your ideas into distinct paragraphs with clear topic sentences. Aim for 4-6 paragraphs.",
+    });
+  }
+
+  // Always include a strength
+  suggestions.push({
+    id: (suggestionId++).toString(),
+    type: "strength",
+    priority: "medium",
+    title: "Clear Focus on Prompt",
+    description:
+      "Your essay maintains focus on the prompt and demonstrates understanding of the requirements.",
+    action:
+      "Continue building on this foundation by adding more specific details and personal insights.",
+  });
+
+  // Program-specific suggestion for MBA
+  if (degreeType?.toLowerCase().includes("mba")) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "improvement",
+      priority: "high",
+      title: "Strengthen Leadership Examples",
+      description:
+        "MBA essays should feature specific leadership experiences with quantifiable results.",
+      action:
+        "Include concrete examples of leading teams or driving change with measurable outcomes.",
+    });
+  }
+
+  const baseScore = Math.min(
+    90,
+    Math.max(
+      40,
+      completionRatio * 25 +
+        Math.min(paragraphCount, 5) * 10 +
+        (sentenceCount > 5 ? 20 : sentenceCount * 4) +
+        15
+    )
+  );
+
+  return {
+    overallScore: Math.round(baseScore),
+    suggestions,
+    structureScore: Math.round(
+      Math.min(
+        100,
+        paragraphCount * 20 + (sentenceCount > 10 ? 20 : sentenceCount * 2)
+      )
+    ),
+    contentRelevance: Math.round(baseScore + 5),
+    narrativeFlow: Math.round(Math.max(40, baseScore - 5)),
+    leadershipEmphasis: degreeType?.toLowerCase().includes("mba")
+      ? Math.round(Math.max(30, baseScore - 15))
+      : Math.round(baseScore),
+    specificityScore: Math.round(Math.max(30, baseScore - 20)),
+    readabilityScore: Math.round(
+      Math.max(
+        50,
+        100 - (avgSentenceLength > 25 ? 20 : 0) - (paragraphCount < 3 ? 15 : 0)
+      )
+    ),
+    sentenceCount,
+    paragraphCount,
+    avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
+    complexWordCount: content.split(" ").filter((w) => w.length > 6).length,
+    passiveVoiceCount: sentences.filter(
+      (s) => s.includes(" was ") || s.includes(" were ") || s.includes(" been ")
+    ).length,
+    grammarIssues: Math.round(sentenceCount * 0.1),
+  };
+}
 // Helper function for version-specific AI analysis
 async function performVersionAIAnalysis(data) {
   return await performAIAnalysis(data);
 }
 
 // Enhanced fallback analysis function
-function generateAdvancedFallbackAnalysis(content, wordCount, wordLimit, prompt, degreeType = "Unknown") {
-  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  const paragraphs = content.split('\n').filter(p => p.trim().length > 0);
-  const words = content.split(/\s+/).filter(w => w.length > 0);
-  
+function generateAdvancedFallbackAnalysis(
+  content,
+  wordCount,
+  wordLimit,
+  prompt,
+  degreeType = "Unknown"
+) {
+  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const paragraphs = content.split("\n").filter((p) => p.trim().length > 0);
+  const words = content.split(/\s+/).filter((w) => w.length > 0);
+
   // Basic metrics
   const sentenceCount = sentences.length;
   const paragraphCount = Math.max(1, paragraphs.length);
   const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0;
-  
+
   // Word completion ratio
   const completionRatio = wordLimit > 0 ? wordCount / wordLimit : 0;
-  
+
   // Generate suggestions based on content analysis
   const suggestions = [];
   let suggestionId = 1;
-  
+
   // Word count analysis
   if (completionRatio < 0.7) {
     suggestions.push({
@@ -1391,22 +1675,27 @@ function generateAdvancedFallbackAnalysis(content, wordCount, wordLimit, prompt,
       type: "warning",
       priority: "high",
       title: "Essay Length Below Target",
-      description: `Your essay is currently ${Math.round(completionRatio * 100)}% of the recommended length. Admissions officers expect essays that fully utilize the word limit to demonstrate thoroughness and attention to detail.`,
-      action: "Expand your examples with specific details, add more supporting evidence, or include additional relevant experiences that strengthen your narrative.",
-      impact: "high"
+      description: `Your essay is currently ${Math.round(
+        completionRatio * 100
+      )}% of the recommended length. Admissions officers expect essays that fully utilize the word limit to demonstrate thoroughness and attention to detail.`,
+      action:
+        "Expand your examples with specific details, add more supporting evidence, or include additional relevant experiences that strengthen your narrative.",
+      impact: "high",
     });
   } else if (completionRatio > 1.05) {
     suggestions.push({
       id: (suggestionId++).toString(),
       type: "critical",
-      priority: "high", 
+      priority: "high",
       title: "Essay Exceeds Word Limit",
-      description: "Your essay exceeds the word limit, which may result in automatic rejection or negative impression with admissions committees.",
-      action: "Edit ruthlessly to remove redundant phrases, combine similar ideas, and focus on your strongest examples while staying within the limit.",
-      impact: "high"
+      description:
+        "Your essay exceeds the word limit, which may result in automatic rejection or negative impression with admissions committees.",
+      action:
+        "Edit ruthlessly to remove redundant phrases, combine similar ideas, and focus on your strongest examples while staying within the limit.",
+      impact: "high",
     });
   }
-  
+
   // Structure analysis
   if (paragraphCount < 3) {
     suggestions.push({
@@ -1414,12 +1703,14 @@ function generateAdvancedFallbackAnalysis(content, wordCount, wordLimit, prompt,
       type: "improvement",
       priority: "medium",
       title: "Consider Better Paragraph Structure",
-      description: "Your essay would benefit from clearer paragraph breaks to improve readability and logical flow.",
-      action: "Organize your ideas into distinct paragraphs with clear topic sentences and supporting details.",
-      impact: "medium"
+      description:
+        "Your essay would benefit from clearer paragraph breaks to improve readability and logical flow.",
+      action:
+        "Organize your ideas into distinct paragraphs with clear topic sentences and supporting details.",
+      impact: "medium",
     });
   }
-  
+
   // Sentence variety
   if (avgSentenceLength < 12) {
     suggestions.push({
@@ -1427,70 +1718,102 @@ function generateAdvancedFallbackAnalysis(content, wordCount, wordLimit, prompt,
       type: "improvement",
       priority: "low",
       title: "Enhance Sentence Variety",
-      description: "Your sentences tend to be quite short. Varying sentence length can improve flow and engagement.",
-      action: "Combine some shorter sentences and add more complex sentence structures to create better rhythm.",
-      impact: "low"
+      description:
+        "Your sentences tend to be quite short. Varying sentence length can improve flow and engagement.",
+      action:
+        "Combine some shorter sentences and add more complex sentence structures to create better rhythm.",
+      impact: "low",
     });
   }
-  
+
   // Program-specific suggestions
-  if (degreeType?.toLowerCase().includes('mba')) {
+  if (degreeType?.toLowerCase().includes("mba")) {
     suggestions.push({
       id: (suggestionId++).toString(),
       type: "improvement",
       priority: "high",
       title: "Strengthen Leadership Examples",
-      description: "MBA essays should prominently feature specific leadership experiences with quantifiable results.",
-      action: "Include concrete examples of times you led teams, managed projects, or drove organizational change with measurable outcomes.",
-      impact: "high"
+      description:
+        "MBA essays should prominently feature specific leadership experiences with quantifiable results.",
+      action:
+        "Include concrete examples of times you led teams, managed projects, or drove organizational change with measurable outcomes.",
+      impact: "high",
     });
   }
-  
+
   // Add a strength
   suggestions.push({
     id: (suggestionId++).toString(),
     type: "strength",
     priority: "medium",
     title: "Good Essay Foundation",
-    description: "Your essay demonstrates a solid understanding of the prompt and maintains focus on relevant topics.",
-    action: "Continue building on this strong foundation by adding more specific details and personal insights.",
-    impact: "medium"
+    description:
+      "Your essay demonstrates a solid understanding of the prompt and maintains focus on relevant topics.",
+    action:
+      "Continue building on this strong foundation by adding more specific details and personal insights.",
+    impact: "medium",
   });
-  
+
   // Calculate scores
-  const baseScore = Math.min(90, Math.max(40, 
-    (completionRatio * 30) + // 30 points for length
-    (Math.min(paragraphCount, 5) * 8) + // Up to 40 points for structure  
-    (sentenceCount > 0 ? 20 : 0) + // 20 points for having content
-    10 // Base points
-  ));
-  
+  const baseScore = Math.min(
+    90,
+    Math.max(
+      40,
+      completionRatio * 30 + // 30 points for length
+        Math.min(paragraphCount, 5) * 8 + // Up to 40 points for structure
+        (sentenceCount > 0 ? 20 : 0) + // 20 points for having content
+        10 // Base points
+    )
+  );
+
   const overallScore = Math.round(baseScore);
-  
+
   return {
     overallScore,
     suggestions,
     strengths: [
       "Essay addresses the prompt directly",
       "Content is focused and relevant",
-      completionRatio > 0.8 ? "Good use of available word count" : "Room to expand on key themes"
+      completionRatio > 0.8
+        ? "Good use of available word count"
+        : "Room to expand on key themes",
     ].filter(Boolean),
     improvements: [
       completionRatio < 0.9 ? "Add more specific examples and details" : null,
       paragraphCount < 4 ? "Improve paragraph structure and transitions" : null,
-      "Consider adding more quantifiable achievements"
+      "Consider adding more quantifiable achievements",
     ].filter(Boolean),
-    warnings: completionRatio > 1.05 ? ["Essay exceeds word limit - immediate editing required"] : [],
-    readabilityScore: Math.round(Math.max(50, 100 - (avgSentenceLength > 25 ? 20 : 0) - (paragraphCount < 3 ? 15 : 0))),
+    warnings:
+      completionRatio > 1.05
+        ? ["Essay exceeds word limit - immediate editing required"]
+        : [],
+    readabilityScore: Math.round(
+      Math.max(
+        50,
+        100 - (avgSentenceLength > 25 ? 20 : 0) - (paragraphCount < 3 ? 15 : 0)
+      )
+    ),
     sentenceCount,
     paragraphCount,
     avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
-    complexWordCount: Math.round(words.filter(w => w.length > 6).length),
-    passiveVoiceCount: Math.round(sentences.filter(s => s.includes(' was ') || s.includes(' were ') || s.includes(' been ')).length),
-    structureScore: Math.round(Math.min(100, (paragraphCount * 20) + (sentenceCount > 10 ? 20 : sentenceCount * 2))),
+    complexWordCount: Math.round(words.filter((w) => w.length > 6).length),
+    passiveVoiceCount: Math.round(
+      sentences.filter(
+        (s) =>
+          s.includes(" was ") || s.includes(" were ") || s.includes(" been ")
+      ).length
+    ),
+    structureScore: Math.round(
+      Math.min(
+        100,
+        paragraphCount * 20 + (sentenceCount > 10 ? 20 : sentenceCount * 2)
+      )
+    ),
     contentRelevance: Math.round(baseScore + 10), // Assume relevance is slightly higher than overall
     narrativeFlow: Math.round(Math.max(40, baseScore - 5)),
-    leadershipEmphasis: degreeType?.toLowerCase().includes('mba') ? Math.round(baseScore - 15) : Math.round(baseScore),
+    leadershipEmphasis: degreeType?.toLowerCase().includes("mba")
+      ? Math.round(baseScore - 15)
+      : Math.round(baseScore),
     specificityScore: Math.round(Math.max(30, baseScore - 20)), // Usually lower for specificity
     grammarIssues: Math.round(sentenceCount * 0.1), // Estimate based on length
   };

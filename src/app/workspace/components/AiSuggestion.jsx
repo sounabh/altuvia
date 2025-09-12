@@ -58,7 +58,7 @@ export function AISuggestions({
   const [error, setError] = useState(null)
   
   // State for version-specific analyses
-  const [versionAnalyses, setVersionAnalyses] = useState({}) // versionId -> analysis
+  const [versionAnalyses, setVersionAnalyses] = useState({})
   const [selectedVersionForView, setSelectedVersionForView] = useState(null)
   
   // UI state
@@ -71,18 +71,14 @@ export function AISuggestions({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
 
-  /**
-   * Load existing analyses for versions on component mount
-   */
+  // Load existing analyses for versions on component mount
   useEffect(() => {
     if (versions && versions.length > 0) {
       loadExistingAnalyses()
     }
   }, [versions, essayId])
 
-  /**
-   * Set current analysis when versions change
-   */
+  // Set current analysis when versions change
   useEffect(() => {
     if (currentVersionId && versionAnalyses[currentVersionId]) {
       setAnalysis(versionAnalyses[currentVersionId])
@@ -92,9 +88,7 @@ export function AISuggestions({
     }
   }, [currentVersionId, versionAnalyses])
 
-  /**
-   * Load existing AI analyses for all versions
-   */
+  // Load existing AI analyses for all versions
   const loadExistingAnalyses = async () => {
     try {
       const response = await fetch(`/api/essay/${encodeURIComponent(universityName)}`, {
@@ -110,9 +104,10 @@ export function AISuggestions({
         const result = await response.json()
         if (result.success && result.analyses) {
           const analysesMap = {}
-          result.analyses.forEach(analysis => {
-            const key = analysis.essayVersionId || 'current'
-            analysesMap[key] = analysis
+          result.analyses.forEach(aiResult => {
+            const key = aiResult.essayVersionId || 'current'
+            // Transform database result to expected format
+            analysesMap[key] = transformAIResultToAnalysis(aiResult)
           })
           setVersionAnalyses(analysesMap)
         }
@@ -122,9 +117,86 @@ export function AISuggestions({
     }
   }
 
-  /**
-   * Perform AI analysis for current content or specific version
-   */
+  // Transform AI result from database to expected analysis format
+  const transformAIResultToAnalysis = (aiResult) => {
+    if (!aiResult) return null
+
+    try {
+      const suggestions = JSON.parse(aiResult.suggestions || '[]')
+      const strengths = JSON.parse(aiResult.strengths || '[]')
+      const improvements = JSON.parse(aiResult.improvements || '[]')
+      const warnings = JSON.parse(aiResult.warnings || '[]')
+
+      // Combine all feedback into suggestions array with proper typing
+      const allSuggestions = [
+        ...suggestions.map(s => ({ ...s, type: s.type || 'improvement' })),
+        ...strengths.map((s, idx) => ({
+          id: `strength_${idx}`,
+          type: 'strength',
+          title: typeof s === 'string' ? s : s.title || s.point || 'Strength Identified',
+          description: typeof s === 'string' ? s : s.description || s.assessment || s,
+          action: typeof s === 'object' ? s.action || s.leverage : undefined,
+          priority: 'medium'
+        })),
+        ...improvements.map((s, idx) => ({
+          id: `improvement_${idx}`,
+          type: 'improvement',
+          title: typeof s === 'string' ? s : s.title || s.issue || 'Improvement Needed',
+          description: typeof s === 'string' ? s : s.description || s.why || s,
+          action: typeof s === 'object' ? s.action || s.solution : undefined,
+          priority: typeof s === 'object' ? s.priority || 'medium' : 'medium'
+        })),
+        ...warnings.map((s, idx) => ({
+          id: `warning_${idx}`,
+          type: s.severity === 'critical' ? 'critical' : 'warning',
+          title: typeof s === 'string' ? s : s.title || s.issue || 'Warning',
+          description: typeof s === 'string' ? s : s.description || s.consequence || s,
+          action: typeof s === 'object' ? s.action || s.solution : undefined,
+          priority: typeof s === 'object' ? (s.severity === 'critical' ? 'high' : 'medium') : 'medium'
+        }))
+      ]
+
+      return {
+        overallScore: aiResult.overallScore || 50,
+        suggestions: allSuggestions,
+        structureScore: aiResult.structureScore || 50,
+        contentRelevance: aiResult.contentRelevance || 50,
+        narrativeFlow: aiResult.narrativeFlow || 50,
+        leadershipEmphasis: aiResult.leadershipEmphasis || 50,
+        specificityScore: aiResult.specificityScore || 50,
+        readabilityScore: aiResult.readabilityScore || 50,
+        sentenceCount: aiResult.sentenceCount || 0,
+        paragraphCount: aiResult.paragraphCount || 0,
+        avgSentenceLength: aiResult.avgSentenceLength || 0,
+        complexWordCount: aiResult.complexWordCount || 0,
+        passiveVoiceCount: aiResult.passiveVoiceCount || 0,
+        grammarIssues: aiResult.grammarIssues || 0,
+        createdAt: aiResult.createdAt,
+        processingTime: aiResult.processingTime
+      }
+    } catch (error) {
+      console.error('Error transforming AI result:', error)
+      return {
+        overallScore: aiResult.overallScore || 50,
+        suggestions: [],
+        structureScore: 50,
+        contentRelevance: 50,
+        narrativeFlow: 50,
+        leadershipEmphasis: 50,
+        specificityScore: 50,
+        readabilityScore: aiResult.readabilityScore || 50,
+        sentenceCount: aiResult.sentenceCount || 0,
+        paragraphCount: aiResult.paragraphCount || 0,
+        avgSentenceLength: aiResult.avgSentenceLength || 0,
+        complexWordCount: aiResult.complexWordCount || 0,
+        passiveVoiceCount: aiResult.passiveVoiceCount || 0,
+        grammarIssues: 0,
+        error: 'Failed to parse suggestions data'
+      }
+    }
+  }
+
+  // Perform AI analysis for current content or specific version
   const performAIAnalysis = async (versionId = null, versionContent = null) => {
     if (!essayId) return
 
@@ -140,13 +212,6 @@ export function AISuggestions({
     setError(null)
 
     try {
-      console.log("Starting AI analysis...", {
-        essayId,
-        versionId: analysisVersionId,
-        contentLength: analysisContent.length,
-        universityName
-      })
-
       const response = await fetch(`/api/essay/${encodeURIComponent(universityName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,7 +251,6 @@ export function AISuggestions({
         }
       } else {
         const errorData = await response.json().catch(() => ({}))
-        console.error("AI Analysis API error:", response.status, errorData)
         
         if (response.status === 500 && errorData.error?.includes("API key")) {
           throw new Error("AI service configuration issue. Please contact support.")
@@ -204,9 +268,7 @@ export function AISuggestions({
     }
   }
 
-  /**
-   * Get suggestion icon based on type
-   */
+  // Get suggestion icon based on type
   const getSuggestionIcon = (type) => {
     switch (type) {
       case 'critical':
@@ -222,9 +284,7 @@ export function AISuggestions({
     }
   }
 
-  /**
-   * Get suggestion styling based on type
-   */
+  // Get suggestion styling based on type
   const getSuggestionStyling = (type) => {
     const base = "border rounded-lg p-4 transition-all duration-200"
     
@@ -242,26 +302,20 @@ export function AISuggestions({
     }
   }
 
-  /**
-   * Get score color
-   */
+  // Get score color
   const getScoreColor = (score) => {
     if (score >= 80) return "text-green-600 bg-green-100"
     if (score >= 60) return "text-amber-600 bg-amber-100"
     return "text-red-600 bg-red-100"
   }
 
-  /**
-   * Filter suggestions by type
-   */
+  // Filter suggestions by type
   const getSuggestionsByType = (type, analysisData = analysis) => {
     if (!analysisData?.suggestions) return []
     return analysisData.suggestions.filter(s => s.type === type)
   }
 
-  /**
-   * Count issues by severity
-   */
+  // Count issues by severity
   const getIssueCounts = (analysisData = analysis) => {
     if (!analysisData?.suggestions) return { critical: 0, warning: 0, improvement: 0, strength: 0 }
     
@@ -273,9 +327,7 @@ export function AISuggestions({
     }
   }
 
-  /**
-   * Toggle section expansion
-   */
+  // Toggle section expansion
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -283,9 +335,7 @@ export function AISuggestions({
     }))
   }
 
-  /**
-   * Get version analysis or indicate if none exists
-   */
+  // Get version analysis or indicate if none exists
   const getVersionAnalysisStatus = (versionId) => {
     if (versionAnalyses[versionId]) {
       return { hasAnalysis: true, analysis: versionAnalyses[versionId] }
@@ -293,19 +343,16 @@ export function AISuggestions({
     return { hasAnalysis: false, analysis: null }
   }
 
-  /**
-   * Render analysis for display
-   */
+  // Render analysis for display
   const renderAnalysis = (analysisData) => {
     if (!analysisData) return null
 
     const issueCounts = getIssueCounts(analysisData)
-    const totalIssues = issueCounts.critical + issueCounts.warning + issueCounts.improvement
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pb-4">
         {/* Header with overall score */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between sticky top-0 bg-white py-3 z-10 border-b">
           <div>
             <h2 className="text-xl font-bold text-gray-900">AI Essay Analysis</h2>
             <p className="text-sm text-gray-600">Comprehensive feedback on your essay</p>
@@ -361,12 +408,11 @@ export function AISuggestions({
           </div>
         </div>
 
-        {/* Render suggestion sections */}
         {/* Critical Issues */}
         {getSuggestionsByType('critical', analysisData).length > 0 && (
           <div className="space-y-3">
             <div 
-              className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg cursor-pointer"
+              className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
               onClick={() => toggleSection('critical')}
             >
               <div className="flex items-center space-x-2">
@@ -385,9 +431,9 @@ export function AISuggestions({
             
             {expandedSections.critical && (
               <div className="space-y-3 pl-2">
-                {getSuggestionsByType('critical', analysisData).map((suggestion) => (
+                {getSuggestionsByType('critical', analysisData).map((suggestion, idx) => (
                   <div
-                    key={suggestion.id}
+                    key={suggestion.id || `critical-${idx}`}
                     className={getSuggestionStyling(suggestion.type)}
                   >
                     <div className="flex items-start space-x-3">
@@ -399,7 +445,7 @@ export function AISuggestions({
                         {suggestion.action && (
                           <div className="mt-3 p-3 bg-red-100 rounded-lg">
                             <p className="text-xs font-semibold text-red-800 mb-1 flex items-center">
-                              <MessageSquare className="w-3 h-3 mr-1" /> Suggested Revision:
+                              <MessageSquare className="w-3 h-3 mr-1" /> Suggested Action:
                             </p>
                             <p className="text-sm text-red-700">{suggestion.action}</p>
                           </div>
@@ -422,8 +468,158 @@ export function AISuggestions({
           </div>
         )}
 
-        {/* Similar sections for warnings, improvements, and strengths */}
-        {/* ... (other sections remain similar) ... */}
+        {/* Warnings */}
+        {getSuggestionsByType('warning', analysisData).length > 0 && (
+          <div className="space-y-3">
+            <div 
+              className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
+              onClick={() => toggleSection('warning')}
+            >
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+                <span className="font-semibold text-amber-900">Warnings</span>
+                <Badge className="bg-amber-200 text-amber-800 border-0">
+                  {getSuggestionsByType('warning', analysisData).length}
+                </Badge>
+              </div>
+              {expandedSections.warning ? (
+                <ChevronUp className="w-4 h-4 text-amber-600" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-amber-600" />
+              )}
+            </div>
+            
+            {expandedSections.warning && (
+              <div className="space-y-3 pl-2">
+                {getSuggestionsByType('warning', analysisData).map((suggestion, idx) => (
+                  <div
+                    key={suggestion.id || `warning-${idx}`}
+                    className={getSuggestionStyling(suggestion.type)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      {getSuggestionIcon(suggestion.type)}
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-amber-900 mb-1">{suggestion.title}</h4>
+                        <p className="text-sm text-amber-700 mb-2">{suggestion.description}</p>
+                        
+                        {suggestion.action && (
+                          <div className="mt-3 p-3 bg-amber-100 rounded-lg">
+                            <p className="text-xs font-semibold text-amber-800 mb-1 flex items-center">
+                              <MessageSquare className="w-3 h-3 mr-1" /> Suggested Action:
+                            </p>
+                            <p className="text-sm text-amber-700">{suggestion.action}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Improvements */}
+        {getSuggestionsByType('improvement', analysisData).length > 0 && (
+          <div className="space-y-3">
+            <div 
+              className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+              onClick={() => toggleSection('improvement')}
+            >
+              <div className="flex items-center space-x-2">
+                <Lightbulb className="w-5 h-5 text-blue-600" />
+                <span className="font-semibold text-blue-900">Improvement Opportunities</span>
+                <Badge className="bg-blue-200 text-blue-800 border-0">
+                  {getSuggestionsByType('improvement', analysisData).length}
+                </Badge>
+              </div>
+              {expandedSections.improvement ? (
+                <ChevronUp className="w-4 h-4 text-blue-600" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-blue-600" />
+              )}
+            </div>
+            
+            {expandedSections.improvement && (
+              <div className="space-y-3 pl-2">
+                {getSuggestionsByType('improvement', analysisData).map((suggestion, idx) => (
+                  <div
+                    key={suggestion.id || `improvement-${idx}`}
+                    className={getSuggestionStyling(suggestion.type)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      {getSuggestionIcon(suggestion.type)}
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-1">{suggestion.title}</h4>
+                        <p className="text-sm text-blue-700 mb-2">{suggestion.description}</p>
+                        
+                        {suggestion.action && (
+                          <div className="mt-3 p-3 bg-blue-100 rounded-lg">
+                            <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center">
+                              <MessageSquare className="w-3 h-3 mr-1" /> Suggested Action:
+                            </p>
+                            <p className="text-sm text-blue-700">{suggestion.action}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Strengths */}
+        {getSuggestionsByType('strength', analysisData).length > 0 && (
+          <div className="space-y-3">
+            <div 
+              className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg cursor-pointer hover:bg-green-100 transition-colors"
+              onClick={() => toggleSection('strength')}
+            >
+              <div className="flex items-center space-x-2">
+                <Award className="w-5 h-5 text-green-600" />
+                <span className="font-semibold text-green-900">Strengths</span>
+                <Badge className="bg-green-200 text-green-800 border-0">
+                  {getSuggestionsByType('strength', analysisData).length}
+                </Badge>
+              </div>
+              {expandedSections.strength ? (
+                <ChevronUp className="w-4 h-4 text-green-600" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-green-600" />
+              )}
+            </div>
+            
+            {expandedSections.strength && (
+              <div className="space-y-3 pl-2">
+                {getSuggestionsByType('strength', analysisData).map((suggestion, idx) => (
+                  <div
+                    key={suggestion.id || `strength-${idx}`}
+                    className={getSuggestionStyling(suggestion.type)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      {getSuggestionIcon(suggestion.type)}
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-green-900 mb-1">{suggestion.title}</h4>
+                        <p className="text-sm text-green-700 mb-2">{suggestion.description}</p>
+                        
+                        {suggestion.action && (
+                          <div className="mt-3 p-3 bg-green-100 rounded-lg">
+                            <p className="text-xs font-semibold text-green-800 mb-1 flex items-center">
+                              <MessageSquare className="w-3 h-3 mr-1" /> How to Leverage:
+                            </p>
+                            <p className="text-sm text-green-700">{suggestion.action}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Writing Metrics */}
         {analysisData.readabilityScore && (
@@ -443,18 +639,26 @@ export function AISuggestions({
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Avg Sentence</span>
                 <span className="font-bold text-gray-900">
-                  {Math.round(analysisData.avgSentenceLength)} words
+                  {Math.round(analysisData.avgSentenceLength || 0)} words
                 </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Sentences</span>
-                <span className="font-bold text-gray-900">{analysisData.sentenceCount}</span>
+                <span className="font-bold text-gray-900">{analysisData.sentenceCount || 0}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Paragraphs</span>
-                <span className="font-bold text-gray-900">{analysisData.paragraphCount}</span>
+                <span className="font-bold text-gray-900">{analysisData.paragraphCount || 0}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Analysis metadata */}
+        {analysisData.processingTime && (
+          <div className="text-xs text-gray-500 text-center py-2">
+            Analysis completed in {Math.round(analysisData.processingTime / 1000 * 100) / 100}s
+            {analysisData.createdAt && ` • ${new Date(analysisData.createdAt).toLocaleString()}`}
           </div>
         )}
       </div>
@@ -523,16 +727,24 @@ export function AISuggestions({
                       View All
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0">
-                    <DialogHeader className="px-6 py-4 border-b">
+                  <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="px-6 py-4 border-b sticky top-0 bg-white z-10">
                       <DialogTitle className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Sparkles className="w-5 h-5 text-blue-600" />
                           <span>AI Analysis - Full Report</span>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsModalOpen(false)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </DialogTitle>
                     </DialogHeader>
-                    <ScrollArea className="flex-1 px-6 py-4">
+                    <ScrollArea className="flex-1 px-6 max-h-full">
                       {renderAnalysis(currentAnalysis)}
                     </ScrollArea>
                   </DialogContent>
@@ -545,35 +757,37 @@ export function AISuggestions({
           {showVersionHistory && versions.length > 0 && (
             <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
               <h4 className="text-xs font-semibold text-gray-700 mb-2">Version Analyses</h4>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {versions.map((version) => {
-                  const { hasAnalysis } = getVersionAnalysisStatus(version.id)
-                  return (
-                    <div key={version.id} className="flex items-center justify-between text-xs">
-                      <span className="truncate flex-1 text-gray-600">
-                        {version.label}
-                      </span>
-                      <div className="flex items-center space-x-1">
-                        {hasAnalysis ? (
-                          <Badge className="bg-green-100 text-green-700 text-xs px-2">
-                            Analyzed
-                          </Badge>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => performAIAnalysis(version.id, version.content)}
-                            disabled={isAnalyzing}
-                            className="h-6 px-2 text-xs"
-                          >
-                            <Play className="w-3 h-3" />
-                          </Button>
-                        )}
+              <ScrollArea className="max-h-32">
+                <div className="space-y-2">
+                  {versions.map((version) => {
+                    const { hasAnalysis } = getVersionAnalysisStatus(version.id)
+                    return (
+                      <div key={version.id} className="flex items-center justify-between text-xs">
+                        <span className="truncate flex-1 text-gray-600">
+                          {version.label}
+                        </span>
+                        <div className="flex items-center space-x-1">
+                          {hasAnalysis ? (
+                            <Badge className="bg-green-100 text-green-700 text-xs px-2">
+                              Analyzed
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => performAIAnalysis(version.id, version.content)}
+                              disabled={isAnalyzing}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <Play className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
             </div>
           )}
 
