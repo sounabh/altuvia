@@ -3,8 +3,11 @@ import { ChevronDown } from 'lucide-react';
 
 /**
  * GMAT score filter options
- * Each option contains a `value` (for filtering logic)
- * and a `label` (for UI display).
+ *
+ * Each option contains:
+ * - `value` → used internally for filtering logic
+ * - `label` → displayed in the dropdown
+ *
  * @type {{ value: string, label: string }[]}
  */
 const gmatAverages = [
@@ -17,8 +20,11 @@ const gmatAverages = [
 
 /**
  * University ranking filter options
- * Each option contains a `value` (for filtering logic)
- * and a `label` (for UI display).
+ *
+ * Each option contains:
+ * - `value` → used internally for filtering logic
+ * - `label` → displayed in the dropdown
+ *
  * @type {{ value: string, label: string }[]}
  */
 const rankings = [
@@ -30,17 +36,22 @@ const rankings = [
 ];
 
 /**
- * Memoized dropdown component for filtering
- * Prevents unnecessary re-renders on parent updates.
+ * FilterDropdown Component
+ *
+ * Reusable dropdown component for selecting a filter value.
+ * Uses `memo` to prevent unnecessary re-renders when parent updates.
  *
  * @param {Object} props - Component props
  * @param {string} props.value - Currently selected value
- * @param {(value: string) => void} props.onChange - Change handler
- * @param {{ value: string, label: string }[]} props.options - Options for dropdown
- * @returns {JSX.Element} Filter dropdown component
+ * @param {(value: string) => void} props.onChange - Callback to update selection
+ * @param {{ value: string, label: string }[]} props.options - Dropdown options
+ *
+ * @returns {JSX.Element} Dropdown UI element
  */
 const FilterDropdown = memo(({ value, onChange, options }) => (
   <div className="relative group">
+    
+    {/* Native select element styled as custom dropdown */}
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -53,7 +64,7 @@ const FilterDropdown = memo(({ value, onChange, options }) => (
       ))}
     </select>
 
-    {/* Chevron icon inside dropdown */}
+    {/* Chevron icon overlay inside dropdown */}
     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors duration-200" />
   </div>
 ));
@@ -61,16 +72,21 @@ const FilterDropdown = memo(({ value, onChange, options }) => (
 FilterDropdown.displayName = 'FilterDropdown';
 
 /**
- * Main filter section
- * Renders GMAT and Ranking dropdowns for filtering.
+ * FilterSection Component
+ *
+ * Main section that renders:
+ * - GMAT filter dropdown
+ * - University ranking filter dropdown
+ *
  * Memoized to prevent unnecessary re-renders when parent state changes.
  *
  * @param {Object} props - Component props
- * @param {string} props.selectedGmat - Selected GMAT filter value
- * @param {(value: string) => void} props.setSelectedGmat - GMAT change handler
- * @param {string} props.selectedRanking - Selected ranking filter value
- * @param {(value: string) => void} props.setSelectedRanking - Ranking change handler
- * @returns {JSX.Element} Filter section component
+ * @param {string} props.selectedGmat - Currently selected GMAT filter value
+ * @param {(value: string) => void} props.setSelectedGmat - Setter for GMAT filter
+ * @param {string} props.selectedRanking - Currently selected ranking filter value
+ * @param {(value: string) => void} props.setSelectedRanking - Setter for ranking filter
+ *
+ * @returns {JSX.Element} Filter section containing two dropdowns
  */
 const FilterSection = memo(({
   selectedGmat,
@@ -80,6 +96,7 @@ const FilterSection = memo(({
 }) => {
   return (
     <div className="flex flex-wrap gap-4 justify-center">
+      
       {/* GMAT filter dropdown */}
       <FilterDropdown
         value={selectedGmat}

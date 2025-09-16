@@ -54,10 +54,10 @@ const UniversityCardSkeleton = () => (
 );
 
 /**
- * Main dashboard component for managing saved universities
+ * Main dashboard component for managing saved universities with enhanced progress tracking
  * @returns {JSX.Element} Dashboard with:
- * - Statistics overview
- * - Saved university cards
+ * - Statistics overview with real progress data
+ * - University cards showing essay and task progress
  * - Add/remove functionality
  * - Loading and error states with skeleton UI
  */
@@ -65,13 +65,18 @@ const Index = () => {
   // State management
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [universities, setUniversities] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    inProgress: 0,
+    submitted: 0,
+    upcomingDeadlines: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   /**
-   * Fetches saved universities from backend API
-   * Adds default values for UI components
-   * Handles authentication and error states
+   * Fetches saved universities from backend API with enhanced progress data
+   * Includes essays, calendar events, and task completion tracking
    */
   useEffect(() => {
     const fetchSavedUniversities = async () => {
@@ -95,20 +100,18 @@ const Index = () => {
         });
 
         if (response.ok) {
-          const savedUniversities = await response.json();
-          //console.log(savedUniversities,"client");
+          const data = await response.json();
+          console.log('Enhanced university data:', data);
           
-          // Enhance university data with UI defaults
-          const universitiesWithDefaults = savedUniversities?.universities.map(university => ({
-            ...university,
-            status: 'not-started',
-            essayProgress: 0,
-            tasks: 0,
-            totalTasks: 5,
-            name: university.universityName,
-          }));
+          // Set universities and stats from API response
+          setUniversities(data.universities || []);
+          setStats(data.stats || {
+            total: data.universities?.length || 0,
+            inProgress: 0,
+            submitted: 0,
+            upcomingDeadlines: 0
+          });
           
-          setUniversities(universitiesWithDefaults);
         } else {
           const errorData = await response.json();
           setError(errorData.error || 'Failed to fetch saved universities');
@@ -149,7 +152,18 @@ const Index = () => {
       });
 
       if (response.ok) {
-        setUniversities(universities.filter(u => u.id !== universityId));
+        // Remove from local state and recalculate stats
+        const updatedUniversities = universities.filter(u => u.id !== universityId);
+        setUniversities(updatedUniversities);
+        
+        // Recalculate stats
+        const newStats = {
+          total: updatedUniversities.length,
+          inProgress: updatedUniversities.filter(u => u.status === 'in-progress').length,
+          submitted: updatedUniversities.filter(u => u.status === 'submitted').length,
+          upcomingDeadlines: updatedUniversities.reduce((sum, u) => sum + (u.upcomingDeadlines || 0), 0)
+        };
+        setStats(newStats);
       } else {
         console.error('Failed to remove university');
       }
@@ -158,12 +172,56 @@ const Index = () => {
     }
   };
 
-  // Compute dashboard statistics
-  const stats = {
-    total: universities.length,
-    inProgress: universities.filter(u => u.status === 'in-progress').length,
-    submitted: universities.filter(u => u.status === 'submitted').length,
-    upcomingDeadlines: universities.filter(u => u.status !== 'submitted').length
+  /**
+   * Progress summary component showing overall completion across all universities
+   */
+  const ProgressSummary = () => {
+    if (universities.length === 0) return null;
+    
+    const totalEssays = universities.reduce((sum, u) => sum + (u.totalEssays || 0), 0);
+    const completedEssays = universities.reduce((sum, u) => sum + (u.completedEssays || 0), 0);
+    const totalTasks = universities.reduce((sum, u) => sum + (u.totalTasks || 0), 0);
+    const completedTasks = universities.reduce((sum, u) => sum + (u.tasks || 0), 0);
+    
+    const essayCompletionRate = totalEssays > 0 ? Math.round((completedEssays / totalEssays) * 100) : 0;
+    const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    return (
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">Overall Progress</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Essay Progress */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-slate-600">Essays Completed</span>
+              <span className="text-sm font-bold text-slate-800">{completedEssays}/{totalEssays}</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${essayCompletionRate}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-500 mt-1">{essayCompletionRate}% Complete</div>
+          </div>
+          
+          {/* Task Progress */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-slate-600">Tasks Completed</span>
+              <span className="text-sm font-bold text-slate-800">{completedTasks}/{totalTasks}</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3">
+              <div 
+                className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${taskCompletionRate}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-500 mt-1">{taskCompletionRate}% Complete</div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Loading state UI with skeleton components
@@ -171,7 +229,7 @@ const Index = () => {
     return (
       <div className="min-h-screen">
         <div className="px-4 py-8 max-w-7xl mx-auto">
-          {/* Dashboard Header - Same as original */}
+          {/* Dashboard Header */}
           <div className="mb-8">
             <h1 className="text-center text-[40px] tracking-[0.2px] -mt-10">
               My Saved Universities
@@ -186,7 +244,6 @@ const Index = () => {
 
           {/* University Cards Grid Skeleton */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Generate 6 skeleton cards to simulate loading state */}
             {Array.from({ length: 6 }).map((_, index) => (
               <UniversityCardSkeleton key={index} />
             ))}
@@ -234,6 +291,9 @@ const Index = () => {
         {/* Statistics Overview Component */}
         <StatsOverview stats={stats} />
 
+        {/* Progress Summary */}
+        {universities.length > 0 && <ProgressSummary />}
+
         {/* University Cards Grid */}
         {universities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -264,10 +324,6 @@ const Index = () => {
             </Link>
           </div>
         )}
-
-       
-
-      
       </div>
     </div>
   );

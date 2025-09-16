@@ -3,52 +3,75 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import UniversityCard from './UniversityCard';
 
 /**
- * UniversityGrid component - FIXED VERSION
+ * UniversityGrid Component
  * 
- * Fixes:
- * - Removed auto-refresh on screen visibility change
- * - Simplified caching logic
- * - Better error handling
- * - Removed unnecessary re-fetches
+ * Renders a responsive grid of university cards based on search and filter criteria.
+ * Handles data fetching with caching, debouncing, aborting requests, and error states.
+ *
+ * @component
+ * @param {Object} props - Component props
+ * @param {string} props.searchQuery - Current search query entered by the user
+ * @param {string} props.selectedGmat - Selected GMAT filter value
+ * @param {string} props.selectedRanking - Selected ranking filter value
+ * @returns {JSX.Element} University grid UI
  */
 const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
+  // ----------------------------
+  // State Management
+  // ----------------------------
+
+  /** Universities data returned from API */
   const [universities, setUniversities] = useState([]);
+
+  /** Loading state for API request */
   const [loading, setLoading] = useState(true);
+
+  /** Error state if API fails */
   const [error, setError] = useState(null);
 
-  // Abort controller for canceling requests
+  /** Reference to AbortController to cancel ongoing requests */
   const abortControllerRef = useRef(null);
-  
-  // Simple cache with expiry
+
+  /** Simple in-memory cache for API responses */
   const cacheRef = useRef(new Map());
 
+  // ----------------------------
+  // Derived Values
+  // ----------------------------
+
   /**
-   * Memoized search parameters
+   * Memoized search params (serialized string) for caching and request uniqueness
    */
   const searchParams = useMemo(() => {
-    const params = {
+    return JSON.stringify({
       search: searchQuery?.trim() || '',
       gmat: selectedGmat || 'all',
       ranking: selectedRanking || 'all'
-    };
-    return JSON.stringify(params);
+    });
   }, [searchQuery, selectedGmat, selectedRanking]);
 
+  // ----------------------------
+  // Data Fetching Logic
+  // ----------------------------
+
   /**
-   * Fetch universities data
+   * Fetch universities from API with caching and request aborting
+   * 
+   * @param {string} paramsString - Serialized search parameters
+   * @param {boolean} [forceRefresh=false] - Whether to bypass cache
    */
   const fetchData = useCallback(async (paramsString, forceRefresh = false) => {
-    // Check cache first (valid for 5 minutes)
     const cached = cacheRef.current.get(paramsString);
     const cacheValidTime = 300000; // 5 minutes
-    
+
+    // Serve from cache if still valid
     if (!forceRefresh && cached && Date.now() - cached.timestamp < cacheValidTime) {
       setUniversities(cached.data);
       setLoading(false);
       return;
     }
 
-    // Abort previous request
+    // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -68,9 +91,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
         }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
       const result = await response.json();
 
@@ -83,7 +104,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
           timestamp: Date.now()
         });
 
-        // Limit cache size
+        // Limit cache size to 10 entries
         if (cacheRef.current.size > 10) {
           const firstKey = cacheRef.current.keys().next().value;
           cacheRef.current.delete(firstKey);
@@ -103,22 +124,22 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   }, []);
 
+  // ----------------------------
+  // Effects
+  // ----------------------------
+
   /**
-   * Effect to fetch data with debounce
-   * REMOVED: Visibility change handlers to prevent auto-refresh
+   * Fetch universities when search params change
+   * Includes debounce for search input
    */
   useEffect(() => {
     const debounceTime = searchQuery?.trim() ? 300 : 0;
-
-    const handler = setTimeout(() => {
-      fetchData(searchParams);
-    }, debounceTime);
-
+    const handler = setTimeout(() => fetchData(searchParams), debounceTime);
     return () => clearTimeout(handler);
   }, [searchParams, fetchData]);
 
   /**
-   * Cleanup on unmount
+   * Cleanup: abort any ongoing requests on unmount
    */
   useEffect(() => {
     return () => {
@@ -128,23 +149,31 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     };
   }, []);
 
+  // ----------------------------
+  // Handlers
+  // ----------------------------
+
   /**
-   * Refresh data manually
+   * Clear cache and refresh data from API
    */
   const handleRefresh = useCallback(() => {
     cacheRef.current.clear();
     fetchData(searchParams, true);
   }, [searchParams, fetchData]);
 
+  // ----------------------------
+  // UI: Loading Skeleton
+  // ----------------------------
+
   /**
-   * Loading skeleton
+   * Skeleton loader displayed while universities are being fetched
    */
   const LoadingSkeleton = useMemo(() => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
       {Array.from({ length: 6 }, (_, i) => (
         <div 
           key={i} 
-          className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden h-80 animate-pulse border border-white/60"
+          className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden h-80 animate-pulse border border-gray-200/60"
         >
           <div className="bg-gradient-to-br from-gray-200/60 to-gray-300/40 h-40 w-full" />
           <div className="p-4 space-y-3">
@@ -160,18 +189,19 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     </div>
   ), []);
 
-  // Render states
+  // ----------------------------
+  // Render
+  // ----------------------------
+
   if (loading) return LoadingSkeleton;
 
   if (error) {
     return (
       <div className="text-center py-16 relative">
-        <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-3xl -m-8"></div>
+        <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-xl -m-8"></div>
         <div className="relative z-10">
-          <h3 className="text-xl font-medium text-red-600 mb-2 drop-shadow-sm">
-            Error loading universities
-          </h3>
-          <p className="text-gray-600 drop-shadow-sm mb-4">{error}</p>
+          <h3 className="text-xl font-medium text-red-600 mb-2">Error loading universities</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={handleRefresh}
             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -188,32 +218,25 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       {universities.length > 0 ? (
         universities.map(university => (
           <div key={university.id} className="relative group">
-            <div className="absolute inset-0 bg-white/30 backdrop-blur-sm rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 -m-1"></div>
-            <div className="relative z-10">
-              <UniversityCard 
-                university={university} 
-                onToggleSuccess={(newState) => {
-                  // Update the university in local state
-                  setUniversities(prev => prev.map(u => 
-                    u.id === university.id 
-                      ? { ...u, savedByUsers: newState ? [{ id: 'current-user' }] : [] }
-                      : u
-                  ));
-                }}
-              />
-            </div>
+            <div className="absolute inset-0 bg-white/30 backdrop-blur-sm rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 -m-1"></div>
+            <UniversityCard 
+              university={university} 
+              onToggleSuccess={(newState) => {
+                setUniversities(prev => prev.map(u => 
+                  u.id === university.id 
+                    ? { ...u, savedByUsers: newState ? [{ id: 'current-user' }] : [] }
+                    : u
+                ));
+              }}
+            />
           </div>
         ))
       ) : (
         <div className="col-span-full text-center py-16 relative">
-          <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-3xl -m-8"></div>
+          <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-xl -m-8"></div>
           <div className="relative z-10">
-            <h3 className="text-xl font-medium text-gray-700 mb-2 drop-shadow-sm">
-              No universities found
-            </h3>
-            <p className="text-gray-600 drop-shadow-sm">
-              Try adjusting your search or filter criteria
-            </p>
+            <h3 className="text-xl font-medium text-gray-700 mb-2">No universities found</h3>
+            <p className="text-gray-600">Try adjusting your search or filter criteria</p>
           </div>
         </div>
       )}

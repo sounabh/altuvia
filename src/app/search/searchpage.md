@@ -1,149 +1,255 @@
-# University Search Application - Complete Flow Documentation
-
-## Overview
-
-This documentation explains how the university search application works from start to finish. We'll walk through the entire journey: from when a user types in the search box to how the database fetches and displays results.
+# University Search Application - Complete Documentation
 
 ## 🏗️ Architecture Overview
 
-The application follows a clean, component-based architecture:
+This is a Next.js-based university search application with the following tech stack:
+- **Frontend**: React 19+ with Next.js App Router
+- **Backend**: Next.js API routes with Prisma ORM with Node.js
+- **Database**: PostgreSQL/MySQL (via Prisma)
+- **Authentication**: NextAuth.js
+- **UI**: Tailwind CSS + shadcn/ui components
+- **Icons**: Lucide React
+
+## 📁 Component Structure
 
 ```
-Index (Main Page)
-├── SearchBar (Search input)
-├── FilterSection (GMAT & Ranking filters)
-└── UniversityGrid (Results display)
-    └── UniversityCard (Individual university)
+components/
+├── UniversityCard.jsx         # Individual university display card
+├── UniversityGrid.jsx         # Grid container with data fetching
+├── FilterSection.jsx          # GMAT & Ranking filters
+├── SearchBar.jsx             # Main search input
+└── SearchFilters.jsx         # Comprehensive search component
 ```
 
-## 🔄 Complete User Flow
+---
 
-### 1. User Interaction → State Updates
+## 🧩 Component Analysis
 
-#### When User Types in Search Bar
+### 1. UniversityCard Component
+
+**Purpose**: Renders individual university information in a card format with save functionality.
+
+#### Key Features:
+
+- **Heart Button**: Save/unsave universities (optimistic updates)
+- **Ranking Badge**: Displays university ranking
+- **Metrics Grid**: GMAT scores, acceptance rates
+- **Financial Info**: Tuition and application fees
+- **Hover Effects**: Interactive animations and click indicators
+
+#### State Management:
 ```javascript
-// In SearchBar component
-<input 
-  value={searchQuery}
-  onChange={(e) => setSearchQuery(e.target.value)}
-/>
+const [isAdded, setIsAdded] = useState(false);     // Save state
+const [isLoading, setIsLoading] = useState(false); // Loading state
+const [isHovered, setIsHovered] = useState(false); // Hover state
 ```
 
-**What happens:**
-1. User types "Harvard" in the search box
-2. `onChange` event fires
-3. `setSearchQuery("Harvard")` is called
-4. This updates the `searchQuery` state in the main `Index` component
-5. The state change triggers a re-render
+#### Core Functions:
 
-#### When User Selects Filters
+**toggleHeart()** - Save/Unsave Logic:
 ```javascript
-// In FilterSection component
-<select 
-  value={selectedGmat}
-  onChange={(e) => setSelectedGmat(e.target.value)}
->
+const toggleHeart = useCallback(async (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+
+  // 1. Extract auth token from localStorage
+  let authData = localStorage.getItem("authData");
+  const token = JSON.parse(authData).token;
+
+  // 2. Optimistic UI update
+  const previousState = isAdded;
+  const newState = !isAdded;
+  setIsAdded(newState);
+  setIsLoading(true);
+
+  // 3. API call to toggle saved state
+  const response = await fetch('/api/university/toggleSaved', {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ universityId: university?.id }),
+  });
+
+  // 4. Handle response and revert on error
+  if (response.ok) {
+    const data = await response.json();
+    setIsAdded(Boolean(data.isAdded));
+  } else {
+    setIsAdded(previousState); // Revert on error
+  }
+}, [isAdded, university?.id]);
 ```
 
-**What happens:**
-1. User selects "700+" from GMAT dropdown
-2. `onChange` event fires
-3. `setSelectedGmat("700+")` is called
-4. This updates the `selectedGmat` state in the main `Index` component
-5. The state change triggers a re-render
+#### Data Flow:
+1. Receives `university` prop from UniversityGrid
+2. Initializes saved state from `university.isAdded`
+3. Handles user interactions (save/click)
+4. Navigates to university detail page on click
 
-### 2. State Management in Index Component
+---
 
-The main `Index` component manages all the filter states:
+### 2. UniversityGrid Component
 
+**Purpose**: Container component that fetches and displays universities in a grid layout.
+
+#### Key Features:
+- **Smart Caching**: 5-minute cache with Map-based storage
+- **Request Cancellation**: AbortController for preventing race conditions
+- **Debounced Search**: 300ms delay for search queries
+- **Error Handling**: Graceful error states with retry functionality
+
+#### State Management:
 ```javascript
-const [searchQuery, setSearchQuery] = useState("");
-const [selectedGmat, setSelectedGmat] = useState("all");
-const [selectedRanking, setSelectedRanking] = useState("all");
+const [universities, setUniversities] = useState([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState(null);
 ```
 
-**Key Features:**
-- **Memoized Handlers**: Using `useCallback` to prevent unnecessary re-renders
-- **Single Source of Truth**: All filter states are managed in one place
-- **Props Down**: States are passed down to child components
+#### Core Functions:
 
-### 3. University Grid - Smart Fetching Logic
-
-#### Memoized Search Parameters
+**fetchData()** - Main Data Fetching Logic:
 ```javascript
-const searchParams = useMemo(() => {
-  const params = {
-    search: searchQuery?.trim() || '',
-    gmat: selectedGmat || 'all',
-    ranking: selectedRanking || 'all'
-  };
-  return JSON.stringify(params);
-}, [searchQuery, selectedGmat, selectedRanking]);
+const fetchData = useCallback(async (paramsString, forceRefresh = false) => {
+  // 1. Check cache first (5-minute validity)
+  const cached = cacheRef.current.get(paramsString);
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) {
+    setUniversities(cached.data);
+    return;
+  }
+
+  // 2. Abort previous request
+  if (abortControllerRef.current) {
+    abortControllerRef.current.abort();
+  }
+  abortControllerRef.current = new AbortController();
+
+  // 3. Make API request
+  const params = JSON.parse(paramsString);
+  const urlParams = new URLSearchParams(params);
+  const response = await fetch(`/api/universities?${urlParams}`, {
+    signal: abortControllerRef.current.signal,
+    headers: { 'Cache-Control': 'public, max-age=300' }
+  });
+
+  // 4. Update state and cache
+  const result = await response.json();
+  setUniversities(result.data);
+  cacheRef.current.set(paramsString, {
+    data: result.data,
+    timestamp: Date.now()
+  });
+}, []);
 ```
 
-**Why this matters:**
-- Only re-computes when actual values change
-- Prevents unnecessary API calls
-- Creates a stable identifier for caching
+#### Caching Strategy:
+- **Cache Storage**: JavaScript Map with timestamp-based expiry
+- **Cache Duration**: 5 minutes (300,000ms)
+- **Cache Size Limit**: 10 entries (LRU eviction)
+- **Cache Keys**: Stringified search parameters
 
-#### Intelligent Caching System
+#### Data Flow:
+1. Receives search parameters as props
+2. Memoizes search params to prevent unnecessary requests
+3. Debounces search queries (300ms delay)
+4. Fetches data with caching and error handling
+5. Renders UniversityCard components for each result
+
+---
+
+### 3. FilterSection Component
+
+**Purpose**: Provides dropdown filters for GMAT scores and university rankings.
+
+#### Filter Options:
+
+**GMAT Averages**:
 ```javascript
-const cacheRef = useRef(new Map());
-
-// Check cache first (valid for 1 minute)
-const cached = cacheRef.current.get(paramsString);
-if (cached && Date.now() - cached.timestamp < 60000) {
-  setUniversities(cached.data);
-  setLoading(false);
-  return;
-}
+const gmatAverages = [
+  { value: 'all', label: 'All Scores' },
+  { value: '700+', label: '700 and above' },
+  { value: '650-699', label: '650 - 699' },
+  { value: '600-649', label: '600 - 649' },
+  { value: 'below-600', label: 'Below 600' }
+];
 ```
 
-**How it works:**
-1. Before making API call, check if we already have this data
-2. Cache is valid for 60 seconds (60,000 milliseconds)
-3. If found and still fresh, use cached data immediately
-4. No network request needed = **instant results**
+**Rankings**:
+```javascript
+const rankings = [
+  { value: 'all', label: 'All Ranks' },
+  { value: 'top-10', label: 'Top 10' },
+  { value: 'top-50', label: 'Top 50' },
+  { value: 'top-100', label: 'Top 100' },
+  { value: '100+', label: 'Ranked 100+' }
+];
+```
 
-#### Debounced API Calls
+#### UI Features:
+- **Memoized Dropdowns**: Prevents unnecessary re-renders
+- **Glassmorphism Effect**: backdrop-blur styling
+- **Hover Animations**: Smooth transitions on user interaction
+
+---
+
+### 4. SearchBar Component
+
+**Purpose**: Primary search input with enhanced visual design.
+
+#### Key Features:
+- **Gradient Effects**: Multi-layer glow effects on hover
+- **Clear Button**: Appears when search query exists
+- **Responsive Design**: Adapts to different screen sizes
+- **Smooth Animations**: 500ms transition durations
+
+#### Visual Effects:
+- **Backdrop Blur**: `backdrop-blur-lg` for glassmorphism
+- **Shadow Layers**: Multiple shadow effects for depth
+- **Scale Animations**: `hover:scale-110` for interactive elements
+
+---
+
+### 5. SearchFilters Component (Alternative)
+
+**Purpose**: Comprehensive search interface using shadcn/ui components.
+
+#### Features:
+- **Active Filter Count**: Shows number of applied filters
+- **Clear All Button**: Resets all filters and search
+- **Modern UI**: Uses shadcn/ui Select components
+- **Responsive Grid**: Adapts layout for different screen sizes
+
+#### Filter Management:
 ```javascript
 useEffect(() => {
-  const debounceTime = searchQuery?.trim() ? 300 : 0; // Instant for filters
-  
-  const handler = setTimeout(() => {
-    fetchData(searchParams);
-  }, debounceTime);
-
-  return () => clearTimeout(handler);
-}, [searchParams, fetchData]);
+  let count = 0;
+  if (selectedRankFilter && selectedRankFilter !== 'all') count++;
+  if (selectedGmatFilter && selectedGmatFilter !== 'all') count++;
+  setActiveFilters(count);
+}, [selectedRankFilter, selectedGmatFilter]);
 ```
 
-**Smart debouncing:**
-- **Search queries**: 300ms delay (waits for user to stop typing)
-- **Filter changes**: Instant (no delay needed)
-- **Cleanup**: Cancels previous timeouts to avoid duplicate calls
+---
 
-#### Request Cancellation
-```javascript
-// Abort any previous ongoing request
-if (abortControllerRef.current) {
-  abortControllerRef.current.abort();
-}
-abortControllerRef.current = new AbortController();
-```
+## 🔌 API Layer Analysis
 
-**Prevents race conditions:**
-- If user changes filters quickly, old requests are cancelled
-- Only the latest request completes
-- Ensures UI shows correct data for current filters
+### `/api/universities` Endpoint
 
-### 4. API Endpoint - Database Optimization
+**Purpose**: Main API endpoint for fetching filtered university data.
 
-#### Building the WHERE Clause
+#### Request Parameters:
+- `search`: Text search across name, city, country
+- `gmat`: GMAT score filter ('all', '700+', '650-699', etc.)
+- `ranking`: University ranking filter ('all', 'top-10', 'top-50', etc.)
+
+#### Database Query Logic:
+
+**WHERE Clause Building**:
 ```javascript
 const whereClause = { AND: [] };
 
-// Search filter - matches name, city, or country
+// Search filter
 if (search) {
   whereClause.AND.push({
     OR: [
@@ -153,54 +259,41 @@ if (search) {
     ]
   });
 }
-```
 
-**Database filtering:**
-- **Search**: Looks in university name, city, AND country
-- **Case-insensitive**: "harvard" matches "Harvard"
-- **Partial matching**: "har" matches "Harvard"
+// GMAT filter
+if (gmat === '700+') {
+  whereClause.AND.push({ gmatAverageScore: { gte: 700 } });
+}
 
-#### GMAT Score Filtering
-```javascript
-if (gmat !== 'all') {
-  switch (gmat) {
-    case '700+': 
-      gmatFilter.gmatAverageScore = { gte: 700 }; 
-      break;
-    case '650-699': 
-      gmatFilter.gmatAverageScore = { gte: 650, lte: 699 }; 
-      break;
-  }
+// Ranking filter
+if (ranking === 'top-10') {
+  whereClause.AND.push({ ftGlobalRanking: { lte: 10, not: null } });
 }
 ```
 
-**Range-based filtering:**
-- `gte: 700` = "greater than or equal to 700"
-- `gte: 650, lte: 699` = "between 650 and 699"
-- Database does the filtering, not JavaScript
-
-#### Optimized Database Query
+#### Prisma Query Optimization:
 ```javascript
 const universities = await prisma.university.findMany({
   where: whereClause.AND.length > 0 ? whereClause : undefined,
   include: {
-    images: { where: { isPrimary: true }, take: 1 },
-    savedByUsers: { where: { email: session?.user?.email } },
+    images: {
+      where: { isPrimary: true },
+      take: 1, // Only primary image
+    },
+    savedByUsers: {
+      where: { email: session?.user?.email },
+      select: { id: true }, // Minimal data
+    },
   },
-  take: 50,
-  orderBy: [{ ftGlobalRanking: 'asc' }, { universityName: 'asc' }]
+  take: 50, // Limit results
+  orderBy: [
+    { ftGlobalRanking: 'asc' },
+    { universityName: 'asc' }
+  ],
 });
 ```
 
-**Performance optimizations:**
-- **Selective fields**: Only fetch what we need
-- **Limited results**: Maximum 50 universities (pagination ready)
-- **Optimized joins**: Only get primary image and current user's saves
-- **Smart ordering**: Rank first, then alphabetical
-
-### 5. Data Transformation & Response
-
-#### From Database to UI Format
+#### Data Transformation:
 ```javascript
 const transformed = universities.map(u => ({
   id: u.id,
@@ -211,204 +304,324 @@ const transformed = universities.map(u => ({
   rank: u.ftGlobalRanking ? `#${u.ftGlobalRanking}` : 'N/A',
   gmatAvg: u.gmatAverageScore || 0,
   acceptRate: u.acceptanceRate || 0,
-  // ... more fields
+  tuitionFee: u.tuitionFees ? `${u.tuitionFees.toLocaleString()}` : 'N/A',
+  applicationFee: u.additionalFees ? `${u.additionalFees.toLocaleString()}` : 'N/A',
+  pros: u.whyChooseHighlights || [],
+  isAdded: u.savedByUsers?.length > 0, // Boolean transformation
 }));
 ```
 
-**Data cleaning:**
-- **Safe access**: Uses optional chaining (`?.`) to prevent errors
-- **Fallbacks**: Default image if none exists
-- **Formatting**: Combines city + country into single location
-- **User-friendly**: Shows "#1" instead of raw number "1"
-
-### 6. UI Rendering & User Experience
-
-#### Loading States
-```javascript
-if (loading) return LoadingSkeleton;
+#### Response Format:
+```json
+{
+  "data": [/* transformed universities */],
+  "count": 25,
+  "total": 25
+}
 ```
 
-**Three loading states:**
-1. **Initial load**: Shows skeleton cards while fetching
-2. **Search loading**: Brief loading during new searches
-3. **Filter loading**: Instant for cached results
-
-#### Empty State Handling
+#### Caching Headers:
 ```javascript
-{universities.length > 0 ? (
-  universities.map(university => <UniversityCard key={university.id} university={university} />)
-) : (
-  <div>No universities found</div>
-)}
+return NextResponse.json(data, {
+  headers: {
+    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+  }
+});
 ```
 
-#### University Card Features
-- **Add/Remove functionality**: Save universities for later
-- **Optimistic updates**: Button changes immediately, rolls back if API fails
-- **Hover effects**: Smooth animations and visual feedback
+---
+
+## 🔄 Data Flow Architecture
+
+### 1. User Search Flow
+```
+User Input → SearchBar/SearchFilters → Parent Component → UniversityGrid
+                                                              ↓
+API Request ← URL Parameters ← Memoized Search Params ←────────┘
+     ↓
+Database Query (Prisma) → Data Transformation → JSON Response
+     ↓
+Frontend Cache → State Update → UniversityCard Rendering
+```
+
+### 2. Save/Unsave Flow
+```
+User Click → UniversityCard.toggleHeart()
+                    ↓
+localStorage Auth Check → Optimistic UI Update
+                    ↓
+POST /api/university/toggleSaved → Database Update
+                    ↓
+Response Success/Error → Final State Update/Reversion
+```
+
+### 3. Filter Application Flow
+```
+Filter Change → Parent State Update → Search Params Memoization
+                       ↓
+Debounced API Call → Cache Check → Database Query → UI Update
+```
+
+---
+
+## 💾 Caching Strategy
+
+### Frontend Caching (UniversityGrid)
+```javascript
+// Cache structure
+cacheRef.current = new Map([
+  ['{"search":"","gmat":"all","ranking":"all"}', {
+    data: [...universities],
+    timestamp: 1704067200000
+  }]
+]);
+
+// Cache validity check
+const cacheValidTime = 300000; // 5 minutes
+const isValid = Date.now() - cached.timestamp < cacheValidTime;
+```
+
+### Backend Caching (API Response)
+```javascript
+// HTTP caching headers
+'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+// - public: Can be cached by any cache
+// - s-maxage: Server cache for 5 minutes
+// - stale-while-revalidate: Serve stale content while revalidating
+```
+
+### Authentication Caching
+```javascript
+// localStorage structure
+localStorage.getItem("authData") = {
+  "token": "jwt_token_here",
+  "user": { /* user data */ }
+}
+```
+
+---
+
+## 🎨 UI/UX Design Patterns
+
+### Visual Hierarchy
+1. **Primary**: University name and ranking badge
+2. **Secondary**: Location and key metrics
+3. **Tertiary**: Financial information and advantages
+
+### Color System
+- **Primary Blue**: `#3598FE` (CTAs and highlights)
+- **Navy**: `#002147` (headers and important text)
+- **Grays**: Various shades for text and backgrounds
+- **Semantic Colors**: Green (advantages), Red (errors), Amber (costs)
+
+### Animation Patterns
+- **Hover Transforms**: `hover:-translate-y-1` for cards
+- **Scale Effects**: `hover:scale-110` for buttons
+- **Transition Duration**: 200-500ms for smooth interactions
+- **Loading States**: Skeleton animations and spinners
+
+### Responsive Design
+```css
+/* Grid system */
+grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
+
+/* Spacing */
+gap-4 sm:gap-6
+
+/* Text sizing */
+text-lg sm:text-xl
+```
+
+---
+
+## 🔒 Security Considerations
+
+### Authentication
+- JWT tokens stored in localStorage
+- Bearer token authentication for API requests
+- Session validation on server-side
+
+### Data Validation
+- Input sanitization in API routes
+- Prisma ORM prevents SQL injection
+- CORS handling through Next.js
+
+### Error Handling
+- Graceful error states in UI
+- Optimistic updates with rollback
+- Network error detection and retry
+
+---
 
 ## 🚀 Performance Optimizations
 
-### 1. **Memoization Strategy**
-- `useCallback` for event handlers (prevents child re-renders)
-- `useMemo` for computed values (search parameters)
-- `memo` for components (UniversityCard, SearchBar)
+### React Optimizations
+- **memo()**: Prevents unnecessary re-renders
+- **useCallback()**: Memoizes functions
+- **useMemo()**: Memoizes expensive calculations
+- **Lazy Loading**: Images with `loading="lazy"`
 
-### 2. **Caching Layers**
-- **In-memory cache**: 60-second client-side cache
-- **HTTP cache**: 5-minute server-side cache
-- **Browser cache**: Automatic caching of images and assets
+### Network Optimizations
+- **Debounced Requests**: 300ms delay for searches
+- **Request Cancellation**: AbortController prevents race conditions
+- **Selective Data Fetching**: Only required fields in Prisma queries
+- **Pagination**: Limited to 50 results per request
 
-### 3. **Database Optimizations**
-- **WHERE clauses**: Filter at database level, not in JavaScript
-- **Limited queries**: Only fetch 50 results maximum
-- **Selective includes**: Only join necessary related data
-- **Indexed fields**: Database indexes on commonly searched fields
+### Database Optimizations
+- **Indexed Queries**: Likely indexes on ranking and GMAT scores
+- **Minimal Relations**: Only fetch required related data
+- **Efficient Ordering**: Database-level sorting
 
-### 4. **Network Optimizations**
-- **Debounced search**: Waits 300ms before searching
-- **Request cancellation**: Aborts old requests when new ones start
-- **Compressed responses**: Gzip compression on API responses
+---
 
-## 🎯 Component Responsibilities
+## 🐛 Error Handling
 
-### Index Component (Main Controller)
-- **Manages all filter states**
-- **Coordinates between child components**
-- **Provides the overall layout and styling**
+### Frontend Error Handling
+```javascript
+// Network errors
+catch (error) {
+  if (error.name !== 'AbortError') {
+    setError(error.message);
+    setUniversities([]);
+  }
+}
 
-### SearchBar Component
-- **Handles text input**
-- **Provides clear functionality**
-- **Communicates changes to parent**
-
-### FilterSection Component
-- **Manages dropdown filters**
-- **Renders GMAT and ranking options**
-- **Optimized with memoization**
-
-### UniversityGrid Component
-- **Fetches data from API**
-- **Manages loading and error states**
-- **Implements caching and debouncing**
-- **Renders university cards**
-
-### UniversityCard Component
-- **Displays individual university**
-- **Handles add/remove functionality**
-- **Provides navigation to detail page**
-
-## 🔍 Search Logic Deep Dive
-
-### 1. **Text Search**
-```sql
--- What happens in the database
-SELECT * FROM universities 
-WHERE 
-  university_name ILIKE '%harvard%' OR
-  city ILIKE '%harvard%' OR 
-  country ILIKE '%harvard%'
+// Auth errors
+if (!token) {
+  alert("Authentication expired, please login again");
+  return;
+}
 ```
 
-### 2. **GMAT Filtering**
-```sql
--- For "700+" filter
-SELECT * FROM universities 
-WHERE gmat_average_score >= 700
+### Backend Error Handling
+```javascript
+try {
+  // Database operations
+} catch (error) {
+  console.error("Database error:", error);
+  return NextResponse.json(
+    { error: "Failed to fetch universities", data: [], count: 0 },
+    { status: 500 }
+  );
+}
 ```
 
-### 3. **Ranking Filtering**
-```sql
--- For "Top 50" filter
-SELECT * FROM universities 
-WHERE ft_global_ranking <= 50 AND ft_global_ranking IS NOT NULL
+### User Experience
+- **Loading States**: Skeleton screens during fetch
+- **Empty States**: Friendly messages when no results
+- **Error States**: Clear error messages with retry options
+- **Optimistic Updates**: Immediate UI feedback
+
+---
+
+## 📊 Data Models (Inferred from Code)
+
+### University Model
+```typescript
+interface University {
+  id: string;
+  slug?: string;
+  universityName: string;
+  city: string;
+  country: string;
+  ftGlobalRanking?: number;
+  gmatAverageScore?: number;
+  acceptanceRate?: number;
+  tuitionFees?: number;
+  additionalFees?: number;
+  whyChooseHighlights?: string[];
+  images: UniversityImage[];
+  savedByUsers: SavedUniversity[];
+}
+
+interface UniversityImage {
+  imageUrl: string;
+  isPrimary: boolean;
+}
+
+interface SavedUniversity {
+  id: string;
+  email: string;
+}
 ```
 
-### 4. **Combined Filtering**
-```sql
--- All filters applied together
-SELECT * FROM universities 
-WHERE 
-  (university_name ILIKE '%harvard%' OR city ILIKE '%harvard%' OR country ILIKE '%harvard%')
-  AND gmat_average_score >= 700
-  AND ft_global_ranking <= 50
-ORDER BY ft_global_ranking ASC, university_name ASC
-LIMIT 50
+### API Response Format
+```typescript
+interface APIResponse {
+  data: TransformedUniversity[];
+  count: number;
+  total: number;
+}
+
+interface TransformedUniversity {
+  id: string;
+  slug?: string;
+  name: string;
+  location: string;
+  image: string;
+  rank: string;
+  gmatAvg: number;
+  acceptRate: number;
+  tuitionFee: string;
+  applicationFee: string;
+  pros: string[];
+  cons: string[];
+  isAdded: boolean;
+}
 ```
 
-## 📱 User Experience Flow
+---
 
-1. **Page Loads**
-   - Shows loading skeleton
-   - Fetches all universities (no filters)
-   - Displays results in grid
+## 🔄 State Management Flow
 
-2. **User Searches**
-   - Types "Stanford" → waits 300ms → makes API call
-   - Results filter to show matching universities
-   - Loading state → results appear
-
-3. **User Filters**
-   - Selects "Top 25" ranking → immediate API call (no debounce)
-   - Further narrows results
-   - Cache prevents duplicate requests
-
-4. **User Adds University**
-   - Clicks "Add" button
-   - Button immediately shows "Added" (optimistic update)
-   - API call saves to database
-   - If API fails, button reverts to "Add"
-
-## 🛡️ Error Handling
-
-### Client-Side Errors
-- **Network failures**: Shows error message, keeps previous results
-- **Invalid responses**: Graceful fallback to empty state
-- **Aborted requests**: Silently ignored (not actual errors)
-
-### Server-Side Errors
-- **Database connection issues**: Returns 500 with error message
-- **Invalid query parameters**: Safely ignored, uses defaults
-- **Authentication errors**: Handled by Next.js middleware
-
-## 🎨 UI/UX Design Principles
-
-### Visual Hierarchy
-- **Large, clear search bar**: Primary user action
-- **Subtle filters**: Secondary options, not overwhelming
-- **Card-based results**: Easy to scan and compare
-
-### Responsive Design
-- **Mobile-first**: Works on all screen sizes
-- **Flexible grid**: Adapts from 1 to 3 columns
-- **Touch-friendly**: Large buttons and touch targets
-
-### Performance Feedback
-- **Immediate feedback**: Buttons respond instantly
-- **Loading states**: Users know something is happening
-- **Smooth animations**: 300-500ms transitions feel natural
-
-## 🔧 Technical Implementation Details
-
-### State Flow Diagram
+### Component Hierarchy
 ```
-User Input → Component State → API Parameters → Database Query → Results → UI Update
-     ↓              ↓              ↓              ↓           ↓         ↓
-  "Stanford"   searchQuery:    search=Stanford   WHERE name    Array    Cards
-                "Stanford"                       LIKE '%stan%'
+Parent Component
+    ↓
+SearchFilters / SearchBar + FilterSection
+    ↓
+UniversityGrid
+    ↓
+UniversityCard (multiple)
 ```
 
-### Caching Strategy
-```
-Level 1: In-Memory Cache (60 seconds)
-Level 2: HTTP Cache (5 minutes)  
-Level 3: Database Query Cache (varies)
+### State Flow
+1. **Search/Filter State**: Managed by parent component
+2. **University Data**: Managed by UniversityGrid
+3. **Individual Card State**: Managed by UniversityCard
+4. **Cache State**: Managed by refs in UniversityGrid
+
+### Props Flow
+```javascript
+// Parent → UniversityGrid
+<UniversityGrid 
+  searchQuery={searchQuery}
+  selectedGmat={selectedGmat}
+  selectedRanking={selectedRanking}
+/>
+
+// UniversityGrid → UniversityCard
+<UniversityCard 
+  university={university}
+  onToggleSuccess={handleToggleSuccess}
+/>
 ```
 
-### Error Recovery
-```
-API Error → Show Error Message → Keep Previous Results → Retry Option
-Network Error → Offline Message → Cache Fallback → Auto-retry
-```
+---
 
-This architecture ensures a fast, reliable, and user-friendly search experience with optimal performance and minimal server load.
+## 📱 Responsive Behavior
+
+### Breakpoints
+- **Mobile**: `< 640px` - Single column, compact layout
+- **Tablet**: `640px - 1024px` - Two columns, medium spacing
+- **Desktop**: `1024px+` - Three columns, full features
+
+### Adaptive Elements
+- **Grid Layout**: Responsive column count
+- **Search Bar**: Full width on mobile, constrained on desktop
+- **Filters**: Stack vertically on small screens
+- **Card Layout**: Simplified metrics on mobile
+
+---
+
+This documentation covers the complete architecture, data flow, caching strategies, UI patterns, and implementation details of the university search application. Each component is designed with performance, user experience, and maintainability in mind.

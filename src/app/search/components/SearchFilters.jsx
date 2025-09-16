@@ -1,34 +1,30 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 
 /**
- * Comprehensive search and filter component for university search functionality.
- * Provides:
- * - Search bar
- * - University ranking filter
+ * SearchFilters Component
+ *
+ * Provides a UI for searching and filtering universities by:
+ * - Search term (name, location, or program)
+ * - Ranking filter
  * - GMAT score filter
- * - "Clear all" option with active filter count
+ *
+ * Displays the number of active filters, allows clearing all filters,
+ * and passes changes back up through callback props.
+ *
+ * @component
  *
  * @param {Object} props - Component props
- * @param {string} props.searchTerm - Current search query value
- * @param {(value: string) => void} props.onSearchChange - Handler for search term changes
- * @param {string} props.selectedRankFilter - Currently selected university rank filter
- * @param {(value: string) => void} props.onRankFilterChange - Handler for rank filter changes
+ * @param {string} props.searchTerm - Current search query input
+ * @param {function} props.onSearchChange - Callback when the search input changes
+ * @param {string} props.selectedRankFilter - Currently selected ranking filter
+ * @param {function} props.onRankFilterChange - Callback when ranking filter changes
  * @param {string} props.selectedGmatFilter - Currently selected GMAT score filter
- * @param {(value: string) => void} props.onGmatFilterChange - Handler for GMAT filter changes
- * @returns {JSX.Element} Interactive search and filter component with modern UI
+ * @param {function} props.onGmatFilterChange - Callback when GMAT filter changes
  */
-export const SearchFilters = ({
+const SearchFilters = ({
   searchTerm,
   onSearchChange,
   selectedRankFilter,
@@ -36,33 +32,26 @@ export const SearchFilters = ({
   selectedGmatFilter,
   onGmatFilterChange,
 }) => {
-  // ----------------------------
-  // State
-  // ----------------------------
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  /**
+   * Tracks the number of currently active filters.
+   * @type {number}
+   */
   const [activeFilters, setActiveFilters] = useState(0);
 
-  // ----------------------------
-  // Effects
-  // ----------------------------
-
   /**
-   * Updates the active filter count
-   * (filters are active if not set to "all")
+   * Effect hook to count active filters whenever ranking or GMAT filter changes.
    */
   useEffect(() => {
     let count = 0;
+
     if (selectedRankFilter && selectedRankFilter !== 'all') count++;
     if (selectedGmatFilter && selectedGmatFilter !== 'all') count++;
+
     setActiveFilters(count);
   }, [selectedRankFilter, selectedGmatFilter]);
 
-  // ----------------------------
-  // Handlers
-  // ----------------------------
-
   /**
-   * Clears all filters and resets the search term
+   * Clears all filters (search, ranking, GMAT) back to default values.
    */
   const clearAllFilters = () => {
     onRankFilterChange('all');
@@ -70,27 +59,19 @@ export const SearchFilters = ({
     onSearchChange('');
   };
 
-  // ----------------------------
-  // Render
-  // ----------------------------
   return (
-    <div className="rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border p-6 sm:p-8 mb-8 transition-all duration-500 hover:shadow-[0_16px_50px_rgb(0,0,0,0.15)] bg-[#002147] backdrop-blur-sm">
+    <div className="rounded-xl shadow-lg border border-gray-200/60 p-6 mb-8 transition-all duration-300 hover:shadow-xl bg-white/95 backdrop-blur-sm">
       
-      {/* ----------------------------
-          Header Section
-         ---------------------------- */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-        
-        {/* Icon + Title */}
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE] rounded-3xl flex items-center justify-center shadow-lg">
-            <SlidersHorizontal className="h-6 w-6 text-white" />
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-md">
+            <SlidersHorizontal className="h-5 w-5 text-white" />
           </div>
+
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              Search Universities
-            </h3>
-            <p className="text-sm text-white/80 mt-1 font-medium">
+            <h3 className="text-lg font-semibold text-gray-900">Search Universities</h3>
+            <p className="text-sm text-gray-600 mt-1">
               Find institutions that match your criteria
             </p>
           </div>
@@ -100,77 +81,66 @@ export const SearchFilters = ({
         {(activeFilters > 0 || searchTerm) && (
           <button
             onClick={clearAllFilters}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-white/10 hover:bg-white/20 rounded-2xl transition-all duration-300 backdrop-blur-sm border border-white/20 hover:border-white/30 group"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-300"
           >
-            <X className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
+            <X className="h-4 w-4" />
             Clear {activeFilters > 0 && `(${activeFilters})`}
           </button>
         )}
       </div>
 
-      {/* ----------------------------
-          Search & Filter Controls
-         ---------------------------- */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-center sm:gap-6">
+      {/* Filters Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
 
         {/* Search Input */}
-        <div className="xl:col-span-6 relative w-full max-w-2xl mx-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              // Search handled externally
-            }}
-            className="flex items-center relative"
-          >
-            <Input
+        <div className="md:col-span-6">
+          <div className="relative">
+            <input
               type="text"
               placeholder="Search by name, location, or program..."
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              className="w-full h-12 pl-12 pr-28 py-2 bg-white/90 rounded-full text-sm placeholder:text-[#002147] font-medium"
+              className="w-full h-12 pl-4 pr-12 py-2 bg-white border border-gray-200/60 rounded-xl text-sm placeholder:text-gray-400 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
             />
-            <button
-              type="submit"
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#3598FE] text-white px-5 py-2 text-sm font-semibold rounded-full shadow-md hover:shadow-[0_0_10px_#00f0ff] transition-all duration-300"
-            >
-              Search
-            </button>
-          </form>
+
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              {/* NOTE: Ensure `Search` icon is imported */}
+              <Search className="h-5 w-5" />
+            </div>
+          </div>
         </div>
 
-        {/* University Ranking Filter */}
-        <div className="lg:col-span-2">
-          <Select value={selectedRankFilter} onValueChange={onRankFilterChange}>
-            <SelectTrigger className="h-14 bg-white backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">
-              <SelectValue placeholder="University Rank" />
-            </SelectTrigger>
-            <SelectContent className="bg-white/95 backdrop-blur-sm text-gray-900 border-none shadow-2xl rounded-2xl">
-              <SelectItem value="all" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">All Rankings</SelectItem>
-              <SelectItem value="top100" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">Top 100</SelectItem>
-              <SelectItem value="top50" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">Top 50</SelectItem>
-              <SelectItem value="top25" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">Top 25</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Ranking Filter Dropdown */}
+        <div className="md:col-span-3">
+          <select
+            value={selectedRankFilter}
+            onChange={(e) => onRankFilterChange(e.target.value)}
+            className="w-full h-12 bg-white border border-gray-200/60 rounded-xl px-4 text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+          >
+            <option value="all">All Rankings</option>
+            <option value="top100">Top 100</option>
+            <option value="top50">Top 50</option>
+            <option value="top25">Top 25</option>
+          </select>
         </div>
 
-        {/* GMAT Score Filter */}
-        <div className="lg:col-span-2">
-          <Select value={selectedGmatFilter} onValueChange={onGmatFilterChange}>
-            <SelectTrigger className="h-14 bg-white/95 backdrop-blur-sm text-gray-900 border-none outline-none focus:ring-2 focus:ring-[#3598FE]/50 shadow-lg hover:bg-white hover:shadow-xl transition-all duration-300 rounded-2xl px-5 text-base font-medium">
-              <SelectValue placeholder="GMAT Score Range" />
-            </SelectTrigger>
-            <SelectContent className="bg-white/95 backdrop-blur-sm text-gray-900 border-none shadow-2xl rounded-2xl">
-              <SelectItem value="all" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">All Scores</SelectItem>
-              <SelectItem value="750+" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">750+ (Elite)</SelectItem>
-              <SelectItem value="700+" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">700+ (Excellent)</SelectItem>
-              <SelectItem value="650+" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">650+ (Good)</SelectItem>
-              <SelectItem value="600+" className="h-12 text-base font-medium hover:bg-gray-50 rounded-xl">600+ (Average)</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* GMAT Filter Dropdown */}
+        <div className="md:col-span-3">
+          <select
+            value={selectedGmatFilter}
+            onChange={(e) => onGmatFilterChange(e.target.value)}
+            className="w-full h-12 bg-white border border-gray-200/60 rounded-xl px-4 text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+          >
+            <option value="all">All Scores</option>
+            <option value="750+">750+ (Elite)</option>
+            <option value="700+">700+ (Excellent)</option>
+            <option value="650+">650+ (Good)</option>
+            <option value="600+">600+ (Average)</option>
+          </select>
         </div>
       </div>
     </div>
   );
 };
+
+export default SearchFilters;
