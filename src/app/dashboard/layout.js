@@ -25,35 +25,43 @@ const Layout = ({ children }) => {
       label: 'Dashboard',
       icon: LayoutDashboard,
       href: '/dashboard',
+      comingSoon: false,
+    },
+      {
+      id: 'calendar',
+      label: 'Calendar',
+      icon: Calendar,
+      href: '/dashboard/calender',
+      comingSoon: false,
     },
     {
       id: 'cv-builder',
       label: 'CV Builder',
       icon: FileText,
       href: '/cv-builder',
+      comingSoon: true,
     },
-    {
-      id: 'calendar',
-      label: 'Calendar',
-      icon: Calendar,
-      href: '/dashboard/calender',
-    },
+    
+  
     {
       id: 'resource-hub',
       label: 'Resource Hub',
       icon: BookOpen,
       href: '/resources-hub',
+      comingSoon: true,
     },
-    {
+    /*{
       id: 'settings',
       label: 'Settings',
       icon: Settings,
       href: '/settings',
-    },
+      comingSoon: false,
+    },*/
   ];
 
-  // When a menu item is clicked, set it as active and navigate
-  const handleItemClick = (itemId, href) => {
+  // When a menu item is clicked, set it as active and navigate (only if not coming soon)
+  const handleItemClick = (itemId, href, comingSoon) => {
+    if (comingSoon) return; // Prevent navigation for coming soon items
     setActiveItem(itemId); // This enables the active styling below
     router.push(href);     // Navigate to the selected route
   };
@@ -101,14 +109,17 @@ const Layout = ({ children }) => {
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeItem === item.id;
-
+              const isComingSoon = item.comingSoon;
 
               return (
-                <li key={item.id}>
+                <li key={item.id} className="relative">
                   <button
-                    onClick={() => handleItemClick(item.id, item.href)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group ${
-                      isActive
+                    onClick={() => handleItemClick(item.id, item.href, item.comingSoon)}
+                    disabled={isComingSoon}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group relative ${
+                      isComingSoon
+                        ? 'opacity-40 cursor-not-allowed'
+                        : isActive
                         ? 'bg-[#002147] text-white shadow-md'
                         : 'text-[#002147] hover:bg-[#F0F4FA] hover:text-[#001e3e]'
                     }`}
@@ -116,7 +127,9 @@ const Layout = ({ children }) => {
 
                     <Icon
                       className={`w-5 h-5 transition-colors ${
-                        isActive
+                        isComingSoon
+                          ? 'text-[#002147]'
+                          : isActive
                           ? 'text-white'
                           : 'text-[#002147] group-hover:text-[#001e3e]'
                       }`}
@@ -124,7 +137,9 @@ const Layout = ({ children }) => {
                     {!isCollapsed && (
                       <span
                         className={`font-medium text-sm transition-colors tracking-[0.4px] ${
-                          isActive
+                          isComingSoon
+                            ? 'text-[#002147]'
+                            : isActive
                             ? 'text-white'
                             : 'text-[#002147] group-hover:text-[#001e3e]'
                         }`}
@@ -132,6 +147,18 @@ const Layout = ({ children }) => {
                         {item.label}
                       </span>
                     )}
+                    
+                   
+                    {/* Coming Soon Tag for Collapsed State */}
+                    {isComingSoon && (
+                    <div className="absolute -top-2 -right-2 z-10">
+                      <div className="relative bg-[#002147]  text-white text-[10px] font-bold px-3 py-1 transform rotate-12 shadow-lg">
+                        <span className="tracking-wider">SOON</span>
+                        {/* Ribbon fold effect */}
+                        <div className="absolute -bottom-1 -left-1 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-[#001122]"></div>
+                      </div>
+                    </div>
+                  )}
                   </button>
                 </li>
               );
@@ -160,30 +187,20 @@ export default Layout;
 
 
 
-// ✅ EXPLANATION: Why we check `activeItem === item.id`
+// ✅ EXPLANATION: Coming Soon Feature Implementation
 //
-// Imagine you have 3 chairs (buttons) on the screen:
-// Chair A (dashboard), Chair B (calendar), Chair C (cv-builder)
+// Added `comingSoon` property to menu items to identify which features are not ready yet.
 //
-// When you click Chair B, you set it as active:
-// setActiveItem('calendar');
+// Visual Changes:
+// 1. Items with comingSoon: true get 40% opacity (opacity-40)
+// 2. Cursor changes to not-allowed for disabled state
+// 3. "COMING SOON" tag appears on the right side
+// 4. In collapsed mode, shows a dot indicator instead of full text
 //
-// But React doesn't just remember which one you clicked.
-// It re-renders ALL chairs (buttons) again.
+// Functional Changes:
+// 1. handleItemClick checks if item is coming soon and prevents navigation
+// 2. Button is disabled for coming soon items
+// 3. Hover effects are disabled for coming soon items
 //
-// Now, during render, each chair must ask:
-// => "Am I the one that was clicked? Am I the active one?"
-//
-// That's why we check:
-// const isActive = activeItem === item.id;
-//
-// It works like a teacher giving a gold star ⭐:
-// The teacher asks each student:
-// => "Is your name equal to the active name I saved?"
-//
-// Only the one that matches gets the star (active styles).
-//
-// So even if you clicked just one button,
-// All buttons still need to check if they are the active one.
-//
-// 🔁 Without this check, you won’t know which button to style as active!
+// The #002147 color is used for the coming soon tags to match your brand colors.
+// The tags have white text for good contrast and readability.

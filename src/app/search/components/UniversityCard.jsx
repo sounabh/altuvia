@@ -166,7 +166,7 @@ const UniversityCard = memo(({ university }) => {
             <div className="flex items-center bg-green-50 rounded-lg p-2 border border-green-100">
               <GraduationCap className="w-3 h-3 text-green-600 mr-1.5 flex-shrink-0" />
               <div className="overflow-hidden">
-                <div className="text-[10px] font-medium text-green-700 uppercase tracking-wide">Accept</div>
+                <div className="text-[10px] font-medium text-green-700 uppercase tracking-wide">Acceptance</div>
                 <div className="text-sm font-bold text-gray-900 truncate">
                   {university?.acceptRate || 'N/A'}%
                 </div>
@@ -188,7 +188,7 @@ const UniversityCard = memo(({ university }) => {
             <div className="flex items-center bg-purple-50 rounded-lg p-2 border border-purple-100">
               <Zap className="w-3 h-3 text-purple-600 mr-1.5 flex-shrink-0" />
               <div className="overflow-hidden">
-                <div className="text-[10px] font-medium text-purple-700 uppercase tracking-wide">App Fee</div>
+                <div className="text-[10px] font-medium text-purple-700 uppercase tracking-wide">Additional Fee</div>
                 <div className="text-xs font-semibold text-gray-900 truncate">
                   {university?.applicationFee || 'N/A'}
                 </div>

@@ -9,35 +9,25 @@ import {
 import Link from 'next/link';
 
 /**
- * University card component with interactive features
- * @param {Object} props - Component props
- * @param {Object} props.university - University data object containing:
- *   @param {string} id - University identifier
- *   @param {string} name - University name (fallback to universityName)
- *   @param {string} image - University image URL
- *   @param {string} location - University location
- *   @param {string} status - Application status ('submitted', 'in-progress', etc.)
- *   @param {string} deadline - Application deadline
- *   @param {number} essayProgress - Essay completion percentage
- *   @param {number} tasks - Completed tasks count
- *   @param {number} totalTasks - Total tasks count
- *   @param {number} gmatAverage - Average GMAT score (fallback to gmatAverageScore)
- *   @param {string} slug - URL-friendly identifier (optional)
- * @param {Function} props.onRemove - Callback for remove action
- * @returns {JSX.Element} Interactive university card with:
- * - Context menu actions
- * - Status indicator
- * - Progress tracking
- * - Hover effects
- * - Error handling for images
+ * University card component with interactive features and debugging
  */
 export const UniversityCard = ({ university, onRemove }) => {
-//  console.log('University data in card:', university);
+
+  // Debug: Log the university data to see what we're getting
+  console.log('University data in card:', {
+    id: university.id,
+    name: university.name,
+    tasks: university.tasks,
+    totalTasks: university.totalTasks,
+    completedEssays: university.completedEssays,
+    totalEssays: university.totalEssays,
+    calendarEvents: university.calendarEvents,
+    stats: university.stats,
+    _debug: university._debug
+  });
 
   /**
    * Determines gradient color based on application status
-   * @param {string} status - Application status
-   * @returns {string} Tailwind gradient classes
    */
   const getStatusColor = (status) => {
     switch (status) {
@@ -52,8 +42,6 @@ export const UniversityCard = ({ university, onRemove }) => {
 
   /**
    * Gets display text for application status
-   * @param {string} status - Application status
-   * @returns {string} Human-readable status text
    */
   const getStatusText = (status) => {
     switch (status) {
@@ -68,17 +56,14 @@ export const UniversityCard = ({ university, onRemove }) => {
 
   /**
    * Handles view details action
-   * @param {Event} e - Click event
    */
   const handleViewDetails = (e) => {
     e.preventDefault();
     console.log('View details for:', university.name);
-    // Add view details functionality here
   };
 
   /**
    * Handles remove action
-   * @param {Event} e - Click event
    */
   const handleRemove = (e) => {
     e.preventDefault();
@@ -86,6 +71,29 @@ export const UniversityCard = ({ university, onRemove }) => {
       onRemove(university.id);
     }
   };
+
+  // Calculate essay progress percentage based on completed vs total essays
+  const essayProgressPercentage = university.totalEssays > 0 
+    ? Math.round((university.completedEssays / university.totalEssays) * 100)
+    : 0;
+
+  // Get task data - Calendar events ARE the tasks
+  // Backend should already calculate these correctly, so we use the direct values
+  const totalTasks = university.totalTasks || 0;
+  const completedTasks = university.tasks || 0;
+
+  const taskProgressPercentage = totalTasks > 0 
+    ? Math.round((completedTasks / totalTasks) * 100)
+    : 0;
+
+  console.log(`Task calculation for ${university.name}:`, {
+    completed: completedTasks,
+    total: totalTasks,
+    percentage: taskProgressPercentage,
+    calendarEventsLength: university.calendarEvents?.length || 0,
+    statsTasksTotal: university.stats?.tasks?.total || 'N/A',
+    debugTasksTotal: university._debug?.calendarEventsAsTasks?.total || 'N/A'
+  });
 
   // Determine URL using slug or fallback to ID
   const universityUrl = university.slug 
@@ -168,18 +176,51 @@ export const UniversityCard = ({ university, onRemove }) => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center text-slate-600">
                   <FileText className="w-4 h-4 mr-2" />
-                  <span className="text-sm font-medium">Essay Progress</span>
+                  <span className="text-sm font-medium">Essays</span>
                 </div>
                 <span className="text-sm font-semibold text-slate-900">
-                  {university.essayProgress || 0}%
+                  {university.completedEssays || 0}/{university.totalEssays || 0}
                 </span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
-                <div 
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${university.essayProgress || 0}%` }}
-                />
+              {university.totalEssays > 0 && (
+                <div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${essayProgressPercentage}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {essayProgressPercentage}% Complete
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Task Progress Section - Calendar Events ARE Tasks */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center text-slate-600">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <span className="text-sm font-medium">Tasks</span>
+                </div>
+                <span className="text-sm font-semibold text-slate-900">
+                  {completedTasks}/{totalTasks}
+                </span>
               </div>
+              {totalTasks > 0 && (
+                <div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${taskProgressPercentage}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {taskProgressPercentage}% Complete
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Stats Section */}
@@ -187,7 +228,7 @@ export const UniversityCard = ({ university, onRemove }) => {
               {/* Tasks Completed */}
               <div className="text-center">
                 <div className="text-2xl font-bold text-slate-900">
-                  {university.tasks || 0}/{university.totalTasks || 5}
+                  {completedTasks}/{totalTasks}
                 </div>
                 <div className="text-xs text-slate-600 uppercase tracking-wide">Tasks</div>
               </div>
@@ -200,6 +241,25 @@ export const UniversityCard = ({ university, onRemove }) => {
                 <div className="text-xs text-slate-600 uppercase tracking-wide">GMAT Avg</div>
               </div>
             </div>
+
+            {/* Debug Info (only in development) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="bg-gray-100 p-3 rounded text-xs font-mono">
+                <strong>Debug Info:</strong><br/>
+                <div className="mt-1">
+                  Backend Values: tasks={university.tasks}, totalTasks={university.totalTasks}<br/>
+                  Calendar Events: {university.calendarEvents?.length || 0} events<br/>
+                  Stats Available: {university.stats ? 'Yes' : 'No'}<br/>
+                  {university.stats && (
+                    <>
+                      Stats Tasks: {university.stats.tasks?.total || 'N/A'} total, {university.stats.tasks?.completed || 'N/A'} completed<br/>
+                    </>
+                  )}
+                  Debug Tasks: {university._debug?.calendarEventsAsTasks?.total || 'N/A'} total, {university._debug?.calendarEventsAsTasks?.completed || 'N/A'} completed
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>

@@ -10,14 +10,14 @@ import { BookOpen, Clock, CheckCircle, AlertTriangle, TrendingUp } from 'lucide-
  *   @param {number} submitted - Successfully submitted applications
  *   @param {number} upcomingDeadlines - Total count of upcoming deadlines across all universities
  * @returns {JSX.Element} Responsive grid of enhanced statistic cards with:
- * - Animated icons and gradients
- * - Color-coded categories with hover effects
+ * - Clean hover effects without flashy animations
+ * - Color-coded categories
  * - Progress indicators
  * - Contextual styling based on urgency
  */
 export const StatsOverview = ({ stats }) => {
   /**
-   * Enhanced stat card configuration array with additional styling and logic
+   * Enhanced stat card configuration array with cleaner styling
    */
   const statCards = [
     {
@@ -90,8 +90,8 @@ export const StatsOverview = ({ stats }) => {
             <div
               key={index}
               className={`relative overflow-hidden bg-gradient-to-br ${stat.bgGradient} rounded-2xl p-6 border border-white/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group ${
-                stat.isUrgent ? 'ring-2 ring-red-200 animate-pulse' : ''
-              } ${stat.isCritical ? 'ring-4 ring-red-400' : ''}`}
+                stat.isCritical ? 'ring-2 ring-red-400' : ''
+              }`}
             >
               {/* Background Pattern */}
               <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50"></div>
@@ -100,14 +100,14 @@ export const StatsOverview = ({ stats }) => {
               <div className="relative z-10">
                 {/* Header with Icon and Value */}
                 <div className="flex items-start justify-between mb-4">
-                  {/* Animated Icon Container */}
-                  <div className={`p-3 rounded-xl bg-white/70 backdrop-blur-sm shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className={`w-6 h-6 ${stat.iconColor} ${stat.isUrgent ? 'animate-bounce' : ''}`} />
+                  {/* Icon Container - Simple hover effect */}
+                  <div className={`p-3 rounded-xl bg-white/70 backdrop-blur-sm shadow-md group-hover:scale-105 transition-transform duration-200`}>
+                    <Icon className={`w-6 h-6 ${stat.iconColor}`} />
                   </div>
                   
                   {/* Enhanced Value Display */}
                   <div className="text-right">
-                    <div className={`text-3xl font-bold bg-gradient-to-r ${stat.gradient} bg-clip-text text-transparent group-hover:scale-105 transition-transform duration-300`}>
+                    <div className={`text-3xl font-bold bg-gradient-to-r ${stat.gradient} bg-clip-text text-transparent group-hover:scale-105 transition-transform duration-200`}>
                       {stat.value}
                     </div>
                     {stat.showTrend && stat.value > 0 && (
@@ -145,10 +145,10 @@ export const StatsOverview = ({ stats }) => {
                   </div>
                 )}
 
-                {/* Urgent Action Indicator */}
-                {stat.isUrgent && (
+                {/* Simple Urgent Indicator - No flashing */}
+                {stat.isCritical && (
                   <div className="absolute top-2 right-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                   </div>
                 )}
               </div>

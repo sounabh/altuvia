@@ -375,10 +375,10 @@ export async function POST(request) {
       );
     }
 
-    // Create the calendar event with reminders in a transaction
-    const result = await prisma.$transaction(async (prisma) => {
+    // Create the calendar event with reminders in a transaction with increased timeout
+    const result = await prisma.$transaction(async (tx) => {
       // Create the main event
-      const event = await prisma.calendarEvent.create({
+      const event = await tx.calendarEvent.create({
         data: {
           userId: user.id,
           title: title.trim(),
@@ -438,12 +438,15 @@ export async function POST(request) {
           };
         });
 
-        await prisma.eventReminder.createMany({
+        await tx.eventReminder.createMany({
           data: reminderData
         });
       }
 
       return event;
+    }, {
+      timeout: 15000, // Increased timeout to 15 seconds
+      maxWait: 5000, // Maximum time to wait for a connection from the pool
     });
 
     // Transform the result for frontend
@@ -495,16 +498,12 @@ export async function POST(request) {
 }
 
 // ========================================
-// PUT ENDPOINT - Update Calendar Event
+// PUT ENDPOINT - Update Calendar Event (Optimized)
 // ========================================
 
 /**
  * PUT endpoint for updating calendar events
- * Supports updating event details and reminders
- * Validates permissions and input data
- * 
- * @param {Request} request - The incoming request object
- * @returns {NextResponse} JSON response with updated event or error
+ * SOLUTION 1: Optimized with increased timeout and batch operations
  */
 export async function PUT(request) {
   try {
@@ -661,8 +660,206 @@ export async function PUT(request) {
     // Set update timestamp
     processedData.updatedAt = new Date();
 
-    const result = await prisma.$transaction(async (prisma) => {
-      // Update the main event
+    // SOLUTION 1: Use transaction with increased timeout and optimized queries
+    const result = await prisma.$transaction(async (tx) => {
+      // Update the main event with minimal includes for speed
+      const updatedEvent = await tx.calendarEvent.update({
+        where: { id },
+        data: processedData,
+        include: {
+          university: {
+            select: {
+              universityName: true,
+              slug: true
+            }
+          },
+          program: {
+            select: {
+              programName: true,
+              programSlug: true
+            }
+          }
+        }
+      });
+
+      // Handle reminders separately for better performance
+      if (reminders && Array.isArray(reminders)) {
+        // Use a single delete operation
+        await tx.eventReminder.deleteMany({
+          where: { eventId: id }
+        });
+
+        // Create new reminders in batch
+        if (reminders.length > 0) {
+          const reminderData = reminders.map(reminder => {
+            const reminderTime = reminder.time || 1440;
+            const scheduledFor = new Date(
+              (processedData.startDate || existingEvent.startDate).getTime() - (reminderTime * 60 * 1000)
+            );
+            
+            return {
+              eventId: id,
+              userId: user.id,
+              reminderType: reminder.type || 'email',
+              reminderTime,
+              reminderMessage: reminder.message || `Reminder: ${updatedEvent.title}`,
+              scheduledFor,
+              isActive: true
+            };
+          });
+
+          // Single batch insert
+          await tx.eventReminder.createMany({
+            data: reminderData
+          });
+        }
+      }
+
+      return updatedEvent;
+    }, {
+      timeout: 15000, // Increased timeout to 15 seconds
+      maxWait: 5000,  // Maximum time to wait for a connection
+    });
+
+    // Fetch reminders separately if needed (outside transaction)
+    const finalReminders = reminders && Array.isArray(reminders) ? 
+      await prisma.eventReminder.findMany({
+        where: { eventId: id, isActive: true }
+      }) : [];
+
+    // Transform the result for frontend
+    const transformedResult = {
+      id: result.id,
+      title: result.title,
+      description: result.description,
+      location: result.location,
+      start: result.startDate.toISOString(),
+      end: result.endDate.toISOString(),
+      timezone: result.timezone,
+      isAllDay: result.isAllDay,
+      type: result.eventType,
+      eventType: result.eventType,
+      status: result.eventStatus,
+      eventStatus: result.eventStatus,
+      priority: result.priority,
+      color: result.color,
+      completionStatus: result.completionStatus,
+      isSystemGenerated: result.isSystemGenerated,
+      hasReminders: result.hasReminders,
+      school: result.university?.universityName || 'General',
+      universityId: result.universityId,
+      program: result.program?.programName,
+      programId: result.programId,
+      reminders: finalReminders,
+      createdAt: result.createdAt.toISOString(),
+      updatedAt: result.updatedAt.toISOString()
+    };
+
+    return NextResponse.json({
+      success: true,
+      message: "Calendar event updated successfully",
+      data: transformedResult
+    });
+
+  } catch (error) {
+    console.error("Calendar API PUT error:", error);
+    
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to update calendar event",
+        message: error.message
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// ========================================
+// ALTERNATIVE PUT ENDPOINT - Without Transaction
+// ========================================
+
+/**
+ * SOLUTION 2: Alternative PUT implementation without transactions
+ * Use this if you still experience timeout issues
+ */
+export async function PUT_ALTERNATIVE(request) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    const updateData = await request.json();
+    const { id, reminders, ...eventData } = updateData;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Event ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if event exists and user has permission
+    const existingEvent = await prisma.calendarEvent.findUnique({
+      where: { id },
+    });
+
+    if (!existingEvent) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    if (existingEvent.userId !== user.id) {
+      return NextResponse.json(
+        { error: 'Permission denied' },
+        { status: 403 }
+      );
+    }
+
+    // Process update data (same validation as before)
+    const processedData = {};
+    
+    if (eventData.title !== undefined) {
+      if (!eventData.title.trim()) {
+        return NextResponse.json(
+          { error: 'Title cannot be empty' },
+          { status: 400 }
+        );
+      }
+      processedData.title = eventData.title.trim();
+    }
+    
+    // ... (other field processing code same as above)
+
+    // Update reminders flag
+    if (reminders !== undefined) {
+      processedData.hasReminders = Array.isArray(reminders) && reminders.length > 0;
+    }
+
+    processedData.updatedAt = new Date();
+
+    // SOLUTION 2: Update without transaction - separate operations
+    try {
+      // 1. Update the main event first
       const updatedEvent = await prisma.calendarEvent.update({
         where: { id },
         data: processedData,
@@ -678,14 +875,11 @@ export async function PUT(request) {
               programName: true,
               programSlug: true
             }
-          },
-          reminders: {
-            where: { isActive: true }
           }
         }
       });
 
-      // Update reminders if provided
+      // 2. Handle reminders separately (if provided)
       if (reminders && Array.isArray(reminders)) {
         // Delete existing reminders
         await prisma.eventReminder.deleteMany({
@@ -717,42 +911,50 @@ export async function PUT(request) {
         }
       }
 
-      return updatedEvent;
-    });
+      // 3. Fetch updated reminders
+      const finalReminders = await prisma.eventReminder.findMany({
+        where: { eventId: id, isActive: true }
+      });
 
-    // Transform the result for frontend
-    const transformedResult = {
-      id: result.id,
-      title: result.title,
-      description: result.description,
-      location: result.location,
-      start: result.startDate.toISOString(),
-      end: result.endDate.toISOString(),
-      timezone: result.timezone,
-      isAllDay: result.isAllDay,
-      type: result.eventType,
-      eventType: result.eventType,
-      status: result.eventStatus,
-      eventStatus: result.eventStatus,
-      priority: result.priority,
-      color: result.color,
-      completionStatus: result.completionStatus,
-      isSystemGenerated: result.isSystemGenerated,
-      hasReminders: result.hasReminders,
-      school: result.university?.universityName || 'General',
-      universityId: result.universityId,
-      program: result.program?.programName,
-      programId: result.programId,
-      reminders: result.reminders,
-      createdAt: result.createdAt.toISOString(),
-      updatedAt: result.updatedAt.toISOString()
-    };
+      // Transform and return result
+      const transformedResult = {
+        id: updatedEvent.id,
+        title: updatedEvent.title,
+        description: updatedEvent.description,
+        location: updatedEvent.location,
+        start: updatedEvent.startDate.toISOString(),
+        end: updatedEvent.endDate.toISOString(),
+        timezone: updatedEvent.timezone,
+        isAllDay: updatedEvent.isAllDay,
+        type: updatedEvent.eventType,
+        eventType: updatedEvent.eventType,
+        status: updatedEvent.eventStatus,
+        eventStatus: updatedEvent.eventStatus,
+        priority: updatedEvent.priority,
+        color: updatedEvent.color,
+        completionStatus: updatedEvent.completionStatus,
+        isSystemGenerated: updatedEvent.isSystemGenerated,
+        hasReminders: updatedEvent.hasReminders,
+        school: updatedEvent.university?.universityName || 'General',
+        universityId: updatedEvent.universityId,
+        program: updatedEvent.program?.programName,
+        programId: updatedEvent.programId,
+        reminders: finalReminders,
+        createdAt: updatedEvent.createdAt.toISOString(),
+        updatedAt: updatedEvent.updatedAt.toISOString()
+      };
 
-    return NextResponse.json({
-      success: true,
-      message: "Calendar event updated successfully",
-      data: transformedResult
-    });
+      return NextResponse.json({
+        success: true,
+        message: "Calendar event updated successfully",
+        data: transformedResult
+      });
+
+    } catch (updateError) {
+      // If something fails during the update process, we might have partial updates
+      console.error("Update process error:", updateError);
+      throw updateError;
+    }
 
   } catch (error) {
     console.error("Calendar API PUT error:", error);
@@ -882,3 +1084,24 @@ function getDefaultColor(eventType) {
 
   return colors[eventType] || colors.task;
 }
+
+// ========================================
+// PRISMA CLIENT CONFIGURATION (Optional)
+// ========================================
+
+/**
+ * If you're still experiencing timeout issues, you can also configure
+ * your Prisma client with connection pooling settings.
+ * Add this to your lib/prisma.js file:
+ * 
+ * export const prisma = new PrismaClient({
+ *   datasources: {
+ *     db: {
+ *       url: process.env.DATABASE_URL + "?connection_limit=10&pool_timeout=20"
+ *     }
+ *   }
+ * });
+ * 
+ * Or if using connection string directly:
+ * DATABASE_URL="postgresql://user:pass@host:port/db?connection_limit=10&pool_timeout=20"
+ */
