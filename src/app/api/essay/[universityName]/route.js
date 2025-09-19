@@ -4,10 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// SECURITY FIX: Use environment variable instead of hardcoded API key
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
 
-// GET - Fetch university workspace data with all essays
 export async function GET(request, { params }) {
   try {
     const { universityName } = params;
@@ -17,11 +15,9 @@ export async function GET(request, { params }) {
     console.log("Essay API - University Name:", universityName);
     console.log("Essay API - User ID:", userId);
 
-    // Decode university name from URL
     const decodedUniversityName = decodeURIComponent(universityName);
     console.log("Essay API - Decoded University Name:", decodedUniversityName);
 
-    // Find university by name or slug - made more flexible
     const university = await prisma.university.findFirst({
       where: {
         OR: [
@@ -38,7 +34,6 @@ export async function GET(request, { params }) {
                 .replace(/[^a-z0-9]+/g, "-"),
             },
           },
-          // Additional matching patterns
           {
             universityName: {
               contains: decodedUniversityName,
@@ -59,7 +54,11 @@ export async function GET(request, { params }) {
         programs: {
           where: { isActive: true },
           include: {
-            department: true,
+            departments: {
+              include: {
+                department: true,
+              },
+            },
             essayPrompts: {
               where: { isActive: true },
               include: {
@@ -77,7 +76,7 @@ export async function GET(request, { params }) {
                       },
                     },
                     aiResults: {
-                      where: { essayVersionId: null }, // Keep legacy analyses
+                      where: { essayVersionId: null },
                       orderBy: { createdAt: "desc" },
                       take: 5,
                     },
@@ -113,7 +112,6 @@ export async function GET(request, { params }) {
     );
 
     if (!university) {
-      // Try a broader search to help with debugging
       const allUniversities = await prisma.university.findMany({
         select: { universityName: true, slug: true, isActive: true },
         take: 10,
@@ -134,7 +132,6 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Check if university has programs
     if (!university.programs || university.programs.length === 0) {
       console.log("Essay API - No programs found for university");
       return NextResponse.json({
@@ -155,7 +152,6 @@ export async function GET(request, { params }) {
       });
     }
 
-    // Transform data for frontend with enhanced analytics
     const workspaceData = {
       university: {
         id: university.id,
@@ -165,13 +161,14 @@ export async function GET(request, { params }) {
         website: university.websiteUrl,
         city: university.city,
         country: university.country,
-        color: university.brandColor || "#002147", // Default color
+        color: university.brandColor || "#002147",
       },
       programs: university.programs.map((program) => ({
         id: program.id,
         name: program.programName,
         slug: program.programSlug,
-        departmentName: program.department?.name || "Unknown Department",
+        departmentName:
+          program.departments?.[0]?.department?.name || "Unknown Department",
         degreeType: program.degreeType,
         description: program.programDescription,
         deadlines:
@@ -215,9 +212,9 @@ export async function GET(request, { params }) {
                         timestamp: v.timestamp,
                         isAutoSave: v.isAutoSave,
                         changesSinceLastVersion: v.changesSinceLastVersion,
-                        aiAnalysis: v.aiResults?.[0] || null, // Latest AI analysis for this version
+                        aiAnalysis: v.aiResults?.[0] || null,
                       })) || [],
-                    aiResults: userEssay.aiResults || [], // Legacy analyses
+                    aiResults: userEssay.aiResults || [],
                   }
                 : null,
             };
@@ -293,7 +290,6 @@ export async function GET(request, { params }) {
   }
 }
 
-// POST - Handle essay operations (create, update, save version, AI analysis)
 export async function POST(request, { params }) {
   try {
     const { universityName } = params;
@@ -337,7 +333,6 @@ export async function POST(request, { params }) {
   }
 }
 
-// PUT - Update essay content with auto-save support
 export async function PUT(request, { params }) {
   try {
     const body = await request.json();
@@ -353,7 +348,6 @@ export async function PUT(request, { params }) {
     console.log("Essay API PUT - Essay ID:", essayId);
     console.log("Essay API PUT - Content length:", content?.length || 0);
 
-    // Validate required fields
     if (!essayId) {
       return NextResponse.json(
         { error: "Essay ID is required" },
@@ -361,69 +355,97 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const updateData = {
-      lastModified: new Date(),
-    };
+    const completionResult = await checkEssayCompletion(
+      essayId, 
+      wordCount || 0, 
+      content
+    );
 
-    // Add fields only if they're provided
-    if (content !== undefined) updateData.content = content;
-    if (wordCount !== undefined) updateData.wordCount = wordCount;
-    if (title !== undefined) updateData.title = title;
-    if (priority !== undefined) updateData.priority = priority;
-
-    // Update auto-save timestamp if this is an auto-save
-    if (isAutoSave) {
-      updateData.lastAutoSaved = new Date();
+    if (!completionResult.success) {
+      console.warn('Completion check failed, proceeding with regular update');
     }
 
-    const updatedEssay = await prisma.essay.update({
-      where: { id: essayId },
-      data: updateData,
-      include: {
-        versions: {
-          orderBy: { timestamp: "desc" },
-          take: 10,
-        },
-        aiResults: {
-          where: { essayVersionId: null },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-        },
-        essayPrompt: true,
-        program: {
-          include: {
-            university: true,
-          },
-        },
-      },
-    });
+    let updatedEssay = completionResult.success ? completionResult.essay : null;
 
-    // Auto-save version every 50 words or every 5 minutes
+    if (!updatedEssay) {
+      const updateData = {
+        lastModified: new Date(),
+      };
+
+      if (content !== undefined) updateData.content = content;
+      if (wordCount !== undefined) updateData.wordCount = wordCount;
+      if (title !== undefined) updateData.title = title;
+      if (priority !== undefined) updateData.priority = priority;
+
+      if (isAutoSave) {
+        updateData.lastAutoSaved = new Date();
+      }
+
+      updatedEssay = await prisma.essay.update({
+        where: { id: essayId },
+        data: updateData,
+        include: {
+          versions: { orderBy: { timestamp: 'desc' }, take: 10 },
+          aiResults: { 
+            where: { essayVersionId: null },
+            orderBy: { createdAt: 'desc' }, 
+            take: 3 
+          },
+          essayPrompt: true
+        }
+      });
+    } else {
+      const additionalUpdates = {};
+      if (title !== undefined) additionalUpdates.title = title;
+      if (priority !== undefined) additionalUpdates.priority = priority;
+      if (isAutoSave) additionalUpdates.lastAutoSaved = new Date();
+
+      if (Object.keys(additionalUpdates).length > 0) {
+        updatedEssay = await prisma.essay.update({
+          where: { id: essayId },
+          data: additionalUpdates,
+          include: {
+            versions: { orderBy: { timestamp: 'desc' }, take: 10 },
+            aiResults: { 
+              where: { essayVersionId: null },
+              orderBy: { createdAt: 'desc' }, 
+              take: 3 
+          },
+            essayPrompt: true
+          }
+        });
+      }
+    }
+
     if (isAutoSave && content && wordCount > 0) {
       const lastVersion = updatedEssay.versions[0];
       const shouldCreateAutoSave =
         !lastVersion ||
         (wordCount > 0 &&
-          (Math.abs(wordCount - lastVersion.wordCount) >= 50 || // Every 50 words
-            new Date() - new Date(lastVersion.timestamp) > 15 * 60 * 1000)); // Every 15 minutes
+          (Math.abs(wordCount - lastVersion.wordCount) >= 50 ||
+            new Date() - new Date(lastVersion.timestamp) > 15 * 60 * 1000));
 
       if (shouldCreateAutoSave) {
         await prisma.essayVersion.create({
           data: {
             essayId,
-            content,
-            wordCount,
+            content: content || '',
+            wordCount: wordCount || 0,
             label: `Auto-save ${new Date().toLocaleTimeString()}`,
             isAutoSave: true,
             changesSinceLastVersion: lastVersion
-              ? `+${wordCount - lastVersion.wordCount} words`
-              : "Initial content",
+              ? `${wordCount - lastVersion.wordCount > 0 ? '+' : ''}${
+                  wordCount - lastVersion.wordCount
+                } words`
+              : 'Initial content',
           },
         });
       }
     }
 
-    return NextResponse.json({ essay: updatedEssay });
+    return NextResponse.json({ 
+      essay: updatedEssay
+    });
   } catch (error) {
     console.error("Error updating essay:", error);
     return NextResponse.json(
@@ -436,13 +458,11 @@ export async function PUT(request, { params }) {
   }
 }
 
-// Helper: Create new essay
 async function createEssay(data) {
   const { userId, programId, essayPromptId, applicationId } = data;
 
   console.log("Creating essay with:", { userId, programId, essayPromptId });
 
-  // Validate required fields
   if (!userId || !programId || !essayPromptId) {
     return NextResponse.json(
       {
@@ -452,7 +472,6 @@ async function createEssay(data) {
     );
   }
 
-  // Check if essay already exists
   const existingEssay = await prisma.essay.findFirst({
     where: {
       userId,
@@ -469,7 +488,6 @@ async function createEssay(data) {
     });
   }
 
-  // Get prompt details
   const essayPrompt = await prisma.essayPrompt.findUnique({
     where: { id: essayPromptId },
     include: {
@@ -486,7 +504,6 @@ async function createEssay(data) {
     );
   }
 
-  // Create new essay
   const essay = await prisma.essay.create({
     data: {
       userId,
@@ -518,7 +535,6 @@ async function createEssay(data) {
   return NextResponse.json({ essay });
 }
 
-// Helper: Update essay
 async function updateEssay(data) {
   const { essayId, content, wordCount, title, priority, status } = data;
 
@@ -527,6 +543,37 @@ async function updateEssay(data) {
       { error: "Essay ID is required" },
       { status: 400 }
     );
+  }
+
+  const result = await checkEssayCompletion(
+    essayId,
+    wordCount || 0,
+    content
+  );
+
+  if (result.success) {
+    const additionalUpdates = {};
+    if (title !== undefined) additionalUpdates.title = title;
+    if (priority !== undefined) additionalUpdates.priority = priority;
+    if (status !== undefined) additionalUpdates.status = status;
+
+    if (Object.keys(additionalUpdates).length > 0) {
+      const finalEssay = await prisma.essay.update({
+        where: { id: essayId },
+        data: additionalUpdates,
+        include: {
+          versions: { orderBy: { timestamp: 'desc' }, take: 10 },
+          aiResults: { 
+            where: { essayVersionId: null },
+            orderBy: { createdAt: 'desc' }, 
+            take: 3 
+          }
+        }
+      });
+      return NextResponse.json({ essay: finalEssay });
+    }
+
+    return NextResponse.json({ essay: result.essay });
   }
 
   const updatedEssay = await prisma.essay.update({
@@ -561,7 +608,6 @@ async function updateEssay(data) {
   return NextResponse.json({ essay: updatedEssay });
 }
 
-// Helper: Save essay version (manual save) - WITH OPTIONAL AI ANALYSIS
 async function saveVersion(data) {
   const {
     essayId,
@@ -570,7 +616,7 @@ async function saveVersion(data) {
     label,
     isAutoSave = false,
     changeDescription,
-    performAiAnalysis = false, // NEW: Option to trigger AI analysis on save
+    performAiAnalysis = false,
     prompt,
   } = data;
 
@@ -581,7 +627,6 @@ async function saveVersion(data) {
     );
   }
 
-  // Get essay details for AI analysis
   const essay = await prisma.essay.findUnique({
     where: { id: essayId },
     include: {
@@ -596,19 +641,15 @@ async function saveVersion(data) {
     return NextResponse.json({ error: "Essay not found" }, { status: 404 });
   }
 
-  // Get previous version for comparison
   const lastVersion = await prisma.essayVersion.findFirst({
     where: { essayId },
     orderBy: { timestamp: "desc" },
   });
 
   const changesSinceLastVersion = lastVersion
-    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
-        wordCount - lastVersion.wordCount
-      } words`
+    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${ wordCount - lastVersion.wordCount } words`
     : "Initial version";
 
-  // Create version
   const version = await prisma.essayVersion.create({
     data: {
       essayId,
@@ -620,7 +661,6 @@ async function saveVersion(data) {
     },
   });
 
-  // Update essay's last modified time
   await prisma.essay.update({
     where: { id: essayId },
     data: { lastModified: new Date() },
@@ -628,7 +668,6 @@ async function saveVersion(data) {
 
   let aiAnalysis = null;
 
-  // Perform AI analysis if requested and content is sufficient
   if (performAiAnalysis && content && content.length >= 50) {
     try {
       const analysisResult = await performVersionAIAnalysis({
@@ -644,7 +683,6 @@ async function saveVersion(data) {
       }
     } catch (error) {
       console.warn("AI analysis failed during version save:", error);
-      // Don't fail version save if AI analysis fails
     }
   }
 
@@ -657,7 +695,6 @@ async function saveVersion(data) {
   });
 }
 
-// Helper: Auto-save essay with intelligent versioning
 async function autoSave(data) {
   const { essayId, content, wordCount } = data;
 
@@ -668,7 +705,45 @@ async function autoSave(data) {
     );
   }
 
-  // Update essay content
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content);
+
+  if (result.success) {
+    const finalEssay = await prisma.essay.update({
+      where: { id: essayId },
+      data: { lastAutoSaved: new Date() }
+    });
+
+    const lastVersion = await prisma.essayVersion.findFirst({
+      where: { essayId },
+      orderBy: { timestamp: 'desc' }
+    });
+
+    const shouldCreateAutoSave =
+      !lastVersion ||
+      (wordCount > 0 &&
+        (Math.abs(wordCount - lastVersion.wordCount) >= 50 ||
+          new Date() - new Date(lastVersion.timestamp) > 15 * 60 * 1000));
+
+    if (shouldCreateAutoSave) {
+      await prisma.essayVersion.create({
+        data: {
+          essayId,
+          content: content || '',
+          wordCount: wordCount || 0,
+          label: `Auto-save ${new Date().toLocaleTimeString()}`,
+          isAutoSave: true,
+          changesSinceLastVersion: lastVersion
+            ? `${wordCount - lastVersion.wordCount > 0 ? '+' : ''}${
+                wordCount - lastVersion.wordCount
+              } words`
+            : 'Initial auto-save',
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true, essay: result.essay });
+  }
+
   const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
     data: {
@@ -679,44 +754,13 @@ async function autoSave(data) {
     },
   });
 
-  // Check if we should create an auto-save version
-  const lastVersion = await prisma.essayVersion.findFirst({
-    where: { essayId },
-    orderBy: { timestamp: "desc" },
-  });
-
-  const shouldCreateAutoSave =
-    !lastVersion ||
-    (wordCount > 0 &&
-      (Math.abs(wordCount - lastVersion.wordCount) >= 50 || // Every 50 words
-        new Date() - new Date(lastVersion.timestamp) > 15 * 60 * 1000)); // Every 15 minutes
-
-  if (shouldCreateAutoSave) {
-    await prisma.essayVersion.create({
-      data: {
-        essayId,
-        content: content || "",
-        wordCount: wordCount || 0,
-        label: `Auto-save ${new Date().toLocaleTimeString()}`,
-        isAutoSave: true,
-        changesSinceLastVersion: lastVersion
-          ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
-              wordCount - lastVersion.wordCount
-            } words`
-          : "Initial auto-save",
-      },
-    });
-  }
-
   return NextResponse.json({ success: true, essay: updatedEssay });
 }
 
-// Helper: Get essay analytics data
 async function getEssayAnalytics(data) {
   const { essayId, userId } = data;
 
   try {
-    // Get essay with related data
     const essay = await prisma.essay.findUnique({
       where: { id: essayId },
       include: {
@@ -743,17 +787,31 @@ async function getEssayAnalytics(data) {
       return NextResponse.json({ error: "Essay not found" }, { status: 404 });
     }
 
-    // Get all essays for user for comparative analytics
+    if (!essay.essayPrompt) {
+      console.warn(`Essay ${essayId} has null essayPrompt`);
+      return NextResponse.json({
+        error: "Essay prompt data is missing",
+        essayId,
+        suggestion: "This essay may be orphaned. Consider reassigning it to a valid prompt."
+      }, { status: 400 });
+    }
+
     const allUserEssays = userId
       ? await prisma.essay.findMany({
-          where: { userId },
+          where: {
+            userId,
+            NOT: {
+              essayPromptId: null
+            }
+          },
           include: {
             essayPrompt: true,
           },
         })
       : [];
 
-    // Calculate analytics
+    const validUserEssays = allUserEssays.filter(e => e.essayPrompt !== null);
+
     const analytics = {
       completion: {
         percentage: Math.min(
@@ -768,7 +826,7 @@ async function getEssayAnalytics(data) {
         ),
       },
       timing: {
-        readingTime: Math.ceil(essay.wordCount / 200), // 200 WPM
+        readingTime: Math.ceil(essay.wordCount / 200),
         daysSinceStart: Math.max(
           1,
           Math.ceil((new Date() - essay.createdAt) / (1000 * 60 * 60 * 24))
@@ -793,9 +851,9 @@ async function getEssayAnalytics(data) {
           essay.content.length > 0
             ? Math.round(
                 essay.wordCount /
-                  essay.content
+                  Math.max(1, essay.content
                     .split(/[.!?]+/)
-                    .filter((s) => s.trim().length > 0).length
+                    .filter((s) => s.trim().length > 0).length)
               )
             : 0,
       },
@@ -810,18 +868,19 @@ async function getEssayAnalytics(data) {
       },
       progress: {
         overall:
-          allUserEssays.length > 0
-            ? allUserEssays.reduce(
+          validUserEssays.length > 0
+            ? validUserEssays.reduce(
                 (acc, e) =>
                   acc +
                   Math.min(100, (e.wordCount / e.essayPrompt.wordLimit) * 100),
                 0
-              ) / allUserEssays.length
+              ) / validUserEssays.length
             : 0,
-        completed: allUserEssays.filter(
+        completed: validUserEssays.filter(
           (e) => e.wordCount >= e.essayPrompt.wordLimit * 0.8
         ).length,
-        total: allUserEssays.length,
+        total: validUserEssays.length,
+        orphaned: allUserEssays.length - validUserEssays.length,
       },
     };
 
@@ -829,13 +888,16 @@ async function getEssayAnalytics(data) {
   } catch (error) {
     console.error("Error getting analytics:", error);
     return NextResponse.json(
-      { error: "Failed to get analytics" },
+      {
+        error: "Failed to get analytics",
+        details: error.message,
+        essayId
+      },
       { status: 500 }
     );
   }
 }
 
-// Helper: Delete version
 async function deleteVersion(data) {
   const { versionId, essayId } = data;
 
@@ -847,7 +909,6 @@ async function deleteVersion(data) {
   }
 
   try {
-    // Don't allow deletion of the only version
     const versionCount = await prisma.essayVersion.count({
       where: { essayId },
     });
@@ -859,7 +920,6 @@ async function deleteVersion(data) {
       );
     }
 
-    // Delete version and its AI analyses
     await prisma.aIResult.deleteMany({
       where: { essayVersionId: versionId },
     });
@@ -878,7 +938,6 @@ async function deleteVersion(data) {
   }
 }
 
-// Helper: Restore version
 async function restoreVersion(data) {
   const { essayId, versionId } = data;
 
@@ -898,7 +957,6 @@ async function restoreVersion(data) {
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
     }
 
-    // Update essay with version content
     const updatedEssay = await prisma.essay.update({
       where: { id: essayId },
       data: {
@@ -920,7 +978,6 @@ async function restoreVersion(data) {
       },
     });
 
-    // Create a new version marking this as a restoration
     await prisma.essayVersion.create({
       data: {
         essayId,
@@ -942,7 +999,6 @@ async function restoreVersion(data) {
   }
 }
 
-// Helper: Get version analyses
 async function getVersionAnalyses(data) {
   const { essayId } = data;
 
@@ -950,7 +1006,7 @@ async function getVersionAnalyses(data) {
     const analyses = await prisma.aIResult.findMany({
       where: {
         essayId,
-        essayVersionId: { not: null }, // Only version-specific analyses
+        essayVersionId: { not: null },
       },
       include: {
         essayVersion: {
@@ -974,7 +1030,6 @@ async function getVersionAnalyses(data) {
   }
 }
 
-// FIXED AI Analysis Function - Matches your component and database schema
 async function performAIAnalysis(data) {
   const {
     essayId,
@@ -1005,10 +1060,8 @@ async function performAIAnalysis(data) {
     );
   }
 
-  // Check API key
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
     console.error("GOOGLE_GEMINI_API_KEY not configured");
-    // Return stored analysis if available
     const storedAnalysis = await getStoredAnalysis(essayId, versionId);
     if (storedAnalysis) {
       return NextResponse.json({
@@ -1041,14 +1094,13 @@ async function performAIAnalysis(data) {
       return NextResponse.json({ error: "Essay not found" }, { status: 404 });
     }
 
-    // Check for recent existing analysis (within last hour)
     const recentAnalysis = await prisma.aIResult.findFirst({
       where: {
         essayId,
         essayVersionId: versionId,
         status: "completed",
         createdAt: {
-          gte: new Date(Date.now() - 60 * 60 * 1000), // Last hour
+          gte: new Date(Date.now() - 60 * 60 * 1000),
         },
       },
       orderBy: { createdAt: "desc" },
@@ -1066,7 +1118,6 @@ async function performAIAnalysis(data) {
       });
     }
 
-    // Initialize Gemini
     let model;
     try {
       model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -1087,88 +1138,85 @@ async function performAIAnalysis(data) {
       );
     }
 
-    // Enhanced prompt that returns exactly what your component expects
     const analysisPrompt = `
 You are an expert essay analyst. Analyze this essay and return ONLY a valid JSON response with the exact structure shown below.
 
 ESSAY CONTEXT:
-- Institution: ${essay.program.university.universityName}
-- Program: ${essay.program.programName} (${essay.program.degreeType})
-- Essay Prompt: ${prompt || essay.essayPrompt.promptText}
-- Word Limit: ${essay.essayPrompt.wordLimit}
-- Current Word Count: ${content.split(" ").length}
 
+Institution: ${essay.program.university.universityName}
+Program: ${essay.program.programName} (${essay.program.degreeType})
+Essay Prompt: ${prompt || essay.essayPrompt.promptText}
+Word Limit: ${essay.essayPrompt.wordLimit}
+Current Word Count: ${content.split(" ").length}
 ESSAY CONTENT:
 ${content}
 
 RETURN ONLY THIS JSON STRUCTURE (no additional text):
 {
-  "overallScore": 85,
-  "structureScore": 78,
-  "contentRelevance": 82,
-  "narrativeFlow": 76,
-  "leadershipEmphasis": 80,
-  "specificityScore": 74,
-  "readabilityScore": 88,
-  "sentenceCount": 25,
-  "paragraphCount": 5,
-  "avgSentenceLength": 18.2,
-  "complexWordCount": 12,
-  "passiveVoiceCount": 3,
-  "grammarIssues": 2,
-  "suggestions": [
-    {
-      "id": "1",
-      "type": "critical",
-      "priority": "high",
-      "title": "Clear actionable title",
-      "description": "Detailed explanation of the issue with specific examples",
-      "action": "Step-by-step instructions for improvement"
-    },
-    {
-      "id": "2", 
-      "type": "warning",
-      "priority": "medium",
-      "title": "Another suggestion",
-      "description": "Another detailed explanation",
-      "action": "How to fix this"
-    },
-    {
-      "id": "3",
-      "type": "improvement", 
-      "priority": "medium",
-      "title": "Enhancement opportunity",
-      "description": "What could be better",
-      "action": "How to improve"
-    },
-    {
-      "id": "4",
-      "type": "strength",
-      "priority": "medium", 
-      "title": "What's working well",
-      "description": "Why this is a strength",
-      "action": "How to leverage this further"
-    }
-  ]
+"overallScore": 85,
+"structureScore": 78,
+"contentRelevance": 82,
+"narrativeFlow": 76,
+"leadershipEmphasis": 80,
+"specificityScore": 74,
+"readabilityScore": 88,
+"sentenceCount": 25,
+"paragraphCount": 5,
+"avgSentenceLength": 18.2,
+"complexWordCount": 12,
+"passiveVoiceCount": 3,
+"grammarIssues": 2,
+"suggestions": [
+{
+"id": "1",
+"type": "critical",
+"priority": "high",
+"title": "Clear actionable title",
+"description": "Detailed explanation of the issue with specific examples",
+"action": "Step-by-step instructions for improvement"
+},
+{
+"id": "2",
+"type": "warning",
+"priority": "medium",
+"title": "Another suggestion",
+"description": "Another detailed explanation",
+"action": "How to fix this"
+},
+{
+"id": "3",
+"type": "improvement",
+"priority": "medium",
+"title": "Enhancement opportunity",
+"description": "What could be better",
+"action": "How to improve"
+},
+{
+"id": "4",
+"type": "strength",
+"priority": "medium",
+"title": "What's working well",
+"description": "Why this is a strength",
+"action": "How to leverage this further"
+}
+]
 }
 
 ANALYSIS GUIDELINES:
-- Scores 0-100 (realistic assessment)
-- 3-8 suggestions total
-- Types: critical, warning, improvement, strength
-- Priorities: high, medium, low
-- Specific, actionable feedback
-- Include at least one strength if possible
 
+Scores 0-100 (realistic assessment)
+3-8 suggestions total
+Types: critical, warning, improvement, strength
+Priorities: high, medium, low
+Specific, actionable feedback
+Include at least one strength if possible
 Return only the JSON, no other text.`;
 
-    // Make API call
     let result;
     try {
       result = await model.generateContent(analysisPrompt);
     } catch (apiError) {
       console.error("Gemini API error:", apiError);
-      // Fallback to stored analysis
       const storedAnalysis = await getStoredAnalysis(essayId, versionId);
       if (storedAnalysis) {
         return NextResponse.json({
@@ -1178,7 +1226,6 @@ Return only the JSON, no other text.`;
           message: "Using stored analysis - API request failed",
         });
       }
-      // Generate fallback analysis
       const fallbackAnalysis = generateAdvancedFallbackAnalysis(
         content,
         content.split(" ").length,
@@ -1205,7 +1252,6 @@ Return only the JSON, no other text.`;
     const processingTime = Date.now() - startTime;
     const responseText = result.response.text();
 
-    // Parse AI response
     let analysisData;
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -1216,7 +1262,6 @@ Return only the JSON, no other text.`;
       }
     } catch (parseError) {
       console.warn("JSON parsing failed:", parseError);
-      // Try stored analysis first
       const storedAnalysis = await getStoredAnalysis(essayId, versionId);
       if (storedAnalysis) {
         return NextResponse.json({
@@ -1226,7 +1271,6 @@ Return only the JSON, no other text.`;
           message: "Using stored analysis - AI response parsing failed",
         });
       }
-      // Use fallback
       analysisData = generateAdvancedFallbackAnalysis(
         content,
         content.split(" ").length,
@@ -1236,14 +1280,12 @@ Return only the JSON, no other text.`;
       );
     }
 
-    // Validate and normalize
     analysisData = validateAndNormalizeAnalysis(
       analysisData,
       content,
       essay.essayPrompt.wordLimit
     );
 
-    // Save to database
     const aiResult = await saveAnalysisToDatabase(
       essayId,
       versionId,
@@ -1262,7 +1304,6 @@ Return only the JSON, no other text.`;
   } catch (error) {
     console.error("Error performing AI analysis:", error);
 
-    // Log error
     try {
       await prisma.aIResult.create({
         data: {
@@ -1280,7 +1321,6 @@ Return only the JSON, no other text.`;
       console.error("Failed to log error:", dbError);
     }
 
-    // Final fallback - try stored analysis
     const storedAnalysis = await getStoredAnalysis(essayId, versionId);
     if (storedAnalysis) {
       return NextResponse.json({
@@ -1298,7 +1338,6 @@ Return only the JSON, no other text.`;
   }
 }
 
-// Helper: Get stored analysis
 async function getStoredAnalysis(essayId, versionId = null) {
   try {
     const storedResult = await prisma.aIResult.findFirst({
@@ -1318,7 +1357,6 @@ async function getStoredAnalysis(essayId, versionId = null) {
   }
 }
 
-// Helper: Transform stored analysis to component format
 function transformStoredAnalysisToComponentFormat(aiResult) {
   try {
     const suggestions = JSON.parse(aiResult.suggestions || "[]");
@@ -1326,12 +1364,10 @@ function transformStoredAnalysisToComponentFormat(aiResult) {
     const improvements = JSON.parse(aiResult.improvements || "[]");
     const warnings = JSON.parse(aiResult.warnings || "[]");
 
-    // If suggestions already contain mixed types, use directly
     let allSuggestions = [];
     if (suggestions.length > 0 && suggestions.some((s) => s.type)) {
       allSuggestions = suggestions;
     } else {
-      // Combine separate arrays (legacy format)
       allSuggestions = [
         ...suggestions.map((s, idx) => ({
           id: s.id || `suggestion_${idx}`,
@@ -1392,7 +1428,6 @@ function transformStoredAnalysisToComponentFormat(aiResult) {
   }
 }
 
-// Helper: Validate and normalize analysis
 function validateAndNormalizeAnalysis(analysisData, content, wordLimit) {
   const wordCount = content.split(" ").length;
   const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
@@ -1458,7 +1493,6 @@ function validateAndNormalizeAnalysis(analysisData, content, wordLimit) {
   };
 }
 
-// Helper: Save to database
 async function saveAnalysisToDatabase(
   essayId,
   versionId,
@@ -1513,138 +1547,6 @@ async function saveAnalysisToDatabase(
   }
 }
 
-// Enhanced fallback analysis
-function generateAdvancedFallbackAnalysiss(
-  content,
-  wordCount,
-  wordLimit,
-  prompt,
-  degreeType = "Unknown"
-) {
-  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-  const paragraphs = content.split("\n").filter((p) => p.trim().length > 0);
-  const sentenceCount = sentences.length;
-  const paragraphCount = Math.max(1, paragraphs.length);
-  const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0;
-  const completionRatio = wordLimit > 0 ? wordCount / wordLimit : 0;
-
-  const suggestions = [];
-  let suggestionId = 1;
-
-  // Generate smart suggestions
-  if (completionRatio < 0.7) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "warning",
-      priority: "high",
-      title: "Essay Length Below Target",
-      description: `Your essay is ${Math.round(
-        completionRatio * 100
-      )}% of the recommended length (${wordCount}/${wordLimit} words). Admissions officers expect essays that fully utilize the word limit.`,
-      action:
-        "Expand your examples with specific details and add more supporting evidence to reach the target length.",
-    });
-  } else if (completionRatio > 1.05) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "critical",
-      priority: "high",
-      title: "Essay Exceeds Word Limit",
-      description: `Your essay exceeds the ${wordLimit} word limit by ${
-        wordCount - wordLimit
-      } words, which may result in automatic rejection.`,
-      action:
-        "Edit ruthlessly to remove redundant phrases and focus on your strongest examples while staying within the limit.",
-    });
-  }
-
-  if (paragraphCount < 3) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "improvement",
-      priority: "medium",
-      title: "Improve Paragraph Structure",
-      description:
-        "Your essay would benefit from clearer paragraph breaks to improve readability and logical flow.",
-      action:
-        "Organize your ideas into distinct paragraphs with clear topic sentences. Aim for 4-6 paragraphs.",
-    });
-  }
-
-  // Always include a strength
-  suggestions.push({
-    id: (suggestionId++).toString(),
-    type: "strength",
-    priority: "medium",
-    title: "Clear Focus on Prompt",
-    description:
-      "Your essay maintains focus on the prompt and demonstrates understanding of the requirements.",
-    action:
-      "Continue building on this foundation by adding more specific details and personal insights.",
-  });
-
-  // Program-specific suggestion for MBA
-  if (degreeType?.toLowerCase().includes("mba")) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "improvement",
-      priority: "high",
-      title: "Strengthen Leadership Examples",
-      description:
-        "MBA essays should feature specific leadership experiences with quantifiable results.",
-      action:
-        "Include concrete examples of leading teams or driving change with measurable outcomes.",
-    });
-  }
-
-  const baseScore = Math.min(
-    90,
-    Math.max(
-      40,
-      completionRatio * 25 +
-        Math.min(paragraphCount, 5) * 10 +
-        (sentenceCount > 5 ? 20 : sentenceCount * 4) +
-        15
-    )
-  );
-
-  return {
-    overallScore: Math.round(baseScore),
-    suggestions,
-    structureScore: Math.round(
-      Math.min(
-        100,
-        paragraphCount * 20 + (sentenceCount > 10 ? 20 : sentenceCount * 2)
-      )
-    ),
-    contentRelevance: Math.round(baseScore + 5),
-    narrativeFlow: Math.round(Math.max(40, baseScore - 5)),
-    leadershipEmphasis: degreeType?.toLowerCase().includes("mba")
-      ? Math.round(Math.max(30, baseScore - 15))
-      : Math.round(baseScore),
-    specificityScore: Math.round(Math.max(30, baseScore - 20)),
-    readabilityScore: Math.round(
-      Math.max(
-        50,
-        100 - (avgSentenceLength > 25 ? 20 : 0) - (paragraphCount < 3 ? 15 : 0)
-      )
-    ),
-    sentenceCount,
-    paragraphCount,
-    avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
-    complexWordCount: content.split(" ").filter((w) => w.length > 6).length,
-    passiveVoiceCount: sentences.filter(
-      (s) => s.includes(" was ") || s.includes(" were ") || s.includes(" been ")
-    ).length,
-    grammarIssues: Math.round(sentenceCount * 0.1),
-  };
-}
-// Helper function for version-specific AI analysis
-async function performVersionAIAnalysis(data) {
-  return await performAIAnalysis(data);
-}
-
-// Enhanced fallback analysis function
 function generateAdvancedFallbackAnalysis(
   content,
   wordCount,
@@ -1656,28 +1558,22 @@ function generateAdvancedFallbackAnalysis(
   const paragraphs = content.split("\n").filter((p) => p.trim().length > 0);
   const words = content.split(/\s+/).filter((w) => w.length > 0);
 
-  // Basic metrics
   const sentenceCount = sentences.length;
   const paragraphCount = Math.max(1, paragraphs.length);
   const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0;
 
-  // Word completion ratio
   const completionRatio = wordLimit > 0 ? wordCount / wordLimit : 0;
 
-  // Generate suggestions based on content analysis
   const suggestions = [];
   let suggestionId = 1;
 
-  // Word count analysis
   if (completionRatio < 0.7) {
     suggestions.push({
       id: (suggestionId++).toString(),
       type: "warning",
       priority: "high",
       title: "Essay Length Below Target",
-      description: `Your essay is currently ${Math.round(
-        completionRatio * 100
-      )}% of the recommended length. Admissions officers expect essays that fully utilize the word limit to demonstrate thoroughness and attention to detail.`,
+      description: `Your essay is currently ${Math.round( completionRatio * 100 )}% of the recommended length. Admissions officers expect essays that fully utilize the word limit to demonstrate thoroughness and attention to detail.`,
       action:
         "Expand your examples with specific details, add more supporting evidence, or include additional relevant experiences that strengthen your narrative.",
       impact: "high",
@@ -1696,7 +1592,6 @@ function generateAdvancedFallbackAnalysis(
     });
   }
 
-  // Structure analysis
   if (paragraphCount < 3) {
     suggestions.push({
       id: (suggestionId++).toString(),
@@ -1711,7 +1606,6 @@ function generateAdvancedFallbackAnalysis(
     });
   }
 
-  // Sentence variety
   if (avgSentenceLength < 12) {
     suggestions.push({
       id: (suggestionId++).toString(),
@@ -1726,7 +1620,6 @@ function generateAdvancedFallbackAnalysis(
     });
   }
 
-  // Program-specific suggestions
   if (degreeType?.toLowerCase().includes("mba")) {
     suggestions.push({
       id: (suggestionId++).toString(),
@@ -1741,7 +1634,6 @@ function generateAdvancedFallbackAnalysis(
     });
   }
 
-  // Add a strength
   suggestions.push({
     id: (suggestionId++).toString(),
     type: "strength",
@@ -1754,15 +1646,14 @@ function generateAdvancedFallbackAnalysis(
     impact: "medium",
   });
 
-  // Calculate scores
   const baseScore = Math.min(
     90,
     Math.max(
       40,
-      completionRatio * 30 + // 30 points for length
-        Math.min(paragraphCount, 5) * 8 + // Up to 40 points for structure
-        (sentenceCount > 0 ? 20 : 0) + // 20 points for having content
-        10 // Base points
+      completionRatio * 30 +
+        Math.min(paragraphCount, 5) * 8 +
+        (sentenceCount > 0 ? 20 : 0) +
+        10
     )
   );
 
@@ -1809,12 +1700,151 @@ function generateAdvancedFallbackAnalysis(
         paragraphCount * 20 + (sentenceCount > 10 ? 20 : sentenceCount * 2)
       )
     ),
-    contentRelevance: Math.round(baseScore + 10), // Assume relevance is slightly higher than overall
+    contentRelevance: Math.round(baseScore + 10),
     narrativeFlow: Math.round(Math.max(40, baseScore - 5)),
     leadershipEmphasis: degreeType?.toLowerCase().includes("mba")
       ? Math.round(baseScore - 15)
       : Math.round(baseScore),
-    specificityScore: Math.round(Math.max(30, baseScore - 20)), // Usually lower for specificity
-    grammarIssues: Math.round(sentenceCount * 0.1), // Estimate based on length
+    specificityScore: Math.round(Math.max(30, baseScore - 20)),
+    grammarIssues: Math.round(sentenceCount * 0.1),
   };
+}
+
+async function performVersionAIAnalysis(data) {
+  return await performAIAnalysis(data);
+}
+
+async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
+  try {
+    const essay = await prisma.essay.findUnique({
+      where: { id: essayId },
+      include: {
+        essayPrompt: true,
+        user: true,
+        program: { include: { university: true } }
+      }
+    });
+
+    if (!essay?.essayPrompt) return { success: false };
+
+    const wordLimit = essay.essayPrompt.wordLimit;
+    const completionPercentage = (newWordCount / wordLimit) * 100;
+
+    const COMPLETION_THRESHOLD = 0.90;
+    const shouldBeCompleted = newWordCount >= (wordLimit * COMPLETION_THRESHOLD);
+    const wasCompleted = essay.isCompleted;
+
+    const updateData = {
+      wordCount: newWordCount,
+      completionPercentage: Math.min(completionPercentage, 100),
+      lastModified: new Date(),
+    };
+
+    if (newContent !== null) {
+      updateData.content = newContent;
+    }
+
+    if (shouldBeCompleted && !wasCompleted) {
+      updateData.isCompleted = true;
+      updateData.completedAt = new Date();
+      updateData.status = 'COMPLETED';
+
+      console.log(`[SILENT] Essay ${essayId} auto-completed at ${newWordCount}/${wordLimit} words`);
+
+      try {
+        await prisma.essayCompletionLog.create({
+          data: {
+            essayId,
+            userId: essay.userId,
+            wordCountAtCompletion: newWordCount,
+            wordLimit,
+            completionMethod: 'AUTO',
+            programId: essay.programId,
+            universityId: essay.program?.universityId,
+            essayPromptTitle: essay.essayPrompt?.promptTitle,
+          }
+        });
+      } catch (logError) {
+        console.warn('Failed to log completion:', logError.message);
+      }
+
+    } else if (!shouldBeCompleted && wasCompleted) {
+      updateData.isCompleted = false;
+      updateData.completedAt = null;
+      updateData.status = newWordCount > 0 ? 'IN_PROGRESS' : 'DRAFT';
+
+      console.log(`[SILENT] Essay ${essayId} unmarked as completed`);
+    }
+
+    const updatedEssay = await prisma.essay.update({
+      where: { id: essayId },
+      data: updateData,
+      include: {
+        versions: { orderBy: { timestamp: 'desc' }, take: 10 },
+        aiResults: {
+          where: { essayVersionId: null },
+          orderBy: { createdAt: 'desc' },
+          take: 3
+        },
+        essayPrompt: true
+      }
+    });
+
+    return {
+      success: true,
+      essay: updatedEssay,
+      completionChanged: shouldBeCompleted !== wasCompleted,
+      isCompleted: shouldBeCompleted
+    };
+
+  } catch (error) {
+    console.error('[SILENT] Essay completion check failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function getCompletionStats(userId = null) {
+  const whereClause = userId ? { userId } : {};
+
+  const stats = await prisma.essay.aggregate({
+    where: whereClause,
+    _count: {
+      id: true,
+      isCompleted: true
+    },
+    _avg: {
+      completionPercentage: true
+    }
+  });
+
+  const completedCount = await prisma.essay.count({
+    where: { ...whereClause, isCompleted: true }
+  });
+
+  return {
+    totalEssays: stats._count.id,
+    completedEssays: completedCount,
+    completionRate: stats._count.id > 0 ? (completedCount / stats._count.id) * 100 : 0,
+    averageCompletion: stats._avg.completionPercentage || 0
+  };
+}
+
+async function getRecentCompletions(limit = 10) {
+  return await prisma.essayCompletionLog.findMany({
+    take: limit,
+    orderBy: { completedAt: 'desc' },
+    include: {
+      essay: {
+        include: {
+          essayPrompt: { select: { promptTitle: true } },
+          program: {
+            include: {
+              university: { select: { universityName: true } }
+            }
+          },
+          user: { select: { name: true, email: true } }
+        }
+      }
+    }
+  });
 }

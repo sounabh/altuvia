@@ -63,7 +63,7 @@ const Hero = () => {
         variants={childVariants}
         className="flex flex-col md:flex-row items-center gap-4 md:gap-3 mt-6 w-full md:w-auto"
       >
-        <Link href={isLoggedIn ? "/dashboard" : "/onboarding/signup"}>
+        <Link href={isLoggedIn ? "/search" : "/onboarding/signup"}>
           <button className="w-full sm:w-auto px-4 md:px-5 py-[10px] md:py-[12px] rounded-lg bg-[#002147] hover:bg-[#3598FE] transition-all duration-700 ease-in-out transform hover:rounded-3xl text-white font-inter font-medium text-[14px] leading-[24px] md:leading-[27px] flex items-center justify-center">
             Start Your Journey
           </button>
