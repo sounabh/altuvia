@@ -403,7 +403,8 @@ const DepartmentsPage = () => {
                       {/* View department details button */}
                       <Button
                         variant="default"
-                        onClick={() => handleDepartmentClick(department.id)}
+                        //onClick={() => handleDepartmentClick(department.id)}
+                        disabled
                         size={viewMode === 'list' ? 'sm' : 'default'}
                         className="bg-[#3598FE] hover:bg-[#2485ed]"
                       >
@@ -442,7 +443,7 @@ const DepartmentsPage = () => {
             <Button
               variant="secondary"
               className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-14 flex flex-col items-center space-y-2"
-              onClick={() => router.push(`/university/${slug}/programs`)}
+              onClick={() => router.push(`/dashboard/university/${slug}/programs`)}
             >
               <GraduationCap className="h-8 w-8" />
               <div className="text-center">
@@ -468,7 +469,7 @@ const DepartmentsPage = () => {
             <Button
               variant="secondary"
               className="bg-white/10 hover:bg-white/20 text-white border-white/20 py-14 flex flex-col items-center space-y-2"
-              onClick={() => router.push(`/university/${slug}/admissions`)}
+             // onClick={() => router.push(`/university/${slug}/admissions`)}
             >
               <BookOpen className="h-8 w-8" />
               <div className="text-center">

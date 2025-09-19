@@ -197,6 +197,22 @@ model UniversityImage {
   @@map("university_images")
 }
 
+// Junction table for many-to-many Program-Department relationship
+model ProgramDepartment {
+  id           String @id @default(cuid())
+  programId    String
+  departmentId String
+  createdAt    DateTime @default(now())
+
+  // Relations
+  program    Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, departmentId])
+  @@map("program_departments")
+}
+
+// Update your existing Department model
 model Department {
   id           String   @id @default(cuid())
   universityId String
@@ -206,21 +222,22 @@ model Department {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  programs   Program[]
+  university University          @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  programs   ProgramDepartment[] // Changed from direct Program relation
 
   @@unique([universityId, slug])
   @@map("departments")
 }
 
+// Update your existing Program model - remove departmentId field
 model Program {
   id                     String   @id @default(cuid())
   universityId           String
-  departmentId           String
+  // REMOVE THIS LINE: departmentId           String
   programName            String
   programSlug            String   @unique
   degreeType             String?
-  programLength          Int? // in years
+  programLength          Int?
   specializations        String?
   programDescription     String?
   curriculumOverview     String?
@@ -236,7 +253,8 @@ model Program {
 
   // Relations
   university        University         @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  department        Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departments       ProgramDepartment[] // Many-to-many through junction table
+  // ... keep all your other existing relations
   syllabus          Syllabus?
   rankings          ProgramRanking[]
   externalLinks     ExternalLink[]
@@ -1070,7 +1088,9 @@ model AIResult {
   complexWordCount     Int?
   passiveVoiceCount    Int?
   
- // Additional analysis metrics
+
+
+// Additional analysis metrics
 
   structureScore       Float?
   contentRelevance     Float?
@@ -1078,6 +1098,8 @@ model AIResult {
   leadershipEmphasis   Float?
   specificityScore     Float?
   grammarIssues        Int?
+
+
 
 
   // Metadata

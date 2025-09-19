@@ -330,7 +330,8 @@ const ProgramDetailsPage = () => {
             
             <div className="flex items-center space-x-4">
               <Button
-                onClick={() => router.push(`/university/${slug}/apply/${program.slug}`)}
+                //onClick={() => router.push(`/university/${slug}/apply/${program.slug}`)}
+                disabled
                 className="bg-[#3598FE] hover:bg-[#2980E6] text-white"
               >
                 Apply Now
@@ -350,7 +351,7 @@ const ProgramDetailsPage = () => {
                   <GraduationCap className="h-8 w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold mb-2">{program.name}</h1>
+                  <h1 className="text-3xl md:text-4xl text-white font-bold mb-2">{program.name}</h1>
                   <div className="flex flex-wrap items-center gap-4 text-white/80">
                     <div className="flex items-center">
                       <Building2 className="h-4 w-4 mr-1" />
@@ -776,7 +777,8 @@ const ProgramDetailsPage = () => {
                 <h3 className="text-xl font-bold mb-4">Ready to Apply?</h3>
                 <p className="text-white/80 mb-4">Start your application process today</p>
                 <Button
-                  onClick={() => router.push(`/university/${slug}/apply/${program.slug}`)}
+                //  onClick={() => router.push(`/university/${slug}/apply/${program.slug}`)}
+                disabled
                   className="w-full bg-white text-[#002147] hover:bg-gray-100"
                 >
                   Start Application
@@ -811,7 +813,7 @@ const ProgramDetailsPage = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push(`/university/${slug}`)}
+                  onClick={() => router.push(`/dashboard/university/${slug}`)}
                   className="w-full"
                 >
                   View University Profile
@@ -834,7 +836,8 @@ const ProgramDetailsPage = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push(`/university/${slug}/contact`)}
+                  disabled
+                 // onClick={() => router.push(`/university/${slug}/contact`)}
                   className="w-full"
                 >
                   Contact Admissions
@@ -848,12 +851,7 @@ const ProgramDetailsPage = () => {
         <div className="mt-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-[#002147]">Other Programs in {department?.name || 'This University'}</h2>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/university/${slug}/programs${department ? `?department=${department.id}` : ''}`)}
-            >
-              View All Programs
-            </Button>
+           
           </div>
           
           <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -861,7 +859,7 @@ const ProgramDetailsPage = () => {
             <Button
               variant="outline"
               className="mt-4"
-              onClick={() => router.push(`/university/${slug}/programs`)}
+              onClick={() => router.push(`/dashboard/university/${slug}/programs`)}
             >
               Browse All Programs
             </Button>
