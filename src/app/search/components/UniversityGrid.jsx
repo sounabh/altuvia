@@ -29,11 +29,33 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   /** Error state if API fails */
   const [error, setError] = useState(null);
 
+  /** User email from localStorage */
+  const [userEmail, setUserEmail] = useState(null);
+
   /** Reference to AbortController to cancel ongoing requests */
   const abortControllerRef = useRef(null);
 
   /** Simple in-memory cache for API responses */
   const cacheRef = useRef(new Map());
+
+  // ----------------------------
+  // Get User Email from localStorage
+  // ----------------------------
+
+  /**
+   * Extract user email from localStorage on component mount
+   */
+  useEffect(() => {
+    try {
+      const authData = localStorage.getItem("authData");
+      if (authData) {
+        const parsedAuth = JSON.parse(authData);
+        setUserEmail(parsedAuth.email);
+      }
+    } catch (error) {
+      console.error('Error parsing auth data:', error);
+    }
+  }, []);
 
   // ----------------------------
   // Derived Values
@@ -46,9 +68,10 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     return JSON.stringify({
       search: searchQuery?.trim() || '',
       gmat: selectedGmat || 'all',
-      ranking: selectedRanking || 'all'
+      ranking: selectedRanking || 'all',
+      email: userEmail || '' // Include email in cache key
     });
-  }, [searchQuery, selectedGmat, selectedRanking]);
+  }, [searchQuery, selectedGmat, selectedRanking, userEmail]);
 
   // ----------------------------
   // Data Fetching Logic
@@ -82,7 +105,12 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       setError(null);
 
       const params = JSON.parse(paramsString);
-      const urlParams = new URLSearchParams(params);
+      const urlParams = new URLSearchParams({
+        search: params.search,
+        gmat: params.gmat,
+        ranking: params.ranking,
+        ...(params.email && { email: params.email }) // Only add email if it exists
+      });
 
       const response = await fetch(`/api/universities?${urlParams}`, {
         signal: abortControllerRef.current.signal,
@@ -133,10 +161,13 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
    * Includes debounce for search input
    */
   useEffect(() => {
-    const debounceTime = searchQuery?.trim() ? 300 : 0;
-    const handler = setTimeout(() => fetchData(searchParams), debounceTime);
-    return () => clearTimeout(handler);
-  }, [searchParams, fetchData]);
+    // Only fetch if we have determined the user email state (even if null)
+    if (userEmail !== null || userEmail === null) {
+      const debounceTime = searchQuery?.trim() ? 300 : 0;
+      const handler = setTimeout(() => fetchData(searchParams), debounceTime);
+      return () => clearTimeout(handler);
+    }
+  }, [searchParams, fetchData, userEmail]);
 
   /**
    * Cleanup: abort any ongoing requests on unmount

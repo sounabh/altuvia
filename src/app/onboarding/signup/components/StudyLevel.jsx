@@ -11,28 +11,32 @@ const studyLevels = [
     title: "Undergraduate",
     subtitle: "Bachelor's degree programs",
     icon: "🎓",
-    description: "3-4 year degree programs"
+    description: "3-4 year degree programs",
+    available: false // Added available property
   },
   {
     id: "masters",
     title: "Master's",
     subtitle: "Graduate degree programs",
     icon: "📚",
-    description: "1-2 year advanced programs"
+    description: "1-2 year advanced programs",
+    available: true // Added available property
   },
   {
     id: "mba",
     title: "MBA",
     subtitle: "Master of Business Administration",
     icon: "💼",
-    description: "Business leadership program"
+    description: "Business leadership program",
+    available: false // Added available property
   },
   {
     id: "phd",
     title: "PhD",
     subtitle: "Doctoral degree programs",
     icon: "🔬",
-    description: "Research-focused programs"
+    description: "Research-focused programs",
+    available: false // Added available property
   }
 ];
 
@@ -53,9 +57,8 @@ export const StudyLevelStep = ({
   user
 }) => {
 
-
- // Get user initials for fallback avatar
- const getUserInitials = () => {
+  // Get user initials for fallback avatar
+  const getUserInitials = () => {
     if (user?.user.name) {
       const names = user?.user.name.split(' ');
       return names.length > 1 
@@ -73,7 +76,9 @@ export const StudyLevelStep = ({
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
         {/* Header - logo and avatar */}
         <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
-          <div className="text-white text-xl font-semibold">Logo</div>
+         <span className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-white">
+              Altu<span className="text-[#3598FE]">Via</span>
+            </span>
           
           {/* User Avatar with blue border */}
           <div className="relative">
@@ -98,6 +103,7 @@ export const StudyLevelStep = ({
             </div>
           </div>
         </header>
+        
         {/* Decorative background blobs - Same as StudyLevelStep */}
         <div className="absolute top-[30%] right-[10%] w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
         <div className="absolute top-[18%] left-0 w-[600px] h-[600px] rounded-full bg-[#e1f0ff] opacity-80 blur-[100px] z-0"></div>
@@ -130,17 +136,27 @@ export const StudyLevelStep = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
             {studyLevels.map((level) => {
               const isSelected = selectedLevel === level.id;
+              const isAvailable = level.available;
 
               return (
                 <div
                   key={level.id}
-                  onClick={() => onUpdate(level.id)}
-                  className={`p-8 rounded-2xl border-4 transition-all duration-300 transform cursor-pointer ${
+                  onClick={() => isAvailable && onUpdate(level.id)}
+                  className={`p-8 rounded-2xl border-4 transition-all duration-300 transform relative ${
+                    isAvailable ? "cursor-pointer" : "cursor-not-allowed"
+                  } ${
                     isSelected
                       ? "border-[#002147] bg-white shadow-xl scale-105"
                       : "border-gray-300 bg-white hover:border-[#002147] hover:shadow-lg hover:scale-105"
-                  }`}
+                  } ${!isAvailable ? "opacity-70" : ""}`}
                 >
+                  {/* Coming Soon Ribbon */}
+                  {!isAvailable && (
+                    <div className="absolute -top-2 -right-2 bg-gray-500 text-white px-3 py-1 rounded-lg text-xs font-semibold rotate-6 z-20">
+                      Coming Soon
+                    </div>
+                  )}
+                  
                   <div className="flex items-start space-x-6">
                     {/* Icon */}
                     <div className="text-5xl flex-shrink-0">{level.icon}</div>
@@ -155,7 +171,7 @@ export const StudyLevelStep = ({
                     </div>
 
                     {/* Selected Indicator */}
-                    {isSelected && (
+                    {isSelected && isAvailable && (
                       <div className="w-6 h-6 bg-[#002147] rounded-full flex items-center justify-center flex-shrink-0">
                         <div className="w-3 h-3 bg-white rounded-full"></div>
                       </div>
@@ -168,15 +184,13 @@ export const StudyLevelStep = ({
         </div>
 
         {/* Navigation buttons */}
-       <div className="flex justify-between items-center w-full max-w-6xl px-4 mt-8 z-10 pb-20">
+        <div className="flex justify-between items-center w-full max-w-6xl px-4 mt-8 z-10 pb-20">
           <Button
             onClick={onBack}
             className="bg-[#002147] hover:bg-[#003366] text-white px-11 py-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-normal font-roboto shadow-l ml-36"
           >
-            
             Back
-         <span className="mr-2">←</span> 
-
+            <span className="mr-2">←</span> 
           </Button>
           
           <Button

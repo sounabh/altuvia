@@ -111,7 +111,9 @@ export const AcademicSnapshotStep = ({
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
         {/* HEADER SECTION: Logo and user avatar */}
         <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
-          <div className="text-white text-xl font-semibold">Logo</div>
+           <span className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-white">
+              Altu<span className="text-[#3598FE]">Via</span>
+            </span>
           
           {/* USER AVATAR: With fallback to initials */}
           <div className="relative">

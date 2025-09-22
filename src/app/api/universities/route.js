@@ -1,29 +1,30 @@
-import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { NextResponse } from 'next/server';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { NextResponse } from "next/server";
+import { authOptions } from "../auth/[...nextauth]/route";
 
 /**
  * GET /api/universities
- * 
+ *
  * Fetches a filtered and optimized list of universities with search, GMAT, and ranking filters.
  * Includes primary image and saved state for the current user.
- * 
+ *
  * @param {Request} request - The incoming HTTP request
  * @returns {Promise<NextResponse>} JSON response with university list
  */
 export async function GET(request) {
   const session = await getServerSession(authOptions);
-  
+
   try {
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search')?.trim() || '';
-    const gmat = searchParams.get('gmat') || 'all';
-    const ranking = searchParams.get('ranking') || 'all';
-    
+    const search = searchParams.get("search")?.trim() || "";
+    const gmat = searchParams.get("gmat") || "all";
+    const ranking = searchParams.get("ranking") || "all";
+    const email = searchParams.get("email"); // Get email from query params
+
     // Build optimized WHERE clause - filter at DB level
     const whereClause = { AND: [] };
-    
+
     /**
      * Search filter
      * Matches against university name, city, or country (case-insensitive)
@@ -31,10 +32,10 @@ export async function GET(request) {
     if (search) {
       whereClause.AND.push({
         OR: [
-          { universityName: { contains: search, mode: 'insensitive' } },
-          { city: { contains: search, mode: 'insensitive' } },
-          { country: { contains: search, mode: 'insensitive' } }
-        ]
+          { universityName: { contains: search, mode: "insensitive" } },
+          { city: { contains: search, mode: "insensitive" } },
+          { country: { contains: search, mode: "insensitive" } },
+        ],
       });
     }
 
@@ -42,13 +43,21 @@ export async function GET(request) {
      * GMAT filter
      * Applies range-based filtering on gmatAverageScore
      */
-    if (gmat !== 'all') {
+    if (gmat !== "all") {
       const gmatFilter = {};
       switch (gmat) {
-        case '700+': gmatFilter.gmatAverageScore = { gte: 700 }; break;
-        case '650-699': gmatFilter.gmatAverageScore = { gte: 650, lte: 699 }; break;
-        case '600-649': gmatFilter.gmatAverageScore = { gte: 600, lte: 649 }; break;
-        case 'below-600': gmatFilter.gmatAverageScore = { lt: 600, not: null }; break;
+        case "700+":
+          gmatFilter.gmatAverageScore = { gte: 700 };
+          break;
+        case "650-699":
+          gmatFilter.gmatAverageScore = { gte: 650, lte: 699 };
+          break;
+        case "600-649":
+          gmatFilter.gmatAverageScore = { gte: 600, lte: 649 };
+          break;
+        case "below-600":
+          gmatFilter.gmatAverageScore = { lt: 600, not: null };
+          break;
       }
       if (Object.keys(gmatFilter).length > 0) {
         whereClause.AND.push(gmatFilter);
@@ -59,18 +68,30 @@ export async function GET(request) {
      * Ranking filter
      * Filters by FT Global Ranking ranges
      */
-    if (ranking !== 'all') {
+    if (ranking !== "all") {
       const rankFilter = {};
       switch (ranking) {
-        case 'top-10': rankFilter.ftGlobalRanking = { lte: 10, not: null }; break;
-        case 'top-50': rankFilter.ftGlobalRanking = { lte: 50, not: null }; break;
-        case 'top-100': rankFilter.ftGlobalRanking = { lte: 100, not: null }; break;
-        case '100+': rankFilter.ftGlobalRanking = { gt: 100 }; break;
+        case "top-10":
+          rankFilter.ftGlobalRanking = { lte: 10, not: null };
+          break;
+        case "top-50":
+          rankFilter.ftGlobalRanking = { lte: 50, not: null };
+          break;
+        case "top-100":
+          rankFilter.ftGlobalRanking = { lte: 100, not: null };
+          break;
+        case "100+":
+          rankFilter.ftGlobalRanking = { gt: 100 };
+          break;
       }
       if (Object.keys(rankFilter).length > 0) {
         whereClause.AND.push(rankFilter);
       }
     }
+
+    // Determine which email to use for checking saved universities
+    // Priority: session email > query param email > null
+    const userEmail = session?.user?.email || email || null;
 
     /**
      * Prisma query - fetch only needed fields and related data
@@ -82,16 +103,13 @@ export async function GET(request) {
           where: { isPrimary: true },
           take: 1,
         },
-        savedByUsers: {
-          where: { email: session?.user?.email },
+        savedByUsers: userEmail ? {
+          where: { email: userEmail },
           select: { id: true },
-        },
+        } : false, // Don't include savedByUsers if no email available
       },
       take: 50,
-      orderBy: [
-        { ftGlobalRanking: 'asc' },
-        { universityName: 'asc' }
-      ],
+      orderBy: [{ ftGlobalRanking: "asc" }, { universityName: "asc" }],
     });
 
     // Handle empty results
@@ -99,47 +117,45 @@ export async function GET(request) {
       return NextResponse.json({
         message: "No universities found",
         data: [],
-        count: 0
+        count: 0,
       });
     }
 
     /**
      * Transform DB records to API response format
      */
-// In your /api/universities route
-
-console.log(universities.savedByUsers,"u");
-
-    
-// OPTION 1: Transform to boolean in API (Recommended)
-const transformed = universities.map(u => ({
-  id: u.id,
-  slug: u.slug,
-  name: u.universityName,
-  location: `${u.city}, ${u.country}`,
-  image: u.images[0]?.imageUrl || '/default-university.jpg',
-  rank: u.ftGlobalRanking ? `#${u.ftGlobalRanking}` : 'N/A',
-  gmatAvg: u.gmatAverageScore || 0,
-  acceptRate: u.acceptanceRate || 0,
-  tuitionFee: u.tuitionFees ? `${u.tuitionFees.toLocaleString()}` : 'N/A',
-  applicationFee: u.additionalFees ? `${u.additionalFees.toLocaleString()}` : 'N/A',
-  pros: u.whyChooseHighlights || [],
-  cons: [], // No admissionRequirements in schema
-  isAdded: u.savedByUsers?.length > 0, // Transform to boolean with null check
-  savedByUsers: u.savedByUsers // Keep original for debugging if needed
-}));
+    const transformed = universities.map((u) => ({
+      id: u.id,
+      slug: u.slug,
+      name: u.universityName,
+      location: `${u.city}, ${u.country}`,
+      image: u.images[0]?.imageUrl || "/default-university.jpg",
+      rank: u.ftGlobalRanking ? `#${u.ftGlobalRanking}` : "N/A",
+      gmatAvg: u.gmatAverageScore || 0,
+      acceptRate: u.acceptanceRate || 0,
+      tuitionFee: u.tuitionFees ? `${u.tuitionFees.toLocaleString()}` : "N/A",
+      applicationFee: u.additionalFees
+        ? `${u.additionalFees.toLocaleString()}`
+        : "N/A",
+      pros: u.whyChooseHighlights || [],
+      cons: [], // No admissionRequirements in schema
+      isAdded: u.savedByUsers?.length > 0 || false, // Transform to boolean with fallback
+      savedByUsers: u.savedByUsers || [], // Keep original for debugging if needed
+    }));
 
     // Return JSON response with caching headers
-    return NextResponse.json({
-      data: transformed,
-      count: transformed.length,
-      total: transformed.length
-    }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+    return NextResponse.json(
+      {
+        data: transformed,
+        count: transformed.length,
+        total: transformed.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
       }
-    });
-
+    );
   } catch (error) {
     console.error("Database error:", error);
     return NextResponse.json(
