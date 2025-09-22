@@ -185,7 +185,7 @@ const CollegeShowcase = ({ university }) => {
                     variant="outline"
                     size="sm"
                     onClick={handlePrevImage}
-                    className="absolute top-1/2 left-4 transform -translate-y-1/2 h-10 w-10 p-0 border-white/20 text-white hover:bg-white hover:text-[#002147] transition-all duration-300 rounded-full backdrop-blur-sm"
+                    className="absolute top-1/2 left-4 transform -translate-y-1/2 h-10 w-10 p-0 border-white/20  hover:bg-white hover:text-[#002147] transition-all duration-300 rounded-full backdrop-blur-sm"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
@@ -194,7 +194,7 @@ const CollegeShowcase = ({ university }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleNextImage}
-                    className="absolute top-1/2 right-4 transform -translate-y-1/2 h-10 w-10 p-0 border-white/20 text-white hover:bg-white hover:text-[#002147] transition-all duration-300 rounded-full backdrop-blur-sm"
+                    className="absolute top-1/2 right-4 transform -translate-y-1/2 h-10 w-10 p-0 border-white/20  hover:bg-white hover:text-[#002147] transition-all duration-300 rounded-full backdrop-blur-sm"
                   >
                     <ChevronRight className="h-5 w-5" />
                   </Button>

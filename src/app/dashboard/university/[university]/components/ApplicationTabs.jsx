@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +25,9 @@ import {
   Timer,
   Archive,
   Target,
+  CheckCircle2,
+  Clock as ClockIcon,
+  Calendar as CalendarIcon
 } from "lucide-react";
 
 /**
@@ -36,7 +39,6 @@ import {
  * @returns {JSX.Element} Application workspace component with tabs and modals
  */
 const ApplicationTabs = ({ university }) => {
-
   console.log('ApplicationTabs Debug - University Data:', {
     name: university?.name,
     primaryEssay: university?.primaryEssay,
@@ -60,6 +62,125 @@ const ApplicationTabs = ({ university }) => {
 
   // ✅ FIXED: Get tasks and events from university data with fallback
   const tasksAndEvents = university?.tasksAndEvents || [];
+
+  // Enhanced progress calculation using university data
+  const getProgressData = () => {
+    if (!university) {
+      return {
+        overallProgress: 0,
+        essayProgress: 0,
+        taskProgress: 0,
+        completedEssays: 0,
+        totalEssays: 0,
+        completedTasks: 0,
+        totalTasks: 0,
+        applicationStatus: 'not-started'
+      };
+    }
+
+    // Use enhanced stats if available (when user is authenticated)
+    if (university.enhancedStats) {
+      return {
+        overallProgress: university.overallProgress || 0,
+        essayProgress: university.essayProgress || 0,
+        taskProgress: university.taskProgress || 0,
+        completedEssays: university.enhancedStats.essays?.completed || 0,
+        totalEssays: university.enhancedStats.essays?.total || 0,
+        completedTasks: university.enhancedStats.tasks?.completed || 0,
+        totalTasks: university.enhancedStats.tasks?.total || 0,
+        applicationStatus: university.status || 'not-started',
+        upcomingDeadlines: university.upcomingDeadlines || 0,
+        overdueEvents: university.overdueEvents || 0
+      };
+    }
+
+    // Fallback to basic calculation from existing data
+    const essayPrompts = university.allEssayPrompts || [];
+    const calendarEvents = university.calendarEvents || [];
+    const tasksEvents = university.tasksAndEvents || [];
+    
+    // Calculate essay progress
+    const completedEssays = essayPrompts.filter(essay => 
+      essay.status === 'completed' || essay.progress >= 98
+    ).length;
+    
+    // Calculate task progress from both calendarEvents and tasksAndEvents
+    const allTasks = [...calendarEvents, ...tasksEvents];
+    const completedTasks = allTasks.filter(event => 
+      event.completionStatus === 'completed' || event.status === 'completed'
+    ).length;
+
+    const essayProgress = essayPrompts.length > 0 
+      ? Math.round((completedEssays / essayPrompts.length) * 100)
+      : 0;
+    
+    const taskProgress = allTasks.length > 0 
+      ? Math.round((completedTasks / allTasks.length) * 100)
+      : 0;
+
+    // Calculate overall progress (weighted: 70% essays, 30% tasks)
+    const overallProgress = essayPrompts.length > 0 && allTasks.length > 0
+      ? Math.round((essayProgress * 0.7) + (taskProgress * 0.3))
+      : essayPrompts.length > 0 
+      ? essayProgress 
+      : taskProgress;
+
+    // Determine application status
+    let applicationStatus = 'not-started';
+    if (completedEssays > 0 || completedTasks > 0) {
+      if (completedEssays === essayPrompts.length && completedTasks === allTasks.length && (essayPrompts.length > 0 || allTasks.length > 0)) {
+        applicationStatus = 'submitted';
+      } else {
+        applicationStatus = 'in-progress';
+      }
+    }
+
+    return {
+      overallProgress,
+      essayProgress,
+      taskProgress,
+      completedEssays,
+      totalEssays: essayPrompts.length,
+      completedTasks,
+      totalTasks: allTasks.length,
+      applicationStatus,
+      upcomingDeadlines: allTasks.filter(task => 
+        new Date(task.date) > new Date() && 
+        (task.status !== 'completed' && task.completionStatus !== 'completed')
+      ).length,
+      overdueEvents: allTasks.filter(task => 
+        new Date(task.date) < new Date() && 
+        (task.status !== 'completed' && task.completionStatus !== 'completed')
+      ).length
+    };
+  };
+
+  const progressData = getProgressData();
+
+  // Helper function to get progress bar color based on status
+  const getProgressBarColor = () => {
+    if (progressData.applicationStatus === 'submitted') {
+      return 'bg-green-500';
+    } else if (progressData.applicationStatus === 'in-progress') {
+      return 'bg-blue-500';
+    }
+    return 'bg-gray-400';
+  };
+
+  // Helper function to get status text and color
+  const getStatusInfo = () => {
+    switch (progressData.applicationStatus) {
+      case 'submitted':
+        return { text: 'Application Complete', color: 'text-green-600 bg-green-50', icon: CheckCircle2 };
+      case 'in-progress':
+        return { text: 'In Progress', color: 'text-blue-600 bg-blue-50', icon: ClockIcon };
+      default:
+        return { text: 'Not Started', color: 'text-gray-500 bg-gray-50', icon: CalendarIcon };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
+  const StatusIcon = statusInfo.icon;
 
   // Initialize essay content for the primary essay
   React.useEffect(() => {
@@ -160,29 +281,6 @@ const ApplicationTabs = ({ university }) => {
     );
   };
 
-  /**
-   * Calculate completion percentage for application
-   */
-  const calculateCompletionPercentage = () => {
-    const totalEssays = totalEssaysCount;
-    const totalTasks = tasksAndEvents.filter(item => item.type === 'task' || item.type === 'deadline').length;
-    const totalItems = totalEssays + totalTasks;
-    
-    if (totalItems === 0) return 0;
-    
-    // Count completed essays (from primary essay status)
-    const completedEssays = primaryEssay && (primaryEssay.status === 'submitted' || primaryEssay.progress >= 100) ? 1 : 0;
-    
-    // Count completed tasks
-    const completedTasks = tasksAndEvents.filter(item => 
-      item.status === 'completed'
-    ).length;
-    
-    return Math.round(((completedEssays + completedTasks) / totalItems) * 100);
-  };
-
-  const completionPercentage = calculateCompletionPercentage();
-
   return (
     <div className="my-20">
       {/* Main Application Workspace Card */}
@@ -209,7 +307,7 @@ const ApplicationTabs = ({ university }) => {
                   <div className="text-white font-semibold">
                     Application Progress
                   </div>
-                  <div className="text-white">{completionPercentage}% Complete</div>
+                  <div className="text-white">{progressData.overallProgress}% Complete</div>
                 </div>
 
                 {/* Circular Progress SVG */}
@@ -229,15 +327,82 @@ const ApplicationTabs = ({ university }) => {
                       fill="none"
                       stroke="white"
                       strokeWidth="3"
-                      strokeDasharray={`${completionPercentage}, 100`}
+                      strokeDasharray={`${progressData.overallProgress}, 100`}
                     />
                   </svg>
 
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">{completionPercentage}%</span>
+                    <span className="text-white font-bold text-sm">{progressData.overallProgress}%</span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Enhanced Progress Info Card */}
+            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <StatusIcon className="h-4 w-4 text-white" />
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusInfo.color.replace('text-', 'text-white ').replace('bg-', 'bg-white/20 ')}`}>
+                    {statusInfo.text}
+                  </span>
+                </div>
+                <span className="text-sm font-semibold text-white">
+                  {progressData.overallProgress}%
+                </span>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full h-2 bg-white/20 rounded-full mb-3">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${getProgressBarColor()}`}
+                  style={{ width: `${progressData.overallProgress}%` }}
+                ></div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="text-center text-white">
+                  <div className="font-medium">Essays</div>
+                  <div className="text-white/80">
+                    {progressData.completedEssays}/{progressData.totalEssays}
+                  </div>
+                  <div className="text-white/60 text-[10px]">
+                    ({progressData.essayProgress}%)
+                  </div>
+                </div>
+                <div className="text-center text-white">
+                  <div className="font-medium">Tasks</div>
+                  <div className="text-white/80">
+                    {progressData.completedTasks}/{progressData.totalTasks}
+                  </div>
+                  <div className="text-white/60 text-[10px]">
+                    ({progressData.taskProgress}%)
+                  </div>
+                </div>
+              </div>
+
+              {/* Deadline Indicators */}
+              {(progressData.upcomingDeadlines > 0 || progressData.overdueEvents > 0) && (
+                <div className="flex justify-center space-x-4 mt-3 pt-3 border-t border-white/20">
+                  {progressData.upcomingDeadlines > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <CalendarIcon className="h-3 w-3 text-orange-300" />
+                      <span className="text-xs text-orange-300">
+                        {progressData.upcomingDeadlines} upcoming
+                      </span>
+                    </div>
+                  )}
+                  {progressData.overdueEvents > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <ClockIcon className="h-3 w-3 text-red-300" />
+                      <span className="text-xs text-red-300">
+                        {progressData.overdueEvents} overdue
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -273,9 +438,9 @@ const ApplicationTabs = ({ university }) => {
                       <h3 className="text-2xl font-bold text-white">
                         Essay Workspace
                       </h3>
-                      {totalEssaysCount > 1 && (
+                      {progressData.totalEssays > 1 && (
                         <p className="text-white text-sm mt-1">
-                          Showing 1 of {totalEssaysCount} essays • Access all essays in workspace
+                          Showing 1 of {progressData.totalEssays} essays • {progressData.completedEssays} completed
                         </p>
                       )}
                     </div>
@@ -289,7 +454,7 @@ const ApplicationTabs = ({ university }) => {
                         className="bg-[#3598FE] hover:bg-[#2485ed] text-white hover:shadow-lg transition-all duration-300"
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        {totalEssaysCount > 1 ? `Access All ${totalEssaysCount} Essays` : 'Open Workspace'}
+                        {progressData.totalEssays > 1 ? `Access All ${progressData.totalEssays} Essays` : 'Open Workspace'}
                       </Button>
                     </div>
                   </div>
@@ -396,9 +561,14 @@ const ApplicationTabs = ({ university }) => {
               <TabsContent value="deadlines" className="mt-8">
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h3 className="text-2xl font-bold text-white">
-                      Tasks & Events
-                    </h3>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">
+                        Tasks & Events
+                      </h3>
+                      <p className="text-white text-sm mt-1">
+                        {progressData.completedTasks} of {progressData.totalTasks} tasks completed
+                      </p>
+                    </div>
                     <div className="flex space-x-3">
                       <Button
                         onClick={handleCalendarRedirect}
@@ -554,9 +724,9 @@ const ApplicationTabs = ({ university }) => {
               <p className="text-gray-600">
                 You're about to access your comprehensive essay workspace for{" "}
                 {university?.name || 'this university'}.
-                {totalEssaysCount > 1 && (
+                {progressData.totalEssays > 1 && (
                   <span className="block mt-2 font-medium">
-                    You have {totalEssaysCount} essay prompts to complete.
+                    You have {progressData.totalEssays} essay prompts to complete.
                   </span>
                 )}
               </p>
