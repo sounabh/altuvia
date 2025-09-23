@@ -796,12 +796,13 @@ async function getEssayAnalytics(data) {
       }, { status: 400 });
     }
 
+    // FIXED: Corrected the NOT clause structure
     const allUserEssays = userId
       ? await prisma.essay.findMany({
           where: {
             userId,
-            NOT: {
-              essayPromptId: null
+            essayPromptId: {
+              not: null  // This is the correct syntax for NOT NULL
             }
           },
           include: {
@@ -810,6 +811,7 @@ async function getEssayAnalytics(data) {
         })
       : [];
 
+    // Filter out any essays that still have null essayPrompt after the query
     const validUserEssays = allUserEssays.filter(e => e.essayPrompt !== null);
 
     const analytics = {

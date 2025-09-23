@@ -1,0 +1,739 @@
+// Pipeline Executor and Monitoring System
+// Main execution script with real-time monitoring and error handling
+
+const express = require('express');
+const { UniversityDataPipeline, PipelineScheduler } = require('./university_data_pipeline');
+const { 
+  SpecializedScrapers, 
+  APIDataFetchers, 
+  DataValidator, 
+  PipelineMonitor,
+  PIPELINE_CONFIG 
+} = require('./pipeline_config');
+
+class EnhancedUniversityDataPipeline extends UniversityDataPipeline {
+  constructor() {
+    super();
+    this.scrapers = new SpecializedScrapers();
+    this.apiDataFetchers = new APIDataFetchers();
+    this.validator = new DataValidator();
+    this.monitor = new PipelineMonitor();
+    this.isRunning = false;
+    this.currentProgress = {
+      phase: 'idle',
+      progress: 0,
+      totalItems: 0,
+      processedItems: 0,
+      errors: []
+    };
+  }
+
+  // Enhanced pipeline execution with real-time monitoring
+  async runFullPipeline() {
+    if (this.isRunning) {
+      throw new Error('Pipeline is already running');
+    }
+
+    this.isRunning = true;
+    this.monitor.startMonitoring();
+    
+    try {
+      console.log('🚀 Starting Enhanced University Data Pipeline...');
+      this.updateProgress('initialization', 0, 0, 0);
+
+      // Phase 1: Fetch data from multiple sources
+      await this.executePhase1();
+      
+      // Phase 2: Web scraping enhancement
+      await this.executePhase2();
+      
+      // Phase 3: Data validation and cleaning
+      await this.executePhase3();
+      
+      // Phase 4: Database operations
+      await this.executePhase4();
+      
+      // Phase 5: Post-processing and reporting
+      await this.executePhase5();
+
+      const report = this.monitor.endMonitoring();
+      this.updateProgress('completed', 100, report.totalUniversitiesProcessed, report.totalUniversitiesProcessed);
+      
+      return {
+        success: true,
+        report: report,
+        totalUniversities: this.allUniversities.size,
+        processingTime: report.endTime - report.startTime
+      };
+
+    } catch (error) {
+      console.error('❌ Pipeline failed:', error);
+      this.updateProgress('failed', 0, 0, 0, [error.message]);
+      throw error;
+    } finally {
+      this.isRunning = false;
+      await this.scrapers.closeBrowser();
+    }
+  }
+
+  // Phase 1: Multi-source data collection
+  async executePhase1() {
+    this.updateProgress('data_collection', 10, 0, 0);
+    console.log('📊 Phase 1: Collecting data from multiple sources...');
+
+    this.allUniversities = new Map();
+    const dataSources = [];
+
+    // API Data Sources
+    try {
+      console.log('  Fetching QS Rankings...');
+      const qsData = await this.fetchQSRankings();
+      if (qsData) dataSources.push({ source: 'qs', data: qsData });
+    } catch (error) {
+      this.monitor.recordDataSourceError('qs', error);
+    }
+
+    try {
+      console.log('  Fetching THE Rankings...');
+      const theData = await this.fetchTHERankings();
+      if (theData) dataSources.push({ source: 'the', data: theData });
+    } catch (error) {
+      this.monitor.recordDataSourceError('the', error);
+    }
+
+    try {
+      console.log('  Fetching US News Data...');
+      const usNewsData = await this.fetchUSNewsData();
+      if (usNewsData) dataSources.push({ source: 'usnews', data: usNewsData });
+    } catch (error) {
+      this.monitor.recordDataSourceError('usnews', error);
+    }
+
+    try {
+      console.log('  Fetching College Scorecard Data...');
+      const scorecardData = await this.apiDataFetchers.fetchCollegeScorecardData(500);
+      if (scorecardData) dataSources.push({ source: 'scorecard', data: scorecardData });
+    } catch (error) {
+      this.monitor.recordDataSourceError('scorecard', error);
+    }
+
+    // Process each data source
+    for (const { source, data } of dataSources) {
+      await this.processDataSource(data, source, this.allUniversities);
+    }
+
+    console.log(`  ✅ Collected data for ${this.allUniversities.size} universities from ${dataSources.length} sources`);
+    this.updateProgress('data_collection', 25, this.allUniversities.size, 0);
+  }
+
+  // Phase 2: Web scraping enhancement
+  async executePhase2() {
+    this.updateProgress('web_scraping', 30, this.allUniversities.size, 0);
+    console.log('🕷️ Phase 2: Enhancing data with web scraping...');
+
+    // Advanced scraping with specialized scrapers
+    try {
+      console.log('  Scraping QS Rankings website...');
+      const qsScrapedData = await this.scrapers.scrapeQSRankings();
+      if (qsScrapedData) {
+        await this.mergeScrapedData(qsScrapedData, 'qs');
+      }
+    } catch (error) {
+      this.monitor.recordDataSourceError('qs_scraping', error);
+    }
+
+    try {
+      console.log('  Scraping THE Rankings website...');
+      const theScrapedData = await this.scrapers.scrapeTHERankings();
+      if (theScrapedData) {
+        await this.mergeScrapedData(theScrapedData, 'the');
+      }
+    } catch (error) {
+      this.monitor.recordDataSourceError('the_scraping', error);
+    }
+
+    try {
+      console.log('  Scraping US News website...');
+      const usNewsScrapedData = await this.scrapers.scrapeUSNewsData();
+      if (usNewsScrapedData) {
+        await this.mergeScrapedData(usNewsScrapedData, 'usnews');
+      }
+    } catch (error) {
+      this.monitor.recordDataSourceError('usnews_scraping', error);
+    }
+
+    // Individual university website scraping (limited to top universities)
+    let scrapedCount = 0;
+    const maxScrapeCount = 100; // Limit to prevent overwhelming servers
+    
+    for (const [key, university] of this.allUniversities) {
+      if (scrapedCount >= maxScrapeCount) break;
+      
+      try {
+        if (university.websiteUrl) {
+          const scrapedData = await this.scrapeUniversityWebsite(university.websiteUrl);
+          if (scrapedData) {
+            this.allUniversities.set(key, { ...university, ...scrapedData });
+            scrapedCount++;
+          }
+        }
+      } catch (error) {
+        console.error(`Error scraping ${university.universityName}:`, error);
+      }
+      
+      // Update progress
+      this.updateProgress('web_scraping', 30 + (scrapedCount / maxScrapeCount) * 15, 
+                         this.allUniversities.size, scrapedCount);
+    }
+
+    console.log(`  ✅ Enhanced ${scrapedCount} universities with web scraping`);
+  }
+
+  // Phase 3: Data validation and cleaning
+  async executePhase3() {
+    this.updateProgress('validation', 45, this.allUniversities.size, 0);
+    console.log('🧹 Phase 3: Validating and cleaning data...');
+
+    const validatedUniversities = new Map();
+    let processedCount = 0;
+    
+    for (const [key, university] of this.allUniversities) {
+      try {
+        // Sanitize data
+        const sanitized = DataValidator.sanitizeData(university);
+        
+        // Validate data
+        const validation = DataValidator.validateUniversityData(sanitized);
+        
+        if (validation.isValid) {
+          validatedUniversities.set(key, sanitized);
+          this.monitor.recordUniversityProcessed();
+        } else {
+          console.warn(`Validation failed for ${university.universityName}:`, validation.errors);
+        }
+        
+        processedCount++;
+        this.updateProgress('validation', 45 + (processedCount / this.allUniversities.size) * 15,
+                           this.allUniversities.size, processedCount);
+        
+      } catch (error) {
+        console.error(`Error validating ${university.universityName}:`, error);
+      }
+    }
+
+    this.allUniversities = validatedUniversities;
+    console.log(`  ✅ Validated ${validatedUniversities.size} universities`);
+  }
+
+  // Phase 4: Database operations
+  async executePhase4() {
+    this.updateProgress('database_save', 60, this.allUniversities.size, 0);
+    console.log('💾 Phase 4: Saving to database...');
+
+    const universities = Array.from(this.allUniversities.values());
+    const batches = this.chunkArray(universities, PIPELINE_CONFIG.batch.size);
+    let processedCount = 0;
+    
+    for (const batch of batches) {
+      const batchPromises = batch.map(async (university) => {
+        try {
+          await this.saveUniversityToDatabase(university);
+          this.monitor.recordSuccessfulSave();
+          processedCount++;
+        } catch (error) {
+          console.error(`Failed to save ${university.universityName}:`, error);
+          this.monitor.recordFailedSave();
+        }
+      });
+      
+      await Promise.all(batchPromises);
+      
+      // Update progress
+      this.updateProgress('database_save', 60 + (processedCount / universities.length) * 25,
+                         universities.length, processedCount);
+      
+      // Delay between batches
+      await this.delay(PIPELINE_CONFIG.batch.delayBetweenBatches);
+    }
+
+    console.log(`  ✅ Saved ${processedCount} universities to database`);
+  }
+
+  // Phase 5: Post-processing and reporting
+  async executePhase5() {
+    this.updateProgress('post_processing', 85, 0, 0);
+    console.log('📋 Phase 5: Post-processing and generating reports...');
+
+    try {
+      // Generate statistics
+      await this.generateStatistics();
+      
+      // Update search indexes
+      await this.updateSearchIndexes();
+      
+      // Generate data quality report
+      await this.generateDataQualityReport();
+      
+      // Send notifications
+      await this.sendNotifications();
+      
+    } catch (error) {
+      console.error('Error in post-processing:', error);
+    }
+
+    this.updateProgress('post_processing', 95, 0, 0);
+    console.log('  ✅ Post-processing completed');
+  }
+
+  // Utility methods
+  updateProgress(phase, progress, totalItems, processedItems, errors = []) {
+    this.currentProgress = {
+      phase,
+      progress,
+      totalItems,
+      processedItems,
+      errors: [...this.currentProgress.errors, ...errors],
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async mergeScrapedData(scrapedData, source) {
+    for (const data of scrapedData) {
+      if (!data.name) continue;
+      
+      const key = `${data.name}-${data.country || 'Unknown'}`.toLowerCase();
+      if (this.allUniversities.has(key)) {
+        const existing = this.allUniversities.get(key);
+        this.allUniversities.set(key, this.mergeUniversityData(existing, data));
+      } else {
+        const processed = await this.processUniversityData(data, source);
+        this.allUniversities.set(key, processed);
+      }
+    }
+  }
+
+  async generateStatistics() {
+    const stats = {
+      totalUniversities: this.allUniversities.size,
+      countriesCount: new Set(Array.from(this.allUniversities.values()).map(u => u.country)).size,
+      averageTuition: this.calculateAverageTuition(),
+      rankingsCoverage: this.calculateRankingsCoverage(),
+      dataCompletenessScore: this.calculateDataCompleteness()
+    };
+
+    console.log('📊 Pipeline Statistics:', stats);
+    return stats;
+  }
+
+  calculateAverageTuition() {
+    const universities = Array.from(this.allUniversities.values());
+    const tuitions = universities
+      .filter(u => u.financialData?.tuition)
+      .map(u => u.financialData.tuition);
+    
+    return tuitions.length > 0 ? 
+      tuitions.reduce((sum, t) => sum + t, 0) / tuitions.length : 0;
+  }
+
+  calculateRankingsCoverage() {
+    const universities = Array.from(this.allUniversities.values());
+    return {
+      qs: universities.filter(u => u.rankings?.qs).length,
+      the: universities.filter(u => u.rankings?.the).length,
+      usnews: universities.filter(u => u.rankings?.usnews).length,
+      total: universities.length
+    };
+  }
+
+  calculateDataCompleteness() {
+    const universities = Array.from(this.allUniversities.values());
+    const requiredFields = ['universityName', 'city', 'country', 'overview'];
+    const optionalFields = ['tuitionFees', 'acceptanceRate', 'minimumGpa', 'websiteUrl'];
+    
+    let totalScore = 0;
+    universities.forEach(university => {
+      let score = 0;
+      requiredFields.forEach(field => {
+        if (university[field]) score += 25; // 25% each for required fields
+      });
+      optionalFields.forEach(field => {
+        if (university[field]) score += 6.25; // 6.25% each for optional fields
+      });
+      totalScore += score;
+    });
+    
+    return universities.length > 0 ? totalScore / universities.length : 0;
+  }
+
+  async updateSearchIndexes() {
+    console.log('  Updating search indexes...');
+    // Implementation would depend on your search solution (Elasticsearch, etc.)
+    return Promise.resolve();
+  }
+
+  async generateDataQualityReport() {
+    const universities = Array.from(this.allUniversities.values());
+    const report = {
+      totalRecords: universities.length,
+      missingData: {
+        overview: universities.filter(u => !u.overview).length,
+        tuitionFees: universities.filter(u => !u.financialData?.tuition).length,
+        acceptanceRate: universities.filter(u => !u.admissionData?.acceptanceRate).length,
+        rankings: universities.filter(u => !u.rankings || Object.keys(u.rankings).length === 0).length
+      },
+      duplicates: this.findDuplicates(universities),
+      dataTypes: this.analyzeDataTypes(universities)
+    };
+
+    console.log('  Data Quality Report:', report);
+    return report;
+  }
+
+  findDuplicates(universities) {
+    const seen = new Set();
+    const duplicates = [];
+    
+    universities.forEach(university => {
+      const key = `${university.universityName}-${university.country}`.toLowerCase();
+      if (seen.has(key)) {
+        duplicates.push(university.universityName);
+      } else {
+        seen.add(key);
+      }
+    });
+    
+    return duplicates;
+  }
+
+  analyzeDataTypes(universities) {
+    return {
+      numeric: {
+        tuitionFees: universities.filter(u => typeof u.financialData?.tuition === 'number').length,
+        acceptanceRate: universities.filter(u => typeof u.admissionData?.acceptanceRate === 'number').length,
+        rankings: universities.filter(u => u.rankings && typeof Object.values(u.rankings)[0] === 'number').length
+      },
+      string: {
+        overview: universities.filter(u => typeof u.overview === 'string' && u.overview.length > 100).length,
+        websiteUrl: universities.filter(u => typeof u.websiteUrl === 'string' && u.websiteUrl.startsWith('http')).length
+      }
+    };
+  }
+
+  async sendNotifications() {
+    // Implementation for sending notifications (email, Slack, etc.)
+    console.log('  Sending completion notifications...');
+    return Promise.resolve();
+  }
+
+  getProgress() {
+    return this.currentProgress;
+  }
+}
+
+// ==================== MONITORING DASHBOARD ====================
+
+class MonitoringDashboard {
+  constructor(pipeline) {
+    this.pipeline = pipeline;
+    this.app = express();
+    this.setupRoutes();
+  }
+
+  setupRoutes() {
+    this.app.use(express.json());
+    this.app.use(express.static('public'));
+
+    // Get current pipeline status
+    this.app.get('/api/status', (req, res) => {
+      res.json({
+        isRunning: this.pipeline.isRunning,
+        progress: this.pipeline.getProgress(),
+        lastRun: this.pipeline.monitor.metrics.endTime,
+        metrics: this.pipeline.monitor.metrics
+      });
+    });
+
+    // Start pipeline manually
+    this.app.post('/api/start', async (req, res) => {
+      try {
+        if (this.pipeline.isRunning) {
+          return res.status(400).json({ error: 'Pipeline is already running' });
+        }
+        
+        // Start pipeline in background
+        this.pipeline.runFullPipeline().catch(error => {
+          console.error('Pipeline error:', error);
+        });
+        
+        res.json({ message: 'Pipeline started successfully' });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Stop pipeline
+    this.app.post('/api/stop', (req, res) => {
+      // Implementation would need pipeline cancellation logic
+      res.json({ message: 'Stop request sent' });
+    });
+
+    // Get logs
+    this.app.get('/api/logs', (req, res) => {
+      res.json({
+        errors: this.pipeline.currentProgress.errors,
+        dataSourceErrors: Array.from(this.pipeline.monitor.metrics.dataSourceErrors.entries())
+      });
+    });
+
+    // Dashboard HTML
+    this.app.get('/', (req, res) => {
+      res.send(this.getDashboardHTML());
+    });
+  }
+
+  getDashboardHTML() {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Data Pipeline Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status-running { color: #28a745; }
+        .status-idle { color: #6c757d; }
+        .status-error { color: #dc3545; }
+        .progress-bar { width: 100%; height: 20px; background-color: #e9ecef; border-radius: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background-color: #007bff; transition: width 0.3s ease; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .metric-card { text-align: center; }
+        .metric-value { font-size: 2em; font-weight: bold; color: #007bff; }
+        .metric-label { color: #6c757d; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-danger:hover { background-color: #c82333; }
+        .log-container { max-height: 300px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px; }
+        .error-log { color: #dc3545; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>University Data Pipeline Dashboard</h1>
+        
+        <div class="card">
+            <h2>Pipeline Status</h2>
+            <div id="status-display">Loading...</div>
+            <div id="progress-display" style="margin: 20px 0;">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="progress-text">0% - Idle</div>
+            </div>
+            <div>
+                <button id="start-btn" class="btn-primary" onclick="startPipeline()">Start Pipeline</button>
+                <button id="stop-btn" class="btn-danger" onclick="stopPipeline()">Stop Pipeline</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div id="universities-processed" class="metric-value">0</div>
+                    <div class="metric-label">Universities Processed</div>
+                </div>
+                <div class="metric-card">
+                    <div id="success-rate" class="metric-value">0%</div>
+                    <div class="metric-label">Success Rate</div>
+                </div>
+                <div class="metric-card">
+                    <div id="data-sources" class="metric-value">0</div>
+                    <div class="metric-label">Active Data Sources</div>
+                </div>
+                <div class="metric-card">
+                    <div id="processing-time" class="metric-value">0s</div>
+                    <div class="metric-label">Processing Time</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Error Logs</h2>
+            <div id="error-logs" class="log-container">
+                No errors to display.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let statusInterval;
+
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update status display
+                    const statusEl = document.getElementById('status-display');
+                    if (data.isRunning) {
+                        statusEl.innerHTML = '<span class="status-running">Running</span>';
+                        statusEl.innerHTML += ' - Phase: ' + (data.progress.phase || 'unknown');
+                    } else {
+                        statusEl.innerHTML = '<span class="status-idle">Idle</span>';
+                    }
+
+                    // Update progress bar
+                    const progressFill = document.getElementById('progress-fill');
+                    const progressText = document.getElementById('progress-text');
+                    const progress = data.progress.progress || 0;
+                    
+                    progressFill.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '% - ' + 
+                        (data.progress.phase || 'idle').replace('_', ' ').toUpperCase();
+
+                    // Update metrics
+                    if (data.metrics) {
+                        document.getElementById('universities-processed').textContent = 
+                            data.metrics.totalUniversitiesProcessed || 0;
+                        
+                        const successRate = data.metrics.successfulSaves && data.metrics.failedSaves ?
+                            Math.round((data.metrics.successfulSaves / (data.metrics.successfulSaves + data.metrics.failedSaves)) * 100) : 0;
+                        document.getElementById('success-rate').textContent = successRate + '%';
+                        
+                        document.getElementById('data-sources').textContent = 
+                            data.metrics.dataSourceErrors ? data.metrics.dataSourceErrors.size : 0;
+                        
+                        const processingTime = data.metrics.startTime && data.metrics.endTime ?
+                            Math.round((new Date(data.metrics.endTime) - new Date(data.metrics.startTime)) / 1000) : 0;
+                        document.getElementById('processing-time').textContent = processingTime + 's';
+                    }
+
+                    // Update buttons
+                    document.getElementById('start-btn').disabled = data.isRunning;
+                    document.getElementById('stop-btn').disabled = !data.isRunning;
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                });
+        }
+
+        function updateLogs() {
+            fetch('/api/logs')
+                .then(response => response.json())
+                .then(data => {
+                    const logsEl = document.getElementById('error-logs');
+                    if (data.errors && data.errors.length > 0) {
+                        logsEl.innerHTML = data.errors.map(error => 
+                            '<div class="error-log">' + error + '</div>'
+                        ).join('');
+                    } else {
+                        logsEl.innerHTML = 'No errors to display.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching logs:', error);
+                });
+        }
+
+        function startPipeline() {
+            fetch('/api/start', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        alert('Pipeline started successfully');
+                    }
+                })
+                .catch(error => {
+                    alert('Error starting pipeline: ' + error.message);
+                });
+        }
+
+        function stopPipeline() {
+            fetch('/api/stop', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert('Stop request sent');
+                })
+                .catch(error => {
+                    alert('Error stopping pipeline: ' + error.message);
+                });
+        }
+
+        // Start polling for status updates
+        updateStatus();
+        updateLogs();
+        statusInterval = setInterval(() => {
+            updateStatus();
+            updateLogs();
+        }, 2000);
+    </script>
+</body>
+</html>
+    `;
+  }
+
+  start(port = 3000) {
+    this.app.listen(port, () => {
+      console.log(`Monitoring dashboard available at http://localhost:${port}`);
+    });
+  }
+}
+
+// ==================== MAIN EXECUTION ====================
+
+class PipelineExecutor {
+  constructor() {
+    this.pipeline = new EnhancedUniversityDataPipeline();
+    this.scheduler = new PipelineScheduler(this.pipeline);
+    this.dashboard = new MonitoringDashboard(this.pipeline);
+  }
+
+  async start() {
+    console.log('Starting University Data Pipeline System...');
+    
+    // Start monitoring dashboard
+    this.dashboard.start(3000);
+    
+    // Schedule daily runs at 2 AM
+    this.scheduler.scheduleDailyRun(2);
+    
+    // Run immediately for testing (uncomment if needed)
+    // await this.runOnce();
+  }
+
+  async runOnce() {
+    try {
+      const result = await this.pipeline.runFullPipeline();
+      console.log('Pipeline execution completed:', result);
+      return result;
+    } catch (error) {
+      console.error('Pipeline execution failed:', error);
+      throw error;
+    }
+  }
+}
+
+// Export for use
+module.exports = {
+  EnhancedUniversityDataPipeline,
+  MonitoringDashboard,
+  PipelineExecutor
+};
+
+// CLI execution
+if (require.main === module) {
+  const executor = new PipelineExecutor();
+  
+  const args = process.argv.slice(2);
+  if (args.includes('--run-once')) {
+    executor.runOnce().then(() => process.exit(0)).catch(() => process.exit(1));
+  } else {
+    executor.start();
+  }
+}

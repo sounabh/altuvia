@@ -1,0 +1,1349 @@
+// Pipeline Configuration and Additional Data Sources
+// This file contains configuration, additional scrapers, and specialized data extractors
+
+const puppeteer = require('puppeteer');
+const axios = require('axios');
+
+
+// US MBA Focused Pipeline Executor
+// Run this to collect specifically US MBA program data
+
+const { EnhancedUniversityDataPipeline } = require('./enhanced_pipeline');
+const { MBASpecializedScrapers, MBADataProcessor, MBA_PIPELINE_CONFIG } = require('./mba_enhanced_pipeline');
+
+class USMBAPipeline extends EnhancedUniversityDataPipeline {
+  constructor() {
+    super();
+    this.mbaScraper = new MBASpecializedScrapers();
+    this.mbaProcessor = MBADataProcessor;
+    this.mbaConfig = MBA_PIPELINE_CONFIG;
+  }
+
+  // Override the main pipeline to focus on MBA programs
+  async runMBAPipeline() {
+    if (this.isRunning) {
+      throw new Error('Pipeline is already running');
+    }
+
+    this.isRunning = true;
+    this.monitor.startMonitoring();
+    
+    try {
+      console.log('🎓 Starting US MBA Data Pipeline...');
+      this.updateProgress('initialization', 0, 0, 0);
+
+      // Phase 1: Fetch MBA-specific data
+      await this.executeMBAPhase1();
+      
+      // Phase 2: Enhanced MBA web scraping
+      await this.executeMBAPhase2();
+      
+      // Phase 3: Process and enrich MBA data
+      await this.executeMBAPhase3();
+      
+      // Phase 4: Data validation and cleaning
+      await this.executePhase3(); // Use parent class method
+      
+      // Phase 5: Database operations with MBA-specific logic
+      await this.executeMBAPhase5();
+      
+      // Phase 6: Create MBA-specific data relationships
+      await this.executeMBAPhase6();
+
+      const report = this.monitor.endMonitoring();
+      this.updateProgress('completed', 100, report.totalUniversitiesProcessed, report.totalUniversitiesProcessed);
+      
+      return {
+        success: true,
+        report: report,
+        totalMBAPrograms: this.allUniversities.size,
+        processingTime: report.endTime - report.startTime
+      };
+
+    } catch (error) {
+      console.error('❌ MBA Pipeline failed:', error);
+      this.updateProgress('failed', 0, 0, 0, [error.message]);
+      throw error;
+    } finally {
+      this.isRunning = false;
+      await this.mbaScraper.closeBrowser();
+    }
+  }
+
+  // Phase 1: MBA-specific data collection
+  async executeMBAPhase1() {
+    this.updateProgress('mba_data_collection', 10, 0, 0);
+    console.log('🏫 Phase 1: Collecting US MBA program data...');
+
+    this.allUniversities = new Map();
+    const dataSources = [];
+
+    // US News MBA Rankings
+    try {
+      console.log('  Fetching US News MBA Rankings...');
+      const usNewsMBA = await this.mbaScraper.scrapeUSNewsMBARankings();
+      if (usNewsMBA) dataSources.push({ source: 'usnews_mba', data: usNewsMBA });
+    } catch (error) {
+      this.monitor.recordDataSourceError('usnews_mba', error);
+    }
+
+    // Financial Times MBA Rankings
+    try {
+      console.log('  Fetching Financial Times MBA Rankings...');
+      const ftMBA = await this.mbaScraper.scrapeFTMBARankings();
+      if (ftMBA) dataSources.push({ source: 'ft_mba', data: ftMBA });
+    } catch (error) {
+      this.monitor.recordDataSourceError('ft_mba', error);
+    }
+
+    // AACSB Accreditation Data
+    try {
+      console.log('  Fetching AACSB Accreditation Data...');
+      const aacsb = await this.mbaScraper.scrapeAACSBAccreditation();
+      if (aacsb) dataSources.push({ source: 'aacsb', data: aacsb });
+    } catch (error) {
+      this.monitor.recordDataSourceError('aacsb', error);
+    }
+
+    // Process each MBA data source
+    for (const { source, data } of dataSources) {
+      await this.processMBADataSource(data, source, this.allUniversities);
+    }
+
+    console.log(`  ✅ Collected data for ${this.allUniversities.size} MBA programs from ${dataSources.length} sources`);
+    this.updateProgress('mba_data_collection', 25, this.allUniversities.size, 0);
+  }
+
+  // Phase 2: Enhanced MBA web scraping
+  async executeMBAPhase2() {
+    this.updateProgress('mba_web_scraping', 30, this.allUniversities.size, 0);
+    console.log('🕷️ Phase 2: Enhanced MBA web scraping...');
+
+    // Poet&Quants detailed data
+    try {
+      console.log('  Scraping Poet&Quants MBA data...');
+      const poetQuantsData = await this.mbaScraper.scrapePoetAndQuantsData();
+      if (poetQuantsData) {
+        await this.mergeMBAScrapedData(poetQuantsData, 'poet_quants');
+      }
+    } catch (error) {
+      this.monitor.recordDataSourceError('poet_quants', error);
+    }
+
+    // Enhanced individual MBA program websites
+    let scrapedCount = 0;
+    const maxScrapeCount = 50; // Focus on top 50 MBA programs
+    
+    for (const [key, university] of this.allUniversities) {
+      if (scrapedCount >= maxScrapeCount) break;
+      
+      try {
+        if (university.websiteUrl) {
+          const mbaSpecificData = await this.scrapeMBAWebsite(university.websiteUrl);
+          if (mbaSpecificData) {
+            this.allUniversities.set(key, { ...university, ...mbaSpecificData });
+            scrapedCount++;
+          }
+        }
+      } catch (error) {
+        console.error(`Error scraping MBA data for ${university.universityName}:`, error);
+      }
+      
+      this.updateProgress('mba_web_scraping', 30 + (scrapedCount / maxScrapeCount) * 20, 
+                         this.allUniversities.size, scrapedCount);
+    }
+
+    console.log(`  ✅ Enhanced ${scrapedCount} MBA programs with detailed scraping`);
+  }
+
+  // Phase 3: MBA data enrichment and processing
+  async executeMBAPhase3() {
+    this.updateProgress('mba_processing', 50, this.allUniversities.size, 0);
+    console.log('⚙️ Phase 3: Processing and enriching MBA data...');
+
+    let processedCount = 0;
+    const processedUniversities = new Map();
+    
+    for (const [key, rawData] of this.allUniversities) {
+      try {
+        // Apply MBA-specific data processing
+        const processedMBA = await this.processMBASpecificData(rawData);
+        
+        // Add MBA-specific fields
+        processedMBA.degreeType = 'MBA';
+        processedMBA.isMBAProgram = true;
+        
+        // Enhance with MBA-specific essay prompts
+        processedMBA.essayPrompts = await this.generateMBAEssayPrompts(processedMBA);
+        
+        // Calculate MBA-specific deadlines
+        processedMBA.admissionDeadlines = await this.generateMBADeadlines(processedMBA);
+        
+        processedUniversities.set(key, processedMBA);
+        processedCount++;
+        
+        this.updateProgress('mba_processing', 50 + (processedCount / this.allUniversities.size) * 15,
+                           this.allUniversities.size, processedCount);
+        
+      } catch (error) {
+        console.error(`Error processing MBA data for ${rawData.universityName}:`, error);
+      }
+    }
+
+    this.allUniversities = processedUniversities;
+    console.log(`  ✅ Processed ${processedUniversities.size} MBA programs`);
+  }
+
+  // Phase 5: MBA-specific database operations
+  async executeMBAPhase5() {
+    this.updateProgress('mba_database_save', 70, this.allUniversities.size, 0);
+    console.log('💾 Phase 5: Saving MBA programs to database...');
+
+    const mbaPrograms = Array.from(this.allUniversities.values());
+    const batches = this.chunkArray(mbaPrograms, this.config.batchSize);
+    let savedCount = 0;
+    
+    for (const batch of batches) {
+      const batchPromises = batch.map(async (mbaProgram) => {
+        try {
+          // Save university
+          const university = await this.saveUniversityToDatabase(mbaProgram);
+          
+          // Save MBA program specifically
+          const program = await this.saveMBAProgramToDatabase(university.id, mbaProgram);
+          
+          // Save MBA-specific admission requirements
+          await this.saveMBAAdmissionData(university.id, program.id, mbaProgram);
+          
+          // Save MBA essay prompts
+          if (mbaProgram.essayPrompts && mbaProgram.essayPrompts.length > 0) {
+            await this.saveMBAEssayPrompts(university.id, program.id, mbaProgram.essayPrompts);
+          }
+          
+          // Save MBA deadlines
+          if (mbaProgram.admissionDeadlines && mbaProgram.admissionDeadlines.length > 0) {
+            await this.saveMBADeadlines(university.id, program.id, mbaProgram.admissionDeadlines);
+          }
+          
+          this.monitor.recordSuccessfulSave();
+          savedCount++;
+        } catch (error) {
+          console.error(`Failed to save MBA program ${mbaProgram.universityName}:`, error);
+          this.monitor.recordFailedSave();
+        }
+      });
+      
+      await Promise.all(batchPromises);
+      
+      this.updateProgress('mba_database_save', 70 + (savedCount / mbaPrograms.length) * 20,
+                         mbaPrograms.length, savedCount);
+      
+      await this.delay(this.config.batch.delayBetweenBatches);
+    }
+
+    console.log(`  ✅ Saved ${savedCount} MBA programs to database`);
+  }
+
+  // Phase 6: Create MBA-specific relationships and departments
+  async executeMBAPhase6() {
+    this.updateProgress('mba_relationships', 90, 0, 0);
+    console.log('🔗 Phase 6: Creating MBA program relationships...');
+
+    try {
+      // Create Business School departments
+      await this.createBusinessDepartments();
+      
+      // Link MBA programs to departments
+      await this.linkMBAToDepartments();
+      
+      // Create MBA specializations as separate programs
+      await this.createMBASpecializations();
+      
+      // Generate MBA calendar events for deadlines
+      await this.generateMBACalendarEvents();
+      
+    } catch (error) {
+      console.error('Error creating MBA relationships:', error);
+    }
+
+    console.log('  ✅ MBA relationships and structures created');
+  }
+
+  // Helper methods for MBA-specific operations
+
+  async processMBADataSource(data, source, universitiesMap) {
+    const mbaPrograms = Array.isArray(data) ? data : [data];
+    
+    for (const mbaData of mbaPrograms) {
+      try {
+        // Process using MBA-specific processor
+        const processed = this.mbaProcessor.processMBAData(mbaData, source);
+        
+        // Filter for US programs only
+        if (processed.country !== 'United States') continue;
+        
+        const key = `${processed.universityName}-${processed.programName || 'mba'}`.toLowerCase();
+        
+        if (universitiesMap.has(key)) {
+          // Merge MBA data if university already exists
+          universitiesMap.set(key, this.mergeMBAData(
+            universitiesMap.get(key),
+            processed
+          ));
+        } else {
+          universitiesMap.set(key, processed);
+        }
+      } catch (error) {
+        console.error(`Error processing MBA data from ${source}:`, error);
+      }
+    }
+  }
+
+  async mergeMBAScrapedData(scrapedData, source) {
+    for (const data of scrapedData) {
+      if (!data.name) continue;
+      
+      const key = `${data.name}-${data.programName || 'mba'}`.toLowerCase();
+      if (this.allUniversities.has(key)) {
+        const existing = this.allUniversities.get(key);
+        this.allUniversities.set(key, this.mergeMBAData(existing, data));
+      } else {
+        const processed = this.mbaProcessor.processMBAData(data, source);
+        if (processed.country === 'United States') {
+          this.allUniversities.set(key, processed);
+        }
+      }
+    }
+  }
+
+  mergeMBAData(existing, newData) {
+    return {
+      ...existing,
+      ...newData,
+      rankings: { ...existing.rankings, ...newData.rankings },
+      admissionData: { ...existing.admissionData, ...newData.admissionData },
+      financialData: { ...existing.financialData, ...newData.financialData },
+      outcomesData: { ...existing.outcomesData, ...newData.outcomesData },
+      programDetails: { ...existing.programDetails, ...newData.programDetails }
+    };
+  }
+
+  async scrapeMBAWebsite(websiteUrl) {
+    // Enhanced MBA-specific website scraping
+    try {
+      await this.delay(this.config.requestDelay);
+      const response = await axios.get(websiteUrl);
+      const $ = cheerio.load(response.data);
+      
+      return {
+        mbaOverview: this.extractMBAOverview($),
+        admissionRequirements: this.extractMBAAdmissionRequirements($),
+        curriculum: this.extractMBACurriculum($),
+        specializations: this.extractMBASpecializations($),
+        facultyInfo: this.extractFacultyInfo($),
+        careerServices: this.extractCareerServices($),
+        applicationDeadlines: this.extractMBADeadlines($),
+        tuitionDetails: this.extractDetailedTuition($),
+        scholarshipOpportunities: this.extractMBAScholarships($)
+      };
+    } catch (error) {
+      console.error(`Error scraping MBA website ${websiteUrl}:`, error);
+      return null;
+    }
+  }
+
+  extractMBAOverview($) {
+    const selectors = [
+      '.mba-overview',
+      '.program-overview',
+      '[data-testid="mba-overview"]',
+      '.about-program',
+      '.program-description'
+    ];
+
+    for (const selector of selectors) {
+      const text = $(selector).text().trim();
+      if (text && text.length > 200) {
+        return text.substring(0, 2000);
+      }
+    }
+    return null;
+  }
+
+  extractMBAAdmissionRequirements($) {
+    const requirements = {};
+    
+    // GMAT requirements
+    const gmatText = $('*:contains("GMAT")').text();
+    const gmatMatch = gmatText.match(/GMAT.*?(\d{3})/i);
+    if (gmatMatch) {
+      requirements.gmatMinScore = parseInt(gmatMatch[1]);
+    }
+    
+    // Work experience requirements
+    const workExpText = $('*:contains("work experience"), *:contains("professional experience")').text();
+    const workExpMatch = workExpText.match(/(\d+).*?years?.*?experience/i);
+    if (workExpMatch) {
+      requirements.minWorkExperience = parseInt(workExpMatch[1]) * 12; // Convert to months
+    }
+    
+    // Application deadlines
+    const deadlineText = $('*:contains("deadline"), *:contains("application")').text();
+    requirements.applicationDeadlines = this.extractDeadlineDates(deadlineText);
+    
+    return requirements;
+  }
+
+  extractMBACurriculum($) {
+    const curriculum = {};
+    
+    // Core courses
+    const coreCourses = [];
+    $('.core-courses li, .required-courses li, .curriculum .core li').each((index, element) => {
+      const course = $(element).text().trim();
+      if (course && course.length > 10) {
+        coreCourses.push(course);
+      }
+    });
+    curriculum.coreCourses = coreCourses;
+    
+    // Electives
+    const electives = [];
+    $('.elective-courses li, .electives li, .curriculum .electives li').each((index, element) => {
+      const course = $(element).text().trim();
+      if (course && course.length > 10) {
+        electives.push(course);
+      }
+    });
+    curriculum.electives = electives;
+    
+    // Program duration
+    const durationText = $('.program-duration, .duration, *:contains("duration")').text();
+    const durationMatch = durationText.match(/(\d+)\s*(months?|years?)/i);
+    if (durationMatch) {
+      curriculum.duration = durationMatch[0];
+    }
+    
+    return curriculum;
+  }
+
+  extractMBASpecializations($) {
+    const specializations = [];
+    
+    const specializationSelectors = [
+      '.specializations li',
+      '.concentrations li',
+      '.tracks li',
+      '.focus-areas li',
+      '[data-testid="specializations"] li'
+    ];
+
+    for (const selector of specializationSelectors) {
+      $(selector).each((index, element) => {
+        const spec = $(element).text().trim();
+        if (spec && spec.length > 5) {
+          specializations.push({
+            name: spec,
+            slug: this.generateSlug(spec)
+          });
+        }
+      });
+    }
+
+    return specializations;
+  }
+
+  async processMBASpecificData(rawData) {
+    // Apply MBA-specific business logic
+    const processed = { ...rawData };
+    
+    // Standardize MBA program names
+    processed.programName = this.standardizeMBAProgramName(processed.programName);
+    
+    // Calculate MBA-specific metrics
+    processed.mbaMetrics = {
+      roiScore: this.calculateROI(processed),
+      competitivenessScore: this.calculateCompetitiveness(processed),
+      diversityScore: this.calculateDiversity(processed)
+    };
+    
+    // Add MBA-specific requirements
+    processed.mbaRequirements = this.extractMBARequirements(processed);
+    
+    return processed;
+  }
+
+  standardizeMBAProgramName(programName) {
+    if (!programName) return 'MBA';
+    
+    const standardNames = {
+      'executive mba': 'Executive MBA',
+      'part-time mba': 'Part-time MBA',
+      'online mba': 'Online MBA',
+      'professional mba': 'Professional MBA',
+      'accelerated mba': 'Accelerated MBA',
+      'joint mba': 'Joint MBA'
+    };
+    
+    const lower = programName.toLowerCase();
+    return standardNames[lower] || programName;
+  }
+
+  calculateROI(mbaData) {
+    if (!mbaData.outcomesData?.averageStartingSalary || !mbaData.financialData?.tuition) {
+      return null;
+    }
+    
+    const salary = mbaData.outcomesData.averageStartingSalary;
+    const tuition = mbaData.financialData.tuition;
+    const paybackPeriod = tuition / (salary * 0.3); // Assuming 30% salary allocation for loan repayment
+    
+    return Math.round((100 - paybackPeriod) * 10) / 10; // Higher score = better ROI
+  }
+
+  calculateCompetitiveness(mbaData) {
+    let score = 50; // Base score
+    
+    if (mbaData.admissionData?.acceptanceRate) {
+      const acceptanceRate = mbaData.admissionData.acceptanceRate;
+      score += (50 - acceptanceRate); // Lower acceptance rate = higher score
+    }
+    
+    if (mbaData.admissionData?.gmatAverageScore) {
+      const gmat = mbaData.admissionData.gmatAverageScore;
+      score += Math.max(0, (gmat - 600) / 10); // Higher GMAT = higher score
+    }
+    
+    return Math.min(100, Math.max(0, score));
+  }
+
+  async generateMBAEssayPrompts(mbaData) {
+    // Standard MBA essay prompts
+    const standardPrompts = [
+      {
+        promptTitle: "Leadership Experience",
+        promptText: "Describe a significant leadership experience and what you learned from it. How will this experience contribute to your MBA journey and future career goals?",
+        wordLimit: 500,
+        minWordCount: 300,
+        isMandatory: true
+      },
+      {
+        promptTitle: "Career Goals",
+        promptText: "What are your short-term and long-term career goals? How will an MBA from our program help you achieve these goals?",
+        wordLimit: 400,
+        minWordCount: 250,
+        isMandatory: true
+      },
+      {
+        promptTitle: "Why This School",
+        promptText: "Why do you want to pursue an MBA at our school specifically? What aspects of our program align with your goals?",
+        wordLimit: 300,
+        minWordCount: 200,
+        isMandatory: true
+      },
+      {
+        promptTitle: "Diversity and Inclusion",
+        promptText: "How will you contribute to the diversity and collaborative environment of our MBA program?",
+        wordLimit: 350,
+        minWordCount: 200,
+        isMandatory: false
+      }
+    ];
+    
+    return standardPrompts;
+  }
+
+  async generateMBADeadlines(mbaData) {
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    
+    // Standard MBA application deadlines
+    return [
+      {
+        deadlineType: "Early Decision",
+        deadlineDate: new Date(`${currentYear}-10-15`),
+        title: "Early Decision Deadline",
+        description: "Early decision applications with binding commitment"
+      },
+      {
+        deadlineType: "Round 1",
+        deadlineDate: new Date(`${currentYear}-11-15`),
+        title: "Round 1 Application Deadline",
+        description: "First regular application round"
+      },
+      {
+        deadlineType: "Round 2",
+        deadlineDate: new Date(`${nextYear}-01-15`),
+        title: "Round 2 Application Deadline",
+        description: "Second regular application round"
+      },
+      {
+        deadlineType: "Round 3",
+        deadlineDate: new Date(`${nextYear}-03-15`),
+        title: "Round 3 Application Deadline",
+        description: "Final application round (limited spots)"
+      }
+    ];
+  }
+
+  async saveMBAProgramToDatabase(universityId, mbaData) {
+    try {
+      const program = await prisma.program.upsert({
+        where: { programSlug: mbaData.slug },
+        update: {
+          programName: mbaData.programName || 'MBA',
+          degreeType: 'MBA',
+          programDescription: mbaData.mbaOverview || mbaData.overview,
+          specializations: mbaData.programDetails?.specializations?.join(', '),
+          programLength: this.parseProgramLength(mbaData.programDetails?.duration),
+          isActive: true,
+          updatedAt: new Date()
+        },
+        create: {
+          universityId,
+          programName: mbaData.programName || 'MBA',
+          programSlug: mbaData.slug,
+          degreeType: 'MBA',
+          programDescription: mbaData.mbaOverview || mbaData.overview,
+          specializations: mbaData.programDetails?.specializations?.join(', '),
+          programLength: this.parseProgramLength(mbaData.programDetails?.duration),
+          isActive: true
+        }
+      });
+
+      return program;
+    } catch (error) {
+      console.error('Error saving MBA program to database:', error);
+      throw error;
+    }
+  }
+
+  async saveMBAAdmissionData(universityId, programId, mbaData) {
+    if (!mbaData.admissionData) return;
+
+    try {
+      await prisma.admission.upsert({
+        where: { 
+          universityId_programId: {
+            universityId,
+            programId
+          }
+        },
+        update: {
+          gmatMinScore: mbaData.admissionData.gmatMinScore,
+          gmatMaxScore: mbaData.admissionData.gmatMaxScore,
+          gmatAverageScore: mbaData.admissionData.gmatAverageScore,
+          greMinScore: mbaData.admissionData.greMinScore,
+          greMaxScore: mbaData.admissionData.greMaxScore,
+          greAverageScore: mbaData.admissionData.greAverageScore,
+          minimumGpa: mbaData.admissionData.minimumGpa,
+          minWorkExperience: mbaData.admissionData.minWorkExperience,
+          maxWorkExperience: mbaData.admissionData.maxWorkExperience,
+          acceptanceRate: mbaData.admissionData.acceptanceRate,
+          workExperienceRequired: mbaData.admissionData.minWorkExperience > 0,
+          updatedAt: new Date()
+        },
+        create: {
+          universityId,
+          programId,
+          gmatMinScore: mbaData.admissionData.gmatMinScore,
+          gmatMaxScore: mbaData.admissionData.gmatMaxScore,
+          gmatAverageScore: mbaData.admissionData.gmatAverageScore,
+          greMinScore: mbaData.admissionData.greMinScore,
+          greMaxScore: mbaData.admissionData.greMaxScore,
+          greAverageScore: mbaData.admissionData.greAverageScore,
+          minimumGpa: mbaData.admissionData.minimumGpa,
+          minWorkExperience: mbaData.admissionData.minWorkExperience,
+          maxWorkExperience: mbaData.admissionData.maxWorkExperience,
+          acceptanceRate: mbaData.admissionData.acceptanceRate,
+          workExperienceRequired: mbaData.admissionData.minWorkExperience > 0
+        }
+      });
+    } catch (error) {
+      console.error('Error saving MBA admission data:', error);
+    }
+  }
+
+  async createBusinessDepartments() {
+    // Create common business school departments
+    const departments = [
+      'Business Administration',
+      'Finance',
+      'Marketing',
+      'Operations Management',
+      'Human Resources',
+      'Strategy',
+      'Entrepreneurship',
+      'International Business',
+      'Information Systems'
+    ];
+
+    for (const [key, university] of this.allUniversities) {
+      try {
+        for (const deptName of departments) {
+          await prisma.department.upsert({
+            where: {
+              universityId_slug: {
+                universityId: university.id,
+                slug: this.generateSlug(deptName)
+              }
+            },
+            update: {
+              name: deptName,
+              updatedAt: new Date()
+            },
+            create: {
+              universityId: university.id,
+              name: deptName,
+              slug: this.generateSlug(deptName)
+            }
+          });
+        }
+      } catch (error) {
+        console.error(`Error creating departments for ${university.universityName}:`, error);
+      }
+    }
+  }
+
+  parseProgramLength(duration) {
+    if (!duration) return 24; // Default 2 years for MBA
+    
+    const match = duration.match(/(\d+)\s*(months?|years?)/i);
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2].toLowerCase();
+      return unit.startsWith('year') ? value * 12 : value;
+    }
+    
+    return 24; // Default
+  }
+}
+
+// Export the MBA-focused pipeline
+module.exports = { USMBAPipeline };
+
+// CLI usage for running MBA pipeline specifically
+if (require.main === module) {
+  const mbaPipeline = new USMBAPipeline();
+  
+  const args = process.argv.slice(2);
+  if (args.includes('--run-mba')) {
+    mbaPipeline.runMBAPipeline()
+      .then(result => {
+        console.log('MBA Pipeline completed successfully:', result);
+        process.exit(0);
+      })
+      .catch(error => {
+        console.error('MBA Pipeline failed:', error);
+        process.exit(1);
+      });
+  } else {
+    console.log('Use --run-mba to start the US MBA pipeline');
+  }
+}
+
+// ==================== CONFIGURATION ====================
+
+const PIPELINE_CONFIG = {
+  // Rate limiting settings
+  rateLimit: {
+    requestsPerMinute: 30,
+    delayBetweenRequests: 2000,
+    maxConcurrentRequests: 5
+  },
+  
+  // Retry settings
+  retry: {
+    maxRetries: 3,
+    retryDelay: 1000,
+    backoffMultiplier: 2
+  },
+  
+  // Batch processing
+  batch: {
+    size: 10,
+    delayBetweenBatches: 5000
+  },
+  
+  // Data sources
+  dataSources: {
+    rankings: {
+      qs: {
+        url: 'https://www.topuniversities.com/sites/default/files/qs-rankings/files/qs-wur-2024-location.json',
+        enabled: true,
+        priority: 1
+      },
+      the: {
+        url: 'https://www.timeshighereducation.com/sites/default/files/the_data_rankings/world_university_rankings_2024_0__0.json',
+        enabled: true,
+        priority: 1
+      },
+      usnews: {
+        url: 'https://www.usnews.com/best-colleges/api/search',
+        enabled: true,
+        priority: 2
+      },
+      arwu: {
+        url: 'http://www.shanghairanking.com/api/rankings/arwu/2024',
+        enabled: true,
+        priority: 2
+      }
+    },
+    
+    admissionData: {
+      collegeboard: {
+        url: 'https://bigfuture.collegeboard.org/api/v1/colleges',
+        enabled: true,
+        priority: 1
+      },
+      commonapp: {
+        url: 'https://www.commonapp.org/api/colleges',
+        enabled: true,
+        priority: 2
+      },
+      petersons: {
+        url: 'https://www.petersons.com/api/college-search',
+        enabled: true,
+        priority: 2
+      }
+    },
+    
+    financialData: {
+      ipeds: {
+        url: 'https://nces.ed.gov/ipeds/datacenter/api/data',
+        enabled: true,
+        priority: 1
+      },
+      collegescorecard: {
+        url: 'https://api.data.gov/ed/collegescorecard/v1/schools',
+        enabled: true,
+        priority: 1
+      }
+    }
+  }
+};
+
+// ==================== SPECIALIZED SCRAPERS ====================
+
+class SpecializedScrapers {
+  constructor() {
+    this.browser = null;
+  }
+
+  async initBrowser() {
+    if (!this.browser) {
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
+      });
+    }
+    return this.browser;
+  }
+
+  // QS World University Rankings scraper
+  async scrapeQSRankings() {
+    const browser = await this.initBrowser();
+    const page = await browser.newPage();
+    
+    try {
+      await page.goto('https://www.topuniversities.com/university-rankings/world-university-rankings/2024', {
+        waitUntil: 'networkidle2'
+      });
+      
+      await page.waitForSelector('.ranking-data-table');
+      
+      const universities = await page.evaluate(() => {
+        const rows = document.querySelectorAll('.ranking-data-table tbody tr');
+        return Array.from(rows).map(row => {
+          const cells = row.querySelectorAll('td');
+          return {
+            rank: cells[0]?.textContent?.trim(),
+            name: cells[1]?.querySelector('.uni-link')?.textContent?.trim(),
+            country: cells[2]?.textContent?.trim(),
+            overallScore: cells[3]?.textContent?.trim(),
+            academicReputation: cells[4]?.textContent?.trim(),
+            employerReputation: cells[5]?.textContent?.trim(),
+            facultyStudent: cells[6]?.textContent?.trim(),
+            citationsPerFaculty: cells[7]?.textContent?.trim(),
+            internationalFaculty: cells[8]?.textContent?.trim(),
+            internationalStudents: cells[9]?.textContent?.trim()
+          };
+        });
+      });
+      
+      return universities;
+    } catch (error) {
+      console.error('Error scraping QS rankings:', error);
+      return null;
+    } finally {
+      await page.close();
+    }
+  }
+
+  // Times Higher Education scraper
+  async scrapeTHERankings() {
+    const browser = await this.initBrowser();
+    const page = await browser.newPage();
+    
+    try {
+      await page.goto('https://www.timeshighereducation.com/world-university-rankings/2024/world-ranking', {
+        waitUntil: 'networkidle2'
+      });
+      
+      await page.waitForSelector('.ranking-institution-title');
+      
+      const universities = await page.evaluate(() => {
+        const institutions = document.querySelectorAll('.ranking-institution');
+        return Array.from(institutions).map(institution => {
+          return {
+            rank: institution.querySelector('.ranking-position')?.textContent?.trim(),
+            name: institution.querySelector('.ranking-institution-title a')?.textContent?.trim(),
+            country: institution.querySelector('.location')?.textContent?.trim(),
+            overallScore: institution.querySelector('.score')?.textContent?.trim(),
+            teachingScore: institution.querySelector('[data-column="teaching"]')?.textContent?.trim(),
+            researchScore: institution.querySelector('[data-column="research"]')?.textContent?.trim(),
+            citationsScore: institution.querySelector('[data-column="citations"]')?.textContent?.trim(),
+            industryIncomeScore: institution.querySelector('[data-column="industry_income"]')?.textContent?.trim(),
+            internationalOutlookScore: institution.querySelector('[data-column="international_outlook"]')?.textContent?.trim()
+          };
+        });
+      });
+      
+      return universities;
+    } catch (error) {
+      console.error('Error scraping THE rankings:', error);
+      return null;
+    } finally {
+      await page.close();
+    }
+  }
+
+  // US News scraper for detailed college data
+  async scrapeUSNewsData() {
+    const browser = await this.initBrowser();
+    const page = await browser.newPage();
+    
+    try {
+      await page.goto('https://www.usnews.com/best-colleges/rankings/national-universities', {
+        waitUntil: 'networkidle2'
+      });
+      
+      await page.waitForSelector('.Anchor__AnchorBase-sc-1tv5p9l-0');
+      
+      const universities = await page.evaluate(() => {
+        const items = document.querySelectorAll('[data-testid="college-tile"]');
+        return Array.from(items).map(item => {
+          return {
+            rank: item.querySelector('.Rank__StyledRank-sc-3gi1o6-0')?.textContent?.trim(),
+            name: item.querySelector('.Heading__HeadingStyled-sc-1w5xk2o-0')?.textContent?.trim(),
+            location: item.querySelector('.Text__TextStyled-sc-1hsap7v-0')?.textContent?.trim(),
+            tuition: item.querySelector('[data-testid="tuition-fees"]')?.textContent?.trim(),
+            enrollment: item.querySelector('[data-testid="enrollment"]')?.textContent?.trim(),
+            acceptanceRate: item.querySelector('[data-testid="acceptance-rate"]')?.textContent?.trim(),
+            satRange: item.querySelector('[data-testid="sat-range"]')?.textContent?.trim(),
+            graduationRate: item.querySelector('[data-testid="graduation-rate"]')?.textContent?.trim()
+          };
+        });
+      });
+      
+      return universities;
+    } catch (error) {
+      console.error('Error scraping US News data:', error);
+      return null;
+    } finally {
+      await page.close();
+    }
+  }
+
+  // College Board Big Future scraper
+  async scrapeCollegeBoardData() {
+    const browser = await this.initBrowser();
+    const page = await browser.newPage();
+    
+    try {
+      await page.goto('https://bigfuture.collegeboard.org/college-search-results', {
+        waitUntil: 'networkidle2'
+      });
+      
+      // Wait for search results to load
+      await page.waitForSelector('.college-result-item', { timeout: 10000 });
+      
+      const colleges = await page.evaluate(() => {
+        const items = document.querySelectorAll('.college-result-item');
+        return Array.from(items).map(item => {
+          return {
+            name: item.querySelector('.college-name')?.textContent?.trim(),
+            location: item.querySelector('.college-location')?.textContent?.trim(),
+            type: item.querySelector('.college-type')?.textContent?.trim(),
+            size: item.querySelector('.enrollment')?.textContent?.trim(),
+            tuition: item.querySelector('.tuition-fees')?.textContent?.trim(),
+            satRange: item.querySelector('.sat-scores')?.textContent?.trim(),
+            actRange: item.querySelector('.act-scores')?.textContent?.trim(),
+            acceptanceRate: item.querySelector('.admission-rate')?.textContent?.trim(),
+            graduationRate: item.querySelector('.graduation-rate')?.textContent?.trim(),
+            website: item.querySelector('.college-website a')?.href
+          };
+        });
+      });
+      
+      return colleges;
+    } catch (error) {
+      console.error('Error scraping College Board data:', error);
+      return null;
+    } finally {
+      await page.close();
+    }
+  }
+
+  // Niche.com scraper for detailed college information
+  async scrapeNicheData() {
+    const browser = await this.initBrowser();
+    const page = await browser.newPage();
+    
+    try {
+      await page.goto('https://www.niche.com/colleges/search/best-colleges/', {
+        waitUntil: 'networkidle2'
+      });
+      
+      await page.waitForSelector('.search-result');
+      
+      const colleges = await page.evaluate(() => {
+        const results = document.querySelectorAll('.search-result');
+        return Array.from(results).map(result => {
+          return {
+            name: result.querySelector('.search-result__title a')?.textContent?.trim(),
+            location: result.querySelector('.search-result__location')?.textContent?.trim(),
+            nicheGrade: result.querySelector('.niche-grade')?.textContent?.trim(),
+            acceptanceRate: result.querySelector('[data-test="acceptance-rate"]')?.textContent?.trim(),
+            satRange: result.querySelector('[data-test="sat-range"]')?.textContent?.trim(),
+            netPrice: result.querySelector('[data-test="net-price"]')?.textContent?.trim(),
+            enrollment: result.querySelector('[data-test="enrollment"]')?.textContent?.trim(),
+            studentFacultyRatio: result.querySelector('[data-test="student-faculty-ratio"]')?.textContent?.trim(),
+            graduationRate: result.querySelector('[data-test="graduation-rate"]')?.textContent?.trim()
+          };
+        });
+      });
+      
+      return colleges;
+    } catch (error) {
+      console.error('Error scraping Niche data:', error);
+      return null;
+    } finally {
+      await page.close();
+    }
+  }
+
+  async closeBrowser() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+}
+
+// ==================== API DATA FETCHERS ====================
+
+class APIDataFetchers {
+  constructor() {
+    this.apiKeys = {
+      collegeScorecard: process.env.COLLEGE_SCORECARD_API_KEY,
+      ipeds: process.env.IPEDS_API_KEY
+    };
+  }
+
+  // College Scorecard API
+  async fetchCollegeScorecardData(limit = 100, offset = 0) {
+    try {
+      const response = await axios.get('https://api.data.gov/ed/collegescorecard/v1/schools', {
+        params: {
+          api_key: this.apiKeys.collegeScorecard,
+          'school.operating': 1,
+          'school.main_campus': 1,
+          'school.degrees_awarded.predominant': '3,4', // Bachelor's and Graduate
+          '_fields': [
+            'id',
+            'school.name',
+            'school.city',
+            'school.state',
+            'school.zip',
+            'school.school_url',
+            'school.price_calculator_url',
+            'latest.admissions.admission_rate.overall',
+            'latest.admissions.sat_scores.average.overall',
+            'latest.admissions.act_scores.midpoint.cumulative',
+            'latest.cost.tuition.in_state',
+            'latest.cost.tuition.out_of_state',
+            'latest.cost.roomboard.oncampus',
+            'latest.student.size',
+            'latest.completion.completion_rate_4yr_100nt',
+            'latest.student.demographics.race_ethnicity.white',
+            'latest.student.demographics.race_ethnicity.black',
+            'latest.student.demographics.race_ethnicity.hispanic',
+            'latest.student.demographics.race_ethnicity.asian',
+            'latest.academics.program_percentage.agriculture',
+            'latest.academics.program_percentage.business_marketing',
+            'latest.academics.program_percentage.engineering',
+            'latest.academics.program_percentage.computer'
+          ].join(','),
+          _per_page: limit,
+          _page: Math.floor(offset / limit)
+        }
+      });
+      
+      return response.data.results;
+    } catch (error) {
+      console.error('Error fetching College Scorecard data:', error);
+      return null;
+    }
+  }
+
+  // IPEDS Data API
+  async fetchIPEDSData(year = '2023') {
+    try {
+      const response = await axios.get('https://nces.ed.gov/ipeds/datacenter/api/data', {
+        params: {
+          api_key: this.apiKeys.ipeds,
+          year: year,
+          table: 'IC' + year, // Institutional Characteristics
+          format: 'json'
+        }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching IPEDS data:', error);
+      return null;
+    }
+  }
+
+  // Peterson's API
+  async fetchPetersonsData() {
+    try {
+      const response = await axios.get('https://www.petersons.com/api/college-search', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        },
+        params: {
+          format: 'json',
+          limit: 100
+        }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching Peterson\'s data:', error);
+      return null;
+    }
+  }
+
+  // Common Application API
+  async fetchCommonAppData() {
+    try {
+      const response = await axios.get('https://www.commonapp.org/api/colleges', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching Common App data:', error);
+      return null;
+    }
+  }
+
+  // Academic Ranking of World Universities (ARWU) API
+  async fetchARWUData(year = '2024') {
+    try {
+      const response = await axios.get(`http://www.shanghairanking.com/api/rankings/arwu/${year}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching ARWU data:', error);
+      return null;
+    }
+  }
+}
+
+// ==================== DATA VALIDATORS ====================
+
+class DataValidator {
+  static validateUniversityData(data) {
+    const errors = [];
+    
+    if (!data.universityName || data.universityName.length < 3) {
+      errors.push('University name is required and must be at least 3 characters');
+    }
+    
+    if (!data.country || data.country.length < 2) {
+      errors.push('Country is required');
+    }
+    
+    if (data.acceptanceRate && (data.acceptanceRate < 0 || data.acceptanceRate > 100)) {
+      errors.push('Acceptance rate must be between 0 and 100');
+    }
+    
+    if (data.tuitionFees && data.tuitionFees < 0) {
+      errors.push('Tuition fees cannot be negative');
+    }
+    
+    if (data.minimumGpa && (data.minimumGpa < 0 || data.minimumGpa > 4.0)) {
+      errors.push('GPA must be between 0 and 4.0');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+  
+  static validateProgramData(data) {
+    const errors = [];
+    
+    if (!data.programName || data.programName.length < 3) {
+      errors.push('Program name is required and must be at least 3 characters');
+    }
+    
+    if (!data.degreeType) {
+      errors.push('Degree type is required');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+  
+  static sanitizeData(data) {
+    const sanitized = { ...data };
+    
+    // Remove null, undefined, and empty string values
+    Object.keys(sanitized).forEach(key => {
+      if (sanitized[key] === null || sanitized[key] === undefined || sanitized[key] === '') {
+        delete sanitized[key];
+      }
+    });
+    
+    // Sanitize strings
+    if (sanitized.universityName) {
+      sanitized.universityName = sanitized.universityName.trim();
+    }
+    
+    if (sanitized.city) {
+      sanitized.city = sanitized.city.trim();
+    }
+    
+    if (sanitized.country) {
+      sanitized.country = sanitized.country.trim();
+    }
+    
+    // Convert numeric strings to numbers
+    if (sanitized.acceptanceRate && typeof sanitized.acceptanceRate === 'string') {
+      const rate = parseFloat(sanitized.acceptanceRate.replace('%', ''));
+      if (!isNaN(rate)) {
+        sanitized.acceptanceRate = rate;
+      }
+    }
+    
+    if (sanitized.tuitionFees && typeof sanitized.tuitionFees === 'string') {
+      const fees = parseFloat(sanitized.tuitionFees.replace(/[$,]/g, ''));
+      if (!isNaN(fees)) {
+        sanitized.tuitionFees = fees;
+      }
+    }
+    
+    return sanitized;
+  }
+}
+
+// ==================== PIPELINE MONITOR ====================
+
+class PipelineMonitor {
+  constructor() {
+    this.metrics = {
+      totalUniversitiesProcessed: 0,
+      totalProgramsProcessed: 0,
+      successfulSaves: 0,
+      failedSaves: 0,
+      dataSourceErrors: new Map(),
+      startTime: null,
+      endTime: null
+    };
+  }
+  
+  startMonitoring() {
+    this.metrics.startTime = new Date();
+    console.log(`Pipeline monitoring started at ${this.metrics.startTime.toISOString()}`);
+  }
+  
+  recordUniversityProcessed() {
+    this.metrics.totalUniversitiesProcessed++;
+  }
+  
+  recordProgramProcessed() {
+    this.metrics.totalProgramsProcessed++;
+  }
+  
+  recordSuccessfulSave() {
+    this.metrics.successfulSaves++;
+  }
+  
+  recordFailedSave() {
+    this.metrics.failedSaves++;
+  }
+  
+  recordDataSourceError(source, error) {
+    if (!this.metrics.dataSourceErrors.has(source)) {
+      this.metrics.dataSourceErrors.set(source, []);
+    }
+    this.metrics.dataSourceErrors.get(source).push({
+      timestamp: new Date(),
+      error: error.message
+    });
+  }
+  
+  endMonitoring() {
+    this.metrics.endTime = new Date();
+    const duration = this.metrics.endTime - this.metrics.startTime;
+    
+    console.log('\n=== PIPELINE EXECUTION REPORT ===');
+    console.log(`Duration: ${Math.round(duration / 1000)} seconds`);
+    console.log(`Universities Processed: ${this.metrics.totalUniversitiesProcessed}`);
+    console.log(`Programs Processed: ${this.metrics.totalProgramsProcessed}`);
+    console.log(`Successful Saves: ${this.metrics.successfulSaves}`);
+    console.log(`Failed Saves: ${this.metrics.failedSaves}`);
+    console.log(`Success Rate: ${((this.metrics.successfulSaves / (this.metrics.successfulSaves + this.metrics.failedSaves)) * 100).toFixed(2)}%`);
+    
+    if (this.metrics.dataSourceErrors.size > 0) {
+      console.log('\nData Source Errors:');
+      for (const [source, errors] of this.metrics.dataSourceErrors) {
+        console.log(`  ${source}: ${errors.length} errors`);
+      }
+    }
+    
+    return this.metrics;
+  }
+}
+
+module.exports = {
+  PIPELINE_CONFIG,
+  SpecializedScrapers,
+  APIDataFetchers,
+  DataValidator,
+  PipelineMonitor
+};
