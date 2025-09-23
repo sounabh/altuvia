@@ -47,15 +47,21 @@ export const UniversityCard = ({ university, onRemove }) => {
     const isFullyComplete = university.stats?.applicationHealth?.isFullyComplete;
     const essaysComplete = university.stats?.applicationHealth?.essaysFullyComplete;
     const tasksComplete = university.stats?.applicationHealth?.tasksFullyComplete;
+    const hasEssays = university.totalEssays > 0;
+    const hasTasks = university.totalTasks > 0;
     
     switch (status) {
       case 'submitted':
         return 'Submitted'; // Only shows when both essays AND tasks are 100% complete
       case 'in-progress':
         // Show more detailed status for in-progress
-        if (essaysComplete && !tasksComplete) {
+        if (essaysComplete && hasEssays && !tasksComplete && hasTasks) {
           return 'Essays Done';
-        } else if (!essaysComplete && tasksComplete) {
+        } else if (!essaysComplete && hasEssays && tasksComplete && hasTasks) {
+          return 'Tasks Done';  
+        } else if (essaysComplete && hasEssays && !hasTasks) {
+          return 'Essays Done';
+        } else if (tasksComplete && hasTasks && !hasEssays) {
           return 'Tasks Done';
         } else {
           return 'In Progress';
@@ -117,13 +123,21 @@ export const UniversityCard = ({ university, onRemove }) => {
   const tasksFullyComplete = university.stats?.applicationHealth?.tasksFullyComplete;
   const readyForSubmission = university.stats?.applicationHealth?.readyForSubmission;
 
+  // FIXED: Better logic for showing essay and task sections
+  const hasEssays = university.totalEssays > 0;
+  const hasTasks = totalTasks > 0;
+  const hasAnyContent = hasEssays || hasTasks;
+
   console.log(`Enhanced calculation for ${university.name}:`, {
     essayProgress: essayProgressPercentage,
     taskProgress: taskProgressPercentage,
     essaysComplete: essaysFullyComplete,
     tasksComplete: tasksFullyComplete,
     readyForSubmission: readyForSubmission,
-    status: university.status
+    status: university.status,
+    hasEssays,
+    hasTasks,
+    hasAnyContent
   });
 
   // Determine URL using slug or fallback to ID
@@ -184,12 +198,12 @@ export const UniversityCard = ({ university, onRemove }) => {
           {/* Completion Indicator Icons */}
           {(essaysFullyComplete || tasksFullyComplete) && university.status !== 'submitted' && (
             <div className="absolute top-4 left-4 flex gap-1">
-              {essaysFullyComplete && (
+              {essaysFullyComplete && hasEssays && (
                 <div className="bg-green-500 text-white rounded-full p-1" title="Essays Complete">
                   <FileText className="w-3 h-3" />
                 </div>
               )}
-              {tasksFullyComplete && (
+              {tasksFullyComplete && hasTasks && (
                 <div className="bg-blue-500 text-white rounded-full p-1" title="Tasks Complete">
                   <Calendar className="w-3 h-3" />
                 </div>
@@ -228,21 +242,21 @@ export const UniversityCard = ({ university, onRemove }) => {
               </div>
             </div>
 
-            {/* Enhanced Essay Progress Section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center text-slate-600">
-                  <FileText className="w-4 h-4 mr-2" />
-                  <span className="text-sm font-medium">Essays</span>
-                  {essaysFullyComplete && (
-                    <CheckCircle2 className="w-4 h-4 ml-1 text-green-500" />
-                  )}
+            {/* FIXED: Enhanced Essay Progress Section - Only show if essays exist */}
+            {hasEssays && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center text-slate-600">
+                    <FileText className="w-4 h-4 mr-2" />
+                    <span className="text-sm font-medium">Essays</span>
+                    {essaysFullyComplete && (
+                      <CheckCircle2 className="w-4 h-4 ml-1 text-green-500" />
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {university.completedEssays || 0}/{university.totalEssays || 0}
+                  </span>
                 </div>
-                <span className="text-sm font-semibold text-slate-900">
-                  {university.completedEssays || 0}/{university.totalEssays || 0}
-                </span>
-              </div>
-              {university.totalEssays > 0 && (
                 <div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div 
@@ -263,24 +277,24 @@ export const UniversityCard = ({ university, onRemove }) => {
                     )}
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Enhanced Task Progress Section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center text-slate-600">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  <span className="text-sm font-medium">Tasks</span>
-                  {tasksFullyComplete && (
-                    <CheckCircle2 className="w-4 h-4 ml-1 text-green-500" />
-                  )}
-                </div>
-                <span className="text-sm font-semibold text-slate-900">
-                  {completedTasks}/{totalTasks}
-                </span>
               </div>
-              {totalTasks > 0 && (
+            )}
+
+            {/* FIXED: Enhanced Task Progress Section - Only show if tasks exist */}
+            {hasTasks && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center text-slate-600">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    <span className="text-sm font-medium">Tasks</span>
+                    {tasksFullyComplete && (
+                      <CheckCircle2 className="w-4 h-4 ml-1 text-green-500" />
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {completedTasks}/{totalTasks}
+                  </span>
+                </div>
                 <div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div 
@@ -296,21 +310,40 @@ export const UniversityCard = ({ university, onRemove }) => {
                     {taskProgressPercentage}% Complete
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Enhanced Stats Section */}
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-              {/* Tasks Completed with Status */}
-              <div className="text-center">
-                <div className="text-2xl font-bold text-slate-900 flex items-center justify-center gap-1">
-                  {completedTasks}/{totalTasks}
-                  {tasksFullyComplete && totalTasks > 0 && (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  )}
+              {/* FIXED: Tasks Completed with Status - Only show if tasks exist */}
+              {hasTasks ? (
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-slate-900 flex items-center justify-center gap-1">
+                    {completedTasks}/{totalTasks}
+                    {tasksFullyComplete && (
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-600 uppercase tracking-wide">Tasks</div>
                 </div>
-                <div className="text-xs text-slate-600 uppercase tracking-wide">Tasks</div>
-              </div>
+              ) : hasEssays ? (
+                // Show essay count if no tasks but has essays
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-slate-900 flex items-center justify-center gap-1">
+                    {university.completedEssays}/{university.totalEssays}
+                    {essaysFullyComplete && (
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-600 uppercase tracking-wide">Essays</div>
+                </div>
+              ) : (
+                // Placeholder if no content
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-slate-900">0</div>
+                  <div className="text-xs text-slate-600 uppercase tracking-wide">Items</div>
+                </div>
+              )}
               
               {/* GMAT Average */}
               <div className="text-center">
@@ -329,24 +362,35 @@ export const UniversityCard = ({ university, onRemove }) => {
                   <span className="text-sm font-semibold">Ready for Submission!</span>
                 </div>
                 <div className="text-xs text-green-600 text-center mt-1">
-                  All essays and tasks completed
+                  {hasEssays && hasTasks ? 'All essays and tasks completed' :
+                   hasEssays ? 'All essays completed' :
+                   hasTasks ? 'All tasks completed' : 'Ready to submit'}
                 </div>
               </div>
             )}
 
-            {/* Progress Summary for In-Progress Applications */}
-            {university.status === 'in-progress' && !readyForSubmission && (
+            {/* FIXED: Progress Summary for In-Progress Applications */}
+            {university.status === 'in-progress' && !readyForSubmission && hasAnyContent && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
                 <div className="text-sm text-blue-800 font-medium mb-1">
                   Progress Summary
                 </div>
                 <div className="text-xs text-blue-700 space-y-1">
-                  {!essaysFullyComplete && (
+                  {hasEssays && !essaysFullyComplete && (
                     <div>• {university.totalEssays - university.completedEssays} essays remaining</div>
                   )}
-                  {!tasksFullyComplete && (
+                  {hasTasks && !tasksFullyComplete && (
                     <div>• {totalTasks - completedTasks} tasks remaining</div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* FIXED: Show message if no essays or tasks exist */}
+            {!hasAnyContent && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-4">
+                <div className="text-sm text-gray-600 text-center">
+                  No essays or tasks configured yet
                 </div>
               </div>
             )}
@@ -359,6 +403,8 @@ export const UniversityCard = ({ university, onRemove }) => {
                   <div>Status: {university.status}</div>
                   <div>Essays: {university.completedEssays}/{university.totalEssays} ({essayProgressPercentage}%)</div>
                   <div>Tasks: {completedTasks}/{totalTasks} ({taskProgressPercentage}%)</div>
+                  <div>Has Essays: {hasEssays ? 'Yes' : 'No'}</div>
+                  <div>Has Tasks: {hasTasks ? 'Yes' : 'No'}</div>
                   <div>Essays Complete: {essaysFullyComplete ? 'Yes' : 'No'}</div>
                   <div>Tasks Complete: {tasksFullyComplete ? 'Yes' : 'No'}</div>
                   <div>Ready for Submission: {readyForSubmission ? 'Yes' : 'No'}</div>
