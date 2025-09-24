@@ -350,59 +350,61 @@ export function AISuggestions({
     const issueCounts = getIssueCounts(analysisData)
 
     return (
-      <div className="space-y-6 pb-4">
-        {/* Header with overall score */}
-        <div className="flex items-center justify-between sticky top-0 bg-white py-3 z-10 border-b">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">AI Essay Analysis</h2>
-            <p className="text-sm text-gray-600">Comprehensive feedback on your essay</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-700">Overall Score:</span>
-            <Badge className={`${getScoreColor(analysisData.overallScore)} text-sm px-3 py-1 font-semibold`}>
-              {analysisData.overallScore}/100
-            </Badge>
+      <div className="space-y-6">
+        {/* Header with overall score - Sticky */}
+        <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-100 py-4 z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">AI Essay Analysis</h2>
+              <p className="text-sm text-gray-600">Comprehensive feedback on your essay</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-700">Overall Score:</span>
+              <Badge className={`${getScoreColor(analysisData.overallScore)} text-sm px-3 py-1.5 font-bold`}>
+                {analysisData.overallScore}/100
+              </Badge>
+            </div>
           </div>
         </div>
 
         {/* Score breakdown */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-1">
+          <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-blue-700">Structure</span>
               <BarChart3 className="w-3 h-3 text-blue-600" />
             </div>
-            <span className={`text-sm font-bold ${getScoreColor(analysisData.structureScore || 50).replace('bg-', 'text-')}`}>
+            <span className={`text-lg font-bold ${getScoreColor(analysisData.structureScore || 50).replace('bg-', 'text-')}`}>
               {analysisData.structureScore || 50}
             </span>
           </div>
           
-          <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+          <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-purple-700">Relevance</span>
               <Target className="w-3 h-3 text-purple-600" />
             </div>
-            <span className={`text-sm font-bold ${getScoreColor(analysisData.contentRelevance || 50).replace('bg-', 'text-')}`}>
+            <span className={`text-lg font-bold ${getScoreColor(analysisData.contentRelevance || 50).replace('bg-', 'text-')}`}>
               {analysisData.contentRelevance || 50}
             </span>
           </div>
           
-          <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+          <div className="bg-green-50 p-3 rounded-xl border border-green-100">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-green-700">Leadership</span>
               <TrendingUp className="w-3 h-3 text-green-600" />
             </div>
-            <span className={`text-sm font-bold ${getScoreColor(analysisData.leadershipEmphasis || 50).replace('bg-', 'text-')}`}>
+            <span className={`text-lg font-bold ${getScoreColor(analysisData.leadershipEmphasis || 50).replace('bg-', 'text-')}`}>
               {analysisData.leadershipEmphasis || 50}
             </span>
           </div>
           
-          <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+          <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-amber-700">Specificity</span>
               <Zap className="w-3 h-3 text-amber-600" />
             </div>
-            <span className={`text-sm font-bold ${getScoreColor(analysisData.specificityScore || 50).replace('bg-', 'text-')}`}>
+            <span className={`text-lg font-bold ${getScoreColor(analysisData.specificityScore || 50).replace('bg-', 'text-')}`}>
               {analysisData.specificityScore || 50}
             </span>
           </div>
@@ -410,9 +412,9 @@ export function AISuggestions({
 
         {/* Critical Issues */}
         {getSuggestionsByType('critical', analysisData).length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 px-1">
             <div 
-              className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-xl cursor-pointer hover:bg-red-100 transition-colors"
               onClick={() => toggleSection('critical')}
             >
               <div className="flex items-center space-x-2">
@@ -440,14 +442,14 @@ export function AISuggestions({
                       {getSuggestionIcon(suggestion.type)}
                       <div className="flex-1">
                         <h4 className="text-sm font-semibold text-red-900 mb-1">{suggestion.title}</h4>
-                        <p className="text-sm text-red-700 mb-2">{suggestion.description}</p>
+                        <p className="text-sm text-red-700 mb-2 leading-relaxed">{suggestion.description}</p>
                         
                         {suggestion.action && (
                           <div className="mt-3 p-3 bg-red-100 rounded-lg">
                             <p className="text-xs font-semibold text-red-800 mb-1 flex items-center">
                               <MessageSquare className="w-3 h-3 mr-1" /> Suggested Action:
                             </p>
-                            <p className="text-sm text-red-700">{suggestion.action}</p>
+                            <p className="text-sm text-red-700 leading-relaxed">{suggestion.action}</p>
                           </div>
                         )}
                       </div>
@@ -470,9 +472,9 @@ export function AISuggestions({
 
         {/* Warnings */}
         {getSuggestionsByType('warning', analysisData).length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 px-1">
             <div 
-              className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors"
               onClick={() => toggleSection('warning')}
             >
               <div className="flex items-center space-x-2">
@@ -500,14 +502,14 @@ export function AISuggestions({
                       {getSuggestionIcon(suggestion.type)}
                       <div className="flex-1">
                         <h4 className="text-sm font-semibold text-amber-900 mb-1">{suggestion.title}</h4>
-                        <p className="text-sm text-amber-700 mb-2">{suggestion.description}</p>
+                        <p className="text-sm text-amber-700 mb-2 leading-relaxed">{suggestion.description}</p>
                         
                         {suggestion.action && (
                           <div className="mt-3 p-3 bg-amber-100 rounded-lg">
                             <p className="text-xs font-semibold text-amber-800 mb-1 flex items-center">
                               <MessageSquare className="w-3 h-3 mr-1" /> Suggested Action:
                             </p>
-                            <p className="text-sm text-amber-700">{suggestion.action}</p>
+                            <p className="text-sm text-amber-700 leading-relaxed">{suggestion.action}</p>
                           </div>
                         )}
                       </div>
@@ -521,9 +523,9 @@ export function AISuggestions({
 
         {/* Improvements */}
         {getSuggestionsByType('improvement', analysisData).length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 px-1">
             <div 
-              className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors"
               onClick={() => toggleSection('improvement')}
             >
               <div className="flex items-center space-x-2">
@@ -551,14 +553,14 @@ export function AISuggestions({
                       {getSuggestionIcon(suggestion.type)}
                       <div className="flex-1">
                         <h4 className="text-sm font-semibold text-blue-900 mb-1">{suggestion.title}</h4>
-                        <p className="text-sm text-blue-700 mb-2">{suggestion.description}</p>
+                        <p className="text-sm text-blue-700 mb-2 leading-relaxed">{suggestion.description}</p>
                         
                         {suggestion.action && (
                           <div className="mt-3 p-3 bg-blue-100 rounded-lg">
                             <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center">
                               <MessageSquare className="w-3 h-3 mr-1" /> Suggested Action:
                             </p>
-                            <p className="text-sm text-blue-700">{suggestion.action}</p>
+                            <p className="text-sm text-blue-700 leading-relaxed">{suggestion.action}</p>
                           </div>
                         )}
                       </div>
@@ -572,9 +574,9 @@ export function AISuggestions({
 
         {/* Strengths */}
         {getSuggestionsByType('strength', analysisData).length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 px-1">
             <div 
-              className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg cursor-pointer hover:bg-green-100 transition-colors"
+              className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-xl cursor-pointer hover:bg-green-100 transition-colors"
               onClick={() => toggleSection('strength')}
             >
               <div className="flex items-center space-x-2">
@@ -602,14 +604,14 @@ export function AISuggestions({
                       {getSuggestionIcon(suggestion.type)}
                       <div className="flex-1">
                         <h4 className="text-sm font-semibold text-green-900 mb-1">{suggestion.title}</h4>
-                        <p className="text-sm text-green-700 mb-2">{suggestion.description}</p>
+                        <p className="text-sm text-green-700 mb-2 leading-relaxed">{suggestion.description}</p>
                         
                         {suggestion.action && (
                           <div className="mt-3 p-3 bg-green-100 rounded-lg">
                             <p className="text-xs font-semibold text-green-800 mb-1 flex items-center">
                               <MessageSquare className="w-3 h-3 mr-1" /> How to Leverage:
                             </p>
-                            <p className="text-sm text-green-700">{suggestion.action}</p>
+                            <p className="text-sm text-green-700 leading-relaxed">{suggestion.action}</p>
                           </div>
                         )}
                       </div>
@@ -621,9 +623,9 @@ export function AISuggestions({
           </div>
         )}
         
-        {/* Writing Metrics */}
+        {/* Writing Metrics - Always visible at bottom */}
         {analysisData.readabilityScore && (
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200 mx-1 mt-6">
             <div className="flex items-center space-x-2 mb-3">
               <BookOpen className="w-5 h-5 text-gray-700" />
               <span className="text-sm font-semibold text-gray-900">Writing Metrics</span>
@@ -632,23 +634,23 @@ export function AISuggestions({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Readability</span>
-                <span className={`font-bold ${getScoreColor(analysisData.readabilityScore).replace('bg-', 'text-')}`}>
+                <span className={`font-bold text-lg ${getScoreColor(analysisData.readabilityScore).replace('bg-', 'text-')}`}>
                   {analysisData.readabilityScore}/100
                 </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Avg Sentence</span>
-                <span className="font-bold text-gray-900">
+                <span className="font-bold text-gray-900 text-lg">
                   {Math.round(analysisData.avgSentenceLength || 0)} words
                 </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Sentences</span>
-                <span className="font-bold text-gray-900">{analysisData.sentenceCount || 0}</span>
+                <span className="font-bold text-gray-900 text-lg">{analysisData.sentenceCount || 0}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-xs text-gray-600 mb-1">Paragraphs</span>
-                <span className="font-bold text-gray-900">{analysisData.paragraphCount || 0}</span>
+                <span className="font-bold text-gray-900 text-lg">{analysisData.paragraphCount || 0}</span>
               </div>
             </div>
           </div>
@@ -656,7 +658,7 @@ export function AISuggestions({
 
         {/* Analysis metadata */}
         {analysisData.processingTime && (
-          <div className="text-xs text-gray-500 text-center py-2">
+          <div className="text-xs text-gray-500 text-center py-4 mx-1">
             Analysis completed in {Math.round(analysisData.processingTime / 1000 * 100) / 100}s
             {analysisData.createdAt && ` • ${new Date(analysisData.createdAt).toLocaleString()}`}
           </div>
@@ -675,7 +677,7 @@ export function AISuggestions({
   return (
     <>
       {/* Compact Card View */}
-      <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
+      <Card className="shadow-lg border-0 bg-white/95 backdrop-blur-sm">
         <div className="p-4">
           
           {/* Header */}
@@ -727,8 +729,8 @@ export function AISuggestions({
                       View All
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden">
-                    <DialogHeader className="px-6 py-4 border-b sticky top-0 bg-white z-10">
+                  <DialogContent className="max-w-5xl w-[90vw] h-[90vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="px-6 py-4 border-b sticky top-0 bg-white/95 backdrop-blur-sm z-20 shrink-0">
                       <DialogTitle className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Sparkles className="w-5 h-5 text-blue-600" />
@@ -744,9 +746,13 @@ export function AISuggestions({
                         </Button>
                       </DialogTitle>
                     </DialogHeader>
-                    <ScrollArea className="flex-1 px-6 max-h-full">
-                      {renderAnalysis(currentAnalysis)}
-                    </ScrollArea>
+                    <div className="flex-1 overflow-hidden">
+                      <ScrollArea className="h-full px-6 py-2">
+                        <div className="pb-6">
+                          {renderAnalysis(currentAnalysis)}
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </DialogContent>
                 </Dialog>
               )}
@@ -793,120 +799,159 @@ export function AISuggestions({
 
           {/* Analyzing State */}
           {isAnalyzing && (
-            <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center space-x-2">
-                <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
-                <span className="text-xs text-blue-700">Analyzing your essay...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-blue-700">Analyzing your essay...</span>
+                  <p className="text-xs text-blue-600 mt-0.5">This may take a few moments</p>
+                </div>
               </div>
             </div>
           )}
 
           {/* Error State */}
           {error && (
-            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-xs text-red-700">{error}</p>
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-red-700">Analysis Failed</p>
+                  <p className="text-xs text-red-600 mt-0.5">{error}</p>
+                </div>
+              </div>
             </div>
           )}
 
           {/* No Content State */}
           {!content || content.length < 50 ? (
-            <div className="text-center py-4">
-              <Brain className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-xs text-gray-500">Save your essay to get AI analysis</p>
+            <div className="text-center py-6">
+              <Brain className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-600 mb-1">Ready to Analyze</p>
+              <p className="text-xs text-gray-500">Write at least 50 characters to get AI feedback</p>
             </div>
           ) : currentAnalysis ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               
               {/* Quick Score Overview */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-100">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
                 <div className="flex items-center space-x-2">
-                  <BarChart3 className="w-4 h-4 text-indigo-600" />
-                  <span className="text-xs font-medium text-indigo-900">Overall Score</span>
+                  <BarChart3 className="w-5 h-5 text-indigo-600" />
+                  <div>
+                    <span className="text-sm font-semibold text-indigo-900">Overall Score</span>
+                    <p className="text-xs text-indigo-700">Based on comprehensive analysis</p>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Progress 
                     value={currentAnalysis.overallScore} 
-                    className="h-2 w-20 bg-indigo-200"
+                    className="h-2 w-24 bg-indigo-200"
                   />
-                  <Badge className={`${getScoreColor(currentAnalysis.overallScore)} text-xs px-2 py-1 font-semibold`}>
+                  <Badge className={`${getScoreColor(currentAnalysis.overallScore)} text-sm px-3 py-1.5 font-bold`}>
                     {currentAnalysis.overallScore}/100
                   </Badge>
                 </div>
               </div>
 
-              {/* Issue Summary */}
-              <div className="grid grid-cols-4 gap-2 text-xs">
+              {/* Issue Summary Grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 {issueCounts.critical > 0 && (
-                  <div className="flex flex-col items-center p-2 bg-red-50 rounded-lg border border-red-100">
-                    <AlertTriangle className="w-4 h-4 text-red-500 mb-1" />
-                    <span className="text-red-700 font-bold">{issueCounts.critical}</span>
-                    <span className="text-red-600 text-xs">Critical</span>
+                  <div className="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <span className="text-red-700 font-medium">Critical</span>
+                    </div>
+                    <Badge className="bg-red-100 text-red-700 font-bold">
+                      {issueCounts.critical}
+                    </Badge>
                   </div>
                 )}
+                
                 {issueCounts.warning > 0 && (
-                  <div className="flex flex-col items-center p-2 bg-amber-50 rounded-lg border border-amber-100">
-                    <AlertCircle className="w-4 h-4 text-amber-500 mb-1" />
-                    <span className="text-amber-700 font-bold">{issueCounts.warning}</span>
-                    <span className="text-amber-600 text-xs">Warnings</span>
+                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
+                      <span className="text-amber-700 font-medium">Warnings</span>
+                    </div>
+                    <Badge className="bg-amber-100 text-amber-700 font-bold">
+                      {issueCounts.warning}
+                    </Badge>
                   </div>
                 )}
+                
                 {issueCounts.improvement > 0 && (
-                  <div className="flex flex-col items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
-                    <Lightbulb className="w-4 h-4 text-blue-500 mb-1" />
-                    <span className="text-blue-700 font-bold">{issueCounts.improvement}</span>
-                    <span className="text-blue-600 text-xs">Suggestions</span>
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100">
+                    <div className="flex items-center space-x-2">
+                      <Lightbulb className="w-4 h-4 text-blue-500" />
+                      <span className="text-blue-700 font-medium">Improvements</span>
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-700 font-bold">
+                      {issueCounts.improvement}
+                    </Badge>
                   </div>
                 )}
+                
                 {issueCounts.strength > 0 && (
-                  <div className="flex flex-col items-center p-2 bg-green-50 rounded-lg border border-green-100">
-                    <Award className="w-4 h-4 text-green-500 mb-1" />
-                    <span className="text-green-700 font-bold">{issueCounts.strength}</span>
-                    <span className="text-green-600 text-xs">Strengths</span>
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-100">
+                    <div className="flex items-center space-x-2">
+                      <Award className="w-4 h-4 text-green-500" />
+                      <span className="text-green-700 font-medium">Strengths</span>
+                    </div>
+                    <Badge className="bg-green-100 text-green-700 font-bold">
+                      {issueCounts.strength}
+                    </Badge>
                   </div>
                 )}
               </div>
 
-              {/* Most Important Issue */}
+              {/* Priority Alert */}
               {issueCounts.critical > 0 && getSuggestionsByType('critical', currentAnalysis)[0] && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-red-900 mb-1">
-                        Priority Issue: {getSuggestionsByType('critical', currentAnalysis)[0].title}
+                <div className="p-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-red-900 mb-1">
+                        🚨 Priority Issue
                       </p>
-                      <p className="text-xs text-red-700">
-                        {getSuggestionsByType('critical', currentAnalysis)[0].description.substring(0, 120)}...
+                      <p className="text-sm font-medium text-red-800 mb-1">
+                        {getSuggestionsByType('critical', currentAnalysis)[0].title}
+                      </p>
+                      <p className="text-xs text-red-700 leading-relaxed">
+                        {getSuggestionsByType('critical', currentAnalysis)[0].description.substring(0, 150)}
+                        {getSuggestionsByType('critical', currentAnalysis)[0].description.length > 150 && '...'}
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* View Full Analysis Button */}
+              {/* Action Button */}
               <Button
                 onClick={() => setIsModalOpen(true)}
-                className="w-full h-9 bg-[#3598FE] hover:bg-[#2563EB] text-xs font-medium"
+                className="w-full h-10 bg-gradient-to-r from-[#3598FE] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1d4ed8] text-sm font-medium shadow-lg"
               >
-                <Eye className="w-4 h-4 mr-1" />
-                View {totalIssues} Suggestions & Full Analysis
+                <Eye className="w-4 h-4 mr-2" />
+                View Complete Analysis ({totalIssues} insights)
               </Button>
 
             </div>
           ) : (
             /* Initial State - Manual analysis required */
-            <div className="text-center py-3">
+            <div className="text-center py-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#3598FE] to-[#2563EB] rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
               <Button
                 onClick={() => performAIAnalysis(currentVersionId)}
                 disabled={!content || content.length < 50 || isAnalyzing}
                 size="sm"
-                className="bg-[#3598FE] hover:bg-[#2563EB] text-xs h-8 font-medium"
+                className="bg-gradient-to-r from-[#3598FE] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1d4ed8] text-sm h-9 px-6 font-medium shadow-lg"
               >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Analyze Essay
+                <Sparkles className="w-4 h-4 mr-2" />
+                Start AI Analysis
               </Button>
-              <p className="text-xs text-gray-500 mt-2">
-                Click to get AI-powered feedback
+              <p className="text-xs text-gray-500 mt-3 max-w-xs mx-auto leading-relaxed">
+                Get instant feedback on structure, content relevance, and writing quality
               </p>
             </div>
           )}

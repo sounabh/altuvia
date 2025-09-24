@@ -1041,12 +1041,7 @@ async function performAIAnalysis(data) {
     analysisTypes = ["comprehensive"],
   } = data;
 
-  console.log(
-    "Starting AI analysis for essay:",
-    essayId,
-    "version:",
-    versionId
-  );
+  console.log("Starting AI analysis for essay:", essayId, "version:", versionId);
 
   if (!essayId || !content) {
     return NextResponse.json(
@@ -1096,6 +1091,7 @@ async function performAIAnalysis(data) {
       return NextResponse.json({ error: "Essay not found" }, { status: 404 });
     }
 
+    // Check for recent analysis
     const recentAnalysis = await prisma.aIResult.findFirst({
       where: {
         essayId,
@@ -1109,8 +1105,7 @@ async function performAIAnalysis(data) {
     });
 
     if (recentAnalysis) {
-      const transformedAnalysis =
-        transformStoredAnalysisToComponentFormat(recentAnalysis);
+      const transformedAnalysis = transformStoredAnalysisToComponentFormat(recentAnalysis);
       return NextResponse.json({
         success: true,
         analysis: transformedAnalysis,
@@ -1120,99 +1115,148 @@ async function performAIAnalysis(data) {
       });
     }
 
+    // Initialize Gemini with the latest model - UPGRADED TO FLASH 2.0
     let model;
     try {
-      model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      // Using Gemini 2.0 Flash for better analysis quality
+      model = genAI.getGenerativeModel({ 
+        model: "gemini-2.0-flash-exp",
+        generationConfig: {
+          temperature: 0.7,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 4096,
+        },
+      });
     } catch (initError) {
-      console.error("Failed to initialize Gemini:", initError);
-      const storedAnalysis = await getStoredAnalysis(essayId, versionId);
-      if (storedAnalysis) {
-        return NextResponse.json({
-          success: true,
-          analysis: storedAnalysis,
-          cached: true,
-          message: "Using stored analysis - AI initialization failed",
-        });
+      console.error("Failed to initialize Gemini 2.0, falling back to Pro:", initError);
+      try {
+        model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      } catch (fallbackError) {
+        console.error("Failed to initialize Gemini:", fallbackError);
+        const storedAnalysis = await getStoredAnalysis(essayId, versionId);
+        if (storedAnalysis) {
+          return NextResponse.json({
+            success: true,
+            analysis: storedAnalysis,
+            cached: true,
+            message: "Using stored analysis - AI initialization failed",
+          });
+        }
+        return NextResponse.json(
+          { error: "AI service initialization failed" },
+          { status: 500 }
+        );
       }
-      return NextResponse.json(
-        { error: "AI service initialization failed" },
-        { status: 500 }
-      );
     }
 
+    // Calculate essay metrics for context
+    const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    const completionRatio = essay.essayPrompt.wordLimit > 0 ? wordCount / essay.essayPrompt.wordLimit : 0;
+    
+    // Get university tier and competitiveness
+    const universityTier = getUniversityTier(essay.program.university.universityName);
+    const programType = essay.program.degreeType.toLowerCase();
+    
+    // ENHANCED ANALYSIS PROMPT - Much more sophisticated and context-aware
     const analysisPrompt = `
-You are an expert essay analyst. Analyze this essay and return ONLY a valid JSON response with the exact structure shown below.
+You are a Senior Admissions Officer at ${essay.program.university.universityName} with 15+ years of experience evaluating ${essay.program.degreeType} applications. You have read thousands of essays and understand exactly what makes candidates stand out in this highly competitive process.
 
-ESSAY CONTEXT:
+INSTITUTIONAL CONTEXT:
+- Institution: ${essay.program.university.universityName} (${universityTier} tier university)
+- Program: ${essay.program.programName} (${essay.program.degreeType})
+- Competition Level: ${getCompetitionLevel(universityTier, programType)}
+- Admission Rate: ~${getAdmissionRate(universityTier, programType)}%
+- Essay Prompt: "${prompt || essay.essayPrompt.promptText}"
+- Word Limit: ${essay.essayPrompt.wordLimit}
+- Current Word Count: ${wordCount}
 
-Institution: ${essay.program.university.universityName}
-Program: ${essay.program.programName} (${essay.program.degreeType})
-Essay Prompt: ${prompt || essay.essayPrompt.promptText}
-Word Limit: ${essay.essayPrompt.wordLimit}
-Current Word Count: ${content.split(" ").length}
-ESSAY CONTENT:
+APPLICANT'S ESSAY:
 ${content}
 
-RETURN ONLY THIS JSON STRUCTURE (no additional text):
+EVALUATION FRAMEWORK:
+
+As an admissions officer, I need to assess this essay against these specific criteria for ${essay.program.degreeType} programs at ${universityTier}-tier institutions:
+
+1. PROMPT ADHERENCE: Does this directly answer what we asked? Many applicants fail here.
+2. NARRATIVE SOPHISTICATION: Is this a compelling story or generic statements?
+3. LEADERSHIP EVIDENCE: Can I see concrete examples of impact and initiative?
+4. INTELLECTUAL CURIOSITY: Does this show deep thinking and genuine interest?
+5. PROGRAM FIT: Why specifically our program? Generic essays are rejected.
+6. DIFFERENTIATION: What makes this applicant unique among thousands?
+7. MATURITY & SELF-AWARENESS: Does this show genuine reflection and growth?
+8. COMMUNICATION SKILLS: Can they articulate complex ideas clearly?
+
+SCORING PHILOSOPHY:
+- 85-100: Exceptional essays I'd champion in committee meetings
+- 75-84: Strong essays that advance to final rounds
+- 65-74: Good essays that need refinement to be competitive
+- 55-64: Average essays that struggle in our applicant pool
+- 45-54: Weak essays with significant issues
+- Below 45: Essays with fundamental problems
+
+ANALYSIS REQUIREMENTS:
+
+1. Read the ENTIRE essay carefully, noting specific phrases, examples, and arguments
+2. Evaluate against the exact prompt requirements
+3. Compare to typical ${programType} essays at ${universityTier}-tier schools
+4. Identify specific sections that work/don't work with exact quotes
+5. Consider the applicant's career goals and program alignment
+6. Assess narrative arc and storytelling effectiveness
+7. Look for red flags that would concern admissions committees
+8. Evaluate authenticity vs. generic business school speak
+
+Return ONLY valid JSON in this exact format:
+
 {
-"overallScore": 85,
-"structureScore": 78,
-"contentRelevance": 82,
-"narrativeFlow": 76,
-"leadershipEmphasis": 80,
-"specificityScore": 74,
-"readabilityScore": 88,
-"sentenceCount": 25,
-"paragraphCount": 5,
-"avgSentenceLength": 18.2,
-"complexWordCount": 12,
-"passiveVoiceCount": 3,
-"grammarIssues": 2,
-"suggestions": [
-{
-"id": "1",
-"type": "critical",
-"priority": "high",
-"title": "Clear actionable title",
-"description": "Detailed explanation of the issue with specific examples",
-"action": "Step-by-step instructions for improvement"
-},
-{
-"id": "2",
-"type": "warning",
-"priority": "medium",
-"title": "Another suggestion",
-"description": "Another detailed explanation",
-"action": "How to fix this"
-},
-{
-"id": "3",
-"type": "improvement",
-"priority": "medium",
-"title": "Enhancement opportunity",
-"description": "What could be better",
-"action": "How to improve"
-},
-{
-"id": "4",
-"type": "strength",
-"priority": "medium",
-"title": "What's working well",
-"description": "Why this is a strength",
-"action": "How to leverage this further"
-}
-]
+  "overallScore": [Realistic score 25-95 based on actual essay quality and competition level],
+  "structureScore": [25-95: logical flow, transitions, essay organization],
+  "contentRelevance": [25-95: how directly and completely this answers the prompt],
+  "narrativeFlow": [25-95: storytelling quality, engagement, coherence],
+  "leadershipEmphasis": [25-95: concrete leadership examples with measurable impact],
+  "specificityScore": [25-95: specific examples vs. vague generalizations],
+  "readabilityScore": [25-95: clarity, grammar, sentence variety, word choice],
+  "sentenceCount": ${sentences.length},
+  "paragraphCount": ${Math.max(paragraphs.length, 1)},
+  "avgSentenceLength": ${sentences.length > 0 ? Math.round((wordCount / sentences.length) * 10) / 10 : 0},
+  "complexWordCount": [count sophisticated vocabulary words],
+  "passiveVoiceCount": [estimate passive voice instances],
+  "grammarIssues": [count grammar/style issues 0-15],
+  "suggestions": [
+    {
+      "id": "1",
+      "type": "critical|warning|improvement|strength",
+      "priority": "high|medium|low",
+      "title": "Specific issue title (max 60 chars)",
+      "description": "Detailed explanation with specific quotes/examples from the essay (150-250 chars)",
+      "action": "Concrete, actionable steps with examples of how to improve (100-200 chars)"
+    }
+    // REQUIREMENTS:
+    // - Include 6-10 suggestions minimum
+    // - Reference specific phrases/sentences from the essay
+    // - At least 1-2 critical issues if essay quality is poor
+    // - At least 2-3 warnings for common problems
+    // - 3-4 improvement opportunities with specific examples
+    // - 1-2 genuine strengths (if any exist)
+    // - Mix priorities: 2-3 high, 3-4 medium, 1-2 low
+    // - Be brutally honest but constructive
+    // - Focus on what would actually matter in admissions
+  ]
 }
 
-ANALYSIS GUIDELINES:
-
-Scores 0-100 (realistic assessment)
-3-8 suggestions total
-Types: critical, warning, improvement, strength
-Priorities: high, medium, low
-Specific, actionable feedback
-Include at least one strength if possible
-Return only the JSON, no other text.`;
+CRITICAL INSTRUCTIONS:
+- Quote specific phrases from the essay in your suggestions
+- Be as specific as a real admissions officer reviewing this application
+- Consider this essay against thousands of others you've seen
+- Don't inflate scores - be realistic about admission chances
+- Focus on issues that would actually impact admission decisions
+- Identify both surface-level and deep structural problems
+- Recognize when content is generic vs. authentic and personal
+- Consider cultural fit and program-specific requirements
+- Point out missed opportunities to demonstrate key qualities
+- Be constructive but honest about significant weaknesses`;
 
     let result;
     try {
@@ -1228,18 +1272,19 @@ Return only the JSON, no other text.`;
           message: "Using stored analysis - API request failed",
         });
       }
-      const fallbackAnalysis = generateAdvancedFallbackAnalysis(
+      const fallbackAnalysis = generateRealisticFallbackAnalysis(
         content,
-        content.split(" ").length,
+        wordCount,
         essay.essayPrompt.wordLimit,
         prompt,
-        essay.program.degreeType
+        essay.program.degreeType,
+        completionRatio
       );
       await saveAnalysisToDatabase(
         essayId,
         versionId,
         fallbackAnalysis,
-        startTime,
+        Date.now() - startTime,
         "fallback",
         apiError.message
       );
@@ -1273,15 +1318,17 @@ Return only the JSON, no other text.`;
           message: "Using stored analysis - AI response parsing failed",
         });
       }
-      analysisData = generateAdvancedFallbackAnalysis(
+      analysisData = generateRealisticFallbackAnalysis(
         content,
-        content.split(" ").length,
+        wordCount,
         essay.essayPrompt.wordLimit,
         prompt,
-        essay.program.degreeType
+        essay.program.degreeType,
+        completionRatio
       );
     }
 
+    // Validate and normalize the analysis
     analysisData = validateAndNormalizeAnalysis(
       analysisData,
       content,
@@ -1293,7 +1340,7 @@ Return only the JSON, no other text.`;
       versionId,
       analysisData,
       processingTime,
-      "gemini"
+      "gemini-2.0-flash-exp" // Updated model name
     );
 
     return NextResponse.json({
@@ -1305,39 +1352,202 @@ Return only the JSON, no other text.`;
     });
   } catch (error) {
     console.error("Error performing AI analysis:", error);
-
-    try {
-      await prisma.aIResult.create({
-        data: {
-          essayId,
-          essayVersionId: versionId,
-          analysisType: "comprehensive",
-          status: "failed",
-          errorMessage: error.message,
-          aiProvider: "gemini",
-          suggestions: JSON.stringify([]),
-          processingTime: Date.now() - startTime,
-        },
-      });
-    } catch (dbError) {
-      console.error("Failed to log error:", dbError);
-    }
-
-    const storedAnalysis = await getStoredAnalysis(essayId, versionId);
-    if (storedAnalysis) {
-      return NextResponse.json({
-        success: true,
-        analysis: storedAnalysis,
-        cached: true,
-        message: "Using stored analysis - Analysis failed",
-      });
-    }
-
     return NextResponse.json(
       { error: "Analysis failed and no stored analysis available" },
       { status: 500 }
     );
   }
+}
+
+// Helper functions to add context about university tiers and competition levels
+function getUniversityTier(universityName) {
+  const universityLower = universityName.toLowerCase();
+  
+  // Ivy League and equivalent
+  if (['harvard', 'stanford', 'mit', 'yale', 'princeton', 'columbia', 'wharton', 'booth', 'kellogg', 'sloan'].some(school => universityLower.includes(school))) {
+    return 'Elite';
+  }
+  
+  // Top tier
+  if (['berkeley', 'michigan', 'ucla', 'nyu', 'duke', 'northwestern', 'chicago', 'cornell', 'dartmouth', 'brown'].some(school => universityLower.includes(school))) {
+    return 'Top';
+  }
+  
+  // High tier
+  if (['texas', 'virginia', 'washington', 'georgia tech', 'carnegie mellon', 'johns hopkins'].some(school => universityLower.includes(school))) {
+    return 'High';
+  }
+  
+  return 'Competitive';
+}
+
+function getCompetitionLevel(tier, programType) {
+  const competitionMatrix = {
+    'Elite': {
+      'mba': 'Extremely High (Top 1% of global applicants)',
+      'masters': 'Extremely High (Top 2% of applicants)',
+      'phd': 'Extremely High (Top 1% with research excellence)',
+      'undergraduate': 'Extremely High (Top 3% of high school students)'
+    },
+    'Top': {
+      'mba': 'Very High (Top 5% of applicants)',
+      'masters': 'Very High (Top 8% of applicants)', 
+      'phd': 'Very High (Top 3% with strong research)',
+      'undergraduate': 'Very High (Top 10% of high school students)'
+    },
+    'High': {
+      'mba': 'High (Top 15% of applicants)',
+      'masters': 'High (Top 20% of applicants)',
+      'phd': 'High (Top 10% with research potential)',
+      'undergraduate': 'High (Top 20% of high school students)'
+    },
+    'Competitive': {
+      'mba': 'Moderate to High (Top 30% of applicants)',
+      'masters': 'Moderate (Top 40% of applicants)',
+      'phd': 'Moderate to High (Top 25% with research interest)',
+      'undergraduate': 'Moderate (Top 40% of high school students)'
+    }
+  };
+  
+  return competitionMatrix[tier]?.[programType] || 'High Competition';
+}
+
+function getAdmissionRate(tier, programType) {
+  const admissionMatrix = {
+    'Elite': { 'mba': '6-12', 'masters': '5-15', 'phd': '3-8', 'undergraduate': '3-8' },
+    'Top': { 'mba': '12-25', 'masters': '15-30', 'phd': '8-15', 'undergraduate': '8-20' },
+    'High': { 'mba': '25-40', 'masters': '30-50', 'phd': '15-25', 'undergraduate': '20-35' },
+    'Competitive': { 'mba': '40-60', 'masters': '50-70', 'phd': '25-40', 'undergraduate': '35-55' }
+  };
+  
+  return admissionMatrix[tier]?.[programType] || '30-50';
+}
+
+// Improved fallback analysis with realistic scoring
+function generateRealisticFallbackAnalysis(
+  content,
+  wordCount,
+  wordLimit,
+  prompt,
+  degreeType = "Unknown",
+  completionRatio = 0
+) {
+  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const paragraphs = content.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  const words = content.split(/\s+/).filter((w) => w.length > 0);
+
+  const sentenceCount = sentences.length;
+  const paragraphCount = Math.max(1, paragraphs.length);
+  const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0;
+
+  // More realistic base scoring
+  let baseScore = 45; // Start lower
+  
+  // Word count impact (more nuanced)
+  if (completionRatio >= 0.8 && completionRatio <= 1.0) baseScore += 15;
+  else if (completionRatio >= 0.6) baseScore += 8;
+  else if (completionRatio < 0.3) baseScore -= 10;
+  
+  // Structure impact
+  if (paragraphCount >= 4) baseScore += 8;
+  else if (paragraphCount >= 3) baseScore += 5;
+  else if (paragraphCount < 2) baseScore -= 8;
+  
+  // Sentence variety
+  if (avgSentenceLength >= 15 && avgSentenceLength <= 25) baseScore += 5;
+  else if (avgSentenceLength < 10 || avgSentenceLength > 30) baseScore -= 5;
+  
+  // Content depth indicators
+  const hasSpecificExamples = /\b(specifically|for example|in particular|such as)\b/i.test(content);
+  const hasNumbers = /\b\d+(%|dollars?|years?|months?|people|students?|percent)\b/i.test(content);
+  const hasActionVerbs = /(led|managed|created|developed|implemented|achieved|improved)/gi.test(content);
+  
+  if (hasSpecificExamples) baseScore += 8;
+  if (hasNumbers) baseScore += 6;
+  if (hasActionVerbs) baseScore += 5;
+
+  const overallScore = Math.max(25, Math.min(85, baseScore + Math.floor(Math.random() * 10 - 5)));
+
+  const suggestions = [];
+  let suggestionId = 1;
+
+  // Generate realistic suggestions based on analysis
+  if (completionRatio < 0.7) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "critical",
+      priority: "high",
+      title: "Essay significantly under word limit",
+      description: `At ${Math.round(completionRatio * 100)}% of target length, your essay appears incomplete to admissions readers.`,
+      action: "Expand with specific examples, deeper analysis, and more detailed storytelling."
+    });
+  }
+
+  if (paragraphCount < 3) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "warning",
+      priority: "medium",
+      title: "Poor paragraph structure",
+      description: "Essays need clear organization with distinct paragraphs for different ideas.",
+      action: "Break content into 4-5 focused paragraphs with clear topic sentences."
+    });
+  }
+
+  if (!hasSpecificExamples) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "improvement",
+      priority: "high",
+      title: "Add concrete examples",
+      description: "Generic statements weaken your narrative impact and memorability.",
+      action: "Include specific situations, numbers, names, and measurable outcomes."
+    });
+  }
+
+  if (degreeType?.toLowerCase().includes("mba") && !hasActionVerbs) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "improvement",
+      priority: "high",
+      title: "Strengthen leadership language",
+      description: "MBA essays must demonstrate leadership through action-oriented language.",
+      action: "Use strong verbs like 'led,' 'implemented,' 'achieved' with specific results."
+    });
+  }
+
+  // Always include at least one strength if possible
+  if (overallScore >= 50) {
+    suggestions.push({
+      id: (suggestionId++).toString(),
+      type: "strength",
+      priority: "medium",
+      title: "Clear writing foundation",
+      description: "Your essay demonstrates good basic writing skills and stays on topic.",
+      action: "Build on this foundation by adding more specific details and personal insights."
+    });
+  }
+
+  return {
+    overallScore,
+    suggestions,
+    structureScore: Math.max(20, Math.min(90, baseScore + (paragraphCount >= 4 ? 10 : -10))),
+    contentRelevance: Math.max(30, Math.min(85, baseScore + (hasSpecificExamples ? 8 : -12))),
+    narrativeFlow: Math.max(25, Math.min(80, baseScore + (avgSentenceLength > 12 ? 5 : -8))),
+    leadershipEmphasis: degreeType?.toLowerCase().includes("mba") 
+      ? Math.max(20, Math.min(85, baseScore + (hasActionVerbs ? 10 : -15)))
+      : Math.max(40, Math.min(80, baseScore)),
+    specificityScore: Math.max(20, Math.min(85, baseScore + (hasNumbers ? 15 : -15))),
+    readabilityScore: Math.max(40, Math.min(90, baseScore + 5)),
+    sentenceCount,
+    paragraphCount,
+    avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
+    complexWordCount: words.filter((w) => w.length > 7).length,
+    passiveVoiceCount: sentences.filter(s => 
+      /(was|were|been|being)\s+\w+ed\b/i.test(s)
+    ).length,
+    grammarIssues: Math.floor(sentenceCount * 0.05) + Math.floor(Math.random() * 3)
+  };
 }
 
 async function getStoredAnalysis(essayId, versionId = null) {
