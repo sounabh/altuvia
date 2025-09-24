@@ -12,7 +12,8 @@ import NextAuth from "next-auth";
 
 // Import the authentication providers you want to use
 import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
+import  CredentialsProvider  from "next-auth/providers/credentials";
+
 
 // =============================================================================
 // MAIN NEXTAUTH CONFIGURATION OBJECT
