@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, memo } from "react";
-import { MapPin, Heart, GraduationCap, DollarSign, TrendingUp, Award, Zap, Star } from "lucide-react";
+import { MapPin, Heart, GraduationCap, DollarSign, TrendingUp, Award, Zap } from "lucide-react";
 
 const UniversityCard = memo(({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
@@ -87,14 +87,6 @@ const UniversityCard = memo(({ university }) => {
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => window.location.href = universityUrl}
     >
-      {/* Premium Ribbon for Top Universities */}
-      {university.rank && university.rank <= 10 && (
-        <div className="absolute top-3 left-0 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-bold px-2 py-1 shadow-md z-10 rounded-r-md flex items-center">
-          <Star className="w-3 h-3 mr-1 inline fill-white" />
-          TOP {university.rank}
-        </div>
-      )}
-
       <div className="flex flex-col h-full">
         {/* Header with Image */}
         <div className="relative h-36 overflow-hidden">

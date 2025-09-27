@@ -6,11 +6,19 @@ import { authOptions } from "../auth/[...nextauth]/route";
 /**
  * GET /api/universities
  *
- * Fetches a filtered and optimized list of universities with search, GMAT, and ranking filters.
+ * Fetches a filtered and paginated list of universities with search, GMAT, and ranking filters.
  * Includes primary image and saved state for the current user.
  *
+ * Query Parameters:
+ * - search: string - Search term for university name, city, or country
+ * - gmat: string - GMAT filter (all, 700+, 650-699, 600-649, below-600)
+ * - ranking: string - Ranking filter (all, top-10, top-50, top-100, 100+)
+ * - email: string - User email for saved universities
+ * - page: number - Page number (default: 1)
+ * - limit: number - Items per page (default: 12, max: 50)
+ *
  * @param {Request} request - The incoming HTTP request
- * @returns {Promise<NextResponse>} JSON response with university list
+ * @returns {Promise<NextResponse>} JSON response with university list and pagination info
  */
 export async function GET(request) {
   const session = await getServerSession(authOptions);
@@ -21,6 +29,11 @@ export async function GET(request) {
     const gmat = searchParams.get("gmat") || "all";
     const ranking = searchParams.get("ranking") || "all";
     const email = searchParams.get("email"); // Get email from query params
+    
+    // Pagination parameters
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "6")));
+    const skip = (page - 1) * limit;
 
     // Build optimized WHERE clause - filter at DB level
     const whereClause = { AND: [] };
@@ -93,11 +106,43 @@ export async function GET(request) {
     // Priority: session email > query param email > null
     const userEmail = session?.user?.email || email || null;
 
+    // Build final where condition
+    const finalWhereClause = whereClause.AND.length > 0 ? whereClause : undefined;
+
     /**
-     * Prisma query - fetch only needed fields and related data
+     * Get total count for pagination
+     * Run this query first to calculate total pages
+     */
+    const totalCount = await prisma.university.count({
+      where: finalWhereClause,
+    });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    // Handle empty results early
+    if (totalCount === 0) {
+      return NextResponse.json({
+        message: "No universities found",
+        data: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
+    }
+
+    /**
+     * Prisma query - fetch only needed fields and related data with pagination
      */
     const universities = await prisma.university.findMany({
-      where: whereClause.AND.length > 0 ? whereClause : undefined,
+      where: finalWhereClause,
       include: {
         images: {
           where: { isPrimary: true },
@@ -108,18 +153,13 @@ export async function GET(request) {
           select: { id: true },
         } : false, // Don't include savedByUsers if no email available
       },
-      take: 50,
-      orderBy: [{ ftGlobalRanking: "asc" }, { universityName: "asc" }],
+      skip,
+      take: limit,
+      orderBy: [
+        { ftGlobalRanking: { sort: "asc", nulls: "last" } }, // Rank nulls last
+        { universityName: "asc" }
+      ],
     });
-
-    // Handle empty results
-    if (universities.length === 0) {
-      return NextResponse.json({
-        message: "No universities found",
-        data: [],
-        count: 0,
-      });
-    }
 
     /**
      * Transform DB records to API response format
@@ -130,12 +170,12 @@ export async function GET(request) {
       name: u.universityName,
       location: `${u.city}, ${u.country}`,
       image: u.images[0]?.imageUrl || "/default-university.jpg",
-      rank: u.ftGlobalRanking ? `#${u.ftGlobalRanking}` : "N/A",
-      gmatAvg: u.gmatAverageScore || 0,
-      acceptRate: u.acceptanceRate || 0,
-      tuitionFee: u.tuitionFees ? `${u.tuitionFees.toLocaleString()}` : "N/A",
+      rank: u.ftGlobalRanking || "N/A",
+      gmatAvg: u.gmatAverageScore || "N/A",
+      acceptRate: u.acceptanceRate || "N/A",
+      tuitionFee: u.tuitionFees ? `$${u.tuitionFees.toLocaleString()}` : "N/A",
       applicationFee: u.additionalFees
-        ? `${u.additionalFees.toLocaleString()}`
+        ? `$${u.additionalFees.toLocaleString()}`
         : "N/A",
       pros: u.whyChooseHighlights || [],
       cons: [], // No admissionRequirements in schema
@@ -143,24 +183,67 @@ export async function GET(request) {
       savedByUsers: u.savedByUsers || [], // Keep original for debugging if needed
     }));
 
+    // Build pagination metadata
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      totalItems: totalCount,
+      itemsPerPage: limit,
+      hasNextPage,
+      hasPrevPage,
+      startIndex: skip + 1,
+      endIndex: Math.min(skip + limit, totalCount),
+    };
+
     // Return JSON response with caching headers
     return NextResponse.json(
       {
         data: transformed,
+        pagination,
+        // Legacy fields for backward compatibility
         count: transformed.length,
-        total: transformed.length,
+        total: totalCount,
       },
       {
         headers: {
+          // Cache for 5 minutes, allow stale for 10 minutes
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          // Add pagination headers for debugging
+          "X-Total-Count": totalCount.toString(),
+          "X-Page": page.toString(),
+          "X-Per-Page": limit.toString(),
+          "X-Total-Pages": totalPages.toString(),
         },
       }
     );
   } catch (error) {
     console.error("Database error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch universities", data: [], count: 0 },
+      { 
+        error: "Failed to fetch universities", 
+        data: [], 
+        pagination: {
+          currentPage: 1,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: 12,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      },
       { status: 500 }
     );
   }
+}
+
+/**
+ * POST /api/universities
+ * 
+ * For bulk operations or advanced filtering (future use)
+ */
+export async function POST(request) {
+  return NextResponse.json(
+    { error: "POST method not implemented yet" },
+    { status: 501 }
+  );
 }
