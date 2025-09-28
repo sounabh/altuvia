@@ -341,7 +341,7 @@ const CollegeShowcase = ({ university }) => {
               <div className="grid grid-cols-2 gap-3">
                 {university.stats?.acceptance !== "N/A" && university.stats?.acceptance && (
                   <div className="text-center p-4 bg-[#002147] shadow-md hover:shadow-lg transition-shadow rounded-xl">
-                    <div className="text-2xl font-bold text-white mb-1">{university.stats.acceptance}</div>
+                    <div className="text-2xl font-bold text-white mb-1">{university.stats.acceptance }</div>
                     <div className="text-xs text-blue-200 font-medium">Acceptance Rate</div>
                   </div>
                 )}

@@ -34,6 +34,34 @@ const useDebounce = (value, delay = 300) => {
 };
 
 /**
+ * Intelligently format duration based on the numeric value
+ * Numbers 1-6 are treated as years, 7+ are treated as months
+ * @param {number} duration - Duration value from the database
+ * @returns {string} Formatted duration string
+ */
+const formatDuration = (duration) => {
+  if (!duration) return 'Not specified';
+  
+  // Convert to number if it's a string
+  const numDuration = typeof duration === 'string' ? parseInt(duration) : duration;
+  
+  if (isNaN(numDuration)) return 'Not specified';
+  
+  // Logic: 1-6 are years, 7+ are months
+  if (numDuration <= 6) {
+    return numDuration === 1 ? '1 year' : `${numDuration} years`;
+  } else {
+    // If it's a multiple of 12 and greater than 12, convert to years for readability
+    if (numDuration >= 12 && numDuration % 12 === 0) {
+      const years = numDuration / 12;
+      return years === 1 ? '1 year' : `${years} years`;
+    }
+    // Otherwise, show as months
+    return numDuration === 1 ? '1 month' : `${numDuration} months`;
+  }
+};
+
+/**
  * Skeleton component for individual program cards
  */
 const ProgramCardSkeleton = ({ viewMode }) => (
@@ -279,25 +307,14 @@ const ProgramsPage = () => {
    * Utility functions
    */
   const formatCurrency = (amount, currency = 'USD') => {
-    if (!amount) return 'Not specified';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatDuration = (months) => {
-    if (!months) return 'Not specified';
-    if (months === 12) return '1 year';
-    if (months < 12) return `${months} months`;
-    const years = Math.floor(months / 12);
-    const remainingMonths = months % 12;
-    if (remainingMonths === 0) return `${years} year${years > 1 ? 's' : ''}`;
-    return `${years} year${years > 1 ? 's' : ''} ${remainingMonths} month${remainingMonths > 1 ? 's' : ''}`;
-  };
-
+  if (amount === null || amount === undefined) return 'Not specified';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
   // Loading state
   if (loading) {
     return <ProgramsPageSkeleton viewMode={viewMode} />;
@@ -509,13 +526,13 @@ const ProgramsPage = () => {
                           {program.duration && (
                             <div className="flex items-center text-gray-600">
                               <Clock className="h-4 w-4 mr-1" />
-                              {formatDuration(program.duration * 12)}
+                              {formatDuration(program.duration)}
                             </div>
                           )}
                           {program.tuitionFees && (
                             <div className="flex items-center text-green-600">
                               <DollarSign className="h-4 w-4 mr-1" />
-                              {formatCurrency(program.tuitionFees)}
+                              {formatCurrency(program.tuitionFees) || ""}
                             </div>
                           )}
                         </div>

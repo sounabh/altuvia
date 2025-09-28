@@ -264,13 +264,31 @@ const ProgramDetailsPage = () => {
   };
 
   /**
-   * Format duration in years to readable text
-   * @param {number} years - Duration in years
+   * Intelligently format duration based on the numeric value
+   * Numbers 1-6 are treated as years, 7+ are treated as months
+   * @param {number} duration - Duration value from the database
    * @returns {string} Formatted duration string
    */
-  const formatDuration = (years) => {
-    if (!years) return 'Not specified';
-    return years === 1 ? '1 year' : `${years} years`;
+  const formatDuration = (duration) => {
+    if (!duration) return 'Not specified';
+    
+    // Convert to number if it's a string
+    const numDuration = typeof duration === 'string' ? parseInt(duration) : duration;
+    
+    if (isNaN(numDuration)) return 'Not specified';
+    
+    // Logic: 1-6 are years, 7+ are months
+    if (numDuration <= 6) {
+      return numDuration === 1 ? '1 year' : `${numDuration} years`;
+    } else {
+      // If it's a multiple of 12 and greater than 12, convert to years for readability
+      if (numDuration >= 12 && numDuration % 12 === 0) {
+        const years = numDuration / 12;
+        return years === 1 ? '1 year' : `${years} years`;
+      }
+      // Otherwise, show as months
+      return numDuration === 1 ? '1 month' : `${numDuration} months`;
+    }
   };
 
   // Show skeleton loading state while data is being fetched

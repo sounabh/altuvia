@@ -55,7 +55,7 @@ const UniversityOverview = ({ university }) => {
       icon: Users, 
       label: "Acceptance Rate", 
       value: university.acceptanceRate ? 
-        `${(university.acceptanceRate * 100).toFixed(1)}%` : 'Competitive'
+        `${(university.acceptanceRate ).toFixed(1)}%` : 'Competitive'
     },
     { 
       icon: DollarSign, 
@@ -280,11 +280,11 @@ const UniversityOverview = ({ university }) => {
                   <div className="bg-white p-4 rounded-lg border border-gray-200">
                     <h4 className="font-bold text-[#002147] mb-2">Tuition Fees</h4>
                     <div className="text-xl font-bold text-[#3598FE] mb-1">
-                      {university.currency || '$'}{university.tuitionFees.toLocaleString()}
+                      {university.currency || '$' } { university.tuitionFees.toLocaleString()}
                     </div>
                     {university.additionalFees && (
                       <p className="text-sm text-gray-600">
-                        Additional: {university.currency || '$'}{university.additionalFees.toLocaleString()}
+                        Additional: { university.currency || '$'} {university.additionalFees.toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -377,6 +377,7 @@ const UniversityOverview = ({ university }) => {
             {/* Apply Now Button */}
             <Button 
               onClick={() => window.open('/apply', '_blank')}
+              disabled
               className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
             >
               <Download className="h-4 w-4 mr-2" />
@@ -386,6 +387,7 @@ const UniversityOverview = ({ university }) => {
             {/* Scholarships Button */}
             <Button
               onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
+              disabled
               className="bg-[#002147] hover:bg-[#001a36] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
             >
               <Building2 className="h-4 w-4 mr-2" />
@@ -395,6 +397,7 @@ const UniversityOverview = ({ university }) => {
             {/* Gallery Button */}
             <Button
               onClick={() => window.location.href = `/university/${university.slug}/gallery`}
+              disabled
               className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
             >
               <GraduationCap className="h-4 w-4 mr-2" />
