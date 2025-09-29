@@ -70,6 +70,7 @@ const SmartCalendar = () => {
   // ========================================
   // STATE MANAGEMENT
   // ========================================
+  const [userEmail, setUserEmail] = useState('');
   
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -109,6 +110,20 @@ const SmartCalendar = () => {
   // ========================================
   // CALENDAR CONFIGURATION
   // ========================================
+
+
+useEffect(() => {
+  try {
+    const authData = JSON.parse(localStorage.getItem("authData") || "{}");
+    const email = authData.email || '';
+    setUserEmail(email);
+  } catch (error) {
+    console.error("Error parsing auth data:", error);
+    setUserEmail('');
+  }
+}, []);
+
+
 
   const eventTypes = [
     { value: 'deadline', label: 'Deadline', color: '#dc2626', icon: '⏰' },
@@ -172,19 +187,24 @@ const SmartCalendar = () => {
     }
   }, []);
 
-  const buildApiUrl = useCallback((params = {}) => {
-    const searchParams = new URLSearchParams();
-    
-    // Add parameters
-    Object.keys(params).forEach(key => {
-      if (params[key] !== undefined && params[key] !== null && params[key] !== 'all') {
-        searchParams.append(key, params[key]);
-      }
-    });
-    
-    const queryString = searchParams.toString();
-    return `/api/calendar${queryString ? `?${queryString}` : ''}`;
-  }, []);
+ const buildApiUrl = useCallback((params = {}) => {
+  const searchParams = new URLSearchParams();
+  
+  // Add userEmail if available
+  if (userEmail) {
+    searchParams.append('userEmail', userEmail);
+  }
+  
+  // Add other parameters
+  Object.keys(params).forEach(key => {
+    if (params[key] !== undefined && params[key] !== null && params[key] !== 'all') {
+      searchParams.append(key, params[key]);
+    }
+  });
+  
+  const queryString = searchParams.toString();
+  return `/api/calendar${queryString ? `?${queryString}` : ''}`;
+}, [userEmail]); // Add userEmail as dependency
 
   const fetchEvents = useCallback(async () => {
     setIsLoading(true);
@@ -262,7 +282,7 @@ const SmartCalendar = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [buildApiUrl, filterSchool, filterType]);
+  }, [buildApiUrl, filterSchool, filterType,userEmail]);
 
   const saveEvent = async (eventData) => {
     try {
