@@ -165,12 +165,27 @@ const SmartCalendar = () => {
   // API FUNCTIONS
   // ========================================
 
-  const fetchSavedUniversities = useCallback(async () => {
+ const fetchSavedUniversities = useCallback(async () => {
     try {
-      const url = `/api/universities${
-        userEmail ? `?userEmail=${encodeURIComponent(userEmail)}` : ""
-      }`;
-      const response = await fetch(url);
+      // Get auth token from localStorage
+      const authData = localStorage.getItem("authData");
+      if (!authData) {
+        console.warn("No authentication data found");
+        setSavedUniversities([]);
+        return;
+      }
+
+      const parsedData = JSON.parse(authData);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      // Use the correct endpoint that returns only saved universities
+      const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${parsedData.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -178,31 +193,35 @@ const SmartCalendar = () => {
 
       const result = await response.json();
 
-      if (!result.data) {
+      console.log('Fetched saved universities:', result);
+
+      if (!result.universities || !Array.isArray(result.universities)) {
+        console.warn('No saved universities data found in response');
+        setSavedUniversities([]);
         return;
       }
 
-      // Filter universities that are saved by the current user
-      const savedUnis = result.data.filter((university) => {
-        if (Array.isArray(university.savedByUsers)) {
-          return university.savedByUsers.length > 0;
-        } else if (typeof university.isAdded === "boolean") {
-          return university.isAdded;
-        }
-        return false;
-      });
-
-      // Transform to match the format expected by the calendar
-      const transformedSavedUnis = savedUnis.map((uni) => ({
+      // Transform saved universities to the expected format for dropdown
+      const transformedSavedUnis = result.universities.map((uni) => ({
         id: uni.id,
-        universityName: uni.name,
+        universityName: uni.universityName || uni.name,
       }));
+
+      console.log('Transformed saved universities for dropdown:', transformedSavedUnis);
 
       setSavedUniversities(transformedSavedUnis);
     } catch (err) {
       console.error("Error fetching saved universities:", err);
+      setSavedUniversities([]);
     }
-  }, [userEmail]);
+  }, []);
+
+
+
+
+
+
+
 
   const buildApiUrl = useCallback(
     (params = {}) => {
