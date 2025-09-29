@@ -24,6 +24,10 @@ export async function GET(request) {
     
     // Prioritize query param over session (like universities API)
     const finalEmail = userEmail || session?.user?.email;
+
+    console.log('====================================');
+    console.log(finalEmail,userEmail);
+    console.log('====================================');
     
     if (!finalEmail) {
       return NextResponse.json(
