@@ -9,7 +9,8 @@ import {
   BookOpen,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Book
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -32,6 +33,13 @@ const Layout = ({ children }) => {
       label: 'Calendar',
       icon: Calendar,
       href: '/dashboard/calender',
+      comingSoon: false,
+    },
+    {
+ id: 'essay',
+      label: 'Essays',
+      icon: Book,
+      href: '/workspace/independent',
       comingSoon: false,
     },
     {
