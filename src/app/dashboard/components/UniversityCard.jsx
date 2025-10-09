@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapPin, Calendar, FileText, MoreHorizontal, Eye, Trash2, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, Calendar, FileText, MoreHorizontal, Trash2, CheckCircle2, Heart } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -7,32 +7,198 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import Link from 'next/link';
+import { toast } from "sonner";
 
 /**
- * Enhanced University card component with 98% essay completion logic and strict submission criteria
+ * Enhanced University card component with remove functionality
  */
-export const UniversityCard = ({ university, onRemove }) => {
+export const UniversityCard = ({ university, onRemove, onUpdate }) => {
+  const [isAdded, setIsAdded] = useState(Boolean(university.isAdded));
+  const [isRemoving, setIsRemoving] = useState(false);
 
-  // Debug: Log the university data to see what we're getting
+  // Debug: Log the university data
   console.log('Enhanced University data in card:', {
     id: university.id,
     name: university.name,
     status: university.status,
+    isAdded: university.isAdded,
     tasks: university.tasks,
     totalTasks: university.totalTasks,
     completedEssays: university.completedEssays,
     totalEssays: university.totalEssays,
     applicationHealth: university.stats?.applicationHealth,
-    enhancedCompletion: university.stats?.essays?.enhancedCompletionBreakdown
   });
 
   /**
-   * Enhanced status color determination with strict submission criteria
+   * Toggle heart - Add/Remove from saved universities
+   */
+  const toggleHeart = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    let authData, token;
+
+    try {
+      authData = localStorage.getItem("authData");
+      if (!authData) {
+        toast.error("Please login to save universities");
+        return;
+      }
+
+      const parsedAuth = JSON.parse(authData);
+      token = parsedAuth.token;
+
+      if (!token) {
+        toast.error("Authentication expired, please login again");
+        return;
+      }
+    } catch (error) {
+      toast.error("Authentication error, please try again");
+      return;
+    }
+
+    const previousState = isAdded;
+    const newState = !isAdded;
+
+    setIsAdded(newState);
+
+    if (newState) {
+      toast.success("University added to dashboard", {
+        style: {
+          background: '#ec4899',
+          color: 'white',
+          border: 'none',
+        },
+        duration: 2000,
+      });
+    } else {
+      toast("University removed from dashboard", {
+        style: {
+          background: '#6b7280',
+          color: 'white',
+          border: 'none',
+        },
+        duration: 2000,
+      });
+    }
+
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/university/toggleSaved`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ universityId: university?.id }),
+      });
+
+      if (response.ok) {
+        if (onUpdate) {
+          onUpdate();
+        }
+      } else {
+        setIsAdded(previousState);
+        toast.error(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
+      }
+    } catch (error) {
+      setIsAdded(previousState);
+      toast.error("Network error. Please check your connection and try again.");
+    }
+  };
+
+  /**
+   * Handle remove from context menu
+   */
+  const handleRemoveFromSaved = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isRemoving) return;
+
+    let authData, token;
+
+    try {
+      authData = localStorage.getItem("authData");
+      if (!authData) {
+        toast.error("Please login first");
+        return;
+      }
+
+      const parsedAuth = JSON.parse(authData);
+      token = parsedAuth.token;
+
+      if (!token) {
+        toast.error("Authentication expired, please login again");
+        return;
+      }
+    } catch (error) {
+      toast.error("Authentication error, please try again");
+      return;
+    }
+
+    setIsRemoving(true);
+
+    toast("Removing university...", {
+      style: {
+        background: '#6b7280',
+        color: 'white',
+        border: 'none',
+      },
+      duration: 1500,
+    });
+
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/university/toggleSaved`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ universityId: university?.id }),
+      });
+
+      if (response.ok) {
+        toast.success("University successfully removed", {
+          style: {
+            background: '#ef4444',
+            color: 'white',
+            border: 'none',
+          },
+          duration: 2000,
+        });
+
+        setIsAdded(false);
+
+        if (onUpdate) {
+          setTimeout(() => {
+            onUpdate();
+          }, 300);
+        }
+
+        if (onRemove) {
+          onRemove(university.id);
+        }
+      } else {
+        toast.error("Failed to remove university. Please try again.");
+        setIsRemoving(false);
+      }
+    } catch (error) {
+      toast.error("Network error. Please check your connection and try again.");
+      setIsRemoving(false);
+    }
+  };
+
+  /**
+   * Enhanced status color determination
    */
   const getStatusColor = (status) => {
     switch (status) {
       case 'submitted':
-        return 'from-green-500 to-green-600'; // Only when EVERYTHING is complete
+        return 'from-green-500 to-green-600';
       case 'in-progress':
         return 'from-blue-500 to-blue-600';
       default:
@@ -41,24 +207,22 @@ export const UniversityCard = ({ university, onRemove }) => {
   };
 
   /**
-   * Enhanced status text with completion indicators
+   * Enhanced status text
    */
   const getStatusText = (status) => {
-    const isFullyComplete = university.stats?.applicationHealth?.isFullyComplete;
     const essaysComplete = university.stats?.applicationHealth?.essaysFullyComplete;
     const tasksComplete = university.stats?.applicationHealth?.tasksFullyComplete;
     const hasEssays = university.totalEssays > 0;
     const hasTasks = university.totalTasks > 0;
-    
+
     switch (status) {
       case 'submitted':
-        return 'Submitted'; // Only shows when both essays AND tasks are 100% complete
+        return 'Submitted';
       case 'in-progress':
-        // Show more detailed status for in-progress
         if (essaysComplete && hasEssays && !tasksComplete && hasTasks) {
           return 'Essays Done';
         } else if (!essaysComplete && hasEssays && tasksComplete && hasTasks) {
-          return 'Tasks Done';  
+          return 'Tasks Done';
         } else if (essaysComplete && hasEssays && !hasTasks) {
           return 'Essays Done';
         } else if (tasksComplete && hasTasks && !hasEssays) {
@@ -72,76 +236,39 @@ export const UniversityCard = ({ university, onRemove }) => {
   };
 
   /**
-   * Get status badge styling with enhanced visual indicators
+   * Get status badge styling
    */
   const getStatusBadgeStyle = (status) => {
-    const isFullyComplete = university.stats?.applicationHealth?.isFullyComplete;
     const readyForSubmission = university.stats?.applicationHealth?.readyForSubmission;
-    
+
     let baseStyle = `absolute bottom-4 left-4 px-3 py-1 rounded-full text-white text-sm font-medium bg-gradient-to-r ${getStatusColor(status)}`;
-    
-    // Add pulsing effect for ready-for-submission state
+
     if (readyForSubmission && status !== 'submitted') {
       baseStyle += ' animate-pulse ring-2 ring-white/50';
     }
-    
+
     return baseStyle;
   };
 
-  /**
-   * Handles view details action
-   */
-  const handleViewDetails = (e) => {
-    e.preventDefault();
-    console.log('View details for:', university.name);
-  };
-
-  /**
-   * Handles remove action
-   */
-  const handleRemove = (e) => {
-    e.preventDefault();
-    if (onRemove) {
-      onRemove(university.id);
-    }
-  };
-
-  // Enhanced essay progress calculation (backend already handles 98% logic)
-  const essayProgressPercentage = university.totalEssays > 0 
+  const essayProgressPercentage = university.totalEssays > 0
     ? Math.round((university.completedEssays / university.totalEssays) * 100)
     : 0;
 
-  // Task progress calculation
   const totalTasks = university.totalTasks || 0;
   const completedTasks = university.tasks || 0;
-  const taskProgressPercentage = totalTasks > 0 
+  const taskProgressPercentage = totalTasks > 0
     ? Math.round((completedTasks / totalTasks) * 100)
     : 0;
 
-  // Enhanced completion indicators
   const essaysFullyComplete = university.stats?.applicationHealth?.essaysFullyComplete;
   const tasksFullyComplete = university.stats?.applicationHealth?.tasksFullyComplete;
   const readyForSubmission = university.stats?.applicationHealth?.readyForSubmission;
 
-  // FIXED: Better logic for showing essay and task sections
   const hasEssays = university.totalEssays > 0;
   const hasTasks = totalTasks > 0;
   const hasAnyContent = hasEssays || hasTasks;
 
-  console.log(`Enhanced calculation for ${university.name}:`, {
-    essayProgress: essayProgressPercentage,
-    taskProgress: taskProgressPercentage,
-    essaysComplete: essaysFullyComplete,
-    tasksComplete: tasksFullyComplete,
-    readyForSubmission: readyForSubmission,
-    status: university.status,
-    hasEssays,
-    hasTasks,
-    hasAnyContent
-  });
-
-  // Determine URL using slug or fallback to ID
-  const universityUrl = university.slug 
+  const universityUrl = university.slug
     ? `/dashboard/university/${university.slug}`
     : `/dashboard/university/${university.id}`;
 
@@ -150,8 +277,8 @@ export const UniversityCard = ({ university, onRemove }) => {
       <div className="bg-white/70 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group cursor-pointer">
         {/* University Image Section */}
         <div className="relative h-48 overflow-hidden">
-          <img 
-            src={university.image || '/default-university.jpg'} 
+          <img
+            src={university.image || '/default-university.jpg'}
             alt={university.name || university.universityName}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
@@ -159,33 +286,42 @@ export const UniversityCard = ({ university, onRemove }) => {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-          
-          {/* Context Menu for Actions */}
+
+          {/* Heart Button - Top Left */}
+          <button
+            onClick={toggleHeart}
+            className={`absolute top-4 left-4 p-2 rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-95 z-20 ${
+              isAdded
+                ? "bg-rose-500 text-white shadow-md"
+                : "bg-white/90 text-gray-600 hover:text-rose-500 shadow-sm"
+            }`}
+          >
+            <Heart className={`w-4 h-4 transition-all ${isAdded ? 'fill-current' : ''}`} />
+          </button>
+
+          {/* Context Menu for Remove - Top Right */}
           <ContextMenu>
             <ContextMenuTrigger asChild>
-              <button 
+              <button
                 className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors z-10"
                 onClick={(e) => e.preventDefault()}
               >
                 <MoreHorizontal className="w-4 h-4 text-slate-600" />
               </button>
             </ContextMenuTrigger>
-            <ContextMenuContent className="w-48">
-              <ContextMenuItem onClick={handleViewDetails} className="flex items-center gap-2">
-                <Eye className="w-4 h-4" />
-                View Details
-              </ContextMenuItem>
-              <ContextMenuItem 
-                onClick={handleRemove} 
-                className="flex items-center gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+            <ContextMenuContent className="w-56">
+              <ContextMenuItem
+                onClick={handleRemoveFromSaved}
+                disabled={isRemoving}
+                className="flex items-center gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                Remove
+                <span>{isRemoving ? 'Removing...' : 'Remove University'}</span>
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
 
-          {/* Enhanced Status Badge with Ready Indicator */}
+          {/* Enhanced Status Badge */}
           <div className={getStatusBadgeStyle(university.status)}>
             <div className="flex items-center gap-1">
               {readyForSubmission && university.status !== 'submitted' && (
@@ -197,7 +333,7 @@ export const UniversityCard = ({ university, onRemove }) => {
 
           {/* Completion Indicator Icons */}
           {(essaysFullyComplete || tasksFullyComplete) && university.status !== 'submitted' && (
-            <div className="absolute top-4 left-4 flex gap-1">
+            <div className="absolute top-16 left-4 flex gap-1">
               {essaysFullyComplete && hasEssays && (
                 <div className="bg-green-500 text-white rounded-full p-1" title="Essays Complete">
                   <FileText className="w-3 h-3" />
@@ -218,7 +354,7 @@ export const UniversityCard = ({ university, onRemove }) => {
           <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
             {university.name || university.universityName}
           </h3>
-          
+
           {/* Location */}
           <div className="flex items-center text-slate-600 mb-4">
             <MapPin className="w-4 h-4 mr-2" />
@@ -226,7 +362,7 @@ export const UniversityCard = ({ university, onRemove }) => {
           </div>
 
           <div className="space-y-4">
-            {/* Deadline Info with Enhanced Status */}
+            {/* Deadline Info */}
             <div className="flex items-center justify-between">
               <div className="flex items-center text-slate-600">
                 <Calendar className="w-4 h-4 mr-2" />
@@ -242,7 +378,7 @@ export const UniversityCard = ({ university, onRemove }) => {
               </div>
             </div>
 
-            {/* FIXED: Enhanced Essay Progress Section - Only show if essays exist */}
+            {/* Essay Progress Section */}
             {hasEssays && (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -259,10 +395,10 @@ export const UniversityCard = ({ university, onRemove }) => {
                 </div>
                 <div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div 
+                    <div
                       className={`h-2 rounded-full transition-all duration-500 ${
-                        essaysFullyComplete 
-                          ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                        essaysFullyComplete
+                          ? 'bg-gradient-to-r from-green-500 to-green-600'
                           : 'bg-gradient-to-r from-blue-500 to-blue-600'
                       }`}
                       style={{ width: `${essayProgressPercentage}%` }}
@@ -270,17 +406,12 @@ export const UniversityCard = ({ university, onRemove }) => {
                   </div>
                   <div className="text-xs text-slate-500 mt-1 flex justify-between">
                     <span>{essayProgressPercentage}% Complete</span>
-                    {university.stats?.essays?.enhancedCompletionBreakdown?.completedByWordCount98 > 0 && (
-                      <span className="text-green-600 font-medium">
-                        {university.stats.essays.enhancedCompletionBreakdown.completedByWordCount98} at 98%+
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* FIXED: Enhanced Task Progress Section - Only show if tasks exist */}
+            {/* Task Progress Section */}
             {hasTasks && (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -297,10 +428,10 @@ export const UniversityCard = ({ university, onRemove }) => {
                 </div>
                 <div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div 
+                    <div
                       className={`h-2 rounded-full transition-all duration-500 ${
-                        tasksFullyComplete 
-                          ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                        tasksFullyComplete
+                          ? 'bg-gradient-to-r from-green-500 to-green-600'
                           : 'bg-gradient-to-r from-amber-500 to-amber-600'
                       }`}
                       style={{ width: `${taskProgressPercentage}%` }}
@@ -315,7 +446,6 @@ export const UniversityCard = ({ university, onRemove }) => {
 
             {/* Enhanced Stats Section */}
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-              {/* FIXED: Tasks Completed with Status - Only show if tasks exist */}
               {hasTasks ? (
                 <div className="text-center">
                   <div className="text-2xl font-bold text-slate-900 flex items-center justify-center gap-1">
@@ -327,7 +457,6 @@ export const UniversityCard = ({ university, onRemove }) => {
                   <div className="text-xs text-slate-600 uppercase tracking-wide">Tasks</div>
                 </div>
               ) : hasEssays ? (
-                // Show essay count if no tasks but has essays
                 <div className="text-center">
                   <div className="text-2xl font-bold text-slate-900 flex items-center justify-center gap-1">
                     {university.completedEssays}/{university.totalEssays}
@@ -338,14 +467,12 @@ export const UniversityCard = ({ university, onRemove }) => {
                   <div className="text-xs text-slate-600 uppercase tracking-wide">Essays</div>
                 </div>
               ) : (
-                // Placeholder if no content
                 <div className="text-center">
                   <div className="text-2xl font-bold text-slate-900">0</div>
                   <div className="text-xs text-slate-600 uppercase tracking-wide">Items</div>
                 </div>
               )}
-              
-              {/* GMAT Average */}
+
               <div className="text-center">
                 <div className="text-2xl font-bold text-slate-900">
                   {university.gmatAverage || university.gmatAverageScore || 'N/A'}
@@ -362,31 +489,40 @@ export const UniversityCard = ({ university, onRemove }) => {
                   <span className="text-sm font-semibold">Ready for Submission!</span>
                 </div>
                 <div className="text-xs text-green-600 text-center mt-1">
-                  {hasEssays && hasTasks ? 'All essays and tasks completed' :
-                   hasEssays ? 'All essays completed' :
-                   hasTasks ? 'All tasks completed' : 'Ready to submit'}
+                  {hasEssays && hasTasks
+                    ? 'All essays and tasks completed'
+                    : hasEssays
+                    ? 'All essays completed'
+                    : hasTasks
+                    ? 'All tasks completed'
+                    : 'Ready to submit'}
                 </div>
               </div>
             )}
 
-            {/* FIXED: Progress Summary for In-Progress Applications */}
-            {university.status === 'in-progress' && !readyForSubmission && hasAnyContent && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                <div className="text-sm text-blue-800 font-medium mb-1">
-                  Progress Summary
+            {/* Progress Summary */}
+            {university.status === 'in-progress' &&
+              !readyForSubmission &&
+              hasAnyContent && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                  <div className="text-sm text-blue-800 font-medium mb-1">
+                    Progress Summary
+                  </div>
+                  <div className="text-xs text-blue-700 space-y-1">
+                    {hasEssays && !essaysFullyComplete && (
+                      <div>
+                        • {university.totalEssays - university.completedEssays} essays
+                        remaining
+                      </div>
+                    )}
+                    {hasTasks && !tasksFullyComplete && (
+                      <div>• {totalTasks - completedTasks} tasks remaining</div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-blue-700 space-y-1">
-                  {hasEssays && !essaysFullyComplete && (
-                    <div>• {university.totalEssays - university.completedEssays} essays remaining</div>
-                  )}
-                  {hasTasks && !tasksFullyComplete && (
-                    <div>• {totalTasks - completedTasks} tasks remaining</div>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
 
-            {/* FIXED: Show message if no essays or tasks exist */}
+            {/* No Content Message */}
             {!hasAnyContent && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-4">
                 <div className="text-sm text-gray-600 text-center">
@@ -394,29 +530,6 @@ export const UniversityCard = ({ university, onRemove }) => {
                 </div>
               </div>
             )}
-
-            {/* Debug Info (only in development) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="bg-gray-100 p-3 rounded text-xs font-mono mt-4">
-                <strong>Enhanced Debug Info:</strong><br/>
-                <div className="mt-1 space-y-1">
-                  <div>Status: {university.status}</div>
-                  <div>Essays: {university.completedEssays}/{university.totalEssays} ({essayProgressPercentage}%)</div>
-                  <div>Tasks: {completedTasks}/{totalTasks} ({taskProgressPercentage}%)</div>
-                  <div>Has Essays: {hasEssays ? 'Yes' : 'No'}</div>
-                  <div>Has Tasks: {hasTasks ? 'Yes' : 'No'}</div>
-                  <div>Essays Complete: {essaysFullyComplete ? 'Yes' : 'No'}</div>
-                  <div>Tasks Complete: {tasksFullyComplete ? 'Yes' : 'No'}</div>
-                  <div>Ready for Submission: {readyForSubmission ? 'Yes' : 'No'}</div>
-                  {university.stats?.essays?.enhancedCompletionBreakdown && (
-                    <div>
-                      98% Completions: {university.stats.essays.enhancedCompletionBreakdown.completedByWordCount98}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
       </div>

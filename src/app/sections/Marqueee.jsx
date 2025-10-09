@@ -32,35 +32,16 @@ const UniversityMarquee = () => {
       <div className="max-w-full mx-auto">
        
         <p className="font-inter leading-[24px] sm:leading-[28px] md:leading-[30px] text-center lg:leading-[32px] text-[#6C7280] font-normal text-lg">
-        Trusted by Thousands of Future Students
+       Empowering Students on Their Journey to Top Universities
           </p>
         
-        {/* Marquee Container */}
-        <div className="relative overflow-hidden hover-pause-marquee mt-10">
-          {/* Left Gradient */}
-          <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
-          
-          {/* Right Gradient */}
-          <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
-          
-          {/* Marquee Animation */}
-          <div className="flex animate-marquee items-center py-4">
-            {/* First set of logos */}
-            {logos.map((logo, index) => (
-              <LogoImage logo={logo} index={index} setKey="first" key={`first-${index}`} />
-            ))}
-            
-            {/* Duplicate set for seamless loop */}
-            {logos.map((logo, index) => (
-              <LogoImage logo={logo} index={index} setKey="second" key={`second-${index}`} />
-            ))}
-            
-            {/* Third set to ensure smooth transition */}
-            {logos.map((logo, index) => (
-              <LogoImage logo={logo} index={index} setKey="third" key={`third-${index}`} />
-            ))}
-          </div>
-        </div>
+        {/* Marquee Container 
+        
+        
+        
+        
+        */}
+       
         
        
       </div>
@@ -105,3 +86,32 @@ const UniversityMarquee = () => {
 };
 
 export default UniversityMarquee;
+
+
+/*
+  <div className="relative overflow-hidden hover-pause-marquee mt-10">
+    <!-- Left Gradient -->
+    <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
+    
+    <!-- Right Gradient -->
+    <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+    
+    <!-- Marquee Animation -->
+    <div className="flex animate-marquee items-center py-4">
+      <!-- First set of logos -->
+      {logos.map((logo, index) => (
+        <LogoImage logo={logo} index={index} setKey="first" key={`first-${index}`} />
+      ))}
+      
+      <!-- Duplicate set for seamless loop -->
+      {logos.map((logo, index) => (
+        <LogoImage logo={logo} index={index} setKey="second" key={`second-${index}`} />
+      ))}
+      
+      <!-- Third set to ensure smooth transition -->
+      {logos.map((logo, index) => (
+        <LogoImage logo={logo} index={index} setKey="third" key={`third-${index}`} />
+      ))}
+    </div>
+  </div>
+*/

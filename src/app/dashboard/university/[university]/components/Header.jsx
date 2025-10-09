@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Bell, Settings, Heart, HeartOff, Calendar, Clock, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Bell, Settings, Heart, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const Header = ({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingAction, setLoadingAction] = useState(null);
-
   const router = useRouter();
 
-  // Enhanced progress calculation using university data from getUniversityBySlug
+  // Enhanced progress calculation using university data
   const getProgressData = () => {
     if (!university) {
       return {
@@ -25,7 +24,7 @@ const Header = ({ university }) => {
       };
     }
 
-    // Use enhanced stats if available (when user is authenticated)
+    // Use enhanced stats if available
     if (university.enhancedStats) {
       return {
         overallProgress: university.overallProgress || 0,
@@ -41,7 +40,7 @@ const Header = ({ university }) => {
       };
     }
 
-    // Fallback to basic calculation from existing data
+    // Fallback to basic calculation
     const essayPrompts = university.allEssayPrompts || [];
     const calendarEvents = university.calendarEvents || [];
     
@@ -61,14 +60,12 @@ const Header = ({ university }) => {
       ? Math.round((completedTasks / calendarEvents.length) * 100)
       : 0;
 
-    // Calculate overall progress (weighted: 70% essays, 30% tasks)
     const overallProgress = essayPrompts.length > 0 && calendarEvents.length > 0
       ? Math.round((essayProgress * 0.7) + (taskProgress * 0.3))
       : essayPrompts.length > 0 
       ? essayProgress 
       : taskProgress;
 
-    // Determine application status
     let applicationStatus = 'not-started';
     if (completedEssays > 0 || completedTasks > 0) {
       if (completedEssays === essayPrompts.length && completedTasks === calendarEvents.length && (essayPrompts.length > 0 || calendarEvents.length > 0)) {
@@ -95,7 +92,7 @@ const Header = ({ university }) => {
   const progressData = getProgressData();
 
   /**
-   * Effect to initialize saved status by checking if current user has saved this university
+   * Initialize saved status from localStorage
    */
   useEffect(() => {
     try {
@@ -105,7 +102,6 @@ const Header = ({ university }) => {
       const parsedData = JSON.parse(authData);
       const userId = parsedData.userId;
 
-      // Check if user's id is inside savedByUsers array of objects
       const isSaved =
         Array.isArray(university.savedByUsers) &&
         university.savedByUsers.some((user) => user.id === userId);
@@ -117,33 +113,48 @@ const Header = ({ university }) => {
   }, [university]);
 
   /**
-   * Toggle university saved status with optimistic updates
+   * Toggle university saved status with instant UI update
    */
   const toggleSaved = async (e) => {
     e.stopPropagation();
     e.preventDefault();
 
-    // Get fresh auth data from localStorage
-    const authData =
-      typeof window !== "undefined" ? localStorage.getItem("authData") : null;
+    const authData = typeof window !== "undefined" ? localStorage.getItem("authData") : null;
 
     if (!authData) {
-      console.warn("⚠️ No auth data found in localStorage");
+      toast.error("Please login to save universities");
       return;
     }
 
     const parsedData = JSON.parse(authData);
 
-    // Store what action we're performing BEFORE changing state
-    const currentState = isAdded;
-    const actionBeingPerformed = currentState ? "removing" : "saving";
-    
-    // Set loading action based on PREVIOUS state (what we're changing FROM)
-    setLoadingAction(actionBeingPerformed);
-
-    // Optimistic update - change UI immediately
+    const previousState = isAdded;
     const newState = !isAdded;
+
+    // ✨ INSTANT UI UPDATE
     setIsAdded(newState);
+
+    // Show immediate feedback
+    if (newState) {
+      toast.success("University added to dashboard", {
+        style: {
+          background: '#ec4899',
+          color: 'white',
+          border: 'none',
+        },
+        duration: 2000,
+      });
+    } else {
+      toast.success("University removed from dashboard", {
+        style: {
+          background: '#ef4444',
+          color: 'white',
+          border: 'none',
+        },
+        duration: 2000,
+      });
+    }
+
     setIsLoading(true);
 
     try {
@@ -164,42 +175,22 @@ const Header = ({ university }) => {
 
       if (response.ok) {
         const data = await response.json();
-        // Confirm the optimistic update was correct
         setIsAdded(data.isAdded);
       } else {
-        // Rollback on error
-        console.error("Failed to update status:", response.status);
-        setIsAdded(currentState); // Use the stored previous state
+        // Revert on failure
+        setIsAdded(previousState);
+        toast.error(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
       }
     } catch (error) {
-      // Rollback on error
-      console.error("Error toggling save:", error);
-      setIsAdded(currentState); // Use the stored previous state
+      // Revert on failure
+      setIsAdded(previousState);
+      toast.error("Network error. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
-      setLoadingAction(null); // Clear loading action
     }
   };
 
-  // Helper function to get the correct loading text
-  const getLoadingText = () => {
-    if (!isLoading || !loadingAction) return null;
-    return loadingAction === "saving" ? "Saving..." : "Removing...";
-  };
-
-  // Helper function to get loading state colors
-  const getLoadingStateColor = () => {
-    if (!isLoading || !loadingAction) {
-      return isAdded ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600";
-    }
-    
-    // During loading, show color based on the action being performed
-    return loadingAction === "saving" 
-      ? "bg-red-100 text-red-800"  // Saving = red (will become saved)
-      : "bg-gray-100 text-gray-600"; // Removing = gray (will become unsaved)
-  };
-
-  // Helper function to get progress bar color based on status
+  // Helper function to get progress bar color
   const getProgressBarColor = () => {
     if (progressData.applicationStatus === 'submitted') {
       return 'bg-green-500';
@@ -273,9 +264,7 @@ const Header = ({ university }) => {
                       : "Save this university"
                   }
                 >
-                  {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : isAdded ? (
+                  {isAdded ? (
                     <Heart className="h-5 w-5 fill-current" />
                   ) : (
                     <Heart className="h-5 w-5" />
@@ -288,24 +277,14 @@ const Header = ({ university }) => {
             {university && (
               <div className="mt-1">
                 <span
-                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors ${getLoadingStateColor()}`}
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                    isAdded
+                      ? "bg-red-100 text-red-800"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
                 >
-                  {isLoading ? (
-                    <>
-                      <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin mr-1" />
-                      {getLoadingText()}
-                    </>
-                  ) : isAdded ? (
-                    <>
-                      <Heart className="w-3 h-3 mr-1 fill-current" />
-                      Saved
-                    </>
-                  ) : (
-                    <>
-                      <Heart className="w-3 h-3 mr-1" />
-                      Not Saved
-                    </>
-                  )}
+                  <Heart className={`w-3 h-3 mr-1 ${isAdded ? 'fill-current' : ''}`} />
+                  {isAdded ? 'Saved' : 'Not Saved'}
                 </span>
               </div>
             )}
@@ -327,14 +306,6 @@ const Header = ({ university }) => {
                   {progressData.overallProgress}%
                 </span>
               </div>
-
-            
-
-              {/* Stats Grid */}
-             
-
-              {/* Deadline Indicators */}
-            
             </div>
 
             {/* Action Buttons */}

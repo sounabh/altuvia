@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, memo } from "react";
 import { MapPin, Heart, GraduationCap, DollarSign, TrendingUp, Award, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 const UniversityCard = memo(({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
@@ -26,7 +27,7 @@ const UniversityCard = memo(({ university }) => {
     try {
       authData = localStorage.getItem("authData");
       if (!authData) {
-        alert("Please login to save universities");
+        toast.error("Please login to save universities");
         return;
       }
 
@@ -34,21 +35,43 @@ const UniversityCard = memo(({ university }) => {
       token = parsedAuth.token;
 
       if (!token) {
-        alert("Authentication expired, please login again");
+        toast.error("Authentication expired, please login again");
         return;
       }
 
     } catch (error) {
-      alert("Authentication error, please try again");
+      toast.error("Authentication error, please try again");
       return;
     }
 
     const previousState = isAdded;
     const newState = !isAdded;
 
+    // ✨ INSTANT UI UPDATE - No loading state
     setIsAdded(newState);
-    setIsLoading(true);
 
+    // Show immediate feedback with pink toast
+    if (newState) {
+      toast.success("University added to dashboard", {
+        style: {
+          background: '#ec4899',
+          color: 'white',
+          border: 'none',
+        },
+        duration: 2000,
+      });
+    } else {
+      toast("University removed from dashboard", {
+        style: {
+          background: '#6b7280',
+          color: 'white',
+          border: 'none',
+        },
+        duration: 2000,
+      });
+    }
+
+    // Make API call in background
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
@@ -61,20 +84,16 @@ const UniversityCard = memo(({ university }) => {
         body: JSON.stringify({ universityId: university?.id }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setIsAdded(Boolean(data.isAdded));
-      } else {
+      if (!response.ok) {
+        // Revert on failure
         setIsAdded(previousState);
-        alert(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
+        toast.error(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
       }
 
     } catch (error) {
+      // Revert on failure
       setIsAdded(previousState);
-      alert("Network error. Please check your connection and try again.");
-
-    } finally {
-      setIsLoading(false);
+      toast.error("Network error. Please check your connection and try again.");
     }
   }, [isAdded, university?.id]);
 
@@ -106,25 +125,16 @@ const UniversityCard = memo(({ university }) => {
             #{university?.rank}
           </div>
           
-          {/* Heart Button */}
+          {/* Heart Button - No Loading State */}
           <button
             onClick={toggleHeart}
-            disabled={isLoading}
-            className={`absolute top-2 left-2 p-1.5 rounded-full backdrop-blur-sm transition-all duration-300 ${
-              isLoading 
-                ? "opacity-75 cursor-not-allowed" 
-                : "hover:scale-110 active:scale-95"
-            } ${
+            className={`absolute top-2 left-2 p-1.5 rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-95 ${
               isAdded
                 ? "bg-rose-500 text-white shadow-md"
                 : "bg-white/90 text-gray-600 hover:text-rose-500 shadow-sm"
             }`}
           >
-            {isLoading ? (
-              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Heart className={`w-4 h-4 transition-all ${isAdded ? 'fill-current' : ''}`} />
-            )}
+            <Heart className={`w-4 h-4 transition-all ${isAdded ? 'fill-current' : ''}`} />
           </button>
         </div>
 
