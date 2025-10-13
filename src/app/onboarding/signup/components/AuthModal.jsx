@@ -16,6 +16,46 @@ import { Separator } from "@/components/ui/separator";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
+// Loading Skeleton Component
+const AuthLoadingSkeleton = () => (
+  <div className="space-y-5 py-2 animate-pulse">
+    {/* Social Buttons Skeleton */}
+    <div className="space-y-3">
+      <div className="w-full h-11 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg"></div>
+      <div className="w-full h-11 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-lg"></div>
+    </div>
+
+    {/* Divider */}
+    <div className="relative">
+      <Separator className="bg-gray-200" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="bg-white px-3 text-sm text-gray-400">or</span>
+      </div>
+    </div>
+
+    {/* Form Fields Skeleton */}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-16"></div>
+        <div className="h-11 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-lg"></div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-20"></div>
+        <div className="h-11 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-lg"></div>
+      </div>
+
+      <div className="h-11 bg-gradient-to-r from-[#002147] via-[#003366] to-[#002147] rounded-lg"></div>
+    </div>
+
+    {/* Toggle Text Skeleton */}
+    <div className="flex justify-center gap-2">
+      <div className="h-4 bg-gray-200 rounded w-32"></div>
+      <div className="h-4 bg-gray-300 rounded w-16"></div>
+    </div>
+  </div>
+);
+
 export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -28,10 +68,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const [error, setError] = useState("");
   const [hasExistingData, setHasExistingData] = useState(false);
   const [existingUserEmail, setExistingUserEmail] = useState("");
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  /**
-   * Utility function to check if token is expired
-   */
   const isTokenExpired = (authData) => {
     if (!authData.lastLogin) return true;
     const lastLogin = new Date(authData.lastLogin);
@@ -40,9 +78,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     return hoursSinceLogin > 24;
   };
 
-  /**
-   * Check localStorage for existing auth credentials
-   */
   useEffect(() => {
     const checkExistingData = () => {
       try {
@@ -63,6 +98,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
         }
       } catch (error) {
         localStorage.removeItem("authData");
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -73,24 +110,17 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     setError("");
   }, [isLogin]);
 
-  /**
-   * Handle OAuth session success
-   */
   useEffect(() => {
     if (session && session.user && !isLoading) {
       handleOAuthSuccess(session);
     }
   }, [session, isLoading]);
 
-  /**
-   * Process successful OAuth authentication
-   */
   const handleOAuthSuccess = async (sessionData) => {
     try {
       setIsLoading(true);
       const oauthUser = sessionData.user;
 
-      // Email consistency check for existing users
       if (hasExistingData && existingUserEmail !== oauthUser.email) {
         setError(
           `This ${sessionData.provider || "OAuth"} account (${
@@ -114,7 +144,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
       if (response.ok) {
         const userData = await response.json();
 
-        // Store complete authentication data with profile completion flag
         const authData = {
           token: userData.token,
           userId: userData.data.userId,
@@ -126,7 +155,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
         };
         localStorage.setItem("authData", JSON.stringify(authData));
 
-        // Determine next steps based on profile completion
         await handleSuccessfulAuth(userData);
       } else {
         const errorData = await response.json();
@@ -141,9 +169,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  /**
-   * Initiate OAuth login
-   */
   const handleOAuthLogin = async (provider) => {
     setIsLoading(true);
     setError("");
@@ -164,9 +189,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  /**
-   * Handle email/password login
-   */
   const handleSignIn = async () => {
     setError("");
 
@@ -191,7 +213,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
       const userData = await response.json();
 
       if (response.ok && userData.success) {
-        // Store complete authentication data
         const authData = {
           token: userData.token,
           userId: userData.data.userId,
@@ -227,9 +248,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  /**
-   * Handle new account creation
-   */
   const handleSignUp = async () => {
     setError("");
 
@@ -268,19 +286,17 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
       const userData = await response.json();
 
       if (response.ok && userData.success) {
-        // Store auth data for new user
         const authData = {
           token: userData.token,
           userId: userData.data.userId,
           email: userData.data.email,
           name: userData.data.name,
           provider: 'credentials',
-          hasCompleteProfile: false, // Always false for new registrations
+          hasCompleteProfile: false,
           lastLogin: new Date().toISOString(),
         };
         localStorage.setItem("authData", JSON.stringify(authData));
 
-        // Create credentials session
         await signIn("credentials", {
           email,
           password,
@@ -288,7 +304,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           redirect: false,
         });
 
-        // New users always go through onboarding
         const mockSession = {
           user: {
             name: userData.data.name,
@@ -297,7 +312,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           },
         };
 
-        onSuccess(mockSession, true); // true indicates should start onboarding
+        onSuccess(mockSession, true);
         onClose();
       } else {
         if (response.status === 409) {
@@ -320,12 +335,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  /**
-   * Determine post-authentication flow using localStorage first
-   */
   const handleSuccessfulAuth = async (userData) => {
     try {
-      // Get fresh auth data from localStorage
       const authDataStr = localStorage.getItem("authData");
       if (!authDataStr) {
         setError("Authentication data not found. Please try again.");
@@ -334,17 +345,14 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
 
       const authData = JSON.parse(authDataStr);
 
-      // Use localStorage profile status if token is fresh
       if (!isTokenExpired(authData)) {
         if (authData.hasCompleteProfile) {
-          // Direct redirect to dashboard
           setTimeout(() => {
             router.push("/dashboard");
           }, 500);
           onClose();
           return;
         } else {
-          // Start onboarding
           const mockSession = {
             user: {
               name: userData.data.name,
@@ -359,7 +367,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
         }
       }
 
-      // Token is old, verify with server and update localStorage
       const response = await fetch(`${API_BASE_URL}/api/user/me`, {
         method: "GET",
         headers: { Authorization: `Bearer ${authData.token}` },
@@ -368,7 +375,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
       if (response.ok) {
         const userDetails = await response.json();
         
-        // Update localStorage with fresh profile status
         const updatedAuthData = {
           ...authData,
           hasCompleteProfile: userDetails.data.hasCompleteProfile || false,
@@ -394,7 +400,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           onClose();
         }
       } else if (response.status === 401) {
-        // Token expired, clear localStorage
         localStorage.removeItem("authData");
         setError("Session expired. Please sign in again.");
       } else {
@@ -405,9 +410,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  /**
-   * Handle form submission
-   */
   const handleSubmit = async () => {
     if (isLoading) return;
 
@@ -424,19 +426,31 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  /**
-   * Handle Enter key press
-   */
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !isLoading) {
       handleSubmit();
     }
   };
 
+  if (isInitializing) {
+    return (
+      <Dialog open={isOpen} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-[420px] rounded-xl border-0 shadow-2xl bg-white">
+          <DialogHeader className="space-y-3 pb-2">
+            <DialogTitle className="text-2xl font-bold text-center text-[#002147]">
+              Welcome
+            </DialogTitle>
+          </DialogHeader>
+          <AuthLoadingSkeleton />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog
       open={isOpen}
-      onOpenChange={() => {}} // Disable close functionality
+      onOpenChange={() => {}}
     >
       <DialogContent className="sm:max-w-[420px] rounded-xl border-0 shadow-2xl bg-white">
         <DialogHeader className="space-y-3 pb-2">
@@ -460,14 +474,12 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* Error Display */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
             </div>
           )}
 
-          {/* OAuth Social Login Section */}
           <div className="space-y-3">
             <Button
               onClick={() => handleOAuthLogin("google")}
@@ -505,7 +517,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
             </Button>
           </div>
 
-          {/* Divider */}
           <div className="relative">
             <Separator className="bg-gray-200" />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -513,7 +524,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Email/Password Form */}
           <div className="space-y-4">
             <div className="space-y-2">
               <label
@@ -558,7 +568,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
               />
             </div>
 
-            {/* Confirm Password - Only for signup */}
             {!isLogin && !hasExistingData && (
               <div className="space-y-2">
                 <label
@@ -580,7 +589,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
               </div>
             )}
 
-            {/* Submit Button */}
             <Button
               onClick={handleSubmit}
               className="w-full h-11 bg-[#002147] hover:bg-[#001a38] text-white font-medium rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
@@ -601,7 +609,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
             </Button>
           </div>
 
-          {/* Toggle Between Login/Signup */}
           {!hasExistingData && (
             <div className="text-center pt-2">
               <button

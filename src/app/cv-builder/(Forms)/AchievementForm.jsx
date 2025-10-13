@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
+import { useCVData } from '../page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,18 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Award, Plus, X, Trophy } from 'lucide-react';
 
 
-
 export const AchievementsForm = () => {
-  const [achievements, setAchievements] = useState([
-    {
-      id: '1',
-      title: '',
-      organization: '',
-      date: '',
-      type: '',
-      description: '',
-    }
-  ]);
+  const { cvData, updateCVData } = useCVData();
+  const achievements = cvData.achievements || [];
 
   const addAchievement = () => {
     const newAchievement = {
@@ -32,17 +24,18 @@ export const AchievementsForm = () => {
       type: '',
       description: '',
     };
-    setAchievements([...achievements, newAchievement]);
+    updateCVData('achievements', [...achievements, newAchievement]);
   };
 
   const removeAchievement = (id) => {
-    setAchievements(achievements.filter(achievement => achievement.id !== id));
+    updateCVData('achievements', achievements.filter(achievement => achievement.id !== id));
   };
 
   const updateAchievement = (id, field, value) => {
-    setAchievements(achievements.map(achievement => 
+    const updated = achievements.map(achievement => 
       achievement.id === id ? { ...achievement, [field]: value } : achievement
-    ));
+    );
+    updateCVData('achievements', updated);
   };
 
   return (
@@ -109,7 +102,7 @@ export const AchievementsForm = () => {
 
             <div className="space-y-2">
               <Label className="cv-heading">Achievement Type</Label>
-              <Select onValueChange={(value) => updateAchievement(achievement.id, 'type', value)}>
+              <Select value={achievement.type} onValueChange={(value) => updateAchievement(achievement.id, 'type', value)}>
                 <SelectTrigger className="border-cvBorder focus:border-cvAccent">
                   <SelectValue placeholder="Select achievement type" />
                 </SelectTrigger>

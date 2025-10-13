@@ -13,6 +13,79 @@ import { AcademicSnapshotStep } from "./AcademicSnapshot";
 import { PaymentStep } from "./PaymentSteps";
 import { LoadingStep } from "./Loading";
 
+// Premium Loading Component
+const PremiumLoadingScreen = ({ message }) => {
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center z-50">
+      <div className="max-w-md w-full mx-auto px-6">
+        <div className="space-y-12">
+          {/* Animated Logo/Icon */}
+          <div className="flex justify-center">
+            <div className="relative w-20 h-20">
+              {/* Outer rotating ring */}
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#002147] border-r-[#002147] animate-spin"></div>
+              
+              {/* Middle pulsing ring */}
+              <div className="absolute inset-2 rounded-full border border-slate-200 animate-pulse"></div>
+              
+              {/* Inner static icon */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#002147] to-[#003d7a] rounded-xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-semibold text-[#002147]">
+              {message === "Setting up your experience..." 
+                ? "Setting up your account"
+                : message === "Checking user status..."
+                ? "Verifying credentials"
+                : message === "Processing login..."
+                ? "Authenticating"
+                : message === "Initializing session..."
+                ? "Initializing"
+                : "Loading"}
+            </h1>
+            
+            <p className="text-sm text-slate-600">
+              {message === "Setting up your experience..." 
+                ? "We're preparing everything for you"
+                : message === "Checking user status..."
+                ? "Please wait while we verify your account"
+                : message === "Processing login..."
+                ? "Connecting securely"
+                : message === "Initializing session..."
+                ? "Starting your session"
+                : "Please wait"}
+            </p>
+          </div>
+
+          {/* Progress indicator dots */}
+          <div className="flex justify-center gap-2">
+            <div className="w-2 h-2 bg-[#002147] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+            <div className="w-2 h-2 bg-[#002147] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+            <div className="w-2 h-2 bg-[#002147] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+          </div>
+
+          {/* Subtle progress bar */}
+          <div className="space-y-2">
+            <div className="h-1 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#002147] to-[#003d7a] rounded-full w-2/3 animate-pulse"></div>
+            </div>
+            <p className="text-xs text-slate-500 text-center">This may take a few seconds</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const OnboardingFlow = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -27,6 +100,7 @@ export const OnboardingFlow = () => {
   const [userHasProfile, setUserHasProfile] = useState(false);
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Setting up your experience...");
 
   // Centralized state for storing onboarding data across steps
   const [data, setData] = useState({
@@ -50,17 +124,16 @@ export const OnboardingFlow = () => {
    * Utility function to check if token is expired or old
    */
  const isTokenExpired = useCallback((authData) => {
-  // ✅ Always return false - let backend handle token validation
-  // The JWT token itself has a 30-day expiry built-in
-  if (!authData || !authData.token) return true; // Only check if token exists
-  
-  return false; // Let backend validate actual JWT expiration
+  if (!authData || !authData.token) return true;
+  return false;
 }, []);
+
   /**
    * Handles OAuth session authentication
    */
   const handleSessionAuth = useCallback(async (sessionData) => {
     setIsProcessingOAuth(true);
+    setLoadingMessage("Processing login...");
 
     try {
       const API_BASE_URL =
@@ -157,6 +230,7 @@ export const OnboardingFlow = () => {
    */
   const fetchUserData = useCallback(async () => {
     setIsCheckingUser(true);
+    setLoadingMessage("Checking user status...");
     
     try {
       const authDataStr = localStorage.getItem("authData");
@@ -397,7 +471,7 @@ export const OnboardingFlow = () => {
           email: responseData.data?.email,
           name: responseData.data?.name,
           provider: responseData.data?.provider,
-          hasCompleteProfile: true, // Set to true after completion
+          hasCompleteProfile: true,
           lastLogin: new Date().toISOString(),
         };
         localStorage.setItem("authData", JSON.stringify(authData));
@@ -429,33 +503,48 @@ export const OnboardingFlow = () => {
     isProcessingOAuth ||
     isInitializing;
 
-  // Show loading spinner during initial checks
+  // Show premium loading screen during initial checks
   if (isLoading) {
-    let loadingMessage = "Checking authentication...";
-    if (status === "loading") loadingMessage = "Initializing session...";
-    if (isProcessingOAuth) loadingMessage = "Processing login...";
-    if (isCheckingUser) loadingMessage = "Checking user status...";
-    if (isInitializing) loadingMessage = "Setting up your experience...";
-
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{loadingMessage}</p>
-        </div>
-      </div>
-    );
+    return <PremiumLoadingScreen message={loadingMessage} />;
   }
 
-  // Show loading spinner before redirecting to dashboard
+  // Show premium loading screen before redirecting to dashboard
   if (user && studentId && userHasProfile) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            Welcome back! Redirecting to dashboard...
-          </p>
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center z-50">
+        <div className="max-w-md w-full mx-auto px-6">
+          <div className="space-y-12">
+            {/* Success Icon */}
+            <div className="flex justify-center">
+              <div className="relative w-20 h-20">
+                <div className="absolute inset-0 rounded-full border-2 border-emerald-200 animate-pulse"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="text-center space-y-4">
+              <h1 className="text-2xl font-semibold text-[#002147]">
+                Welcome back
+              </h1>
+              <p className="text-sm text-slate-600">
+                Taking you to your dashboard
+              </p>
+            </div>
+
+            {/* Progress dots */}
+            <div className="flex justify-center gap-2">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: "300ms" }}></div>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
+import { useCVData } from '../page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,18 +12,8 @@ import { Briefcase, Plus, X, Lightbulb } from 'lucide-react';
 
 
 export const ExperienceForm = () => {
-  const [experiences, setExperiences] = useState([
-    {
-      id: '1',
-      company: '',
-      position: '',
-      location: '',
-      startDate: '',
-      endDate: '',
-      isCurrentRole: false,
-      description: '',
-    }
-  ]);
+  const { cvData, updateCVData } = useCVData();
+  const experiences = cvData.experience || [];
 
   const addExperience = () => {
     const newExperience = {
@@ -35,17 +26,18 @@ export const ExperienceForm = () => {
       isCurrentRole: false,
       description: '',
     };
-    setExperiences([...experiences, newExperience]);
+    updateCVData('experience', [...experiences, newExperience]);
   };
 
   const removeExperience = (id) => {
-    setExperiences(experiences.filter(exp => exp.id !== id));
+    updateCVData('experience', experiences.filter(exp => exp.id !== id));
   };
 
   const updateExperience = (id, field, value) => {
-    setExperiences(experiences.map(exp => 
+    const updated = experiences.map(exp => 
       exp.id === id ? { ...exp, [field]: value } : exp
-    ));
+    );
+    updateCVData('experience', updated);
   };
 
   return (

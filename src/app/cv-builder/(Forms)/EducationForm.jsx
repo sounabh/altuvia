@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,22 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GraduationCap, Plus, X } from 'lucide-react';
-
-
+import { useCVData } from '../page';
 
 export const EducationForm = () => {
-  const [educations, setEducations] = useState([
-    {
-      id: '1',
-      institution: '',
-      degree: '',
-      field: '',
-      startDate: '',
-      endDate: '',
-      gpa: '',
-      description: '',
-    }
-  ]);
+  const { cvData, updateCVData } = useCVData();
+  const educations = cvData.education;
 
   const addEducation = () => {
     const newEducation = {
@@ -36,15 +25,15 @@ export const EducationForm = () => {
       gpa: '',
       description: '',
     };
-    setEducations([...educations, newEducation]);
+    updateCVData('education', [...educations, newEducation]);
   };
 
   const removeEducation = (id) => {
-    setEducations(educations.filter(edu => edu.id !== id));
+    updateCVData('education', educations.filter(edu => edu.id !== id));
   };
 
   const updateEducation = (id, field, value) => {
-    setEducations(educations.map(edu => 
+    updateCVData('education', educations.map(edu => 
       edu.id === id ? { ...edu, [field]: value } : edu
     ));
   };
@@ -92,7 +81,7 @@ export const EducationForm = () => {
               </div>
               <div className="space-y-2">
                 <Label className="cv-heading">Degree Type</Label>
-                <Select onValueChange={(value) => updateEducation(education.id, 'degree', value)}>
+                <Select value={education.degree} onValueChange={(value) => updateEducation(education.id, 'degree', value)}>
                   <SelectTrigger className="border-cvBorder focus:border-cvAccent">
                     <SelectValue placeholder="Select degree type" />
                   </SelectTrigger>

@@ -1,28 +1,17 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FolderOpen, Plus, X, ExternalLink, Github } from 'lucide-react';
-
+import { useCVData } from '../page';
 
 export const ProjectsForm = () => {
-  const [projects, setProjects] = useState([
-    {
-      id: '1',
-      name: '',
-      description: '',
-      technologies: '',
-      startDate: '',
-      endDate: '',
-      githubUrl: '',
-      liveUrl: '',
-      achievements: '',
-    }
-  ]);
+  const { cvData, updateCVData } = useCVData();
+  const projects = cvData.projects;
 
   const addProject = () => {
     const newProject = {
@@ -36,15 +25,15 @@ export const ProjectsForm = () => {
       liveUrl: '',
       achievements: '',
     };
-    setProjects([...projects, newProject]);
+    updateCVData('projects', [...projects, newProject]);
   };
 
   const removeProject = (id) => {
-    setProjects(projects.filter(project => project.id !== id));
+    updateCVData('projects', projects.filter(project => project.id !== id));
   };
 
   const updateProject = (id, field, value) => {
-    setProjects(projects.map(project => 
+    updateCVData('projects', projects.map(project => 
       project.id === id ? { ...project, [field]: value } : project
     ));
   };

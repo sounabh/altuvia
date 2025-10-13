@@ -28,7 +28,7 @@ const studyLevels = [
     subtitle: "Master of Business Administration",
     icon: "💼",
     description: "Business leadership program",
-    available: false // Added available property
+    available: true // Added available property
   },
   {
     id: "phd",

@@ -1,28 +1,17 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Plus, X } from 'lucide-react';
-
-
+import { useCVData } from '../page';
 
 export const VolunteerForm = () => {
-  const [experiences, setExperiences] = useState([
-    {
-      id: '1',
-      organization: '',
-      role: '',
-      location: '',
-      startDate: '',
-      endDate: '',
-      description: '',
-      impact: '',
-    }
-  ]);
+  const { cvData, updateCVData } = useCVData();
+  const experiences = cvData.volunteer;
 
   const addExperience = () => {
     const newExperience = {
@@ -35,15 +24,15 @@ export const VolunteerForm = () => {
       description: '',
       impact: '',
     };
-    setExperiences([...experiences, newExperience]);
+    updateCVData('volunteer', [...experiences, newExperience]);
   };
 
   const removeExperience = (id) => {
-    setExperiences(experiences.filter(exp => exp.id !== id));
+    updateCVData('volunteer', experiences.filter(exp => exp.id !== id));
   };
 
   const updateExperience = (id, field, value) => {
-    setExperiences(experiences.map(exp => 
+    updateCVData('volunteer', experiences.map(exp => 
       exp.id === id ? { ...exp, [field]: value } : exp
     ));
   };

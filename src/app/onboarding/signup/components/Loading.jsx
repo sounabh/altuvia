@@ -1,34 +1,22 @@
 import { useEffect, useState, useRef } from "react";
 
 /**
- * LoadingStep component - Handles profile submission with improved localStorage management
+ * LoadingStep component - Handles profile submission with premium UI/UX
  * 
  * @param {Object} props - Component properties
  * @param {Object} props.userData - User data collected during onboarding
  * @param {Function} props.onComplete - Callback invoked when submission completes
- * @returns {JSX.Element} Loading interface with progress visualization
+ * @returns {JSX.Element} Premium loading interface
  */
 export const LoadingStep = ({ userData, onComplete }) => {
   // State management
-  const [progress, setProgress] = useState(0);
-  const [currentMessage, setCurrentMessage] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [isComplete, setIsComplete] = useState(false);
-  const [dots, setDots] = useState("");
+  const [phase, setPhase] = useState("processing");
 
   // Ref to prevent duplicate submissions
   const hasSubmittedRef = useRef(false);
-
-  // Loading messages
-  const messages = [
-    "Analyzing your preferences",
-    "Matching you with universities",
-    "Calculating compatibility scores",
-    "Processing information",
-    "Preparing your recommendations",
-    "Almost ready",
-  ];
 
   /**
    * Get authentication token from localStorage with validation
@@ -70,7 +58,7 @@ export const LoadingStep = ({ userData, onComplete }) => {
         const updatedAuth = {
           ...existingAuth,
           token: newToken || existingAuth.token,
-          hasCompleteProfile: true, // Mark profile as complete
+          hasCompleteProfile: true,
           lastLogin: new Date().toISOString(),
           ...additionalData
         };
@@ -88,36 +76,6 @@ export const LoadingStep = ({ userData, onComplete }) => {
     }
   };
 
-  // Animation effects
-  useEffect(() => {
-    const dotsInterval = setInterval(() => {
-      setDots((prev) => (prev === "..." ? "" : prev + "."));
-    }, 500);
-
-    return () => clearInterval(dotsInterval);
-  }, []);
-
-  useEffect(() => {
-    let progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 4;
-      });
-    }, 100);
-
-    let messageInterval = setInterval(() => {
-      setCurrentMessage((prev) => (prev + 1) % messages.length);
-    }, 1500);
-
-    return () => {
-      clearInterval(progressInterval);
-      clearInterval(messageInterval);
-    };
-  }, []);
-
   /**
    * Prepare submission data with security considerations
    */
@@ -131,7 +89,6 @@ export const LoadingStep = ({ userData, onComplete }) => {
     paymentInfo: {
       name: userData?.paymentInfo?.name || "",
       email: userData?.paymentInfo?.email || "",
-      // Mask card number for security
       cardNumber: userData?.paymentInfo?.cardNumber
         ? "****" + userData.paymentInfo.cardNumber.slice(-4)
         : "",
@@ -139,10 +96,9 @@ export const LoadingStep = ({ userData, onComplete }) => {
   });
 
   /**
-   * Submit user data with improved error handling and localStorage management
+   * Submit user data with improved error handling
    */
   const submitData = async () => {
-    // Prevent duplicate submissions
     if (hasSubmittedRef.current) {
       console.log("⚠️ Submission already in progress, skipping...");
       return;
@@ -150,10 +106,10 @@ export const LoadingStep = ({ userData, onComplete }) => {
     
     hasSubmittedRef.current = true;
     setIsSubmitting(true);
+    setPhase("submitting");
     setSubmitError(null);
 
     try {
-      // Get fresh token
       const token = getAuthToken();
       
       if (!token) {
@@ -183,9 +139,6 @@ export const LoadingStep = ({ userData, onComplete }) => {
       console.log("📥 Server response:", data);
 
       if (response.ok && data.success !== false) {
-        setIsComplete(true);
-        
-        // Update localStorage with new token and completion flag
         if (data.token) {
           updateAuthData(data.token, {
             userId: data.data?.userId,
@@ -194,11 +147,12 @@ export const LoadingStep = ({ userData, onComplete }) => {
             provider: data.data?.provider
           });
         } else {
-          // No new token provided, just update completion flag
           updateAuthData(null);
         }
 
-        // Trigger completion callback after delay
+        setPhase("complete");
+        setIsComplete(true);
+
         if (onComplete) {
           setTimeout(() => {
             onComplete(data);
@@ -206,14 +160,13 @@ export const LoadingStep = ({ userData, onComplete }) => {
         }
       } 
       else if (response.status === 401) {
-        // Handle expired token
         localStorage.removeItem("authData");
         throw new Error("Your session has expired. Please sign in again.");
       }
       else if (response.status === 409 && data.userExists) {
-        // Profile already completed - update localStorage and proceed
         console.log("✅ Profile already completed, updating localStorage");
         updateAuthData(data.token || getAuthToken());
+        setPhase("complete");
         setIsComplete(true);
         
         if (onComplete) {
@@ -228,12 +181,10 @@ export const LoadingStep = ({ userData, onComplete }) => {
     } catch (error) {
       console.error("❌ Profile submission error:", error);
       
-      // Reset submission lock on error
       hasSubmittedRef.current = false;
       
       let errorMessage = "Failed to submit profile. Please try again.";
       
-      // Handle specific error types
       if (error.message.includes("Authentication token")) {
         errorMessage = error.message;
       } else if (error.message.includes("session has expired")) {
@@ -244,6 +195,7 @@ export const LoadingStep = ({ userData, onComplete }) => {
         errorMessage = error.message;
       }
       
+      setPhase("error");
       setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -257,262 +209,194 @@ export const LoadingStep = ({ userData, onComplete }) => {
     console.log("🔄 Retrying profile submission...");
     hasSubmittedRef.current = false;
     setSubmitError(null);
-    setProgress(0);
-    
-    // Restart progress animation
-    let progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 4;
-      });
-    }, 100);
+    setPhase("processing");
+    setIsSubmitting(false);
   };
 
   /**
-   * Auto-submit when progress reaches 100%
+   * Auto-submit when component mounts
    */
-  useEffect(() => {
-    if (progress === 100 && !isSubmitting && !submitError && !hasSubmittedRef.current && !isComplete) {
-      console.log("🚀 Progress complete, submitting data...");
-      const submitTimer = setTimeout(submitData, 1000);
-      return () => clearTimeout(submitTimer);
-    }
-  }, [progress, isSubmitting, submitError, isComplete]);
-
-  // Token expiration handler
   useEffect(() => {
     const token = getAuthToken();
     if (!token) {
+      setPhase("error");
       setSubmitError("Authentication required. Please sign in again.");
+    } else if (!hasSubmittedRef.current && !isComplete) {
+      const submitTimer = setTimeout(submitData, 800);
+      return () => clearTimeout(submitTimer);
     }
   }, []);
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 overflow-y-auto">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center space-y-8">
-          {/* Animated spinner */}
-          <div className="space-y-6">
-            <div className="relative">
-              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center transition-all duration-500 ${
-                isComplete 
-                  ? 'bg-green-600 animate-pulse' 
-                  : submitError 
-                    ? 'bg-red-600 animate-pulse' 
-                    : 'bg-[#002147] animate-pulse'
-              }`}>
-                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center">
-                  <span className="text-4xl">
-                    {isComplete ? '🎉' : submitError ? '⚠️' : '🎓'}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Loading ring animation */}
-              {(isSubmitting && !isComplete) && (
-                <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
-              )}
-            </div>
-
-            <h1 className={`text-4xl font-bold transition-colors duration-500 ${
-              isComplete 
-                ? 'text-green-600' 
-                : submitError 
-                  ? 'text-red-600' 
-                  : 'text-[#002147]'
-            }`}>
-              {isComplete 
-                ? 'Profile Complete!' 
-                : submitError 
-                  ? 'Submission Failed' 
-                  : 'Building Your Profile'
-              }
-            </h1>
-
-            {/* Dynamic message */}
-            <div className="text-xl text-gray-600 min-h-[28px]">
-              {submitError ? (
-                <span className="text-red-600">
-                  Please try again or contact support
-                </span>
-              ) : isSubmitting ? (
-                <span className="inline-flex items-center">
-                  Submitting your profile
-                  <span className="inline-block w-8 text-left">{dots}</span>
-                </span>
-              ) : isComplete ? (
-                <span className="inline-flex items-center text-green-600">
-                  <span className="mr-2 text-2xl animate-bounce">🎊</span>
-                  Redirecting to dashboard
-                  <span className="inline-block w-8 text-left">{dots}</span>
-                </span>
-              ) : (
-                <span>
-                  {messages[currentMessage]}
-                  <span className="inline-block w-8 text-left">{dots}</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-lg">
-            <div className="space-y-4">
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all duration-300 ease-out relative overflow-hidden ${
-                    isComplete 
-                      ? 'bg-green-500' 
-                      : submitError 
-                        ? 'bg-red-500' 
-                        : 'bg-[#002147]'
-                  }`}
-                  style={{ width: `${isComplete ? 100 : progress}%` }}
-                >
-                  {/* Shimmer effect */}
-                  {(isSubmitting || (progress < 100 && !submitError)) && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center space-x-2">
-                <p className={`text-lg font-medium transition-colors duration-500 ${
-                  isComplete 
-                    ? 'text-green-600' 
-                    : submitError 
-                      ? 'text-red-600' 
-                      : 'text-gray-700'
-                }`}>
-                  {isComplete ? '100% Complete' : `${progress}% Complete`}
-                </p>
-                {isSubmitting && (
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
-                  </div>
-                )}
+  // Processing phase - Initial loading
+  if (phase === "processing" && !isSubmitting) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full">
+          <div className="text-center space-y-12">
+            {/* Animated Icon */}
+            <div className="relative w-24 h-24 mx-auto">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#002147] to-[#003d7a] rounded-2xl animate-pulse"></div>
+              <div className="absolute inset-1 bg-white rounded-2xl flex items-center justify-center">
+                <svg className="w-12 h-12 text-[#002147]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
             </div>
 
-            {/* Step Icons */}
-            <div className="grid grid-cols-3 gap-4 mt-8">
-              <div className="text-center space-y-2">
-                <div className="w-8 h-8 bg-[#002147] rounded-full mx-auto flex items-center justify-center">
-                  <span className="text-white text-sm">✓</span>
-                </div>
-                <p className="text-sm text-gray-600">Preferences</p>
-              </div>
-
-              <div className="text-center space-y-2">
-                <div className="w-8 h-8 bg-[#002147] rounded-full mx-auto flex items-center justify-center">
-                  <span className="text-white text-sm">✓</span>
-                </div>
-                <p className="text-sm text-gray-600">Profile</p>
-              </div>
-
-              <div className="text-center space-y-2">
-                <div
-                  className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center transition-all duration-500 ${
-                    isComplete
-                      ? "bg-green-500"
-                      : submitError
-                        ? "bg-red-500"
-                        : progress >= 100
-                          ? "bg-[#002147]"
-                          : isSubmitting
-                            ? "bg-blue-500 animate-spin"
-                            : "bg-blue-500 animate-pulse"
-                  }`}
-                >
-                  <span className="text-white text-sm">
-                    {isComplete
-                      ? "✓"
-                      : submitError
-                        ? "✕"
-                        : progress >= 100 || isSubmitting
-                          ? "⟳"
-                          : "⏳"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  {isComplete 
-                    ? "Complete!" 
-                    : submitError 
-                      ? "Failed" 
-                      : isSubmitting 
-                        ? "Submitting" 
-                        : "Processing"
-                  }
-                </p>
-              </div>
+            {/* Title */}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-[#002147]">
+                Finalizing your profile
+              </h1>
+              <p className="text-slate-600 text-sm">
+                We're preparing your personalized experience
+              </p>
             </div>
 
-            {/* Error Display */}
-            {submitError && (
-              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-center mb-3">
-                  <span className="text-red-600 text-sm mr-2">❌</span>
-                  <p className="text-red-600 text-sm font-medium">Submission Error</p>
-                </div>
-                <p className="text-red-600 text-sm mb-3">{submitError}</p>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleRetry}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
-                  >
-                    Try Again
-                  </button>
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem("authData");
-                      window.location.reload();
-                    }}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm font-medium"
-                  >
-                    Sign In Again
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Success Display */}
-            {isComplete && !submitError && (
-              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <span className="text-green-600 text-sm">✅</span>
-                  <span className="text-green-600 text-sm font-medium">
-                    Profile created successfully!
-                  </span>
-                  <span className="text-2xl animate-bounce">🎊</span>
-                </div>
-                <p className="text-green-600 text-sm text-center">
-                  Preparing your personalized dashboard
-                  <span className="inline-block w-8 text-left font-mono">
-                    {dots}
-                  </span>
-                </p>
-                <div className="mt-3 text-center">
-                  <div className="inline-flex items-center space-x-2 text-xs text-green-700 bg-green-100 rounded-full px-3 py-1">
-                    <span>🔒</span>
-                    <span>Your data is secure and encrypted</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Loading Dots */}
+            <div className="flex justify-center gap-2">
+              <div className="w-3 h-3 bg-[#002147] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+              <div className="w-3 h-3 bg-[#002147] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-3 h-3 bg-[#002147] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Submitting phase - Data being sent
+  if (phase === "submitting" || isSubmitting) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full">
+          <div className="text-center space-y-12">
+            {/* Animated Spinner */}
+            <div className="relative w-24 h-24 mx-auto">
+              <svg className="w-24 h-24 text-[#002147] animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-sm font-semibold text-[#002147]">...</span>
+              </div>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-[#002147]">
+                Setting up your dashboard
+              </h1>
+              <p className="text-slate-600 text-sm">
+                Please wait while we process your information
+              </p>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="space-y-3">
+              <div className="h-1 bg-gradient-to-r from-slate-200 to-slate-300 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#002147] to-[#003d7a] rounded-full animate-pulse w-3/4"></div>
+              </div>
+              <p className="text-xs text-slate-500">Almost there...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Complete phase - Success
+  if (phase === "complete" || isComplete) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full">
+          <div className="text-center space-y-12">
+            {/* Success Icon */}
+            <div className="relative w-24 h-24 mx-auto">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-2xl animate-pulse"></div>
+              <div className="absolute inset-1 bg-white rounded-2xl flex items-center justify-center">
+                <svg className="w-12 h-12 text-emerald-600 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-emerald-600">
+                All set!
+              </h1>
+              <p className="text-slate-600 text-sm">
+                Your profile has been created successfully
+              </p>
+            </div>
+
+            {/* Loading indicator */}
+            <div className="flex justify-center gap-2">
+              <div className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse" style={{ animationDelay: "300ms" }}></div>
+            </div>
+
+            {/* Status text */}
+            <p className="text-sm text-slate-600">
+              Redirecting to dashboard...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error phase
+  if (phase === "error") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full">
+          <div className="text-center space-y-8">
+            {/* Error Icon */}
+            <div className="relative w-24 h-24 mx-auto">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-red-600 rounded-2xl"></div>
+              <div className="absolute inset-1 bg-white rounded-2xl flex items-center justify-center">
+                <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-red-600">
+                Something went wrong
+              </h1>
+              <p className="text-slate-600 text-sm">
+                {submitError || "We encountered an issue processing your profile"}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3 pt-4">
+              <button
+                onClick={handleRetry}
+                className="w-full py-3 bg-[#002147] text-white font-semibold rounded-lg hover:bg-[#001a38] transition-all duration-300 transform hover:scale-105 shadow-lg"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("authData");
+                  window.location.href = "/";
+                }}
+                className="w-full py-3 bg-slate-300 text-slate-800 font-semibold rounded-lg hover:bg-slate-400 transition-all duration-300 shadow-md"
+              >
+                Sign In Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };

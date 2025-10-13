@@ -1,4 +1,5 @@
 "use client"
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,15 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Code, Plus, X } from 'lucide-react';
+import { useCVData } from '../page';
 
 export const SkillsForm = () => {
-  const [skillCategories, setSkillCategories] = useState([
-    { id: '1', name: 'Programming Languages', skills: [] },
-    { id: '2', name: 'Frameworks & Libraries', skills: [] },
-    { id: '3', name: 'Tools & Technologies', skills: [] },
-    { id: '4', name: 'Soft Skills', skills: [] },
-  ]);
-
+  const { cvData, updateCVData } = useCVData();
+  const skillCategories = cvData.skills;
   const [newSkill, setNewSkill] = useState({});
 
   const addSkillCategory = () => {
@@ -23,15 +20,15 @@ export const SkillsForm = () => {
       name: '',
       skills: [],
     };
-    setSkillCategories([...skillCategories, newCategory]);
+    updateCVData('skills', [...skillCategories, newCategory]);
   };
 
   const removeSkillCategory = (id) => {
-    setSkillCategories(skillCategories.filter(category => category.id !== id));
+    updateCVData('skills', skillCategories.filter(category => category.id !== id));
   };
 
   const updateCategoryName = (id, name) => {
-    setSkillCategories(skillCategories.map(category =>
+    updateCVData('skills', skillCategories.map(category =>
       category.id === id ? { ...category, name } : category
     ));
   };
@@ -40,7 +37,7 @@ export const SkillsForm = () => {
     const skill = newSkill[categoryId]?.trim();
     if (!skill) return;
 
-    setSkillCategories(skillCategories.map(category =>
+    updateCVData('skills', skillCategories.map(category =>
       category.id === categoryId
         ? { ...category, skills: [...category.skills, skill] }
         : category
@@ -49,7 +46,7 @@ export const SkillsForm = () => {
   };
 
   const removeSkill = (categoryId, skillIndex) => {
-    setSkillCategories(skillCategories.map(category =>
+    updateCVData('skills', skillCategories.map(category =>
       category.id === categoryId
         ? { ...category, skills: category.skills.filter((_, index) => index !== skillIndex) }
         : category
@@ -76,63 +73,51 @@ export const SkillsForm = () => {
 
       {Array.isArray(skillCategories) &&
         skillCategories.map((category, index) => (
-          // Each Card represents a skill category block
           <Card key={category.id} className="border-cvBorder">
-            
-            {/* Card Header containing title and remove button */}
             <CardHeader>
               <CardTitle className="flex items-center justify-between cv-heading">
                 <div className="flex items-center space-x-2">
                   <Code className="w-5 h-5" />
                   <span>Skill Category {index + 1}</span>
                 </div>
-
-                {/* Show remove button only if there's more than one skill category */}
                 {skillCategories.length > 1 && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeSkillCategory(category.id)} // remove category
+                    onClick={() => removeSkillCategory(category.id)}
                     className="text-red-500 hover:text-red-700 hover:bg-red-50"
                   >
                     <X className="w-4 h-4" />
                   </Button>
                 )}
               </CardTitle>
-
-              {/* Description for this section */}
               <CardDescription className="cv-body">
                 Group related skills together for better organization
               </CardDescription>
             </CardHeader>
-
-            {/* Card Content: form fields for category and skills */}
             <CardContent className="space-y-4">
-
-              {/* Input for category name */}
               <div className="space-y-2">
                 <Label className="cv-heading">Category Name *</Label>
                 <Input
                   value={category.name}
-                  onChange={(e) => updateCategoryName(category.id, e.target.value)} // update category name
+                  onChange={(e) => updateCategoryName(category.id, e.target.value)}
                   placeholder="e.g., Programming Languages, Design Tools, Languages"
                   className="border-cvBorder focus:border-cvAccent"
                 />
               </div>
 
-              {/* Input + Button for adding new skills */}
               <div className="space-y-2">
                 <Label className="cv-heading">Skills</Label>
                 <div className="flex space-x-2">
                   <Input
-                    value={newSkill[category.id] || ''} // dynamic state for each category
-                    onChange={(e) => handleSkillInputChange(category.id, e.target.value)} // update input
-                    onKeyPress={(e) => handleKeyPress(e, category.id)} // allow enter key to add
+                    value={newSkill[category.id] || ''}
+                    onChange={(e) => handleSkillInputChange(category.id, e.target.value)}
+                    onKeyPress={(e) => handleKeyPress(e, category.id)}
                     placeholder="Type a skill and press Enter"
                     className="border-cvBorder focus:border-cvAccent"
                   />
                   <Button
-                    onClick={() => addSkill(category.id)} // add skill to category
+                    onClick={() => addSkill(category.id)}
                     size="sm"
                     className="bg-cvAccent hover:bg-cvAccentHover text-white px-4"
                   >
@@ -141,7 +126,6 @@ export const SkillsForm = () => {
                 </div>
               </div>
 
-              {/* Show added skills as badges, allow click to remove */}
               {category.skills.length > 0 && (
                 <div className="space-y-2">
                   <Label className="cv-heading text-sm">Added Skills:</Label>
@@ -151,10 +135,9 @@ export const SkillsForm = () => {
                         key={skillIndex}
                         variant="secondary"
                         className="bg-cvLightBg text-cvHeading hover:bg-cvAccent hover:text-white cursor-pointer transition-colors group"
-                        onClick={() => removeSkill(category.id, skillIndex)} // remove skill on click
+                        onClick={() => removeSkill(category.id, skillIndex)}
                       >
                         {skill}
-                        {/* Show X icon on hover for better UX */}
                         <X className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Badge>
                     ))}
@@ -162,7 +145,6 @@ export const SkillsForm = () => {
                   <p className="text-xs cv-body">Click on a skill to remove it</p>
                 </div>
               )}
-
             </CardContent>
           </Card>
         ))}

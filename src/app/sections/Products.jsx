@@ -113,7 +113,11 @@ const ProductShowcase = () => {
             whileHover={{ scale: 1.02 }}
           >
             <div className="sm:w-[600px] sm:h-[390px] lg:w-[800px] lg:h-[520px] bg-gradient-to-br from-white to-gray-50 rounded-3xl border-8 border-[#002147] shadow-[12px_12px_30px_0px_rgba(0,0,0,0.4)] relative overflow-hidden left-[150px]">
-              {/* Add your app or mockup content inside here */}
+              <img 
+                src="/desktop.png" 
+                alt="Desktop Application"
+                className="w-full h-full object-cover rounded-2xl"
+              />
             </div>
           </motion.div>
 
@@ -132,10 +136,15 @@ const ProductShowcase = () => {
               {/* Mobile Notch */}
               <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-20 h-6 bg-[#002147] rounded-full z-10"></div>
               
-              {/* Add mobile screen content here */}
+              {/* Mobile Screen Content */}
+              <img 
+                src="/mobile.jpg" 
+                alt="Mobile Application"
+                className="w-full h-full object-cover rounded-2xl"
+              />
               
               {/* Home Indicator */}
-              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-28 h-1 bg-[#002147] rounded-full"></div>
+              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-28 h-1 bg-[#002147] rounded-full z-10"></div>
             </div>
           </motion.div>
         </div>

@@ -569,10 +569,10 @@ export default function IndependentWorkspacePage() {
           </h3>
           <p className="text-sm text-gray-600 mb-4">{error || "Please log in to continue"}</p>
           <Button
-            onClick={() => (window.location.href = "/login")}
+            onClick={() => (window.location.href = "/dashboard")}
             className="bg-[#3598FE] hover:bg-[#2563EB]"
           >
-            Go to Login
+            Go to dashboard
           </Button>
         </Card>
       </div>

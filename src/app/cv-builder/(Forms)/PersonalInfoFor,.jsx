@@ -1,26 +1,20 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Mail, Phone, MapPin, Globe, Linkedin } from 'lucide-react';
+import { useCVData } from '../page';
 
-export const PersonalInfoForm= () => {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    location: '',
-    website: '',
-    linkedin: '',
-    summary: '',
-  });
+export const PersonalInfoForm = () => {
+  const { cvData, updateCVData } = useCVData();
+  const data = cvData.personal;
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    updateCVData('personal', { ...data, [field]: value });
   };
 
   return (
@@ -46,7 +40,7 @@ export const PersonalInfoForm= () => {
               <Label htmlFor="fullName" className="cv-heading">Full Name *</Label>
               <Input
                 id="fullName"
-                value={formData.fullName}
+                value={data.fullName}
                 onChange={(e) => handleInputChange('fullName', e.target.value)}
                 placeholder="John Doe"
                 className="border-cvBorder focus:border-cvAccent"
@@ -59,7 +53,7 @@ export const PersonalInfoForm= () => {
                 <Input
                   id="email"
                   type="email"
-                  value={formData.email}
+                  value={data.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="john@example.com"
                   className="pl-10 border-cvBorder focus:border-cvAccent"
@@ -75,7 +69,7 @@ export const PersonalInfoForm= () => {
                 <Phone className="absolute left-3 top-3 w-4 h-4 cv-body" />
                 <Input
                   id="phone"
-                  value={formData.phone}
+                  value={data.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="+1 (555) 123-4567"
                   className="pl-10 border-cvBorder focus:border-cvAccent"
@@ -88,7 +82,7 @@ export const PersonalInfoForm= () => {
                 <MapPin className="absolute left-3 top-3 w-4 h-4 cv-body" />
                 <Input
                   id="location"
-                  value={formData.location}
+                  value={data.location}
                   onChange={(e) => handleInputChange('location', e.target.value)}
                   placeholder="New York, NY"
                   className="pl-10 border-cvBorder focus:border-cvAccent"
@@ -104,7 +98,7 @@ export const PersonalInfoForm= () => {
                 <Globe className="absolute left-3 top-3 w-4 h-4 cv-body" />
                 <Input
                   id="website"
-                  value={formData.website}
+                  value={data.website}
                   onChange={(e) => handleInputChange('website', e.target.value)}
                   placeholder="https://johndoe.com"
                   className="pl-10 border-cvBorder focus:border-cvAccent"
@@ -117,7 +111,7 @@ export const PersonalInfoForm= () => {
                 <Linkedin className="absolute left-3 top-3 w-4 h-4 cv-body" />
                 <Input
                   id="linkedin"
-                  value={formData.linkedin}
+                  value={data.linkedin}
                   onChange={(e) => handleInputChange('linkedin', e.target.value)}
                   placeholder="linkedin.com/in/johndoe"
                   className="pl-10 border-cvBorder focus:border-cvAccent"
@@ -130,7 +124,7 @@ export const PersonalInfoForm= () => {
             <Label htmlFor="summary" className="cv-heading">Professional Summary</Label>
             <Textarea
               id="summary"
-              value={formData.summary}
+              value={data.summary}
               onChange={(e) => handleInputChange('summary', e.target.value)}
               placeholder="A brief 2-3 sentence summary of your background, key skills, and career objectives..."
               className="min-h-[100px] border-cvBorder focus:border-cvAccent resize-none"
