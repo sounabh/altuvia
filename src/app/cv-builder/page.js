@@ -1,15 +1,19 @@
+// page.jsx - FIXED VERSION FOR NEXT.JS 15
 "use client";
 
 import React, { useState, createContext, useContext, useEffect } from "react";
+import dynamic from 'next/dynamic';
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { CVBuilder } from "./components/CVBuilder";
 import { PreviewPanel } from "./components/PreviewPanel";
-import { AIAssistant } from "./components/AIssitant";
-import { SmartTipsPanel } from "./components/SmartTipsPanel";
+import SmartTipsPanel from "./components/SmartTipsPanel";
 import { VersionManager } from "./components/VersionManager";
 import { VersionSaveDialog } from "./components/VersionSavedDialog";
 import { toast } from "sonner";
+
+// Regular import - should work in Next.js 15 if component is properly configured
+import AIAnalysisChatPopup from "./components/AIAnalysisChatPopup";
 
 // Context for CV Data
 export const CVDataContext = createContext();
@@ -20,10 +24,11 @@ export const useCVData = () => {
   return context;
 };
 
-// Utility function to generate unique CV number
 const generateUniqueCVNumber = (userId) => {
   const userIdPart = userId.slice(-6);
-  const randomPart = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
+  const randomPart = Math.floor(Math.random() * 9999)
+    .toString()
+    .padStart(4, "0");
   const timestamp = Date.now().toString().slice(-4);
   return `${userIdPart}${timestamp}${randomPart}`;
 };
@@ -35,7 +40,13 @@ const Index = () => {
   const [userEmail, setUserEmail] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showVersionDialog, setShowVersionDialog] = useState(false);
-  
+
+  // AI-related states
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [atsScore, setAtsScore] = useState(null);
+  const [showAIChat, setShowAIChat] = useState(false);
+
   const [cvData, setCvData] = useState({
     personal: {
       fullName: "",
@@ -117,7 +128,6 @@ const Index = () => {
   const [activeSection, setActiveSection] = useState("personal");
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showVersionManager, setShowVersionManager] = useState(false);
 
   // Initialize from localStorage on mount
@@ -127,10 +137,10 @@ const Index = () => {
       if (authData?.userId) {
         setUserId(authData.userId);
         setUserEmail(authData.email);
-        
+
         const savedCVId = localStorage.getItem("currentCVId");
         const savedCVNumber = localStorage.getItem("currentCVNumber");
-        
+
         if (savedCVId && savedCVNumber) {
           setCurrentCVId(savedCVId);
           setCvNumber(savedCVNumber);
@@ -150,10 +160,10 @@ const Index = () => {
     try {
       const authData = localStorage.getItem("authData");
       if (authData) return JSON.parse(authData);
-      
+
       const sessionAuth = sessionStorage.getItem("authData");
       if (sessionAuth) return JSON.parse(sessionAuth);
-      
+
       return null;
     } catch (error) {
       console.error("Error parsing auth data:", error);
@@ -162,8 +172,12 @@ const Index = () => {
   };
 
   const getAuthEmail = () => {
-    const authData = getAuthData();
-    return authData?.email || null;
+    try {
+      const authData = getAuthData();
+      return authData?.email || null;
+    } catch (error) {
+      return null;
+    }
   };
 
   const loadCVData = async (cvId) => {
@@ -171,66 +185,91 @@ const Index = () => {
       const userEmail = getAuthEmail();
       if (!userEmail) return;
 
-      const response = await fetch(`/api/cv/save?cvId=${cvId}&userEmail=${userEmail}`);
-      const result = await response.json();
+      const response = await fetch(
+        `/api/cv/save?cvId=${cvId}&userEmail=${userEmail}`
+      );
+
+      if (!response.ok) {
+        // Don't show error for new CVs, just silently return
+        if (response.status === 404) {
+          console.log("No existing CV data found - this is expected for new CVs");
+          return;
+        }
+        console.error("Failed to load CV data");
+        return;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        console.error("Empty response from server");
+        return;
+      }
+
+      const result = JSON.parse(text);
 
       if (result.success && result.cv) {
         setCvData({
           personal: result.cv.personalInfo || cvData.personal,
-          education: result.cv.educations?.map(edu => ({
-            id: edu.id,
-            institution: edu.institution,
-            degree: edu.degree,
-            field: edu.fieldOfStudy,
-            startDate: edu.startDate,
-            endDate: edu.endDate,
-            gpa: edu.gpa,
-            description: edu.description,
-          })) || cvData.education,
-          experience: result.cv.experiences?.map(exp => ({
-            id: exp.id,
-            company: exp.company,
-            position: exp.position,
-            location: exp.location,
-            startDate: exp.startDate,
-            endDate: exp.endDate,
-            isCurrentRole: exp.isCurrent,
-            description: exp.description,
-          })) || cvData.experience,
-          projects: result.cv.projects?.map(proj => ({
-            id: proj.id,
-            name: proj.name,
-            description: proj.description,
-            technologies: proj.technologies?.join(", "),
-            startDate: proj.startDate,
-            endDate: proj.endDate,
-            githubUrl: proj.githubUrl,
-            liveUrl: proj.liveUrl,
-            achievements: proj.achievements?.join(", "),
-          })) || cvData.projects,
-          skills: result.cv.skills?.map(skill => ({
-            id: skill.id,
-            name: skill.categoryName,
-            skills: skill.skills,
-          })) || cvData.skills,
-          achievements: result.cv.achievements?.map(ach => ({
-            id: ach.id,
-            title: ach.title,
-            organization: ach.organization,
-            date: ach.date,
-            type: ach.type,
-            description: ach.description,
-          })) || cvData.achievements,
-          volunteer: result.cv.volunteers?.map(vol => ({
-            id: vol.id,
-            organization: vol.organization,
-            role: vol.role,
-            location: vol.location,
-            startDate: vol.startDate,
-            endDate: vol.endDate,
-            description: vol.description,
-            impact: vol.impact,
-          })) || cvData.volunteer,
+          education:
+            result.cv.educations?.map((edu) => ({
+              id: edu.id,
+              institution: edu.institution,
+              degree: edu.degree,
+              field: edu.fieldOfStudy,
+              startDate: edu.startDate,
+              endDate: edu.endDate,
+              gpa: edu.gpa,
+              description: edu.description,
+            })) || cvData.education,
+          experience:
+            result.cv.experiences?.map((exp) => ({
+              id: exp.id,
+              company: exp.company,
+              position: exp.position,
+              location: exp.location,
+              startDate: exp.startDate,
+              endDate: exp.endDate,
+              isCurrentRole: exp.isCurrent,
+              description: exp.description,
+            })) || cvData.experience,
+          projects:
+            result.cv.projects?.map((proj) => ({
+              id: proj.id,
+              name: proj.name,
+              description: proj.description,
+              technologies: proj.technologies?.join(", "),
+              startDate: proj.startDate,
+              endDate: proj.endDate,
+              githubUrl: proj.githubUrl,
+              liveUrl: proj.liveUrl,
+              achievements: proj.achievements?.join(", "),
+            })) || cvData.projects,
+          skills:
+            result.cv.skills?.map((skill) => ({
+              id: skill.id,
+              name: skill.categoryName,
+              skills: skill.skills,
+            })) || cvData.skills,
+          achievements:
+            result.cv.achievements?.map((ach) => ({
+              id: ach.id,
+              title: ach.title,
+              organization: ach.organization,
+              date: ach.date,
+              type: ach.type,
+              description: ach.description,
+            })) || cvData.achievements,
+          volunteer:
+            result.cv.volunteers?.map((vol) => ({
+              id: vol.id,
+              organization: vol.organization,
+              role: vol.role,
+              location: vol.location,
+              startDate: vol.startDate,
+              endDate: vol.endDate,
+              description: vol.description,
+              impact: vol.impact,
+            })) || cvData.volunteer,
         });
 
         if (result.cv.templateId) {
@@ -247,6 +286,78 @@ const Index = () => {
       ...prev,
       [section]: data,
     }));
+  };
+
+  /**
+   * ENHANCED AI ANALYSIS - Comprehensive and Realistic
+   */
+  const handleAnalyzeCV = async () => {
+    setIsAnalyzing(true);
+
+    try {
+      const response = await fetch("/api/cv/ai-analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cvData,
+          analysisType: "comprehensive",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Analysis failed");
+      }
+
+      const data = await response.json();
+
+      setAiAnalysis(data);
+      setAtsScore(data.atsScore);
+
+      toast.success("CV analysis completed!", {
+        description: `Overall Score: ${data.overallAnalysis.overallScore}% | ATS Score: ${data.atsScore}%`,
+      });
+    } catch (error) {
+      console.error("Analysis error:", error);
+      toast.error("Failed to analyze CV. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleOpenAIChat = () => {
+    // Check if there's any CV data before opening chat
+    const hasPersonalInfo = cvData.personal && (
+      cvData.personal.fullName || 
+      cvData.personal.email || 
+      cvData.personal.summary
+    );
+    
+    const hasEducation = cvData.education && cvData.education.some(edu => 
+      edu.institution || edu.degree || edu.field
+    );
+    
+    const hasExperience = cvData.experience && cvData.experience.some(exp => 
+      exp.company || exp.position || exp.description
+    );
+    
+    const hasProjects = cvData.projects && cvData.projects.some(proj => 
+      proj.name || proj.description
+    );
+    
+    const hasSkills = cvData.skills && cvData.skills.some(skill => 
+      skill.skills && skill.skills.length > 0
+    );
+    
+    const hasAnyData = hasPersonalInfo || hasEducation || hasExperience || hasProjects || hasSkills;
+    
+    if (!hasAnyData) {
+      toast.error("Please add some CV data before using AI Chat", {
+        description: "Start by filling in your personal information or any other section"
+      });
+      return;
+    }
+    
+    setShowAIChat(true);
   };
 
   const handleSaveClick = () => {
@@ -294,7 +405,9 @@ const Index = () => {
         }
 
         const action = currentCVId ? "updated" : "created";
-        toast.success(`CV ${action} successfully as version: ${versionInfo.versionName}`);
+        toast.success(
+          `CV ${action} successfully as version: ${versionInfo.versionName}`
+        );
       } else {
         throw new Error(result.error || "Failed to save CV");
       }
@@ -318,6 +431,10 @@ const Index = () => {
     setCvNumber(uniqueNumber);
     localStorage.setItem("currentCVNumber", uniqueNumber);
 
+    // Reset AI analysis
+    setAiAnalysis(null);
+    setAtsScore(null);
+
     setCvData({
       personal: {
         fullName: "",
@@ -328,60 +445,72 @@ const Index = () => {
         linkedin: "",
         summary: "",
       },
-      education: [{
-        id: Date.now().toString(),
-        institution: "",
-        degree: "",
-        field: "",
-        startDate: "",
-        endDate: "",
-        gpa: "",
-        description: "",
-      }],
-      experience: [{
-        id: Date.now().toString(),
-        company: "",
-        position: "",
-        location: "",
-        startDate: "",
-        endDate: "",
-        isCurrentRole: false,
-        description: "",
-      }],
-      projects: [{
-        id: Date.now().toString(),
-        name: "",
-        description: "",
-        technologies: "",
-        startDate: "",
-        endDate: "",
-        githubUrl: "",
-        liveUrl: "",
-        achievements: "",
-      }],
-      skills: [{
-        id: Date.now().toString(),
-        name: "Programming Languages",
-        skills: [],
-      }],
-      achievements: [{
-        id: Date.now().toString(),
-        title: "",
-        organization: "",
-        date: "",
-        type: "",
-        description: "",
-      }],
-      volunteer: [{
-        id: Date.now().toString(),
-        organization: "",
-        role: "",
-        location: "",
-        startDate: "",
-        endDate: "",
-        description: "",
-        impact: "",
-      }],
+      education: [
+        {
+          id: Date.now().toString(),
+          institution: "",
+          degree: "",
+          field: "",
+          startDate: "",
+          endDate: "",
+          gpa: "",
+          description: "",
+        },
+      ],
+      experience: [
+        {
+          id: Date.now().toString(),
+          company: "",
+          position: "",
+          location: "",
+          startDate: "",
+          endDate: "",
+          isCurrentRole: false,
+          description: "",
+        },
+      ],
+      projects: [
+        {
+          id: Date.now().toString(),
+          name: "",
+          description: "",
+          technologies: "",
+          startDate: "",
+          endDate: "",
+          githubUrl: "",
+          liveUrl: "",
+          achievements: "",
+        },
+      ],
+      skills: [
+        {
+          id: Date.now().toString(),
+          name: "Programming Languages",
+          skills: [],
+        },
+      ],
+      achievements: [
+        {
+          id: Date.now().toString(),
+          title: "",
+          organization: "",
+          date: "",
+          type: "",
+          description: "",
+        },
+      ],
+      volunteer: [
+        {
+          id: Date.now().toString(),
+          organization: "",
+          role: "",
+          location: "",
+          startDate: "",
+          endDate: "",
+          description: "",
+          impact: "",
+        },
+      ],
     });
 
     setActiveSection("personal");
@@ -397,19 +526,19 @@ const Index = () => {
     try {
       toast.info("Generating PDF...");
       const response = await fetch(`/api/cv/export-pdf?cvId=${currentCVId}`);
-      
+
       if (!response.ok) throw new Error("Failed to generate PDF");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `CV-${cvNumber}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       toast.success("PDF exported successfully!");
     } catch (error) {
       console.error("Export error:", error);
@@ -420,28 +549,47 @@ const Index = () => {
   const handleLoadVersion = (version) => {
     try {
       const newCvData = {
-        personal: version.personalInfoSnapshot ? JSON.parse(version.personalInfoSnapshot) : cvData.personal,
-        education: version.educationSnapshot ? JSON.parse(version.educationSnapshot) : cvData.education,
-        experience: version.experienceSnapshot ? JSON.parse(version.experienceSnapshot) : cvData.experience,
-        projects: version.projectsSnapshot ? JSON.parse(version.projectsSnapshot) : cvData.projects,
-        skills: version.skillsSnapshot ? JSON.parse(version.skillsSnapshot) : cvData.skills,
-        achievements: version.achievementsSnapshot ? JSON.parse(version.achievementsSnapshot) : cvData.achievements,
-        volunteer: version.volunteerSnapshot ? JSON.parse(version.volunteerSnapshot) : cvData.volunteer,
+        personal: version.personalInfoSnapshot
+          ? JSON.parse(version.personalInfoSnapshot)
+          : cvData.personal,
+        education: version.educationSnapshot
+          ? JSON.parse(version.educationSnapshot)
+          : cvData.education,
+        experience: version.experienceSnapshot
+          ? JSON.parse(version.experienceSnapshot)
+          : cvData.experience,
+        projects: version.projectsSnapshot
+          ? JSON.parse(version.projectsSnapshot)
+          : cvData.projects,
+        skills: version.skillsSnapshot
+          ? JSON.parse(version.skillsSnapshot)
+          : cvData.skills,
+        achievements: version.achievementsSnapshot
+          ? JSON.parse(version.achievementsSnapshot)
+          : cvData.achievements,
+        volunteer: version.volunteerSnapshot
+          ? JSON.parse(version.volunteerSnapshot)
+          : cvData.volunteer,
       };
 
       setCvData(newCvData);
-      
+
       if (version.templateId) {
         setSelectedTemplate(version.templateId);
       }
 
-      // If loading a version from a different CV, switch to that CV
+      // Reset AI analysis when loading a version
+      setAiAnalysis(null);
+      setAtsScore(null);
+
       if (version.cvId !== currentCVId) {
         setCurrentCVId(version.cvId);
         setCvNumber(version.cvSlug);
         localStorage.setItem("currentCVId", version.cvId);
         localStorage.setItem("currentCVNumber", version.cvSlug);
-        toast.success(`Switched to CV #${version.cvSlug} and loaded version: ${version.versionLabel}`);
+        toast.success(
+          `Switched to CV #${version.cvSlug} and loaded version: ${version.versionLabel}`
+        );
       } else {
         toast.success(`Loaded version: ${version.versionLabel}`);
       }
@@ -459,7 +607,7 @@ const Index = () => {
         <Header
           onPreviewToggle={() => setIsPreviewMode(!isPreviewMode)}
           isPreviewMode={isPreviewMode}
-          onAIToggle={() => setShowAIAssistant(!showAIAssistant)}
+          onAIToggle={() => {}}
           onVersionToggle={() => setShowVersionManager(!showVersionManager)}
           onSave={handleSaveClick}
           onNewCV={handleNewCV}
@@ -468,26 +616,51 @@ const Index = () => {
           cvData={cvData}
           selectedTemplate={selectedTemplate}
           isSaving={isSaving}
+          isAnalyzing={isAnalyzing}
+          atsScore={atsScore}
+          onOpenAIChat={handleOpenAIChat}
         />
 
         <div className="flex h-[calc(100vh-80px)]">
-          <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+          <Sidebar
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+          />
 
           <div className="flex-1 flex">
-            <div className={`transition-all duration-300 ${isPreviewMode ? "w-1/2" : "flex-1"}`}>
-              <CVBuilder activeSection={activeSection} onSectionChange={setActiveSection} />
+            <div
+              className={`transition-all duration-300 ${
+                isPreviewMode ? "w-1/2" : "flex-1"
+              }`}
+            >
+              <CVBuilder
+                activeSection={activeSection}
+                onSectionChange={setActiveSection}
+              />
             </div>
 
             {isPreviewMode && (
               <div className="w-1/2 border-l border-cvBorder">
-                <PreviewPanel selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
+                <PreviewPanel
+                  selectedTemplate={selectedTemplate}
+                  onTemplateChange={setSelectedTemplate}
+                />
               </div>
             )}
           </div>
 
-          {showAIAssistant && <AIAssistant onClose={() => setShowAIAssistant(false)} />}
+          {/* AI Chat Popup */}
+          {showAIChat && (
+            <AIAnalysisChatPopup
+              onClose={() => setShowAIChat(false)}
+              cvData={cvData}
+              activeSection={activeSection}
+            />
+          )}
+
+          {/* Version Manager */}
           {showVersionManager && (
-            <VersionManager 
+            <VersionManager
               onClose={() => setShowVersionManager(false)}
               cvId={currentCVId}
               onLoadVersion={handleLoadVersion}
@@ -495,15 +668,26 @@ const Index = () => {
             />
           )}
 
-          <SmartTipsPanel activeSection={activeSection} isVisible={!isPreviewMode} />
+          {/* Smart Tips Panel */}
+          <SmartTipsPanel
+            activeSection={activeSection}
+            isVisible={!isPreviewMode}
+            cvData={cvData}
+            aiAnalysis={aiAnalysis}
+            isAnalyzing={isAnalyzing}
+            onRequestAnalysis={handleAnalyzeCV}
+          />
         </div>
 
-        <VersionSaveDialog
-          isOpen={showVersionDialog}
-          onClose={() => setShowVersionDialog(false)}
-          onSave={handleSaveWithVersion}
-          currentVersionName=""
-        />
+        {/* Version Save Dialog */}
+        {showVersionDialog && (
+          <VersionSaveDialog
+            isOpen={showVersionDialog}
+            onClose={() => setShowVersionDialog(false)}
+            onSave={handleSaveWithVersion}
+            currentVersionName=""
+          />
+        )}
       </div>
     </CVDataContext.Provider>
   );
