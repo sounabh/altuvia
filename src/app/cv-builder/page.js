@@ -1,4 +1,4 @@
-// page.jsx - FIXED VERSION FOR NEXT.JS 15
+// page.jsx - FIXED VERSION WITH PROPER ERROR HANDLING
 "use client";
 
 import React, { useState, createContext, useContext, useEffect } from "react";
@@ -11,9 +11,7 @@ import SmartTipsPanel from "./components/SmartTipsPanel";
 import { VersionManager } from "./components/VersionManager";
 import { VersionSaveDialog } from "./components/VersionSavedDialog";
 import { toast } from "sonner";
-
-// Regular import - should work in Next.js 15 if component is properly configured
-import AIAnalysisChatPopup from "./components/AIAnalysisChatPopup";
+import AIAnalysisChatPopup from "./components/AiAnalysisChatPopup";
 
 // Context for CV Data
 export const CVDataContext = createContext();
@@ -180,104 +178,127 @@ const Index = () => {
     }
   };
 
+  // FIXED: Proper CV Data Loading with Better Error Handling
   const loadCVData = async (cvId) => {
     try {
       const userEmail = getAuthEmail();
-      if (!userEmail) return;
+      if (!userEmail) {
+        console.log("No user email found - skipping CV load");
+        return;
+      }
 
       const response = await fetch(
-        `/api/cv/save?cvId=${cvId}&userEmail=${userEmail}`
+        `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(userEmail)}`
       );
 
+      // Handle 404 gracefully for new CVs
+      if (response.status === 404) {
+        console.log("No existing CV found - this is normal for new CVs");
+        return;
+      }
+
+      // Handle other errors
       if (!response.ok) {
-        // Don't show error for new CVs, just silently return
-        if (response.status === 404) {
-          console.log("No existing CV data found - this is expected for new CVs");
-          return;
-        }
-        console.error("Failed to load CV data");
+        console.warn(`Failed to load CV: ${response.status}`);
         return;
       }
 
       const text = await response.text();
-      if (!text) {
-        console.error("Empty response from server");
+      
+      // Handle empty response
+      if (!text || text.trim() === '') {
+        console.log("Empty response - no CV data available");
         return;
       }
 
-      const result = JSON.parse(text);
-
-      if (result.success && result.cv) {
-        setCvData({
-          personal: result.cv.personalInfo || cvData.personal,
-          education:
-            result.cv.educations?.map((edu) => ({
-              id: edu.id,
-              institution: edu.institution,
-              degree: edu.degree,
-              field: edu.fieldOfStudy,
-              startDate: edu.startDate,
-              endDate: edu.endDate,
-              gpa: edu.gpa,
-              description: edu.description,
-            })) || cvData.education,
-          experience:
-            result.cv.experiences?.map((exp) => ({
-              id: exp.id,
-              company: exp.company,
-              position: exp.position,
-              location: exp.location,
-              startDate: exp.startDate,
-              endDate: exp.endDate,
-              isCurrentRole: exp.isCurrent,
-              description: exp.description,
-            })) || cvData.experience,
-          projects:
-            result.cv.projects?.map((proj) => ({
-              id: proj.id,
-              name: proj.name,
-              description: proj.description,
-              technologies: proj.technologies?.join(", "),
-              startDate: proj.startDate,
-              endDate: proj.endDate,
-              githubUrl: proj.githubUrl,
-              liveUrl: proj.liveUrl,
-              achievements: proj.achievements?.join(", "),
-            })) || cvData.projects,
-          skills:
-            result.cv.skills?.map((skill) => ({
-              id: skill.id,
-              name: skill.categoryName,
-              skills: skill.skills,
-            })) || cvData.skills,
-          achievements:
-            result.cv.achievements?.map((ach) => ({
-              id: ach.id,
-              title: ach.title,
-              organization: ach.organization,
-              date: ach.date,
-              type: ach.type,
-              description: ach.description,
-            })) || cvData.achievements,
-          volunteer:
-            result.cv.volunteers?.map((vol) => ({
-              id: vol.id,
-              organization: vol.organization,
-              role: vol.role,
-              location: vol.location,
-              startDate: vol.startDate,
-              endDate: vol.endDate,
-              description: vol.description,
-              impact: vol.impact,
-            })) || cvData.volunteer,
-        });
-
-        if (result.cv.templateId) {
-          setSelectedTemplate(result.cv.templateId);
-        }
+      // Parse JSON safely
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Failed to parse CV data:", parseError);
+        return;
       }
+
+      // Validate result structure
+      if (!result.success || !result.cv) {
+        console.log("Invalid CV data structure received");
+        return;
+      }
+
+      // Update CV data with loaded content
+      setCvData({
+        personal: result.cv.personalInfo || cvData.personal,
+        education:
+          result.cv.educations?.map((edu) => ({
+            id: edu.id,
+            institution: edu.institution || "",
+            degree: edu.degree || "",
+            field: edu.fieldOfStudy || "",
+            startDate: edu.startDate || "",
+            endDate: edu.endDate || "",
+            gpa: edu.gpa || "",
+            description: edu.description || "",
+          })) || cvData.education,
+        experience:
+          result.cv.experiences?.map((exp) => ({
+            id: exp.id,
+            company: exp.company || "",
+            position: exp.position || "",
+            location: exp.location || "",
+            startDate: exp.startDate || "",
+            endDate: exp.endDate || "",
+            isCurrentRole: exp.isCurrent || false,
+            description: exp.description || "",
+          })) || cvData.experience,
+        projects:
+          result.cv.projects?.map((proj) => ({
+            id: proj.id,
+            name: proj.name || "",
+            description: proj.description || "",
+            technologies: proj.technologies?.join(", ") || "",
+            startDate: proj.startDate || "",
+            endDate: proj.endDate || "",
+            githubUrl: proj.githubUrl || "",
+            liveUrl: proj.liveUrl || "",
+            achievements: proj.achievements?.join(", ") || "",
+          })) || cvData.projects,
+        skills:
+          result.cv.skills?.map((skill) => ({
+            id: skill.id,
+            name: skill.categoryName || "",
+            skills: skill.skills || [],
+          })) || cvData.skills,
+        achievements:
+          result.cv.achievements?.map((ach) => ({
+            id: ach.id,
+            title: ach.title || "",
+            organization: ach.organization || "",
+            date: ach.date || "",
+            type: ach.type || "",
+            description: ach.description || "",
+          })) || cvData.achievements,
+        volunteer:
+          result.cv.volunteers?.map((vol) => ({
+            id: vol.id,
+            organization: vol.organization || "",
+            role: vol.role || "",
+            location: vol.location || "",
+            startDate: vol.startDate || "",
+            endDate: vol.endDate || "",
+            description: vol.description || "",
+            impact: vol.impact || "",
+          })) || cvData.volunteer,
+      });
+
+      if (result.cv.templateId) {
+        setSelectedTemplate(result.cv.templateId);
+      }
+
+      console.log("CV data loaded successfully");
     } catch (error) {
       console.error("Error loading CV data:", error);
+      // Don't show error toast for failed loads - just log
     }
   };
 
@@ -288,9 +309,6 @@ const Index = () => {
     }));
   };
 
-  /**
-   * ENHANCED AI ANALYSIS - Comprehensive and Realistic
-   */
   const handleAnalyzeCV = async () => {
     setIsAnalyzing(true);
 
@@ -325,38 +343,6 @@ const Index = () => {
   };
 
   const handleOpenAIChat = () => {
-    // Check if there's any CV data before opening chat
-    const hasPersonalInfo = cvData.personal && (
-      cvData.personal.fullName || 
-      cvData.personal.email || 
-      cvData.personal.summary
-    );
-    
-    const hasEducation = cvData.education && cvData.education.some(edu => 
-      edu.institution || edu.degree || edu.field
-    );
-    
-    const hasExperience = cvData.experience && cvData.experience.some(exp => 
-      exp.company || exp.position || exp.description
-    );
-    
-    const hasProjects = cvData.projects && cvData.projects.some(proj => 
-      proj.name || proj.description
-    );
-    
-    const hasSkills = cvData.skills && cvData.skills.some(skill => 
-      skill.skills && skill.skills.length > 0
-    );
-    
-    const hasAnyData = hasPersonalInfo || hasEducation || hasExperience || hasProjects || hasSkills;
-    
-    if (!hasAnyData) {
-      toast.error("Please add some CV data before using AI Chat", {
-        description: "Start by filling in your personal information or any other section"
-      });
-      return;
-    }
-    
     setShowAIChat(true);
   };
 
@@ -431,7 +417,6 @@ const Index = () => {
     setCvNumber(uniqueNumber);
     localStorage.setItem("currentCVNumber", uniqueNumber);
 
-    // Reset AI analysis
     setAiAnalysis(null);
     setAtsScore(null);
 
@@ -578,7 +563,6 @@ const Index = () => {
         setSelectedTemplate(version.templateId);
       }
 
-      // Reset AI analysis when loading a version
       setAiAnalysis(null);
       setAtsScore(null);
 
@@ -649,7 +633,6 @@ const Index = () => {
             )}
           </div>
 
-          {/* AI Chat Popup */}
           {showAIChat && (
             <AIAnalysisChatPopup
               onClose={() => setShowAIChat(false)}
@@ -658,7 +641,6 @@ const Index = () => {
             />
           )}
 
-          {/* Version Manager */}
           {showVersionManager && (
             <VersionManager
               onClose={() => setShowVersionManager(false)}
@@ -668,7 +650,6 @@ const Index = () => {
             />
           )}
 
-          {/* Smart Tips Panel */}
           <SmartTipsPanel
             activeSection={activeSection}
             isVisible={!isPreviewMode}
@@ -679,7 +660,6 @@ const Index = () => {
           />
         </div>
 
-        {/* Version Save Dialog */}
         {showVersionDialog && (
           <VersionSaveDialog
             isOpen={showVersionDialog}

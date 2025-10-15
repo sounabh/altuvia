@@ -1,23 +1,23 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Loader2, Copy, Check, Sparkles } from 'lucide-react';
+import { X, Send, Loader2, Copy, Check, Sparkles, Download, CheckCircle } from 'lucide-react';
+import { useCVData } from '../page';
+import { toast } from 'sonner';
 
-const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
+export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) {
+  const { updateCVData } = useCVData();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [analysisMode, setAnalysisMode] = useState(null);
-  const [detailedAnalysis, setDetailedAnalysis] = useState(null);
-  const [selectedSection, setSelectedSection] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Check CV data completeness on mount
   useEffect(() => {
     const initialMessage = generateInitialMessage();
     setMessages([initialMessage]);
+    inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -32,21 +32,40 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
     const filledSections = checkFilledSections();
     const emptySections = checkEmptySections();
     
-    let greeting = 'Hello! I\'m your AI CV Assistant. ';
+    let greeting = '👋 Hello! I\'m your AI CV Assistant.\n\n';
     
     if (filledSections.length === 0) {
       greeting += '🚀 I see you\'re just starting your CV. Let me help you build an impressive resume!\n\n';
-      greeting += '**Quick Start Tips:**\n';
-      greeting += '• Start with Personal Information (name, email, summary)\n';
-      greeting += '• Add your work experience or education\n';
-      greeting += '• Include relevant skills and projects\n\n';
-      greeting += 'Once you add some content, I can analyze it and provide detailed feedback!';
+      greeting += '**I can help you with:**\n';
+      greeting += '• Write professional summaries and descriptions\n';
+      greeting += '• Generate content for any section\n';
+      greeting += '• Analyze and improve your CV\n';
+      greeting += '• Answer any CV or career questions\n';
+      greeting += '• Optimize for ATS systems\n\n';
+      greeting += '**Try asking me:**\n';
+      greeting += '• "Write me a professional summary"\n';
+      greeting += '• "How do I make my resume stand out?"\n';
+      greeting += '• "Generate bullet points for my experience"\n';
+      greeting += '• Or any other question!\n\n';
+      greeting += '💬 What would you like help with today?';
     } else if (emptySections.length > 0) {
-      greeting += `I can see you've filled in: **${filledSections.join(', ')}**. Great start! 🎉\n\n`;
-      greeting += `**Missing sections:** ${emptySections.join(', ')}\n\n`;
-      greeting += 'I can analyze what you have and suggest improvements, or help you fill in the missing sections. What would you like to do?';
+      greeting += `Great! I can see you've filled in: **${filledSections.join(', ')}**. 🎉\n\n`;
+      greeting += `**Still need:** ${emptySections.join(', ')}\n\n`;
+      greeting += '**I can help you:**\n';
+      greeting += '• Analyze what you have and suggest improvements\n';
+      greeting += '• Generate content for missing sections\n';
+      greeting += '• Improve your writing and language\n';
+      greeting += '• Answer any questions about CV best practices\n\n';
+      greeting += '💬 What would you like me to do?';
     } else {
-      greeting += 'Your CV looks complete! I can provide a comprehensive analysis. What would you like me to do?';
+      greeting += 'Your CV looks complete! 🎉\n\n';
+      greeting += '**I can help you:**\n';
+      greeting += '• Analyze your full CV comprehensively\n';
+      greeting += '• Improve specific sections\n';
+      greeting += '• Optimize for ATS\n';
+      greeting += '• Tailor for specific roles\n';
+      greeting += '• Answer any career or CV questions\n\n';
+      greeting += '💬 What would you like help with?';
     }
     
     return {
@@ -92,233 +111,52 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
   };
 
   const quickActions = [
-    { label: 'Analyze Full CV', value: 'full', icon: '📊' },
-    { label: 'Analyze Current Section', value: 'section', icon: '📝' },
-    { label: 'ATS Optimization', value: 'ats', icon: '🎯' },
-    { label: 'Content Suggestions', value: 'suggestions', icon: '💡' }
+    { 
+      label: 'Write Professional Summary', 
+      prompt: 'Write me a compelling professional summary based on my background',
+      icon: '✍️' 
+    },
+    { 
+      label: 'Analyze My CV', 
+      prompt: 'Analyze my entire CV and give me detailed feedback on all sections',
+      icon: '📊' 
+    },
+    { 
+      label: 'Improve Current Section', 
+      prompt: `Analyze my ${activeSection} section and suggest specific improvements`,
+      icon: '🔧' 
+    },
+    { 
+      label: 'Generate Bullet Points', 
+      prompt: `Generate professional bullet points for my ${activeSection} section`,
+      icon: '📝' 
+    },
+    { 
+      label: 'ATS Optimization Tips', 
+      prompt: 'How can I optimize my CV for Applicant Tracking Systems?',
+      icon: '🎯' 
+    },
+    { 
+      label: 'Career Advice', 
+      prompt: 'Give me advice on how to improve my career prospects',
+      icon: '💡' 
+    }
   ];
 
-  const handleQuickAction = async (action) => {
-    const filledSections = checkFilledSections();
-    
-    // Check if there's enough data for the requested action
-    if (action === 'full' && filledSections.length === 0) {
-      addMessage({
-        role: 'assistant',
-        content: '⚠️ I need some CV data to perform a full analysis. Please fill in at least one section (Personal Info, Experience, or Education) and try again.'
-      });
-      return;
-    }
-
-    if (action === 'section') {
-      const sectionMap = {
-        personal: 'Personal Info',
-        education: 'Education',
-        experience: 'Experience',
-        projects: 'Projects',
-        skills: 'Skills',
-        achievements: 'Achievements',
-        volunteer: 'Volunteer'
-      };
-      
-      if (!filledSections.includes(sectionMap[activeSection])) {
-        addMessage({
-          role: 'assistant',
-          content: `⚠️ The ${activeSection} section is empty. Please add some content to this section first, then I can analyze it for you.`
-        });
-        return;
-      }
-    }
-
-    let prompt = '';
-    
-    switch(action) {
-      case 'full':
-        prompt = 'Analyze my entire CV comprehensively, section by section';
-        setAnalysisMode('full');
-        break;
-      case 'section':
-        prompt = `Analyze and provide detailed feedback on my ${activeSection} section with specific improvements`;
-        setAnalysisMode('section');
-        break;
-      case 'ats':
-        prompt = 'Analyze my CV for ATS optimization and provide keyword recommendations';
-        setAnalysisMode('ats');
-        break;
-      case 'suggestions':
-        prompt = `Provide specific content suggestions and improvements for my ${activeSection} section`;
-        setAnalysisMode('suggestions');
-        break;
-    }
-
-    addMessage({
-      role: 'user',
-      content: prompt
-    });
-
-    await processAIRequest(prompt, action);
+  const handleQuickAction = (prompt) => {
+    setInput(prompt);
+    inputRef.current?.focus();
   };
 
   const addMessage = (msg) => {
     setMessages(prev => [...prev, {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random(),
       role: msg.role,
       content: msg.content,
       timestamp: new Date(),
+      autoApplyContent: msg.autoApplyContent || null,
       analysis: msg.analysis || null
     }]);
-  };
-
-  const processAIRequest = async (userMessage, action) => {
-    setIsLoading(true);
-    
-    try {
-      // Determine if we need full analysis or specific analysis
-      const analysisType = action === 'full' ? 'comprehensive' : 
-                          action === 'section' ? 'section' :
-                          action === 'ats' ? 'ats' : 'suggestions';
-
-      const response = await fetch('/api/cv/ai-analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cvData,
-          analysisType,
-          targetSection: activeSection
-        })
-      });
-
-      if (!response.ok) throw new Error('Analysis failed');
-
-      const data = await response.json();
-      setDetailedAnalysis(data);
-
-      // Format response based on analysis type
-      let formattedResponse = '';
-
-      if (analysisType === 'comprehensive') {
-        formattedResponse = formatComprehensiveAnalysis(data);
-      } else if (analysisType === 'section') {
-        formattedResponse = formatSectionAnalysis(data, activeSection);
-      } else if (analysisType === 'ats') {
-        formattedResponse = formatATSAnalysis(data);
-      } else {
-        formattedResponse = formatSuggestions(data, activeSection);
-      }
-
-      addMessage({
-        role: 'assistant',
-        content: formattedResponse,
-        analysis: data
-      });
-
-    } catch (error) {
-      console.error('Analysis error:', error);
-      addMessage({
-        role: 'assistant',
-        content: `❌ Error during analysis: ${error.message}. Please try again.`
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const formatComprehensiveAnalysis = (data) => {
-    const analysis = data.overallAnalysis;
-    const sections = data.sectionAnalyses;
-
-    let text = `📋 **COMPREHENSIVE CV ANALYSIS**\n\n`;
-    text += `🎯 **Overall Score: ${analysis.overallScore}/100**\n`;
-    text += `📊 **ATS Score: ${data.atsScore}/100**\n\n`;
-    
-    text += `**Summary:**\n${analysis.summary}\n\n`;
-
-    text += `**💪 Key Strengths:**\n`;
-    analysis.strengths.forEach(s => text += `• ${s}\n`);
-
-    text += `\n**⚠️ Critical Issues:**\n`;
-    analysis.criticalIssues.forEach(i => text += `• ${i}\n`);
-
-    text += `\n**📌 Top Priorities:**\n`;
-    analysis.topPriorities.forEach(p => text += `• ${p}\n`);
-
-    text += `\n**🔧 Section Breakdown:**\n`;
-    Object.values(sections).forEach(section => {
-      const icon = section.score >= 75 ? '✅' : section.score >= 50 ? '⚠️' : '❌';
-      text += `\n${icon} **${section.name.toUpperCase()}**: ${section.score}/100\n`;
-      text += `${section.feedback}\n`;
-    });
-
-    return text;
-  };
-
-  const formatSectionAnalysis = (data, section) => {
-    const analysis = data.sectionAnalyses[section];
-    if (!analysis) return 'Section not found in analysis.';
-
-    let text = `📝 **${section.toUpperCase()} SECTION ANALYSIS**\n\n`;
-    text += `📊 **Score: ${analysis.score}/100** (${analysis.status})\n\n`;
-    text += `${analysis.feedback}\n\n`;
-
-    text += `**✅ Strengths:**\n`;
-    analysis.strengths.forEach(s => text += `• ${s}\n`);
-
-    text += `\n**🔧 Improvements Needed:**\n`;
-    analysis.improvements.forEach(i => text += `• ${i}\n`);
-
-    if (analysis.suggestions && analysis.suggestions.length > 0) {
-      text += `\n**💡 Specific Suggestions:**\n`;
-      analysis.suggestions.forEach(s => text += `• ${s}\n`);
-    }
-
-    if (analysis.atsOptimization && analysis.atsOptimization.missingKeywords && analysis.atsOptimization.missingKeywords.length > 0) {
-      text += `\n**🎯 Missing Keywords for ATS:**\n`;
-      analysis.atsOptimization.missingKeywords.slice(0, 8).forEach(k => text += `• ${k}\n`);
-    }
-
-    return text;
-  };
-
-  const formatATSAnalysis = (data) => {
-    const ats = data;
-
-    let text = `🎯 **ATS OPTIMIZATION ANALYSIS**\n\n`;
-    text += `📊 **ATS Score: ${ats.atsScore}/100**\n\n`;
-
-    if (ats.atsScore >= 75) {
-      text += `✅ Your CV is well-optimized for ATS systems.\n\n`;
-    } else {
-      text += `⚠️ Your CV needs ATS optimization. Consider the recommendations below.\n\n`;
-    }
-
-    if (ats.recommendations && ats.recommendations.length > 0) {
-      text += `**🔧 Recommendations:**\n`;
-      ats.recommendations.forEach(r => text += `• ${r}\n`);
-    }
-
-    return text;
-  };
-
-  const formatSuggestions = (data, section) => {
-    const analysis = data.sectionAnalyses[section];
-    if (!analysis) return 'No suggestions available.';
-
-    let text = `💡 **CONTENT SUGGESTIONS FOR ${section.toUpperCase()}**\n\n`;
-
-    text += `**🎯 Focus Areas:**\n`;
-    analysis.improvements.forEach(i => text += `• ${i}\n`);
-
-    if (analysis.suggestions && analysis.suggestions.length > 0) {
-      text += `\n**✍️ Specific Content Improvements:**\n`;
-      analysis.suggestions.forEach(s => text += `• ${s}\n`);
-    }
-
-    if (analysis.atsOptimization && analysis.atsOptimization.keywords) {
-      text += `\n**🔑 Keywords to Include:**\n`;
-      analysis.atsOptimization.keywords.slice(0, 10).forEach(k => text += `• ${k}\n`);
-    }
-
-    return text;
   };
 
   const handleSendMessage = async (e) => {
@@ -336,7 +174,6 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
     setIsLoading(true);
 
     try {
-      // Send custom message to AI
       const response = await fetch('/api/cv/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -351,32 +188,103 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
       if (!response.ok) throw new Error('Failed to process message');
 
       const data = await response.json();
+      
       addMessage({
         role: 'assistant',
         content: data.response,
-        analysis: data.analysis || null
+        autoApplyContent: data.autoApplyContent,
+        analysis: data.analysis
       });
 
     } catch (error) {
       console.error('Chat error:', error);
       addMessage({
         role: 'assistant',
-        content: `❌ Error: ${error.message}`
+        content: `❌ I apologize, but I encountered an error. Please try again or rephrase your question. I'm here to help!`
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleApplyContent = (autoApplyContent) => {
+    try {
+      const { section, content, type } = autoApplyContent;
+      
+      if (type === 'summary' && section === 'personal') {
+        const updatedPersonal = {
+          ...cvData.personal,
+          summary: content
+        };
+        updateCVData('personal', updatedPersonal);
+        toast.success('Professional summary applied! Check the Personal Info section.');
+      } 
+      else if (type === 'bullets' || type === 'description') {
+        if (section === 'experience' && cvData.experience.length > 0) {
+          const updatedExperience = [...cvData.experience];
+          updatedExperience[0] = {
+            ...updatedExperience[0],
+            description: content
+          };
+          updateCVData('experience', updatedExperience);
+          toast.success('Content applied to your Experience section!');
+        } 
+        else if (section === 'projects' && cvData.projects.length > 0) {
+          const updatedProjects = [...cvData.projects];
+          updatedProjects[0] = {
+            ...updatedProjects[0],
+            description: content
+          };
+          updateCVData('projects', updatedProjects);
+          toast.success('Content applied to your Projects section!');
+        }
+        else {
+          toast.info('Content generated! Copy and paste it into your CV.');
+        }
+      }
+      else if (type === 'skills_list' && section === 'skills') {
+        const skillsArray = content.split(',').map(s => s.trim());
+        const updatedSkills = [{
+          id: Date.now().toString(),
+          name: 'AI Suggested Skills',
+          skills: skillsArray
+        }];
+        updateCVData('skills', updatedSkills);
+        toast.success('Skills applied! Check the Skills section.');
+      }
+      else {
+        toast.info('Content is ready! Copy it from the chat and paste into your CV.');
+      }
+    } catch (error) {
+      console.error('Error applying content:', error);
+      toast.error('Failed to apply content. Please copy and paste manually.');
+    }
+  };
+
   const copyToClipboard = (text, id) => {
-    navigator.clipboard.writeText(text);
+    // Remove markdown formatting for clean copy
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/✍️|💡|📊|🔧|📝|🎯|✓|❌|⚠️/g, '')
+      .replace(/---/g, '')
+      .trim();
+    
+    navigator.clipboard.writeText(cleanText);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+    toast.success('Copied to clipboard!');
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white flex items-center justify-between">
@@ -386,7 +294,7 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
             </div>
             <div>
               <h2 className="text-xl font-bold">AI CV Assistant</h2>
-              <p className="text-sm text-blue-100">Detailed section-by-section analysis</p>
+              <p className="text-sm text-blue-100">Ask me anything about your CV</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition">
@@ -397,9 +305,9 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
           
-          {messages.map((msg, idx) => (
+          {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-2xl ${
+              <div className={`max-w-3xl ${
                 msg.role === 'user' 
                   ? 'bg-blue-600 text-white rounded-lg rounded-tr-none' 
                   : 'bg-white text-gray-800 rounded-lg rounded-tl-none border border-gray-200 shadow-sm'
@@ -408,21 +316,60 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
                   {msg.content.split('\n').map((line, i) => {
                     // Format bold text
                     if (line.includes('**')) {
+                      const parts = line.split('**');
                       return (
-                        <div key={i} className={msg.role === 'user' ? '' : 'font-semibold text-blue-700'}>
-                          {line.replace(/\*\*/g, '')}
+                        <div key={i} className={`${msg.role === 'user' ? '' : 'font-semibold text-blue-700'} mb-1`}>
+                          {parts.map((part, idx) => (
+                            idx % 2 === 0 ? part : <strong key={idx}>{part}</strong>
+                          ))}
                         </div>
                       );
                     }
-                    return <div key={i}>{line}</div>;
+                    // Format bullet points
+                    if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                      return (
+                        <div key={i} className="ml-2 mb-1">{line}</div>
+                      );
+                    }
+                    return <div key={i} className="mb-1">{line || <br />}</div>;
                   })}
                 </div>
                 
-                {msg.analysis && msg.role === 'assistant' && (
+                {/* Auto-Apply Button */}
+                {msg.autoApplyContent && msg.role === 'assistant' && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 flex gap-2">
+                    <button
+                      onClick={() => handleApplyContent(msg.autoApplyContent)}
+                      className="flex items-center gap-2 text-sm bg-green-50 text-green-700 px-4 py-2 rounded-lg hover:bg-green-100 transition font-medium"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Apply to CV
+                    </button>
+                    <button
+                      onClick={() => copyToClipboard(msg.autoApplyContent.content, msg.id + '-apply')}
+                      className="flex items-center gap-2 text-sm bg-blue-50 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100 transition"
+                    >
+                      {copiedId === msg.id + '-apply' ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Regular Copy Button */}
+                {!msg.autoApplyContent && msg.role === 'assistant' && msg.content.length > 100 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <button
                       onClick={() => copyToClipboard(msg.content, msg.id)}
-                      className="flex items-center gap-2 text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded hover:bg-blue-100 transition"
+                      className="flex items-center gap-2 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded hover:bg-blue-100 transition"
                     >
                       {copiedId === msg.id ? (
                         <>
@@ -432,7 +379,7 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
                       ) : (
                         <>
                           <Copy className="w-3 h-3" />
-                          Copy Analysis
+                          Copy Response
                         </>
                       )}
                     </button>
@@ -451,7 +398,7 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
               <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                  <span className="text-sm text-gray-600">AI is analyzing...</span>
+                  <span className="text-sm text-gray-600">AI is thinking...</span>
                 </div>
               </div>
             </div>
@@ -459,10 +406,10 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
 
           {messages.length === 1 && !isLoading && (
             <div className="grid grid-cols-2 gap-3 mt-6">
-              {quickActions.map(action => (
+              {quickActions.map((action, idx) => (
                 <button
-                  key={action.value}
-                  onClick={() => handleQuickAction(action.value)}
+                  key={idx}
+                  onClick={() => handleQuickAction(action.prompt)}
                   className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:shadow-md transition text-left"
                 >
                   <div className="text-2xl mb-2">{action.icon}</div>
@@ -478,35 +425,37 @@ const AIAnalysisChatPopup = ({ onClose, cvData, activeSection }) => {
         {/* Input Area */}
         <div className="border-t border-gray-200 p-4 bg-white">
           <form onSubmit={handleSendMessage} className="flex gap-3">
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me anything about your CV..."
+              onKeyDown={handleKeyPress}
+              placeholder="Ask me anything... (Shift+Enter for new line, Enter to send)"
               disabled={isLoading}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+              rows={2}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 resize-none"
             />
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 self-end"
             >
               {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <Send className="w-4 h-4" />
+                <Send className="w-5 h-5" />
               )}
-              Send
             </button>
           </form>
-          <div className="text-xs text-gray-500 mt-2">
-            Currently analyzing: <strong>{activeSection}</strong> section
+          <div className="text-xs text-gray-500 mt-2 flex items-center justify-between">
+            <span>Currently editing: <strong>{activeSection}</strong> section</span>
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Powered by Gemini AI
+            </span>
           </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default AIAnalysisChatPopup;
+}
