@@ -26,6 +26,7 @@ export const Header = ({
   isAnalyzing,
   atsScore,
   onOpenAIChat,
+  cvId
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isAIHovered, setIsAIHovered] = useState(false);
@@ -48,9 +49,7 @@ export const Header = ({
     <header className="h-20 bg-white border-b border-gray-200 px-8 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">
-            CV Builder
-          </h1>
+          <h1 className="text-xl font-bold text-gray-900">CV Builder</h1>
           <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-[#002147] rounded-md text-sm font-semibold font-mono">
             #{cvNumber}
           </span>
@@ -60,9 +59,7 @@ export const Header = ({
         {atsScore !== null && atsScore !== undefined && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-md">
             <TrendingUp className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-medium text-gray-700">
-              ATS
-            </span>
+            <span className="text-sm font-medium text-gray-700">ATS</span>
             <span
               className={`text-sm font-bold ${
                 atsScore >= 85
@@ -147,9 +144,9 @@ export const Header = ({
         {/* Export PDF Button */}
         <button
           onClick={handleExportPDF}
-          disabled={isSaving || isExporting}
+          disabled={isSaving || isExporting || !cvId}
+          title={!cvId ? "Save CV first to export" : "Export CV as PDF"}
           className="px-4 py-2 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 hover:border-gray-400"
-          title="Export CV as PDF"
         >
           {isExporting ? (
             <>

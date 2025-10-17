@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, createContext, useContext, useEffect } from "react";
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { CVBuilder } from "./components/CVBuilder";
@@ -12,7 +12,10 @@ import SmartTipsPanel from "./components/SmartTipsPanel";
 import { VersionSaveDialog } from "./components/VersionSavedDialog";
 import { toast } from "sonner";
 import AIAnalysisChatPopup from "./components/AiAnalysisChatPopup";
-import { VersionManager, clearVersionsCache } from "./components/VersionManager";
+import {
+  VersionManager,
+  clearVersionsCache,
+} from "./components/VersionManager";
 
 // Context for CV Data
 export const CVDataContext = createContext();
@@ -202,8 +205,8 @@ const Index = () => {
       }
 
       const text = await response.text();
-      
-      if (!text || text.trim() === '') {
+
+      if (!text || text.trim() === "") {
         console.log("Empty response - no CV data available");
         return;
       }
@@ -372,7 +375,9 @@ const Index = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
       }
 
       const result = await response.json();
@@ -501,16 +506,16 @@ const Index = () => {
   const handleExportPDF = async () => {
     try {
       toast.info("Generating PDF...");
-      
+
       // Export current preview data
-      const response = await fetch('/api/cv/export-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/cv/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cvData,
           templateId: selectedTemplate,
-          cvNumber
-        })
+          cvNumber,
+        }),
       });
 
       if (!response.ok) throw new Error("Failed to generate PDF");
@@ -594,7 +599,6 @@ const Index = () => {
           onVersionToggle={() => setShowVersionManager(!showVersionManager)}
           onSave={handleSaveClick}
           onNewCV={handleNewCV}
-          onExportPDF={handleExportPDF}
           cvNumber={cvNumber}
           cvData={cvData}
           selectedTemplate={selectedTemplate}
@@ -602,6 +606,8 @@ const Index = () => {
           isAnalyzing={isAnalyzing}
           atsScore={atsScore}
           onOpenAIChat={handleOpenAIChat}
+          cvId={currentCVId}
+          onExportPDF={handleExportPDF}
         />
 
         <div className="flex h-[calc(100vh-80px)]">
