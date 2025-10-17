@@ -98,7 +98,7 @@ const SmartCalendar = () => {
 
   useEffect(() => {
     try {
-      const authData = JSON.parse(localStorage.getItem("authData") || "{}");
+      const authData = JSON.parse(window.localStorage.getItem("authData") || "{}");
       const email = authData.email || "";
       setUserEmail(email);
     } catch (error) {
@@ -135,7 +135,7 @@ const SmartCalendar = () => {
 
   const fetchSavedUniversities = useCallback(async () => {
     try {
-      const authData = localStorage.getItem("authData");
+      const authData = window.localStorage.getItem("authData");
       if (!authData) {
         setSavedUniversities([]);
         return;
@@ -393,7 +393,7 @@ const SmartCalendar = () => {
   }, [fetchEvents, userEmail]);
 
   // ========================================
-  // EVENT HANDLERS WITH OPTIMISTIC UPDATES
+  // EVENT HANDLERS
   // ========================================
 
   const handleSelectEvent = useCallback((event) => {
@@ -437,37 +437,19 @@ const SmartCalendar = () => {
       universityId: newEvent.universityId || null,
     };
 
-    // Optimistic update
     if (editingEvent) {
       setOperatingEventId(editingEvent.id);
-      const updatedEvents = events.map((e) =>
-        e.id === editingEvent.id
-          ? {
-              ...e,
-              ...eventData,
-              color: eventTypes.find((t) => t.value === eventData.eventType)?.color,
-            }
-          : e
-      );
-      setEvents(updatedEvents);
     } else {
-      const tempId = `temp-${Date.now()}`;
-      const optimisticEvent = {
-        id: tempId,
-        ...eventData,
-        color: eventTypes.find((t) => t.value === eventData.eventType)?.color,
-        isSystemGenerated: false,
-        hasReminders: false,
-        reminders: [],
-      };
-      setEvents([...events, optimisticEvent]);
+      setOperatingEventId("new");
     }
 
-    resetForm();
-
     try {
-      // API call happens in background, but we don't refresh
       await saveEvent(eventData);
+      
+      // Refresh events after save
+      await fetchEvents();
+      
+      resetForm();
       
       if (editingEvent) {
         toast.success("Event updated successfully", {
@@ -481,12 +463,6 @@ const SmartCalendar = () => {
     } catch (err) {
       setSaveError(err.message);
       toast.error(err.message || "Failed to save event");
-      // On error, revert by removing the optimistic update
-      if (editingEvent) {
-        setEvents(events); // Revert to previous state
-      } else {
-        setEvents(events.filter(e => !e.id.startsWith('temp-')));
-      }
     } finally {
       setOperatingEventId(null);
     }
@@ -513,22 +489,20 @@ const SmartCalendar = () => {
     if (!window.confirm("Are you sure you want to delete this event?")) return;
 
     setOperatingEventId(eventId);
-    
-    // Optimistic update
-    const previousEvents = [...events];
-    setEvents(events.filter((e) => e.id !== eventId));
     setSelectedEvent(null);
 
     try {
-      // API call happens in background, but we don't refresh
       await deleteEvent(eventId);
+      
+      // Refresh events after delete
+      await fetchEvents();
+      
       toast.success("Event deleted successfully", {
         className: "bg-red-50 border-red-200",
       });
     } catch (err) {
       setError(err.message);
       toast.error(err.message || "Failed to delete event");
-      setEvents(previousEvents); // Revert on error
     } finally {
       setOperatingEventId(null);
     }
@@ -536,34 +510,20 @@ const SmartCalendar = () => {
 
   const handleCompleteEvent = async (eventId) => {
     setOperatingEventId(eventId);
-
-    // Optimistic update
-    const previousEvents = [...events];
-    setEvents(
-      events.map((e) =>
-        e.id === eventId
-          ? { 
-              ...e, 
-              completionStatus: "completed", 
-              status: "completed",
-              eventStatus: "completed",
-              completedAt: new Date().toISOString()
-            }
-          : e
-      )
-    );
     setSelectedEvent(null);
 
     try {
-      // API call happens in background, but we don't refresh
       await completeEvent(eventId);
+      
+      // Refresh events after completion
+      await fetchEvents();
+      
       toast.success("Event marked as completed! 🎉", {
         className: "bg-green-50 border-green-200",
       });
     } catch (err) {
       setError(err.message);
       toast.error(err.message || "Failed to complete event");
-      setEvents(previousEvents); // Revert on error
     } finally {
       setOperatingEventId(null);
     }
@@ -1386,9 +1346,10 @@ const SmartCalendar = () => {
               </button>
               <button
                 onClick={handleSaveEvent}
-                disabled={!newEvent.title.trim()}
-                className="px-4 py-2 text-sm bg-[#002147] text-white rounded-lg hover:bg-[#001a36] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!newEvent.title.trim() || operatingEventId}
+                className="px-4 py-2 text-sm bg-[#002147] text-white rounded-lg hover:bg-[#001a36] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
+                {operatingEventId && <Loader2 size={14} className="animate-spin" />}
                 {editingEvent ? "Update Event" : "Create Event"}
               </button>
             </div>
