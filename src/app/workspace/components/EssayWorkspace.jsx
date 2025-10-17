@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 export function EssayWorkspace({ universityName, userId, userEmail }) {
-  console.log("EssayWorkspace props:", { universityName, userId, userEmail });
+ // console.log("EssayWorkspace props:", { universityName, userId, userEmail });
 
   // Core state management
   const [workspaceData, setWorkspaceData] = useState(null);

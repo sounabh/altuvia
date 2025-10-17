@@ -10,20 +10,53 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {} }
     if (!date) return "";
     const [year, month] = date.split("-");
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
     return `${monthNames[parseInt(month) - 1]} ${year}`;
+  };
+
+  // Helper function to render description with bullet points
+  const renderDescription = (description) => {
+    if (!description) return null;
+    
+    // If it's an array, render as bullet points
+    if (Array.isArray(description)) {
+      return (
+        <ul className="list-disc list-inside space-y-1 mt-2">
+          {description.map((item, index) => (
+            <li key={index} className="text-sm text-gray-700">{item}</li>
+          ))}
+        </ul>
+      );
+    }
+    
+    // If it's a string with bullet points (• or -)
+    if (typeof description === 'string') {
+      const lines = description.split('\n').filter(line => line.trim());
+      const hasBullets = lines.some(line => line.trim().startsWith('•') || line.trim().startsWith('-'));
+      
+      if (hasBullets) {
+        return (
+          <ul className="list-disc list-inside space-y-1 mt-2">
+            {lines.map((line, index) => (
+              <li key={index} className="text-sm text-gray-700">
+                {line.replace(/^[•\-]\s*/, '')}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+      
+      // Regular text with line breaks
+      return (
+        <div className="text-sm text-gray-700 whitespace-pre-line mt-2">
+          {description}
+        </div>
+      );
+    }
+    
+    return null;
   };
 
   const safeData = {
@@ -50,13 +83,13 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {} }
   const renderTemplate = () => {
     switch (selectedTemplate) {
       case "modern":
-        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} />;
       case "classic":
-        return <ClassicPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+        return <ClassicPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} />;
       case "minimal":
-        return <MinimalPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+        return <MinimalPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} />;
       default:
-        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} />;
     }
   };
 
@@ -94,7 +127,7 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {} }
   );
 };
 
-const ModernPreview = ({ data, formatDate, hasData }) => (
+const ModernPreview = ({ data, formatDate, hasData, renderDescription }) => (
   <div className="p-8 font-sans text-sm">
     <div className="mb-8">
       <h1 className="text-4xl font-bold text-gray-900 mb-1">
@@ -162,11 +195,7 @@ const ModernPreview = ({ data, formatDate, hasData }) => (
                 {exp.company}
                 {exp.location && ` • ${exp.location}`}
               </p>
-              {exp.description && (
-                <div className="text-sm text-gray-600 whitespace-pre-line">
-                  {exp.description}
-                </div>
-              )}
+              {exp.description && renderDescription(exp.description)}
             </div>
           )
         ))}
@@ -181,12 +210,30 @@ const ModernPreview = ({ data, formatDate, hasData }) => (
         {data.projects.map((proj, i) => (
           proj.name && (
             <div key={i} className="mb-4">
-              <h3 className="font-semibold text-gray-900 mb-1">{proj.name}</h3>
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-semibold text-gray-900">{proj.name}</h3>
+                {(proj.startDate || proj.endDate) && (
+                  <span className="text-sm text-gray-600">
+                    {proj.startDate ? formatDate(proj.startDate) : ''} 
+                    {proj.endDate ? ` - ${formatDate(proj.endDate)}` : ''}
+                  </span>
+                )}
+              </div>
               {proj.technologies && (
                 <p className="text-sm text-gray-600 mb-2">{proj.technologies}</p>
               )}
-              {proj.description && (
-                <p className="text-sm text-gray-700 mb-2">{proj.description}</p>
+              {proj.description && renderDescription(proj.description)}
+              {(proj.githubUrl || proj.liveUrl) && (
+                <div className="flex gap-4 mt-2 text-sm text-blue-600">
+                  {proj.githubUrl && <span>GitHub: {proj.githubUrl}</span>}
+                  {proj.liveUrl && <span>Live: {proj.liveUrl}</span>}
+                </div>
+              )}
+              {proj.achievements && (
+                <div className="mt-2">
+                  <p className="text-sm font-medium text-gray-900 mb-1">Key Achievements:</p>
+                  {renderDescription(proj.achievements)}
+                </div>
               )}
             </div>
           )
@@ -231,9 +278,7 @@ const ModernPreview = ({ data, formatDate, hasData }) => (
                 <p className="text-sm text-gray-700 mb-2">{ach.organization}</p>
               )}
               {ach.type && <p className="text-sm text-gray-600 mb-2">{ach.type}</p>}
-              {ach.description && (
-                <p className="text-sm text-gray-600">{ach.description}</p>
-              )}
+              {ach.description && renderDescription(ach.description)}
             </div>
           )
         ))}
@@ -258,11 +303,9 @@ const ModernPreview = ({ data, formatDate, hasData }) => (
                 {vol.organization}
                 {vol.location && ` • ${vol.location}`}
               </p>
-              {vol.description && (
-                <p className="text-sm text-gray-600 mb-2">{vol.description}</p>
-              )}
+              {vol.description && renderDescription(vol.description)}
               {vol.impact && (
-                <p className="text-sm text-gray-600 italic">{vol.impact}</p>
+                <p className="text-sm text-gray-600 italic mt-2">{vol.impact}</p>
               )}
             </div>
           )
@@ -272,7 +315,7 @@ const ModernPreview = ({ data, formatDate, hasData }) => (
   </div>
 );
 
-const ClassicPreview = ({ data, formatDate, hasData }) => (
+const ClassicPreview = ({ data, formatDate, hasData, renderDescription }) => (
   <div className="p-8 font-serif text-sm">
     <div className="text-center mb-8 border-b-2 border-gray-800 pb-4">
       <h1 className="text-3xl font-bold mb-2 text-gray-900">
@@ -344,11 +387,7 @@ const ClassicPreview = ({ data, formatDate, hasData }) => (
                 {exp.company}
                 {exp.location && ` • ${exp.location}`}
               </em>
-              {exp.description && (
-                <div className="text-sm text-gray-700 mt-2 whitespace-pre-line">
-                  {exp.description}
-                </div>
-              )}
+              {exp.description && renderDescription(exp.description)}
             </div>
           )
         ))}
@@ -363,14 +402,32 @@ const ClassicPreview = ({ data, formatDate, hasData }) => (
         {data.projects.map((proj, i) => (
           proj.name && (
             <div key={i} className="mb-3">
-              <strong className="text-gray-900">{proj.name}</strong>
+              <div className="flex justify-between mb-1">
+                <strong className="text-gray-900">{proj.name}</strong>
+                {(proj.startDate || proj.endDate) && (
+                  <span className="text-sm text-gray-700">
+                    {proj.startDate ? formatDate(proj.startDate) : ''} 
+                    {proj.endDate ? ` - ${formatDate(proj.endDate)}` : ''}
+                  </span>
+                )}
+              </div>
               {proj.technologies && (
                 <p className="text-sm text-gray-700 mt-1">
                   Technologies: {proj.technologies}
                 </p>
               )}
-              {proj.description && (
-                <p className="text-sm text-gray-700 mt-1">{proj.description}</p>
+              {proj.description && renderDescription(proj.description)}
+              {(proj.githubUrl || proj.liveUrl) && (
+                <div className="mt-2 text-sm text-blue-600 space-y-1">
+                  {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
+                  {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
+                </div>
+              )}
+              {proj.achievements && (
+                <div className="mt-2">
+                  <strong className="text-sm text-gray-900">Key Achievements:</strong>
+                  {renderDescription(proj.achievements)}
+                </div>
               )}
             </div>
           )
@@ -402,14 +459,19 @@ const ClassicPreview = ({ data, formatDate, hasData }) => (
         <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
           Achievements
         </h2>
-        <div className="text-sm space-y-2">
+        <div className="text-sm space-y-3">
           {data.achievements.map((ach, i) => (
             ach.title && (
               <div key={i}>
-                <strong className="text-gray-900">{ach.title}</strong>
+                <div className="flex justify-between">
+                  <strong className="text-gray-900">{ach.title}</strong>
+                  {ach.date && <span className="text-sm text-gray-700">{ach.date}</span>}
+                </div>
                 {ach.organization && (
                   <p className="text-sm text-gray-700">{ach.organization}</p>
                 )}
+                {ach.type && <p className="text-sm text-gray-700">{ach.type}</p>}
+                {ach.description && renderDescription(ach.description)}
               </div>
             )
           ))}
@@ -422,14 +484,23 @@ const ClassicPreview = ({ data, formatDate, hasData }) => (
         <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
           Volunteer
         </h2>
-        <div className="text-sm space-y-2">
+        <div className="text-sm space-y-3">
           {data.volunteer.map((vol, i) => (
             (vol.organization || vol.role) && (
               <div key={i}>
-                <strong className="text-gray-900">
-                  {vol.role || "Volunteer"}
-                </strong>
+                <div className="flex justify-between">
+                  <strong className="text-gray-900">
+                    {vol.role || "Volunteer"}
+                  </strong>
+                  <span className="text-sm text-gray-700">
+                    {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
+                  </span>
+                </div>
                 <p className="text-sm text-gray-700">{vol.organization}</p>
+                {vol.description && renderDescription(vol.description)}
+                {vol.impact && (
+                  <p className="text-sm text-gray-700 italic">{vol.impact}</p>
+                )}
               </div>
             )
           ))}
@@ -439,7 +510,7 @@ const ClassicPreview = ({ data, formatDate, hasData }) => (
   </div>
 );
 
-const MinimalPreview = ({ data, formatDate, hasData }) => (
+const MinimalPreview = ({ data, formatDate, hasData, renderDescription }) => (
   <div className="p-8 font-sans text-sm">
     <div className="mb-8">
       <h1 className="text-4xl font-light text-gray-900 mb-1">
@@ -497,11 +568,7 @@ const MinimalPreview = ({ data, formatDate, hasData }) => (
                 </span>
               </div>
               <p className="text-sm text-gray-600">{exp.company}</p>
-              {exp.description && (
-                <div className="text-sm text-gray-700 mt-2 whitespace-pre-line">
-                  {exp.description}
-                </div>
-              )}
+              {exp.description && renderDescription(exp.description)}
             </div>
           )
         ))}
@@ -514,12 +581,30 @@ const MinimalPreview = ({ data, formatDate, hasData }) => (
         {data.projects.map((proj, i) => (
           proj.name && (
             <div key={i} className="mb-4">
-              <h3 className="font-medium text-gray-900 mb-1">{proj.name}</h3>
+              <div className="flex justify-between items-baseline mb-1">
+                <h3 className="font-medium text-gray-900 mb-1">{proj.name}</h3>
+                {(proj.startDate || proj.endDate) && (
+                  <span className="text-sm text-gray-500">
+                    {proj.startDate ? formatDate(proj.startDate) : ''} 
+                    {proj.endDate ? ` — ${formatDate(proj.endDate)}` : ''}
+                  </span>
+                )}
+              </div>
               {proj.technologies && (
                 <p className="text-sm text-gray-600 mb-1">{proj.technologies}</p>
               )}
-              {proj.description && (
-                <p className="text-sm text-gray-700">{proj.description}</p>
+              {proj.description && renderDescription(proj.description)}
+              {(proj.githubUrl || proj.liveUrl) && (
+                <div className="flex gap-4 mt-2 text-sm text-blue-600">
+                  {proj.githubUrl && <span>GitHub: {proj.githubUrl}</span>}
+                  {proj.liveUrl && <span>Live: {proj.liveUrl}</span>}
+                </div>
+              )}
+              {proj.achievements && (
+                <div className="mt-2">
+                  <p className="text-sm font-medium text-gray-900 mb-1">Achievements:</p>
+                  {renderDescription(proj.achievements)}
+                </div>
               )}
             </div>
           )
@@ -533,9 +618,6 @@ const MinimalPreview = ({ data, formatDate, hasData }) => (
         <div className="space-y-2 text-sm">
           {data.skills.map((category, i) => {
             const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            console.log('====================================');
-            console.log(skillsList);
-            console.log('====================================');
             return skillsList.length > 0 ? (
               <div key={i}>
                 <span className="font-medium text-gray-900">
@@ -552,14 +634,19 @@ const MinimalPreview = ({ data, formatDate, hasData }) => (
     {hasData(data.achievements) && (
       <div className="mb-8">
         <h2 className="text-lg font-light text-gray-900 mb-3">Achievements</h2>
-        <div className="space-y-2 text-sm">
+        <div className="space-y-3 text-sm">
           {data.achievements.map((ach, i) => (
             ach.title && (
               <div key={i}>
-                <span className="font-medium text-gray-900">{ach.title}</span>
+                <div className="flex justify-between">
+                  <span className="font-medium text-gray-900">{ach.title}</span>
+                  {ach.date && <span className="text-gray-500">{ach.date}</span>}
+                </div>
                 {ach.organization && (
                   <p className="text-gray-600">{ach.organization}</p>
                 )}
+                {ach.type && <p className="text-gray-600">{ach.type}</p>}
+                {ach.description && renderDescription(ach.description)}
               </div>
             )
           ))}
@@ -570,14 +657,23 @@ const MinimalPreview = ({ data, formatDate, hasData }) => (
     {hasData(data.volunteer) && (
       <div>
         <h2 className="text-lg font-light text-gray-900 mb-3">Volunteer</h2>
-        <div className="space-y-2 text-sm">
+        <div className="space-y-3 text-sm">
           {data.volunteer.map((vol, i) => (
             (vol.organization || vol.role) && (
               <div key={i}>
-                <span className="font-medium text-gray-900">
-                  {vol.role || "Volunteer"}
-                </span>
+                <div className="flex justify-between">
+                  <span className="font-medium text-gray-900">
+                    {vol.role || "Volunteer"}
+                  </span>
+                  <span className="text-gray-500">
+                    {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
+                  </span>
+                </div>
                 <p className="text-gray-600">{vol.organization}</p>
+                {vol.description && renderDescription(vol.description)}
+                {vol.impact && (
+                  <p className="text-gray-600 italic">{vol.impact}</p>
+                )}
               </div>
             )
           ))}
