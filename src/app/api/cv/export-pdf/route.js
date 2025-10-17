@@ -1,9 +1,8 @@
-// app/api/cv/export-pdf/route.js - FIXED PDF EXPORT
+// app/api/cv/export-pdf/route.js
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import puppeteer from 'puppeteer';
 
-// POST: Export current preview (doesn't require saved CV)
+// POST: Export current preview
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -16,30 +15,7 @@ export async function POST(request) {
       );
     }
 
-    // Generate HTML from current preview data
-    const html = generateCVHTML(cvData, templateId || 'modern');
-
-    // Launch puppeteer and generate PDF
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px',
-      },
-    });
-    
-    await browser.close();
+    const pdf = await generatePDF(cvData);
 
     return new NextResponse(pdf, {
       headers: {
@@ -51,7 +27,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("PDF export error:", error);
     return NextResponse.json(
-      { error: "Failed to export PDF" },
+      { error: "Failed to export PDF", details: error.message },
       { status: 500 }
     );
   }
@@ -65,20 +41,15 @@ export async function GET(request) {
     const versionId = searchParams.get("versionId");
 
     let cvData;
-    let templateId = "modern";
     let fileName = `CV-${Date.now()}`;
 
     if (versionId) {
-      // Export specific version
       const version = await prisma.cVVersion.findUnique({
         where: { id: versionId },
       });
 
       if (!version) {
-        return NextResponse.json(
-          { error: "Version not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "Version not found" }, { status: 404 });
       }
 
       cvData = {
@@ -90,11 +61,9 @@ export async function GET(request) {
         achievements: JSON.parse(version.achievementsSnapshot || "[]"),
         volunteer: JSON.parse(version.volunteerSnapshot || "[]"),
       };
-      templateId = version.templateId;
       fileName = `CV-${version.versionLabel.replace(/\s+/g, '-')}`;
 
     } else if (cvId) {
-      // Export current CV from database
       const cv = await prisma.cV.findUnique({
         where: { id: cvId },
         include: {
@@ -109,10 +78,7 @@ export async function GET(request) {
       });
 
       if (!cv) {
-        return NextResponse.json(
-          { error: "CV not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "CV not found" }, { status: 404 });
       }
 
       cvData = {
@@ -124,7 +90,6 @@ export async function GET(request) {
         achievements: cv.achievements,
         volunteer: cv.volunteers,
       };
-      templateId = cv.templateId;
       fileName = `CV-${cv.cvNumber}`;
     } else {
       return NextResponse.json(
@@ -133,30 +98,7 @@ export async function GET(request) {
       );
     }
 
-    // Generate HTML for PDF
-    const html = generateCVHTML(cvData, templateId);
-
-    // Launch puppeteer and generate PDF
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px',
-      },
-    });
-    
-    await browser.close();
+    const pdf = await generatePDF(cvData);
 
     return new NextResponse(pdf, {
       headers: {
@@ -168,197 +110,192 @@ export async function GET(request) {
   } catch (error) {
     console.error("PDF export error:", error);
     return NextResponse.json(
-      { error: "Failed to export PDF" },
+      { error: "Failed to export PDF", details: error.message },
       { status: 500 }
     );
   }
 }
 
-function generateCVHTML(cvData, templateId) {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Arial', sans-serif;
-          font-size: 11pt;
-          line-height: 1.6;
-          color: #333;
-          padding: 20px;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 3px solid #2563eb;
-          padding-bottom: 20px;
-        }
-        .name {
-          font-size: 28pt;
-          font-weight: bold;
-          color: #1e40af;
-          margin-bottom: 10px;
-        }
-        .contact-info {
-          font-size: 10pt;
-          color: #666;
-        }
-        .section {
-          margin-bottom: 25px;
-        }
-        .section-title {
-          font-size: 14pt;
-          font-weight: bold;
-          color: #1e40af;
-          border-bottom: 2px solid #93c5fd;
-          padding-bottom: 5px;
-          margin-bottom: 15px;
-          text-transform: uppercase;
-        }
-        .entry {
-          margin-bottom: 15px;
-        }
-        .entry-title {
-          font-weight: bold;
-          font-size: 12pt;
-          color: #1f2937;
-        }
-        .entry-subtitle {
-          font-style: italic;
-          color: #4b5563;
-          margin-bottom: 5px;
-        }
-        .entry-description {
-          color: #374151;
-          text-align: justify;
-          white-space: pre-wrap;
-        }
-        .skills-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 10px;
-        }
-        .skill-category {
-          font-weight: bold;
-          color: #1e40af;
-        }
-        .skill-list {
-          color: #4b5563;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="name">${cvData.personal?.fullName || 'Your Name'}</div>
-        <div class="contact-info">
-          ${cvData.personal?.email || ''} ${cvData.personal?.email && (cvData.personal?.phone || cvData.personal?.location) ? '|' : ''} 
-          ${cvData.personal?.phone || ''} ${cvData.personal?.phone && cvData.personal?.location ? '|' : ''} 
-          ${cvData.personal?.location || ''}
-          ${cvData.personal?.linkedin ? `<br>LinkedIn: ${cvData.personal.linkedin}` : ''}
-        </div>
-      </div>
+async function generatePDF(cvData) {
+  const { PDFDocument, PDFPage, PDFFont } = await import('pdf-lib');
+  const { rgb } = await import('pdf-lib');
 
-      ${cvData.personal?.summary ? `
-      <div class="section">
-        <div class="section-title">Professional Summary</div>
-        <div class="entry-description">${cvData.personal.summary}</div>
-      </div>
-      ` : ''}
+  const pdfDoc = await PDFDocument.create();
+  let page = pdfDoc.addPage([612, 792]); // Letter size
+  let yPosition = 750;
 
-      ${cvData.experience?.length > 0 && cvData.experience.some(exp => exp.company || exp.position) ? `
-      <div class="section">
-        <div class="section-title">Experience</div>
-        ${cvData.experience.filter(exp => exp.company || exp.position).map(exp => `
-          <div class="entry">
-            <div class="entry-title">${exp.position || exp.company || 'Position'}</div>
-            <div class="entry-subtitle">
-              ${exp.company || ''} ${exp.location ? `| ${exp.location}` : ''} ${exp.startDate || exp.endDate ? '|' : ''} 
-              ${exp.startDate ? new Date(exp.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} - 
-              ${exp.isCurrentRole ? 'Present' : (exp.endDate ? new Date(exp.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '')}
-            </div>
-            ${exp.description ? `<div class="entry-description">${exp.description}</div>` : ''}
-          </div>
-        `).join('')}
-      </div>
-      ` : ''}
+  const helvetica = await pdfDoc.embedFont((await import('pdf-lib')).StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont((await import('pdf-lib')).StandardFonts.HelveticaBold);
 
-      ${cvData.education?.length > 0 && cvData.education.some(edu => edu.institution || edu.degree) ? `
-      <div class="section">
-        <div class="section-title">Education</div>
-        ${cvData.education.filter(edu => edu.institution || edu.degree).map(edu => `
-          <div class="entry">
-            <div class="entry-title">${edu.degree || 'Degree'} ${edu.field || edu.fieldOfStudy ? `in ${edu.field || edu.fieldOfStudy}` : ''}</div>
-            <div class="entry-subtitle">
-              ${edu.institution || ''} 
-              ${edu.gpa ? `| GPA: ${edu.gpa}` : ''}
-              ${edu.startDate || edu.endDate ? '|' : ''}
-              ${edu.startDate ? new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} - 
-              ${edu.endDate ? new Date(edu.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}
-            </div>
-            ${edu.description ? `<div class="entry-description">${edu.description}</div>` : ''}
-          </div>
-        `).join('')}
-      </div>
-      ` : ''}
+  const drawText = (text, size, bold = false, y = null) => {
+    const font = bold ? helveticaBold : helvetica;
+    const width = page.getWidth();
+    const maxWidth = width - 40;
 
-      ${cvData.skills?.length > 0 && cvData.skills.some(s => (s.skills || []).length > 0) ? `
-      <div class="section">
-        <div class="section-title">Skills</div>
-        <div class="skills-grid">
-          ${cvData.skills.filter(s => (s.skills || []).length > 0).map(skillGroup => `
-            <div>
-              <span class="skill-category">${skillGroup.categoryName || skillGroup.name || 'Skills'}:</span>
-              <span class="skill-list">${(skillGroup.skills || []).join(', ')}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      ` : ''}
+    if (y !== null) yPosition = y;
 
-      ${cvData.projects?.length > 0 && cvData.projects.some(proj => proj.name) ? `
-      <div class="section">
-        <div class="section-title">Projects</div>
-        ${cvData.projects.filter(proj => proj.name).map(proj => `
-          <div class="entry">
-            <div class="entry-title">${proj.name}</div>
-            ${proj.technologies ? `<div class="entry-subtitle">${proj.technologies}</div>` : ''}
-            ${proj.description ? `<div class="entry-description">${proj.description}</div>` : ''}
-          </div>
-        `).join('')}
-      </div>
-      ` : ''}
+    const lines = text.split('\n');
+    lines.forEach(line => {
+      if (yPosition < 50) {
+        page = pdfDoc.addPage([612, 792]);
+        yPosition = 750;
+      }
+      page.drawText(line, {
+        x: 20,
+        y: yPosition,
+        size,
+        font,
+        color: rgb(0, 0, 0),
+      });
+      yPosition -= size + 5;
+    });
+  };
 
-      ${cvData.achievements?.length > 0 && cvData.achievements.some(ach => ach.title) ? `
-      <div class="section">
-        <div class="section-title">Achievements</div>
-        ${cvData.achievements.filter(ach => ach.title).map(ach => `
-          <div class="entry">
-            <div class="entry-title">${ach.title}</div>
-            ${ach.organization ? `<div class="entry-subtitle">${ach.organization} ${ach.date ? `| ${ach.date}` : ''}</div>` : ''}
-            ${ach.description ? `<div class="entry-description">${ach.description}</div>` : ''}
-          </div>
-        `).join('')}
-      </div>
-      ` : ''}
+  // Header
+  drawText(cvData.personal?.fullName || 'CV', 24, true);
+  yPosition -= 5;
 
-      ${cvData.volunteer?.length > 0 && cvData.volunteer.some(vol => vol.organization || vol.role) ? `
-      <div class="section">
-        <div class="section-title">Volunteer Experience</div>
-        ${cvData.volunteer.filter(vol => vol.organization || vol.role).map(vol => `
-          <div class="entry">
-            <div class="entry-title">${vol.role || 'Volunteer'}</div>
-            <div class="entry-subtitle">
-              ${vol.organization || ''} ${vol.location ? `| ${vol.location}` : ''}
-            </div>
-            ${vol.description ? `<div class="entry-description">${vol.description}</div>` : ''}
-            ${vol.impact ? `<div class="entry-description"><em>${vol.impact}</em></div>` : ''}
-          </div>
-        `).join('')}
-      </div>
-      ` : ''}
-    </body>
-    </html>
-  `;
+  const contactInfo = [
+    cvData.personal?.email,
+    cvData.personal?.phone,
+    cvData.personal?.location,
+  ].filter(Boolean).join(' | ');
+
+  if (contactInfo) {
+    drawText(contactInfo, 10);
+  }
+
+  if (cvData.personal?.linkedin) {
+    drawText(`LinkedIn: ${cvData.personal.linkedin}`, 10);
+  }
+
+  yPosition -= 10;
+
+  // Professional Summary
+  if (cvData.personal?.summary) {
+    drawText('PROFESSIONAL SUMMARY', 12, true);
+    yPosition -= 3;
+    drawText(cvData.personal.summary, 10);
+    yPosition -= 10;
+  }
+
+  // Experience
+  if (cvData.experience?.length > 0 && cvData.experience.some(exp => exp.company || exp.position)) {
+    drawText('EXPERIENCE', 12, true);
+    yPosition -= 3;
+
+    cvData.experience.forEach(exp => {
+      if (exp.company || exp.position) {
+        drawText(exp.position || 'Position', 11, true);
+        const startDate = exp.startDate ? new Date(exp.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
+        const endDate = exp.isCurrentRole ? 'Present' : (exp.endDate ? new Date(exp.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '');
+        drawText(`${exp.company || ''} | ${startDate} - ${endDate}`, 10);
+        if (exp.description) {
+          drawText(exp.description, 10);
+        }
+        yPosition -= 5;
+      }
+    });
+
+    yPosition -= 5;
+  }
+
+  // Education
+  if (cvData.education?.length > 0 && cvData.education.some(edu => edu.institution || edu.degree)) {
+    drawText('EDUCATION', 12, true);
+    yPosition -= 3;
+
+    cvData.education.forEach(edu => {
+      if (edu.institution || edu.degree) {
+        drawText(`${edu.degree || 'Degree'} ${edu.field ? `in ${edu.field}` : ''}`, 11, true);
+        const startDate = edu.startDate ? new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
+        const endDate = edu.endDate ? new Date(edu.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
+        drawText(`${edu.institution || ''} | ${startDate} - ${endDate} ${edu.gpa ? `| GPA: ${edu.gpa}` : ''}`, 10);
+        if (edu.description) {
+          drawText(edu.description, 10);
+        }
+        yPosition -= 5;
+      }
+    });
+
+    yPosition -= 5;
+  }
+
+  // Skills
+  if (cvData.skills?.length > 0 && cvData.skills.some(s => (s.skills || []).length > 0)) {
+    drawText('SKILLS', 12, true);
+    yPosition -= 3;
+
+    cvData.skills.forEach(skillGroup => {
+      if ((skillGroup.skills || []).length > 0) {
+        drawText(`${skillGroup.categoryName || skillGroup.name || 'Skills'}: ${(skillGroup.skills || []).join(', ')}`, 10);
+      }
+    });
+
+    yPosition -= 5;
+  }
+
+  // Projects
+  if (cvData.projects?.length > 0 && cvData.projects.some(proj => proj.name)) {
+    drawText('PROJECTS', 12, true);
+    yPosition -= 3;
+
+    cvData.projects.forEach(proj => {
+      if (proj.name) {
+        drawText(proj.name, 11, true);
+        if (proj.technologies) {
+          drawText(`Technologies: ${proj.technologies}`, 10);
+        }
+        if (proj.description) {
+          drawText(proj.description, 10);
+        }
+        yPosition -= 5;
+      }
+    });
+
+    yPosition -= 5;
+  }
+
+  // Achievements
+  if (cvData.achievements?.length > 0 && cvData.achievements.some(ach => ach.title)) {
+    drawText('ACHIEVEMENTS', 12, true);
+    yPosition -= 3;
+
+    cvData.achievements.forEach(ach => {
+      if (ach.title) {
+        drawText(ach.title, 11, true);
+        if (ach.organization) {
+          drawText(`${ach.organization} ${ach.date ? `| ${ach.date}` : ''}`, 10);
+        }
+        if (ach.description) {
+          drawText(ach.description, 10);
+        }
+        yPosition -= 5;
+      }
+    });
+
+    yPosition -= 5;
+  }
+
+  // Volunteer
+  if (cvData.volunteer?.length > 0 && cvData.volunteer.some(vol => vol.organization || vol.role)) {
+    drawText('VOLUNTEER EXPERIENCE', 12, true);
+    yPosition -= 3;
+
+    cvData.volunteer.forEach(vol => {
+      if (vol.organization || vol.role) {
+        drawText(vol.role || 'Volunteer', 11, true);
+        drawText(`${vol.organization || ''} ${vol.location ? `| ${vol.location}` : ''}`, 10);
+        if (vol.description) {
+          drawText(vol.description, 10);
+        }
+        if (vol.impact) {
+          drawText(`Impact: ${vol.impact}`, 10);
+        }
+        yPosition -= 5;
+      }
+    });
+  }
+
+  return await pdfDoc.save();
 }

@@ -133,7 +133,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription }) => (
       <h1 className="text-4xl font-bold text-gray-900 mb-1">
         {data.personal?.fullName || "Your Name"}
       </h1>
-      <p className="text-lg text-gray-600 mb-4">Software Engineering Student</p>
+    
       <div className="flex flex-wrap gap-4 text-sm text-gray-600">
         {data.personal?.email && <span>✉ {data.personal.email}</span>}
         {data.personal?.phone && <span>📞 {data.personal.phone}</span>}
@@ -516,7 +516,7 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription }) => (
       <h1 className="text-4xl font-light text-gray-900 mb-1">
         {data.personal?.fullName || "Your Name"}
       </h1>
-      <p className="text-lg text-gray-600 mb-4">Software Engineer</p>
+     
       <div className="text-sm text-gray-500 space-y-1">
         {data.personal?.email && <p>{data.personal.email}</p>}
         {data.personal?.phone && <p>{data.personal.phone}</p>}
