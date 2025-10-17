@@ -1,4 +1,4 @@
-// page.jsx - FIXED VERSION WITH PROPER ERROR HANDLING
+// page.jsx - FIXED VERSION WITH PROPER CV NUMBER HANDLING
 "use client";
 
 import React, { useState, createContext, useContext, useEffect } from "react";
@@ -179,7 +179,6 @@ const Index = () => {
     }
   };
 
-  // FIXED: Proper CV Data Loading with Better Error Handling
   const loadCVData = async (cvId) => {
     try {
       const userEmail = getAuthEmail();
@@ -192,13 +191,11 @@ const Index = () => {
         `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(userEmail)}`
       );
 
-      // Handle 404 gracefully for new CVs
       if (response.status === 404) {
         console.log("No existing CV found - this is normal for new CVs");
         return;
       }
 
-      // Handle other errors
       if (!response.ok) {
         console.warn(`Failed to load CV: ${response.status}`);
         return;
@@ -206,13 +203,11 @@ const Index = () => {
 
       const text = await response.text();
       
-      // Handle empty response
       if (!text || text.trim() === '') {
         console.log("Empty response - no CV data available");
         return;
       }
 
-      // Parse JSON safely
       let result;
       try {
         result = JSON.parse(text);
@@ -221,13 +216,11 @@ const Index = () => {
         return;
       }
 
-      // Validate result structure
       if (!result.success || !result.cv) {
         console.log("Invalid CV data structure received");
         return;
       }
 
-      // Update CV data with loaded content
       setCvData({
         personal: result.cv.personalInfo || cvData.personal,
         education:
@@ -299,7 +292,6 @@ const Index = () => {
       console.log("CV data loaded successfully");
     } catch (error) {
       console.error("Error loading CV data:", error);
-      // Don't show error toast for failed loads - just log
     }
   };
 
@@ -352,62 +344,62 @@ const Index = () => {
   };
 
   const handleSaveWithVersion = async (versionInfo) => {
-  try {
-    setIsSaving(true);
-    setShowVersionDialog(false);
+    try {
+      setIsSaving(true);
+      setShowVersionDialog(false);
 
-    const userEmail = getAuthEmail();
-    if (!userEmail) {
-      toast.error("Authentication required. Please log in.");
-      return;
-    }
-
-    const payload = {
-      cvData,
-      selectedTemplate,
-      cvTitle: `CV #${cvNumber}`,
-      userEmail,
-      cvId: currentCVId,
-      cvNumber: cvNumber,
-      versionInfo,
-    };
-
-    const response = await fetch("/api/cv/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      if (result.cv.id && !currentCVId) {
-        setCurrentCVId(result.cv.id);
-        localStorage.setItem("currentCVId", result.cv.id);
+      const userEmail = getAuthEmail();
+      if (!userEmail) {
+        toast.error("Authentication required. Please log in.");
+        return;
       }
 
-      // IMPORTANT: Clear the versions cache so next time VersionManager opens, it fetches fresh data
-      clearVersionsCache(userEmail);
+      const payload = {
+        cvData,
+        selectedTemplate,
+        cvTitle: `CV #${cvNumber}`,
+        userEmail,
+        cvId: currentCVId,
+        cvNumber: cvNumber,
+        versionInfo,
+      };
 
-      const action = currentCVId ? "updated" : "created";
-      toast.success(
-        `CV ${action} successfully as version: ${versionInfo.versionName}`
-      );
-    } else {
-      throw new Error(result.error || "Failed to save CV");
+      const response = await fetch("/api/cv/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Set CV ID if this is first save - CV number stays the same
+        if (result.cv.id && !currentCVId) {
+          setCurrentCVId(result.cv.id);
+          localStorage.setItem("currentCVId", result.cv.id);
+        }
+
+        clearVersionsCache(userEmail);
+
+        const action = currentCVId ? "updated" : "created";
+        toast.success(
+          `CV ${action} successfully as version: ${versionInfo.versionName}`
+        );
+      } else {
+        throw new Error(result.error || "Failed to save CV");
+      }
+    } catch (error) {
+      console.error("CV Save Error:", error);
+      toast.error(error.message || "Failed to save CV");
+    } finally {
+      setIsSaving(false);
     }
-  } catch (error) {
-    console.error("CV Save Error:", error);
-    toast.error(error.message || "Failed to save CV");
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   const handleNewCV = () => {
     if (!userId) {
@@ -507,14 +499,19 @@ const Index = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!currentCVId) {
-      toast.error("Please save your CV first before exporting");
-      return;
-    }
-
     try {
       toast.info("Generating PDF...");
-      const response = await fetch(`/api/cv/export-pdf?cvId=${currentCVId}`);
+      
+      // Export current preview data
+      const response = await fetch('/api/cv/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cvData,
+          templateId: selectedTemplate,
+          cvNumber
+        })
+      });
 
       if (!response.ok) throw new Error("Failed to generate PDF");
 
@@ -570,17 +567,15 @@ const Index = () => {
       setAiAnalysis(null);
       setAtsScore(null);
 
-      if (version.cvId !== currentCVId) {
-        setCurrentCVId(version.cvId);
-        setCvNumber(version.cvSlug);
-        localStorage.setItem("currentCVId", version.cvId);
-        localStorage.setItem("currentCVNumber", version.cvSlug);
-        toast.success(
-          `Switched to CV #${version.cvSlug} and loaded version: ${version.versionLabel}`
-        );
-      } else {
-        toast.success(`Loaded version: ${version.versionLabel}`);
-      }
+      // Load the CV ID and CV number from the version
+      setCurrentCVId(version.cvId);
+      setCvNumber(version.cvSlug);
+      localStorage.setItem("currentCVId", version.cvId);
+      localStorage.setItem("currentCVNumber", version.cvSlug);
+
+      toast.success(
+        `Loaded CV #${version.cvSlug} - version: ${version.versionLabel}`
+      );
 
       setShowVersionManager(false);
     } catch (error) {
@@ -632,8 +627,7 @@ const Index = () => {
                 <PreviewPanel
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
-                    cvData={cvData}
-                  
+                  cvData={cvData}
                 />
               </div>
             )}

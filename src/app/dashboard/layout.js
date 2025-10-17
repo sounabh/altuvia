@@ -47,7 +47,7 @@ const Layout = ({ children }) => {
       label: 'CV Builder',
       icon: FileText,
       href: '/cv-builder',
-      comingSoon: true,
+      comingSoon: false,
     },
     {
       id: 'resource-hub',

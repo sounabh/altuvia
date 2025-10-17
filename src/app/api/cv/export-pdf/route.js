@@ -1,8 +1,63 @@
-// app/api/cv/export-pdf/route.js - PDF EXPORT
+// app/api/cv/export-pdf/route.js - FIXED PDF EXPORT
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import puppeteer from 'puppeteer';
 
+// POST: Export current preview (doesn't require saved CV)
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { cvData, templateId, cvNumber } = body;
+
+    if (!cvData) {
+      return NextResponse.json(
+        { error: "CV data is required" },
+        { status: 400 }
+      );
+    }
+
+    // Generate HTML from current preview data
+    const html = generateCVHTML(cvData, templateId || 'modern');
+
+    // Launch puppeteer and generate PDF
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20px',
+        right: '20px',
+        bottom: '20px',
+        left: '20px',
+      },
+    });
+    
+    await browser.close();
+
+    return new NextResponse(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=CV-${cvNumber || Date.now()}.pdf`,
+      },
+    });
+
+  } catch (error) {
+    console.error("PDF export error:", error);
+    return NextResponse.json(
+      { error: "Failed to export PDF" },
+      { status: 500 }
+    );
+  }
+}
+
+// GET: Export from saved CV or version
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,6 +66,7 @@ export async function GET(request) {
 
     let cvData;
     let templateId = "modern";
+    let fileName = `CV-${Date.now()}`;
 
     if (versionId) {
       // Export specific version
@@ -35,9 +91,10 @@ export async function GET(request) {
         volunteer: JSON.parse(version.volunteerSnapshot || "[]"),
       };
       templateId = version.templateId;
+      fileName = `CV-${version.versionLabel.replace(/\s+/g, '-')}`;
 
     } else if (cvId) {
-      // Export current CV
+      // Export current CV from database
       const cv = await prisma.cV.findUnique({
         where: { id: cvId },
         include: {
@@ -68,6 +125,7 @@ export async function GET(request) {
         volunteer: cv.volunteers,
       };
       templateId = cv.templateId;
+      fileName = `CV-${cv.cvNumber}`;
     } else {
       return NextResponse.json(
         { error: "CV ID or Version ID is required" },
@@ -103,7 +161,7 @@ export async function GET(request) {
     return new NextResponse(pdf, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=CV-${Date.now()}.pdf`,
+        'Content-Disposition': `attachment; filename=${fileName}.pdf`,
       },
     });
 
@@ -175,6 +233,7 @@ function generateCVHTML(cvData, templateId) {
         .entry-description {
           color: #374151;
           text-align: justify;
+          white-space: pre-wrap;
         }
         .skills-grid {
           display: grid;
@@ -194,8 +253,8 @@ function generateCVHTML(cvData, templateId) {
       <div class="header">
         <div class="name">${cvData.personal?.fullName || 'Your Name'}</div>
         <div class="contact-info">
-          ${cvData.personal?.email || ''} | 
-          ${cvData.personal?.phone || ''} | 
+          ${cvData.personal?.email || ''} ${cvData.personal?.email && (cvData.personal?.phone || cvData.personal?.location) ? '|' : ''} 
+          ${cvData.personal?.phone || ''} ${cvData.personal?.phone && cvData.personal?.location ? '|' : ''} 
           ${cvData.personal?.location || ''}
           ${cvData.personal?.linkedin ? `<br>LinkedIn: ${cvData.personal.linkedin}` : ''}
         </div>
@@ -208,16 +267,16 @@ function generateCVHTML(cvData, templateId) {
       </div>
       ` : ''}
 
-      ${cvData.experience?.length > 0 ? `
+      ${cvData.experience?.length > 0 && cvData.experience.some(exp => exp.company || exp.position) ? `
       <div class="section">
         <div class="section-title">Experience</div>
-        ${cvData.experience.map(exp => `
+        ${cvData.experience.filter(exp => exp.company || exp.position).map(exp => `
           <div class="entry">
-            <div class="entry-title">${exp.position || exp.company}</div>
+            <div class="entry-title">${exp.position || exp.company || 'Position'}</div>
             <div class="entry-subtitle">
-              ${exp.company} | ${exp.location || ''} | 
-              ${exp.startDate ? new Date(exp.startDate).getFullYear() : ''} - 
-              ${exp.isCurrent ? 'Present' : (exp.endDate ? new Date(exp.endDate).getFullYear() : '')}
+              ${exp.company || ''} ${exp.location ? `| ${exp.location}` : ''} ${exp.startDate || exp.endDate ? '|' : ''} 
+              ${exp.startDate ? new Date(exp.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} - 
+              ${exp.isCurrentRole ? 'Present' : (exp.endDate ? new Date(exp.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '')}
             </div>
             ${exp.description ? `<div class="entry-description">${exp.description}</div>` : ''}
           </div>
@@ -225,15 +284,18 @@ function generateCVHTML(cvData, templateId) {
       </div>
       ` : ''}
 
-      ${cvData.education?.length > 0 ? `
+      ${cvData.education?.length > 0 && cvData.education.some(edu => edu.institution || edu.degree) ? `
       <div class="section">
         <div class="section-title">Education</div>
-        ${cvData.education.map(edu => `
+        ${cvData.education.filter(edu => edu.institution || edu.degree).map(edu => `
           <div class="entry">
-            <div class="entry-title">${edu.degree || edu.institution}</div>
+            <div class="entry-title">${edu.degree || 'Degree'} ${edu.field || edu.fieldOfStudy ? `in ${edu.field || edu.fieldOfStudy}` : ''}</div>
             <div class="entry-subtitle">
-              ${edu.institution} | ${edu.fieldOfStudy || edu.field || ''} 
+              ${edu.institution || ''} 
               ${edu.gpa ? `| GPA: ${edu.gpa}` : ''}
+              ${edu.startDate || edu.endDate ? '|' : ''}
+              ${edu.startDate ? new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} - 
+              ${edu.endDate ? new Date(edu.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}
             </div>
             ${edu.description ? `<div class="entry-description">${edu.description}</div>` : ''}
           </div>
@@ -241,13 +303,13 @@ function generateCVHTML(cvData, templateId) {
       </div>
       ` : ''}
 
-      ${cvData.skills?.length > 0 ? `
+      ${cvData.skills?.length > 0 && cvData.skills.some(s => (s.skills || []).length > 0) ? `
       <div class="section">
         <div class="section-title">Skills</div>
         <div class="skills-grid">
-          ${cvData.skills.map(skillGroup => `
+          ${cvData.skills.filter(s => (s.skills || []).length > 0).map(skillGroup => `
             <div>
-              <span class="skill-category">${skillGroup.categoryName || skillGroup.name}:</span>
+              <span class="skill-category">${skillGroup.categoryName || skillGroup.name || 'Skills'}:</span>
               <span class="skill-list">${(skillGroup.skills || []).join(', ')}</span>
             </div>
           `).join('')}
@@ -255,16 +317,43 @@ function generateCVHTML(cvData, templateId) {
       </div>
       ` : ''}
 
-      ${cvData.projects?.length > 0 ? `
+      ${cvData.projects?.length > 0 && cvData.projects.some(proj => proj.name) ? `
       <div class="section">
         <div class="section-title">Projects</div>
-        ${cvData.projects.map(proj => `
+        ${cvData.projects.filter(proj => proj.name).map(proj => `
           <div class="entry">
             <div class="entry-title">${proj.name}</div>
-            <div class="entry-subtitle">
-              ${(proj.technologies || []).join(', ')}
-            </div>
+            ${proj.technologies ? `<div class="entry-subtitle">${proj.technologies}</div>` : ''}
             ${proj.description ? `<div class="entry-description">${proj.description}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      ${cvData.achievements?.length > 0 && cvData.achievements.some(ach => ach.title) ? `
+      <div class="section">
+        <div class="section-title">Achievements</div>
+        ${cvData.achievements.filter(ach => ach.title).map(ach => `
+          <div class="entry">
+            <div class="entry-title">${ach.title}</div>
+            ${ach.organization ? `<div class="entry-subtitle">${ach.organization} ${ach.date ? `| ${ach.date}` : ''}</div>` : ''}
+            ${ach.description ? `<div class="entry-description">${ach.description}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      ${cvData.volunteer?.length > 0 && cvData.volunteer.some(vol => vol.organization || vol.role) ? `
+      <div class="section">
+        <div class="section-title">Volunteer Experience</div>
+        ${cvData.volunteer.filter(vol => vol.organization || vol.role).map(vol => `
+          <div class="entry">
+            <div class="entry-title">${vol.role || 'Volunteer'}</div>
+            <div class="entry-subtitle">
+              ${vol.organization || ''} ${vol.location ? `| ${vol.location}` : ''}
+            </div>
+            ${vol.description ? `<div class="entry-description">${vol.description}</div>` : ''}
+            ${vol.impact ? `<div class="entry-description"><em>${vol.impact}</em></div>` : ''}
           </div>
         `).join('')}
       </div>
