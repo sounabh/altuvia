@@ -142,11 +142,7 @@ export const AchievementsForm = () => {
         Add Another Achievement
       </Button>
 
-      <div className="flex justify-end pt-4">
-        <Button className="bg-cvAccent hover:bg-cvAccentHover text-white">
-          Save & Continue
-        </Button>
-      </div>
+      
     </div>
   );
 };

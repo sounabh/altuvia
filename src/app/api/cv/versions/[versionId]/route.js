@@ -1,4 +1,6 @@
 // app/api/cv/versions/[versionId]/route.js - DELETE
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 

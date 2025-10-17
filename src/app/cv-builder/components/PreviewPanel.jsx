@@ -1,233 +1,588 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Eye, Palette } from 'lucide-react';
-import { ModernTemplate } from '../(templates)/ModernTemplate';
-import { ClassicTemplate } from '../(templates)/ClassicTemplate';
-import { MinimalTemplate } from '../(templates)/MinimalTemplate';
-import { useCVData } from '../page';
+import React from "react";
+import { Eye, Palette } from "lucide-react";
 
 const Label = ({ children, className }) => (
   <span className={className}>{children}</span>
 );
 
-export const PreviewPanel = ({
-  selectedTemplate,
-  onTemplateChange,
-}) => {
-  const { cvData } = useCVData();
-
+export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {} }) => {
   const formatDate = (date) => {
-    if (!date) return '';
-    const [year, month] = date.split('-');
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (!date) return "";
+    const [year, month] = date.split("-");
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     return `${monthNames[parseInt(month) - 1]} ${year}`;
+  };
+
+  const safeData = {
+    personal: cvData.personal || {},
+    education: Array.isArray(cvData.education) ? cvData.education : [],
+    experience: Array.isArray(cvData.experience) ? cvData.experience : [],
+    projects: Array.isArray(cvData.projects) ? cvData.projects : [],
+    skills: Array.isArray(cvData.skills) ? cvData.skills : [],
+    achievements: Array.isArray(cvData.achievements) ? cvData.achievements : [],
+    volunteer: Array.isArray(cvData.volunteer) ? cvData.volunteer : [],
+  };
+
+  const hasData = (section) => {
+    if (!section || !Array.isArray(section)) return false;
+    return section.some((item) => {
+      if (!item) return false;
+      return Object.values(item).some((value) => {
+        if (Array.isArray(value)) return value.length > 0;
+        return value && value.toString().trim() !== "";
+      });
+    });
+  };
+
+  const renderTemplate = () => {
+    switch (selectedTemplate) {
+      case "modern":
+        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+      case "classic":
+        return <ClassicPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+      case "minimal":
+        return <MinimalPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+      default:
+        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} />;
+    }
   };
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Preview Header */}
-      <div className="p-4 border-b border-cvBorder bg-cvLightBg">
+      <div className="p-4 border-b border-gray-300 bg-gray-50">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Eye className="w-5 h-5 cv-accent" />
-            <h3 className="font-semibold cv-heading">Live Preview</h3>
+            <Eye className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-gray-800">Live Preview</h3>
           </div>
-          <Button
-            size="sm"
-            className="bg-cvAccent hover:bg-cvAccentHover text-white"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export PDF
-          </Button>
         </div>
 
         <div className="flex items-center space-x-3">
-          <Palette className="w-4 h-4 cv-body" />
-          <Label className="cv-body text-sm">Template:</Label>
-          <Select value={selectedTemplate} onValueChange={onTemplateChange}>
-            <SelectTrigger className="w-[150px] border-cvBorder">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="modern">Modern</SelectItem>
-              <SelectItem value="classic">Classic</SelectItem>
-              <SelectItem value="minimal">Minimal</SelectItem>
-            </SelectContent>
-          </Select>
+          <Palette className="w-4 h-4 text-gray-600" />
+          <Label className="text-gray-700 text-sm">Template:</Label>
+          <select
+            value={selectedTemplate}
+            onChange={(e) => onTemplateChange(e.target.value)}
+            className="w-[150px] border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="modern">Modern</option>
+            <option value="classic">Classic</option>
+            <option value="minimal">Minimal</option>
+          </select>
         </div>
       </div>
 
-      {/* Preview Content */}
-      <div className="flex-1 overflow-auto p-4 bg-gray-100">
-        <div className="bg-white shadow-lg mx-auto max-w-[210mm] min-h-[297mm] p-8">
-          <CVPreview data={cvData} formatDate={formatDate} />
+      <div className="flex-1 overflow-auto p-6 bg-gray-100">
+        <div className="bg-white shadow-xl mx-auto max-w-[210mm] rounded-sm overflow-hidden">
+          {renderTemplate()}
         </div>
       </div>
     </div>
   );
 };
 
-// CV Preview Component
-const CVPreview = ({ data, formatDate }) => {
-  return (
-    <div className="space-y-6">
-      {/* Personal Info */}
-      {data.personal.fullName && (
-        <div className="text-center border-b-2 border-gray-300 pb-4">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">{data.personal.fullName}</h1>
-          <div className="flex flex-wrap justify-center gap-3 text-sm text-gray-600">
-            {data.personal.email && <span>✉ {data.personal.email}</span>}
-            {data.personal.phone && <span>📞 {data.personal.phone}</span>}
-            {data.personal.location && <span>📍 {data.personal.location}</span>}
-            {data.personal.website && <span>🌐 {data.personal.website}</span>}
-            {data.personal.linkedin && <span>💼 {data.personal.linkedin}</span>}
-          </div>
-          {data.personal.summary && (
-            <p className="mt-3 text-gray-700 text-sm leading-relaxed">{data.personal.summary}</p>
-          )}
-        </div>
-      )}
+const ModernPreview = ({ data, formatDate, hasData }) => (
+  <div className="p-8 font-sans text-sm">
+    <div className="mb-8">
+      <h1 className="text-4xl font-bold text-gray-900 mb-1">
+        {data.personal?.fullName || "Your Name"}
+      </h1>
+      <p className="text-lg text-gray-600 mb-4">Software Engineering Student</p>
+      <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+        {data.personal?.email && <span>✉ {data.personal.email}</span>}
+        {data.personal?.phone && <span>📞 {data.personal.phone}</span>}
+        {data.personal?.location && <span>📍 {data.personal.location}</span>}
+        {data.personal?.linkedin && <span>💼 {data.personal.linkedin}</span>}
+      </div>
+    </div>
 
-      {/* Education */}
-      {data.education.some(e => e.institution || e.field) && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3">EDUCATION</h2>
-          {data.education.filter(e => e.institution || e.field).map((edu, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-gray-800">{edu.institution || 'Institution'}</h3>
-                  <p className="text-sm text-gray-600">
-                    {edu.degree && `${edu.degree} in `}{edu.field}
-                    {edu.gpa && ` - GPA: ${edu.gpa}`}
-                  </p>
-                </div>
-                {(edu.startDate || edu.endDate) && (
-                  <span className="text-sm text-gray-600">
-                    {formatDate(edu.startDate)} - {formatDate(edu.endDate) || 'Present'}
-                  </span>
-                )}
+    {data.personal?.summary && (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Professional Summary
+        </h2>
+        <p className="text-sm text-gray-700 leading-relaxed">{data.personal.summary}</p>
+      </div>
+    )}
+
+    {hasData(data.education) && (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Education
+        </h2>
+        {data.education.map((edu, i) => (
+          (edu.institution || edu.degree || edu.field) && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-semibold text-gray-900">
+                  {edu.degree || "Degree"} in {edu.field || "Field"}
+                </h3>
+                <span className="text-sm text-gray-600">
+                  {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
+                </span>
               </div>
-              {edu.description && <p className="text-sm text-gray-600 mt-1">{edu.description}</p>}
+              <p className="text-sm text-gray-700 mb-2">{edu.institution}</p>
+              {edu.gpa && <p className="text-sm text-gray-600">GPA: {edu.gpa}</p>}
+              {edu.description && <p className="text-sm text-gray-600">{edu.description}</p>}
             </div>
-          ))}
-        </div>
-      )}
+          )
+        ))}
+      </div>
+    )}
 
-      {/* Experience */}
-      {data.experience.some(e => e.company || e.position) && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3">EXPERIENCE</h2>
-          {data.experience.filter(e => e.company || e.position).map((exp, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-gray-800">{exp.position || 'Position'}</h3>
-                  <p className="text-sm text-gray-600">{exp.company}{exp.location && ` - ${exp.location}`}</p>
-                </div>
-                {(exp.startDate || exp.endDate) && (
-                  <span className="text-sm text-gray-600">
-                    {formatDate(exp.startDate)} - {exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}
-                  </span>
-                )}
+    {hasData(data.experience) && (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Experience
+        </h2>
+        {data.experience.map((exp, i) => (
+          (exp.company || exp.position) && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-semibold text-gray-900">{exp.position}</h3>
+                <span className="text-sm text-gray-600">
+                  {formatDate(exp.startDate)} -{" "}
+                  {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                </span>
               </div>
+              <p className="text-sm text-gray-700 mb-2">
+                {exp.company}
+                {exp.location && ` • ${exp.location}`}
+              </p>
               {exp.description && (
-                <div className="text-sm text-gray-600 mt-1 whitespace-pre-line">{exp.description}</div>
+                <div className="text-sm text-gray-600 whitespace-pre-line">
+                  {exp.description}
+                </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
+          )
+        ))}
+      </div>
+    )}
 
-      {/* Projects */}
-      {data.projects.some(p => p.name) && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3">PROJECTS</h2>
-          {data.projects.filter(p => p.name).map((proj, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between items-start">
-                <h3 className="font-semibold text-gray-800">{proj.name}</h3>
-                {(proj.startDate || proj.endDate) && (
-                  <span className="text-sm text-gray-600">
-                    {formatDate(proj.startDate)} - {formatDate(proj.endDate)}
-                  </span>
-                )}
-              </div>
-              {proj.description && <p className="text-sm text-gray-600 mt-1">{proj.description}</p>}
+    {hasData(data.projects) && (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Projects
+        </h2>
+        {data.projects.map((proj, i) => (
+          proj.name && (
+            <div key={i} className="mb-4">
+              <h3 className="font-semibold text-gray-900 mb-1">{proj.name}</h3>
               {proj.technologies && (
-                <p className="text-sm text-gray-600 mt-1">
-                  <strong>Technologies:</strong> {proj.technologies}
+                <p className="text-sm text-gray-600 mb-2">{proj.technologies}</p>
+              )}
+              {proj.description && (
+                <p className="text-sm text-gray-700 mb-2">{proj.description}</p>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.skills) && (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Skills
+        </h2>
+        <div className="grid grid-cols-2 gap-4">
+          {data.skills.map((category, i) => {
+            const skillsList = Array.isArray(category.skills) ? category.skills : [];
+            return skillsList.length > 0 ? (
+              <div key={i}>
+                <h4 className="font-medium text-gray-900 mb-1">
+                  {category.name || "Skills"}
+                </h4>
+                <p className="text-sm text-gray-600">{skillsList.join(", ")}</p>
+              </div>
+            ) : null;
+          })}
+        </div>
+      </div>
+    )}
+
+    {hasData(data.achievements) && (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Achievements
+        </h2>
+        {data.achievements.map((ach, i) => (
+          ach.title && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-semibold text-gray-900">{ach.title}</h3>
+                {ach.date && <span className="text-sm text-gray-600">{ach.date}</span>}
+              </div>
+              {ach.organization && (
+                <p className="text-sm text-gray-700 mb-2">{ach.organization}</p>
+              )}
+              {ach.type && <p className="text-sm text-gray-600 mb-2">{ach.type}</p>}
+              {ach.description && (
+                <p className="text-sm text-gray-600">{ach.description}</p>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.volunteer) && (
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 mb-3 pb-2 border-b-2 border-blue-600">
+          Volunteer Experience
+        </h2>
+        {data.volunteer.map((vol, i) => (
+          (vol.organization || vol.role) && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-semibold text-gray-900">{vol.role}</h3>
+                <span className="text-sm text-gray-600">
+                  {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                {vol.organization}
+                {vol.location && ` • ${vol.location}`}
+              </p>
+              {vol.description && (
+                <p className="text-sm text-gray-600 mb-2">{vol.description}</p>
+              )}
+              {vol.impact && (
+                <p className="text-sm text-gray-600 italic">{vol.impact}</p>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+const ClassicPreview = ({ data, formatDate, hasData }) => (
+  <div className="p-8 font-serif text-sm">
+    <div className="text-center mb-8 border-b-2 border-gray-800 pb-4">
+      <h1 className="text-3xl font-bold mb-2 text-gray-900">
+        {data.personal?.fullName || "Your Name"}
+      </h1>
+      <div className="text-sm space-y-1 text-gray-700">
+        {data.personal?.email && <p>{data.personal.email}</p>}
+        {data.personal?.phone && <p>{data.personal.phone}</p>}
+        {data.personal?.location && <p>{data.personal.location}</p>}
+        {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
+      </div>
+    </div>
+
+    {data.personal?.summary && (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Professional Summary
+        </h2>
+        <p className="text-sm leading-relaxed text-justify text-gray-700">
+          {data.personal.summary}
+        </p>
+      </div>
+    )}
+
+    {hasData(data.education) && (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Education
+        </h2>
+        {data.education.map((edu, i) => (
+          (edu.institution || edu.degree || edu.field) && (
+            <div key={i} className="mb-3">
+              <div className="flex justify-between mb-1">
+                <strong className="text-gray-900">
+                  {edu.degree || "Degree"} in {edu.field || "Field"}
+                </strong>
+                <span className="text-sm text-gray-700">
+                  {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
+                </span>
+              </div>
+              <em className="text-gray-700">{edu.institution}</em>
+              {edu.gpa && (
+                <p className="text-sm text-gray-700">
+                  <strong>GPA:</strong> {edu.gpa}
                 </p>
               )}
-              <div className="flex gap-3 text-sm text-blue-600 mt-1">
-                {proj.githubUrl && <a href={proj.githubUrl} className="hover:underline">GitHub</a>}
-                {proj.liveUrl && <a href={proj.liveUrl} className="hover:underline">Live Demo</a>}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.experience) && (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Professional Experience
+        </h2>
+        {data.experience.map((exp, i) => (
+          (exp.company || exp.position) && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between mb-1">
+                <strong className="text-gray-900">{exp.position}</strong>
+                <span className="text-sm text-gray-700">
+                  {formatDate(exp.startDate)} -{" "}
+                  {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                </span>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Skills */}
-      {data.skills.some(c => c.name && c.skills.length > 0) && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3">SKILLS</h2>
-          {data.skills.filter(c => c.name && c.skills.length > 0).map((category, i) => (
-            <div key={i} className="mb-2">
-              <span className="font-semibold text-gray-800">{category.name}: </span>
-              <span className="text-sm text-gray-600">{category.skills.join(', ')}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Achievements */}
-      {data.achievements.some(a => a.title) && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3">ACHIEVEMENTS</h2>
-          {data.achievements.filter(a => a.title).map((ach, i) => (
-            <div key={i} className="mb-2">
-              <div className="flex justify-between">
-                <h3 className="font-semibold text-gray-800">{ach.title}</h3>
-                {ach.date && <span className="text-sm text-gray-600">{formatDate(ach.date)}</span>}
-              </div>
-              {ach.organization && <p className="text-sm text-gray-600">{ach.organization}</p>}
-              {ach.description && <p className="text-sm text-gray-600 mt-1">{ach.description}</p>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Volunteer */}
-      {data.volunteer.some(v => v.organization) && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3">VOLUNTEER & ACTIVITIES</h2>
-          {data.volunteer.filter(v => v.organization).map((vol, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-800">{vol.role || 'Volunteer'}</h3>
-                  <p className="text-sm text-gray-600">{vol.organization}</p>
+              <em className="text-gray-700">
+                {exp.company}
+                {exp.location && ` • ${exp.location}`}
+              </em>
+              {exp.description && (
+                <div className="text-sm text-gray-700 mt-2 whitespace-pre-line">
+                  {exp.description}
                 </div>
-                {(vol.startDate || vol.endDate) && (
-                  <span className="text-sm text-gray-600">
-                    {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
-                  </span>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.projects) && (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Projects
+        </h2>
+        {data.projects.map((proj, i) => (
+          proj.name && (
+            <div key={i} className="mb-3">
+              <strong className="text-gray-900">{proj.name}</strong>
+              {proj.technologies && (
+                <p className="text-sm text-gray-700 mt-1">
+                  Technologies: {proj.technologies}
+                </p>
+              )}
+              {proj.description && (
+                <p className="text-sm text-gray-700 mt-1">{proj.description}</p>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.skills) && (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Technical Skills
+        </h2>
+        <div className="text-sm space-y-2">
+          {data.skills.map((category, i) => {
+            const skillsList = Array.isArray(category.skills) ? category.skills : [];
+            return skillsList.length > 0 ? (
+              <div key={i}>
+                <strong className="text-gray-900">{category.name || "Skills"}:</strong>{" "}
+                <span className="text-gray-700">{skillsList.join(", ")}</span>
+              </div>
+            ) : null;
+          })}
+        </div>
+      </div>
+    )}
+
+    {hasData(data.achievements) && (
+      <div className="mb-6">
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Achievements
+        </h2>
+        <div className="text-sm space-y-2">
+          {data.achievements.map((ach, i) => (
+            ach.title && (
+              <div key={i}>
+                <strong className="text-gray-900">{ach.title}</strong>
+                {ach.organization && (
+                  <p className="text-sm text-gray-700">{ach.organization}</p>
                 )}
               </div>
-              {vol.description && <p className="text-sm text-gray-600 mt-1">{vol.description}</p>}
-              {vol.impact && <p className="text-sm text-gray-600 mt-1"><strong>Impact:</strong> {vol.impact}</p>}
-            </div>
+            )
           ))}
         </div>
-      )}
+      </div>
+    )}
 
-      {!data.personal.fullName && !data.education[0].institution && !data.experience[0].company && (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-lg">Start filling out the form to see your CV preview here</p>
+    {hasData(data.volunteer) && (
+      <div>
+        <h2 className="text-lg font-bold uppercase tracking-wide border-b border-gray-400 pb-1 mb-3 text-gray-900">
+          Volunteer
+        </h2>
+        <div className="text-sm space-y-2">
+          {data.volunteer.map((vol, i) => (
+            (vol.organization || vol.role) && (
+              <div key={i}>
+                <strong className="text-gray-900">
+                  {vol.role || "Volunteer"}
+                </strong>
+                <p className="text-sm text-gray-700">{vol.organization}</p>
+              </div>
+            )
+          ))}
         </div>
-      )}
+      </div>
+    )}
+  </div>
+);
+
+const MinimalPreview = ({ data, formatDate, hasData }) => (
+  <div className="p-8 font-sans text-sm">
+    <div className="mb-8">
+      <h1 className="text-4xl font-light text-gray-900 mb-1">
+        {data.personal?.fullName || "Your Name"}
+      </h1>
+      <p className="text-lg text-gray-600 mb-4">Software Engineer</p>
+      <div className="text-sm text-gray-500 space-y-1">
+        {data.personal?.email && <p>{data.personal.email}</p>}
+        {data.personal?.phone && <p>{data.personal.phone}</p>}
+        {data.personal?.location && <p>{data.personal.location}</p>}
+        {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
+      </div>
     </div>
-  );
-};
+
+    {data.personal?.summary && (
+      <div className="mb-8">
+        <h2 className="text-lg font-light text-gray-900 mb-3">Summary</h2>
+        <p className="text-sm text-gray-700 leading-relaxed">{data.personal.summary}</p>
+      </div>
+    )}
+
+    {hasData(data.education) && (
+      <div className="mb-8">
+        <h2 className="text-lg font-light text-gray-900 mb-3">Education</h2>
+        {data.education.map((edu, i) => (
+          (edu.institution || edu.degree || edu.field) && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between items-baseline mb-1">
+                <h3 className="font-medium text-gray-900">
+                  {edu.degree || "Degree"} in {edu.field || "Field"}
+                </h3>
+                <span className="text-sm text-gray-500">
+                  {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">{edu.institution}</p>
+              {edu.gpa && <p className="text-sm text-gray-500">GPA: {edu.gpa}</p>}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.experience) && (
+      <div className="mb-8">
+        <h2 className="text-lg font-light text-gray-900 mb-3">Experience</h2>
+        {data.experience.map((exp, i) => (
+          (exp.company || exp.position) && (
+            <div key={i} className="mb-4">
+              <div className="flex justify-between items-baseline mb-1">
+                <h3 className="font-medium text-gray-900">{exp.position}</h3>
+                <span className="text-sm text-gray-500">
+                  {formatDate(exp.startDate)} —{" "}
+                  {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">{exp.company}</p>
+              {exp.description && (
+                <div className="text-sm text-gray-700 mt-2 whitespace-pre-line">
+                  {exp.description}
+                </div>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.projects) && (
+      <div className="mb-8">
+        <h2 className="text-lg font-light text-gray-900 mb-3">Projects</h2>
+        {data.projects.map((proj, i) => (
+          proj.name && (
+            <div key={i} className="mb-4">
+              <h3 className="font-medium text-gray-900 mb-1">{proj.name}</h3>
+              {proj.technologies && (
+                <p className="text-sm text-gray-600 mb-1">{proj.technologies}</p>
+              )}
+              {proj.description && (
+                <p className="text-sm text-gray-700">{proj.description}</p>
+              )}
+            </div>
+          )
+        ))}
+      </div>
+    )}
+
+    {hasData(data.skills) && (
+      <div className="mb-8">
+        <h2 className="text-lg font-light text-gray-900 mb-3">Skills</h2>
+        <div className="space-y-2 text-sm">
+          {data.skills.map((category, i) => {
+            const skillsList = Array.isArray(category.skills) ? category.skills : [];
+            console.log('====================================');
+            console.log(skillsList);
+            console.log('====================================');
+            return skillsList.length > 0 ? (
+              <div key={i}>
+                <span className="font-medium text-gray-900">
+                  {category.name || "Skills"}:
+                </span>{" "}
+                <span className="text-gray-600">{skillsList.join(", ")}</span>
+              </div>
+            ) : null;
+          })}
+        </div>
+      </div>
+    )}
+
+    {hasData(data.achievements) && (
+      <div className="mb-8">
+        <h2 className="text-lg font-light text-gray-900 mb-3">Achievements</h2>
+        <div className="space-y-2 text-sm">
+          {data.achievements.map((ach, i) => (
+            ach.title && (
+              <div key={i}>
+                <span className="font-medium text-gray-900">{ach.title}</span>
+                {ach.organization && (
+                  <p className="text-gray-600">{ach.organization}</p>
+                )}
+              </div>
+            )
+          ))}
+        </div>
+      </div>
+    )}
+
+    {hasData(data.volunteer) && (
+      <div>
+        <h2 className="text-lg font-light text-gray-900 mb-3">Volunteer</h2>
+        <div className="space-y-2 text-sm">
+          {data.volunteer.map((vol, i) => (
+            (vol.organization || vol.role) && (
+              <div key={i}>
+                <span className="font-medium text-gray-900">
+                  {vol.role || "Volunteer"}
+                </span>
+                <p className="text-gray-600">{vol.organization}</p>
+              </div>
+            )
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);

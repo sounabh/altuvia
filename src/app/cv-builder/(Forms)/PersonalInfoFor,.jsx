@@ -136,19 +136,7 @@ export const PersonalInfoForm = () => {
         </CardContent>
       </Card>
 
-      <div className="flex justify-between items-center pt-4">
-        <Button 
-          variant="outline"
-          className="border-cvAccent text-cvAccent hover:bg-cvAccent hover:text-white"
-        >
-          Import from LinkedIn
-        </Button>
-        <Button 
-          className="bg-cvAccent hover:bg-cvAccentHover text-white"
-        >
-          Save & Continue
-        </Button>
-      </div>
+    
     </div>
   );
 };

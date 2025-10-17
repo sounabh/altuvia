@@ -8,10 +8,11 @@ import { Sidebar } from "./components/Sidebar";
 import { CVBuilder } from "./components/CVBuilder";
 import { PreviewPanel } from "./components/PreviewPanel";
 import SmartTipsPanel from "./components/SmartTipsPanel";
-import { VersionManager } from "./components/VersionManager";
+
 import { VersionSaveDialog } from "./components/VersionSavedDialog";
 import { toast } from "sonner";
 import AIAnalysisChatPopup from "./components/AiAnalysisChatPopup";
+import { VersionManager, clearVersionsCache } from "./components/VersionManager";
 
 // Context for CV Data
 export const CVDataContext = createContext();
@@ -351,59 +352,62 @@ const Index = () => {
   };
 
   const handleSaveWithVersion = async (versionInfo) => {
-    try {
-      setIsSaving(true);
-      setShowVersionDialog(false);
+  try {
+    setIsSaving(true);
+    setShowVersionDialog(false);
 
-      const userEmail = getAuthEmail();
-      if (!userEmail) {
-        toast.error("Authentication required. Please log in.");
-        return;
-      }
-
-      const payload = {
-        cvData,
-        selectedTemplate,
-        cvTitle: `CV #${cvNumber}`,
-        userEmail,
-        cvId: currentCVId,
-        cvNumber: cvNumber,
-        versionInfo,
-      };
-
-      const response = await fetch("/api/cv/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        if (result.cv.id && !currentCVId) {
-          setCurrentCVId(result.cv.id);
-          localStorage.setItem("currentCVId", result.cv.id);
-        }
-
-        const action = currentCVId ? "updated" : "created";
-        toast.success(
-          `CV ${action} successfully as version: ${versionInfo.versionName}`
-        );
-      } else {
-        throw new Error(result.error || "Failed to save CV");
-      }
-    } catch (error) {
-      console.error("CV Save Error:", error);
-      toast.error(error.message || "Failed to save CV");
-    } finally {
-      setIsSaving(false);
+    const userEmail = getAuthEmail();
+    if (!userEmail) {
+      toast.error("Authentication required. Please log in.");
+      return;
     }
-  };
+
+    const payload = {
+      cvData,
+      selectedTemplate,
+      cvTitle: `CV #${cvNumber}`,
+      userEmail,
+      cvId: currentCVId,
+      cvNumber: cvNumber,
+      versionInfo,
+    };
+
+    const response = await fetch("/api/cv/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      if (result.cv.id && !currentCVId) {
+        setCurrentCVId(result.cv.id);
+        localStorage.setItem("currentCVId", result.cv.id);
+      }
+
+      // IMPORTANT: Clear the versions cache so next time VersionManager opens, it fetches fresh data
+      clearVersionsCache(userEmail);
+
+      const action = currentCVId ? "updated" : "created";
+      toast.success(
+        `CV ${action} successfully as version: ${versionInfo.versionName}`
+      );
+    } else {
+      throw new Error(result.error || "Failed to save CV");
+    }
+  } catch (error) {
+    console.error("CV Save Error:", error);
+    toast.error(error.message || "Failed to save CV");
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handleNewCV = () => {
     if (!userId) {
@@ -628,6 +632,8 @@ const Index = () => {
                 <PreviewPanel
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
+                    cvData={cvData}
+                  
                 />
               </div>
             )}
