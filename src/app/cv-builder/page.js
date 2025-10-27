@@ -1,4 +1,3 @@
-// page.jsx - FIXED VERSION WITH PROPER CV NUMBER HANDLING
 "use client";
 
 import React, { useState, createContext, useContext, useEffect } from "react";
@@ -17,7 +16,6 @@ import {
   clearVersionsCache,
 } from "./components/VersionManager";
 
-// Context for CV Data
 export const CVDataContext = createContext();
 
 export const useCVData = () => {
@@ -43,7 +41,6 @@ const Index = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showVersionDialog, setShowVersionDialog] = useState(false);
 
-  // AI-related states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [atsScore, setAtsScore] = useState(null);
@@ -129,10 +126,10 @@ const Index = () => {
 
   const [activeSection, setActiveSection] = useState("personal");
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
+  const [themeColor, setThemeColor] = useState("#1e40af");
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showVersionManager, setShowVersionManager] = useState(false);
 
-  // Initialize from localStorage on mount
   useEffect(() => {
     try {
       const authData = getAuthData();
@@ -292,6 +289,10 @@ const Index = () => {
         setSelectedTemplate(result.cv.templateId);
       }
 
+      if (result.cv.colorScheme) {
+        setThemeColor(result.cv.colorScheme);
+      }
+
       console.log("CV data loaded successfully");
     } catch (error) {
       console.error("Error loading CV data:", error);
@@ -346,65 +347,65 @@ const Index = () => {
     setShowVersionDialog(true);
   };
 
-  const handleSaveWithVersion = async (versionInfo) => {
-    try {
-      setIsSaving(true);
-      setShowVersionDialog(false);
+ const handleSaveWithVersion = async (versionInfo) => {
+  try {
+    setIsSaving(true);
+    setShowVersionDialog(false);
 
-      const userEmail = getAuthEmail();
-      if (!userEmail) {
-        toast.error("Authentication required. Please log in.");
-        return;
-      }
-
-      const payload = {
-        cvData,
-        selectedTemplate,
-        cvTitle: `CV #${cvNumber}`,
-        userEmail,
-        cvId: currentCVId,
-        cvNumber: cvNumber,
-        versionInfo,
-      };
-
-      const response = await fetch("/api/cv/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Set CV ID if this is first save - CV number stays the same
-        if (result.cv.id && !currentCVId) {
-          setCurrentCVId(result.cv.id);
-          localStorage.setItem("currentCVId", result.cv.id);
-        }
-
-        clearVersionsCache(userEmail);
-
-        const action = currentCVId ? "updated" : "created";
-        toast.success(
-          `CV ${action} successfully as version: ${versionInfo.versionName}`
-        );
-      } else {
-        throw new Error(result.error || "Failed to save CV");
-      }
-    } catch (error) {
-      console.error("CV Save Error:", error);
-      toast.error(error.message || "Failed to save CV");
-    } finally {
-      setIsSaving(false);
+    const userEmail = getAuthEmail();
+    if (!userEmail) {
+      toast.error("Authentication required. Please log in.");
+      return;
     }
-  };
+
+    const payload = {
+      cvData,
+      selectedTemplate,
+      themeColor,  // ADD THIS LINE - Include theme color in payload
+      cvTitle: `CV #${cvNumber}`,
+      userEmail,
+      cvId: currentCVId,
+      cvNumber: cvNumber,
+      versionInfo,
+    };
+
+    const response = await fetch("/api/cv/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      if (result.cv.id && !currentCVId) {
+        setCurrentCVId(result.cv.id);
+        localStorage.setItem("currentCVId", result.cv.id);
+      }
+
+      clearVersionsCache(userEmail);
+
+      const action = currentCVId ? "updated" : "created";
+      toast.success(
+        `CV ${action} successfully as version: ${versionInfo.versionName}`
+      );
+    } else {
+      throw new Error(result.error || "Failed to save CV");
+    }
+  } catch (error) {
+    console.error("CV Save Error:", error);
+    toast.error(error.message || "Failed to save CV");
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handleNewCV = () => {
     if (!userId) {
@@ -420,6 +421,7 @@ const Index = () => {
 
     setAiAnalysis(null);
     setAtsScore(null);
+    setThemeColor("#1e40af");
 
     setCvData({
       personal: {
@@ -507,13 +509,13 @@ const Index = () => {
     try {
       toast.info("Generating PDF...");
 
-      // Export current preview data
       const response = await fetch("/api/cv/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cvData,
           templateId: selectedTemplate,
+          themeColor,
           cvNumber,
         }),
       });
@@ -569,10 +571,13 @@ const Index = () => {
         setSelectedTemplate(version.templateId);
       }
 
+      if (version.colorScheme) {
+        setThemeColor(version.colorScheme);
+      }
+
       setAiAnalysis(null);
       setAtsScore(null);
 
-      // Load the CV ID and CV number from the version
       setCurrentCVId(version.cvId);
       setCvNumber(version.cvSlug);
       localStorage.setItem("currentCVId", version.cvId);
@@ -634,6 +639,8 @@ const Index = () => {
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
                   cvData={cvData}
+                  themeColor={themeColor}
+                  onThemeColorChange={setThemeColor}
                 />
               </div>
             )}

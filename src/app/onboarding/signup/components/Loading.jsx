@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from "react";
+import { useSession } from "next-auth/react";
 
 /**
  * LoadingStep component - Handles profile submission with premium UI/UX
+ * Uses NextAuth session instead of localStorage
  * 
  * @param {Object} props - Component properties
  * @param {Object} props.userData - User data collected during onboarding
@@ -9,6 +11,8 @@ import { useEffect, useState, useRef } from "react";
  * @returns {JSX.Element} Premium loading interface
  */
 export const LoadingStep = ({ userData, onComplete }) => {
+  const { data: session, update: updateSession } = useSession();
+  
   // State management
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -17,64 +21,6 @@ export const LoadingStep = ({ userData, onComplete }) => {
 
   // Ref to prevent duplicate submissions
   const hasSubmittedRef = useRef(false);
-
-  /**
-   * Get authentication token from localStorage with validation
-   */
-  const getAuthToken = () => {
-    try {
-      const authData = typeof window !== "undefined" 
-        ? localStorage.getItem("authData") 
-        : null;
-      
-      if (!authData) {
-        console.warn("⚠️ No auth data found in localStorage");
-        return null;
-      }
-
-      const parsedData = JSON.parse(authData);
-      
-      if (!parsedData.token) {
-        console.warn("⚠️ No token found in auth data");
-        return null;
-      }
-
-      return parsedData.token;
-    } catch (error) {
-      console.error("❌ Error parsing auth data:", error);
-      return null;
-    }
-  };
-
-  /**
-   * Update localStorage with new token and profile completion flag
-   */
-  const updateAuthData = (newToken, additionalData = {}) => {
-    try {
-      const existingAuthStr = localStorage.getItem("authData");
-      
-      if (existingAuthStr) {
-        const existingAuth = JSON.parse(existingAuthStr);
-        const updatedAuth = {
-          ...existingAuth,
-          token: newToken || existingAuth.token,
-          hasCompleteProfile: true,
-          lastLogin: new Date().toISOString(),
-          ...additionalData
-        };
-        
-        localStorage.setItem("authData", JSON.stringify(updatedAuth));
-        console.log("✅ Updated localStorage with profile completion flag");
-        return true;
-      } else {
-        console.warn("⚠️ No existing auth data to update");
-        return false;
-      }
-    } catch (error) {
-      console.error("❌ Error updating localStorage:", error);
-      return false;
-    }
-  };
 
   /**
    * Prepare submission data with security considerations
@@ -110,7 +56,8 @@ export const LoadingStep = ({ userData, onComplete }) => {
     setSubmitError(null);
 
     try {
-      const token = getAuthToken();
+      // Get token from session
+      const token = session?.token;
       
       if (!token) {
         throw new Error("Authentication token not found. Please sign in again.");
@@ -139,16 +86,14 @@ export const LoadingStep = ({ userData, onComplete }) => {
       console.log("📥 Server response:", data);
 
       if (response.ok && data.success !== false) {
-        if (data.token) {
-          updateAuthData(data.token, {
-            userId: data.data?.userId,
-            name: data.data?.name,
-            email: data.data?.email,
-            provider: data.data?.provider
-          });
-        } else {
-          updateAuthData(null);
-        }
+        // Update session with new token and profile completion status
+        await updateSession({
+          token: data.token || token,
+          hasCompleteProfile: true,
+          userId: data.data?.userId,
+          name: data.data?.name,
+          email: data.data?.email,
+        });
 
         setPhase("complete");
         setIsComplete(true);
@@ -160,12 +105,16 @@ export const LoadingStep = ({ userData, onComplete }) => {
         }
       } 
       else if (response.status === 401) {
-        localStorage.removeItem("authData");
         throw new Error("Your session has expired. Please sign in again.");
       }
       else if (response.status === 409 && data.userExists) {
-        console.log("✅ Profile already completed, updating localStorage");
-        updateAuthData(data.token || getAuthToken());
+        console.log("✅ Profile already completed, updating session");
+        
+        await updateSession({
+          token: data.token || token,
+          hasCompleteProfile: true,
+        });
+        
         setPhase("complete");
         setIsComplete(true);
         
@@ -217,7 +166,7 @@ export const LoadingStep = ({ userData, onComplete }) => {
    * Auto-submit when component mounts
    */
   useEffect(() => {
-    const token = getAuthToken();
+    const token = session?.token;
     if (!token) {
       setPhase("error");
       setSubmitError("Authentication required. Please sign in again.");
@@ -225,7 +174,7 @@ export const LoadingStep = ({ userData, onComplete }) => {
       const submitTimer = setTimeout(submitData, 800);
       return () => clearTimeout(submitTimer);
     }
-  }, []);
+  }, [session]);
 
   // Processing phase - Initial loading
   if (phase === "processing" && !isSubmitting) {
@@ -384,7 +333,6 @@ export const LoadingStep = ({ userData, onComplete }) => {
               </button>
               <button
                 onClick={() => {
-                  localStorage.removeItem("authData");
                   window.location.href = "/";
                 }}
                 className="w-full py-3 bg-slate-300 text-slate-800 font-semibold rounded-lg hover:bg-slate-400 transition-all duration-300 shadow-md"

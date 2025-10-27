@@ -1,4 +1,4 @@
-// app/api/cv/save/route.js - ENHANCED VERSION
+// app/api/cv/save/route.js - ENHANCED VERSION WITH THEME COLOR SAVE
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -30,7 +30,7 @@ export async function POST(request) {
       });
     }
 
-    const { cvData, selectedTemplate, cvTitle, cvId, versionInfo } = body;
+    const { cvData, selectedTemplate, themeColor, cvTitle, cvId, versionInfo } = body;
 
     let cv;
     let isNewCV = false;
@@ -41,6 +41,7 @@ export async function POST(request) {
         where: { id: cvId },
         data: {
           templateId: selectedTemplate || undefined,
+          colorScheme: themeColor || "#1e40af",
           updatedAt: new Date(),
         },
       });
@@ -197,7 +198,7 @@ export async function POST(request) {
             achievementsSnapshot: JSON.stringify(cvData.achievements),
             volunteerSnapshot: JSON.stringify(cvData.volunteer),
             templateId: selectedTemplate,
-            colorScheme: "blue",
+            colorScheme: themeColor || "#1e40af",
           },
         });
       }
@@ -215,6 +216,7 @@ export async function POST(request) {
           title: cvTitle || `CV #${cvSlug}`,
           slug: cvSlug,
           templateId: selectedTemplate || "modern",
+          colorScheme: themeColor || "#1e40af",
           isActive: false,
           isPublic: false,
 
@@ -331,7 +333,7 @@ export async function POST(request) {
             achievementsSnapshot: JSON.stringify(cvData.achievements),
             volunteerSnapshot: JSON.stringify(cvData.volunteer),
             templateId: selectedTemplate,
-            colorScheme: "blue",
+            colorScheme: themeColor || "#1e40af",
           },
         });
       }
@@ -346,6 +348,8 @@ export async function POST(request) {
           cvNumber: cv.slug,
           title: cv.title,
           slug: cv.slug,
+          templateId: cv.templateId,
+          colorScheme: cv.colorScheme,
           createdAt: cv.createdAt,
           updatedAt: cv.updatedAt,
         },
@@ -360,3 +364,4 @@ export async function POST(request) {
     );
   }
 }
+

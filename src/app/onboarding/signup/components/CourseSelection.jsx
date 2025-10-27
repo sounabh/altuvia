@@ -108,16 +108,16 @@ export const CourseSelectionStep = ({
    */
   const getUserInitials = () => {
     // Handle full name if available
-    if (user?.user.name) {
-      const names = user?.user.name.split(' ');
+    if (user?.name) {
+      const names = user?.name.split(' ');
       return names.length > 1 
         ? `${names[0][0]}${names[1][0]}`.toUpperCase()
         : names[0][0].toUpperCase();
     }
     
     // Fallback to email if name not available
-    if (user?.user.email) {
-      return user?.user.name[0].toUpperCase();
+    if (user?.email) {
+      return user?.name[0].toUpperCase();
     }
     
     // Ultimate fallback
@@ -138,10 +138,10 @@ export const CourseSelectionStep = ({
           
           {/* USER AVATAR: With fallback to initials */}
           <div className="relative">
-            {user?.user.image ? (
+            {user?.image ? (
               <img
-                src={user?.user.image}
-                alt={`${user?.user.name || 'User'} avatar`}
+                src={user?.image}
+                alt={`${user?.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
                   // Fallback mechanism: Hide broken image and show initials
@@ -153,7 +153,7 @@ export const CourseSelectionStep = ({
             
             {/* FALLBACK AVATAR: Shows user initials */}
             <div 
-              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.user.image ? 'hidden' : 'flex'}`}
+              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.image ? 'hidden' : 'flex'}`}
             >
               {getUserInitials()}
             </div>
@@ -167,7 +167,7 @@ export const CourseSelectionStep = ({
         {/* WELCOME MESSAGE SECTION */}
         <div className="text-center flex flex-col gap-5 items-center justify-center space-y-4 mb-6 mt-6 w-[80%] mx-auto">
           <h1 className="text-[2.2rem] tracking-normal font-normal leading-12 font-roboto text-black z-10">
-            <span className="text-[#8a99aa]"> Welcome </span> {user?.user.name} ! We are
+            <span className="text-[#8a99aa]"> Welcome </span> {user?.name} ! We are
             thrilled to have you here. Discover the world's leading universities
             to shape your academic journey.
           </h1>
