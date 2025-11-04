@@ -146,7 +146,7 @@ const Index = () => {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      const response = await fetch(`${API_BASE_URL}/api/university/unsave`, {
+      const response = await fetch(`${API_BASE_URL}/api/university/toggleSaved`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.token}`,

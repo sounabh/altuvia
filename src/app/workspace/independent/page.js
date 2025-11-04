@@ -197,7 +197,7 @@ export default function IndependentWorkspacePage() {
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+      const response = await fetch(`/api/essay/independent`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session?.token}`,
@@ -249,7 +249,7 @@ export default function IndependentWorkspacePage() {
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+      const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { 
           'Authorization': `Bearer ${session?.token}`,
@@ -419,7 +419,7 @@ export default function IndependentWorkspacePage() {
 
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-        const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+        const response = await fetch(`/api/essay/independent`, {
           method: "POST",
           headers: { 
             'Authorization': `Bearer ${session?.token}`,
@@ -466,7 +466,7 @@ export default function IndependentWorkspacePage() {
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+      const response = await fetch(`/api/essay/independent`, {
         method: "POST",
         headers: { 
           'Authorization': `Bearer ${session?.token}`,
@@ -501,7 +501,7 @@ export default function IndependentWorkspacePage() {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+      const response = await fetch(`/api/essay/independent`, {
         method: "POST",
         headers: { 
           'Authorization': `Bearer ${session?.token}`,
@@ -990,7 +990,7 @@ export default function IndependentWorkspacePage() {
                   try {
                     setError(null);
                     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-                    const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+                    const response = await fetch(`/api/essay/independent`, {
                       method: "POST",
                       headers: { 
                         'Authorization': `Bearer ${session?.token}`,
@@ -1021,7 +1021,7 @@ export default function IndependentWorkspacePage() {
                   try {
                     setError(null);
                     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-                    const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+                    const response = await fetch(`/api/essay/independent`, {
                       method: "POST",
                       headers: { 
                         'Authorization': `Bearer ${session?.token}`,
