@@ -1,10 +1,36 @@
-// src/app/api/essay/independent/route.js - COMPLETE VERSION
+// src/app/api/essay/independent/route.js - WITH SESSION AUTHENTICATION
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+
+// ==========================================
+// AUTHENTICATION HELPER
+// ==========================================
+async function authenticateUser(request) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || !session.userId) {
+    return {
+      authenticated: false,
+      error: NextResponse.json(
+        { error: "Unauthorized - Please sign in" },
+        { status: 401 }
+      )
+    };
+  }
+  
+  return {
+    authenticated: true,
+    userId: session.userId,
+    userEmail: session.user?.email,
+    userName: session.user?.name
+  };
+}
 
 // Helper function to get or create independent program placeholder
 async function getOrCreateIndependentProgram() {
@@ -55,18 +81,19 @@ async function getOrCreateIndependentProgram() {
   }
 }
 
+// ==========================================
 // GET: Fetch user's independent essays
+// ==========================================
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "User ID is required" },
-        { status: 400 }
-      );
+    // Authenticate user from session
+    const auth = await authenticateUser(request);
+    if (!auth.authenticated) {
+      return auth.error;
     }
+
+    const userId = auth.userId;
+    console.log("✅ Fetching essays for authenticated user:", userId);
 
     const independentProgram = await getOrCreateIndependentProgram();
 
@@ -176,27 +203,43 @@ export async function GET(request) {
   }
 }
 
+// ==========================================
 // POST: Handle all essay operations
+// ==========================================
 export async function POST(request) {
   try {
+    // Authenticate user from session
+    const auth = await authenticateUser(request);
+    if (!auth.authenticated) {
+      return auth.error;
+    }
+
     const body = await request.json();
     const { action } = body;
 
+    // Pass userId from session to all operations
+    const operationData = {
+      ...body,
+      userId: auth.userId,
+      userEmail: auth.userEmail,
+      userName: auth.userName
+    };
+
     switch (action) {
       case "create_essay":
-        return await createIndependentEssay(body);
+        return await createIndependentEssay(operationData);
       case "save_version":
-        return await saveVersion(body);
+        return await saveVersion(operationData);
       case "restore_version":
-        return await restoreVersion(body);
+        return await restoreVersion(operationData);
       case "delete_version":
-        return await deleteVersion(body);
+        return await deleteVersion(operationData);
       case "ai_analysis":
-        return await performAIAnalysis(body);
+        return await performAIAnalysis(operationData);
       case "get_analytics":
-        return await getEssayAnalytics(body);
+        return await getEssayAnalytics(operationData);
       case "delete_essay":
-        return await deleteEssay(body);
+        return await deleteEssay(operationData);
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -212,9 +255,18 @@ export async function POST(request) {
   }
 }
 
+// ==========================================
 // PUT: Update essay content (auto-save)
+// ==========================================
 export async function PUT(request) {
   try {
+    // Authenticate user from session
+    const auth = await authenticateUser(request);
+    if (!auth.authenticated) {
+      return auth.error;
+    }
+
+    const userId = auth.userId;
     const body = await request.json();
     const { essayId, content, wordCount, title, priority, isAutoSave = false } = body;
 
@@ -222,6 +274,21 @@ export async function PUT(request) {
       return NextResponse.json(
         { error: "Essay ID is required" },
         { status: 400 }
+      );
+    }
+
+    // Verify essay belongs to authenticated user
+    const essayOwnership = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      }
+    });
+
+    if (!essayOwnership) {
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
       );
     }
 
@@ -269,7 +336,7 @@ export async function PUT(request) {
         updateData.lastAutoSaved = new Date();
       }
 
-                updatedEssay = await prisma.essay.update({
+      updatedEssay = await prisma.essay.update({
         where: { id: essayId },
         data: updateData,
         include: {
@@ -323,18 +390,22 @@ export async function PUT(request) {
   }
 }
 
+// ==========================================
 // Create independent essay
+// ==========================================
 async function createIndependentEssay(data) {
   const { userId, title, wordLimit = 500, priority = "medium" } = data;
 
-  if (!userId || !title) {
+  if (!title) {
     return NextResponse.json(
-      { error: "User ID and title are required" },
+      { error: "Title is required" },
       { status: 400 }
     );
   }
 
   try {
+    console.log("✅ Creating essay for user:", userId);
+    
     const independentProgram = await getOrCreateIndependentProgram();
 
     const essay = await prisma.essay.create({
@@ -379,9 +450,11 @@ async function createIndependentEssay(data) {
   }
 }
 
-// Delete essay
+// ==========================================
+// Delete essay (with ownership verification)
+// ==========================================
 async function deleteEssay(data) {
-  const { essayId } = data;
+  const { essayId, userId } = data;
 
   if (!essayId) {
     return NextResponse.json(
@@ -391,6 +464,22 @@ async function deleteEssay(data) {
   }
 
   try {
+    // Verify ownership
+    const essay = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      }
+    });
+
+    if (!essay) {
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
+      );
+    }
+
+    // Delete related records
     await prisma.aIResult.deleteMany({
       where: { essayId },
     });
@@ -407,6 +496,7 @@ async function deleteEssay(data) {
       where: { id: essayId },
     });
 
+    console.log("✅ Essay deleted by user:", userId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting essay:", error);
@@ -431,6 +521,7 @@ async function saveVersion(data) {
     changeDescription,
     performAiAnalysis = false,
     prompt,
+    userId
   } = data;
 
   if (!essayId) {
@@ -440,12 +531,19 @@ async function saveVersion(data) {
     );
   }
 
-  const essay = await prisma.essay.findUnique({
-    where: { id: essayId },
+  // Verify ownership
+  const essay = await prisma.essay.findFirst({
+    where: {
+      id: essayId,
+      userId: userId
+    }
   });
 
   if (!essay) {
-    return NextResponse.json({ error: "Essay not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Essay not found or access denied" },
+      { status: 403 }
+    );
   }
 
   const lastVersion = await prisma.essayVersion.findFirst({
@@ -506,7 +604,7 @@ async function saveVersion(data) {
 
 // Restore version
 async function restoreVersion(data) {
-  const { essayId, versionId } = data;
+  const { essayId, versionId, userId } = data;
 
   if (!essayId || !versionId) {
     return NextResponse.json(
@@ -516,6 +614,21 @@ async function restoreVersion(data) {
   }
 
   try {
+    // Verify ownership
+    const essay = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      }
+    });
+
+    if (!essay) {
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
+      );
+    }
+
     const version = await prisma.essayVersion.findUnique({
       where: { id: versionId },
     });
@@ -573,7 +686,7 @@ async function restoreVersion(data) {
 
 // Delete version
 async function deleteVersion(data) {
-  const { versionId, essayId } = data;
+  const { versionId, essayId, userId } = data;
 
   if (!versionId || !essayId) {
     return NextResponse.json(
@@ -583,6 +696,21 @@ async function deleteVersion(data) {
   }
 
   try {
+    // Verify ownership
+    const essay = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      }
+    });
+
+    if (!essay) {
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
+      );
+    }
+
     const versionCount = await prisma.essayVersion.count({
       where: { essayId },
     });
@@ -591,7 +719,7 @@ async function deleteVersion(data) {
       return NextResponse.json(
         { error: "Cannot delete the only version" },
         { status: 400 }
-    );
+      );
     }
 
     await prisma.aIResult.deleteMany({
@@ -617,8 +745,12 @@ async function getEssayAnalytics(data) {
   const { essayId, userId } = data;
 
   try {
-    const essay = await prisma.essay.findUnique({
-      where: { id: essayId },
+    // Verify ownership
+    const essay = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      },
       include: {
         versions: {
           orderBy: { timestamp: "desc" },
@@ -639,16 +771,17 @@ async function getEssayAnalytics(data) {
     });
 
     if (!essay) {
-      return NextResponse.json({ error: "Essay not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
+      );
     }
 
-    const allUserEssays = userId
-      ? await prisma.essay.findMany({
-          where: {
-            userId,
-          },
-        })
-      : [];
+    const allUserEssays = await prisma.essay.findMany({
+      where: {
+        userId,
+      },
+    });
 
     const validUserEssays = allUserEssays.filter(e => e.wordLimit > 0);
 
@@ -743,6 +876,7 @@ async function performAIAnalysis(data) {
     versionId = null,
     content,
     analysisTypes = ["comprehensive"],
+    userId
   } = data;
 
   if (!essayId || !content) {
@@ -762,12 +896,19 @@ async function performAIAnalysis(data) {
   const startTime = Date.now();
 
   try {
-    const essay = await prisma.essay.findUnique({
-      where: { id: essayId },
+    // Verify ownership
+    const essay = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      }
     });
 
     if (!essay) {
-      return NextResponse.json({ error: "Essay not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
+      );
     }
 
     // Check for recent analysis
@@ -1204,7 +1345,7 @@ async function saveAnalysisToDatabase(
         passiveVoiceCount: analysisData.passiveVoiceCount,
         structureScore: analysisData.structureScore,
         contentRelevance: analysisData.contentRelevance,
-       narrativeFlow: analysisData.narrativeFlow,
+        narrativeFlow: analysisData.narrativeFlow,
         leadershipEmphasis: analysisData.leadershipEmphasis,
         specificityScore: analysisData.specificityScore,
         grammarIssues: analysisData.grammarIssues,
