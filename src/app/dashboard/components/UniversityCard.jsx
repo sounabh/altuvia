@@ -8,6 +8,8 @@ import {
 } from '@/components/ui/context-menu';
 import Link from 'next/link';
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 /**
  * Enhanced University card component with remove functionality
@@ -15,6 +17,8 @@ import { toast } from "sonner";
 export const UniversityCard = ({ university, onRemove, onUpdate }) => {
   const [isAdded, setIsAdded] = useState(Boolean(university.isAdded));
   const [isRemoving, setIsRemoving] = useState(false);
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
   // Debug: Log the university data
   console.log('Enhanced University data in card:', {
@@ -36,32 +40,22 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
     e.preventDefault();
     e.stopPropagation();
 
-    let authData, token;
-
-    try {
-      authData = localStorage.getItem("authData");
-      if (!authData) {
-        toast.error("Please login to save universities");
-        return;
-      }
-
-      const parsedAuth = JSON.parse(authData);
-      token = parsedAuth.token;
-
-      if (!token) {
-        toast.error("Authentication expired, please login again");
-        return;
-      }
-    } catch (error) {
-      toast.error("Authentication error, please try again");
+    // Check authentication
+    if (status !== "authenticated" || !session?.token) {
+      toast.error("Please login to save universities", {
+        description: "You need to be logged in to save universities to your dashboard"
+      });
+      router.push('/');
       return;
     }
 
     const previousState = isAdded;
     const newState = !isAdded;
 
+    // ✨ INSTANT UI UPDATE
     setIsAdded(newState);
 
+    // Show immediate feedback
     if (newState) {
       toast.success("University added to dashboard", {
         style: {
@@ -89,20 +83,26 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.token}`,
         },
         body: JSON.stringify({ universityId: university?.id }),
       });
 
       if (response.ok) {
+        const data = await response.json();
+        setIsAdded(data.isAdded);
+        
         if (onUpdate) {
           onUpdate();
         }
       } else {
+        // Revert on failure
         setIsAdded(previousState);
         toast.error(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
       }
     } catch (error) {
+      console.error('Toggle saved error:', error);
+      // Revert on failure
       setIsAdded(previousState);
       toast.error("Network error. Please check your connection and try again.");
     }
@@ -117,24 +117,12 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
 
     if (isRemoving) return;
 
-    let authData, token;
-
-    try {
-      authData = localStorage.getItem("authData");
-      if (!authData) {
-        toast.error("Please login first");
-        return;
-      }
-
-      const parsedAuth = JSON.parse(authData);
-      token = parsedAuth.token;
-
-      if (!token) {
-        toast.error("Authentication expired, please login again");
-        return;
-      }
-    } catch (error) {
-      toast.error("Authentication error, please try again");
+    // Check authentication
+    if (status !== "authenticated" || !session?.token) {
+      toast.error("Please login first", {
+        description: "Authentication required to remove universities"
+      });
+      router.push('/auth/signin');
       return;
     }
 
@@ -156,7 +144,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.token}`,
         },
         body: JSON.stringify({ universityId: university?.id }),
       });
@@ -187,6 +175,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
         setIsRemoving(false);
       }
     } catch (error) {
+      console.error('Remove university error:', error);
       toast.error("Network error. Please check your connection and try again.");
       setIsRemoving(false);
     }
@@ -272,6 +261,9 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
     ? `/dashboard/university/${university.slug}`
     : `/dashboard/university/${university.id}`;
 
+  // Check if user is authenticated for conditional rendering
+  const isAuthenticated = status === "authenticated" && !!session?.token;
+
   return (
     <Link href={universityUrl}>
       <div className="bg-white/70 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group cursor-pointer">
@@ -290,11 +282,19 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
           {/* Heart Button - Top Left */}
           <button
             onClick={toggleHeart}
+            disabled={status === "loading"}
             className={`absolute top-4 left-4 p-2 rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-95 z-20 ${
               isAdded
                 ? "bg-rose-500 text-white shadow-md"
                 : "bg-white/90 text-gray-600 hover:text-rose-500 shadow-sm"
-            }`}
+            } ${status === "loading" ? "opacity-75 cursor-not-allowed" : ""}`}
+            title={
+              !isAuthenticated
+                ? "Login to save universities"
+                : isAdded
+                ? "Remove from saved universities"
+                : "Save this university"
+            }
           >
             <Heart className={`w-4 h-4 transition-all ${isAdded ? 'fill-current' : ''}`} />
           </button>
@@ -312,7 +312,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
             <ContextMenuContent className="w-56">
               <ContextMenuItem
                 onClick={handleRemoveFromSaved}
-                disabled={isRemoving}
+                disabled={isRemoving || !isAuthenticated}
                 className="flex items-center gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />

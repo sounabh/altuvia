@@ -74,7 +74,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const {data:session} = useSession()
+  const { data: session, status } = useSession();
 
   /**
    * Fetches saved universities from backend API with enhanced progress data
@@ -82,11 +82,19 @@ const Index = () => {
    */
   useEffect(() => {
     const fetchSavedUniversities = async () => {
-      try {
-        const authData = localStorage.getItem("authData");
-        
+      // Wait for session to load
+      if (status === "loading") {
+        return;
+      }
 
-       
+      // Check authentication
+      if (status !== "authenticated" || !session?.token) {
+        setError("Please login to view your saved universities");
+        setLoading(false);
+        return;
+      }
+
+      try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
         const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
@@ -123,27 +131,25 @@ const Index = () => {
     };
 
     fetchSavedUniversities();
-  }, []);
+  }, [session, status]);
 
   /**
    * Handles removing a university from saved list
    * @param {string} universityId - ID of university to remove
    */
   const handleRemoveUniversity = async (universityId) => {
-    try {
-      const authData = localStorage.getItem("authData");
-      if (!authData) {
-        console.error("No authentication data found");
-        return;
-      }
+    if (!session?.token) {
+      console.error("No authentication token found");
+      return;
+    }
 
-      const parsedData = JSON.parse(authData);
+    try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
       const response = await fetch(`${API_BASE_URL}/api/university/unsave`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${parsedData.token}`,
+          'Authorization': `Bearer ${session?.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ universityId }),
@@ -223,7 +229,7 @@ const Index = () => {
   };
 
   // Loading state UI with skeleton components
-  if (loading) {
+  if (loading || status === "loading") {
     return (
       <div className="min-h-screen">
         <div className="px-4 py-8 max-w-7xl mx-auto">

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Bell, Settings, Heart, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 const Header = ({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   // Enhanced progress calculation using university data
   const getProgressData = () => {
@@ -92,25 +94,25 @@ const Header = ({ university }) => {
   const progressData = getProgressData();
 
   /**
-   * Initialize saved status from localStorage
+   * Initialize saved status from session
    */
   useEffect(() => {
-    try {
-      const authData = localStorage.getItem("authData");
-      if (!authData || !university) return;
+    // Wait for session to load
+    if (status === "loading" || !university) return;
 
-      const parsedData = JSON.parse(authData);
-      const userId = parsedData.userId;
+    // Check if user is authenticated
+    if (status === "authenticated" && session?.userId) {
+      const userId = session?.userId;
 
       const isSaved =
         Array.isArray(university.savedByUsers) &&
         university.savedByUsers.some((user) => user.id === userId);
 
       setIsAdded(isSaved);
-    } catch (error) {
-      console.error("Error initializing saved status:", error);
+    } else {
+      setIsAdded(false);
     }
-  }, [university]);
+  }, [university, session, status]);
 
   /**
    * Toggle university saved status with instant UI update
@@ -119,14 +121,14 @@ const Header = ({ university }) => {
     e.stopPropagation();
     e.preventDefault();
 
-    const authData = typeof window !== "undefined" ? localStorage.getItem("authData") : null;
-
-    if (!authData) {
-      toast.error("Please login to save universities");
+    // Check authentication
+    if (status !== "authenticated" || !session?.token) {
+      toast.error("Please login to save universities", {
+        description: "You need to be logged in to save universities to your dashboard"
+      });
+      router.push('/auth/signin');
       return;
     }
-
-    const parsedData = JSON.parse(authData);
 
     const previousState = isAdded;
     const newState = !isAdded;
@@ -167,7 +169,7 @@ const Header = ({ university }) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${parsedData.token}`,
+            Authorization: `Bearer ${session?.token}`,
           },
           body: JSON.stringify({ universityId: university?.id }),
         }
@@ -182,6 +184,7 @@ const Header = ({ university }) => {
         toast.error(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
       }
     } catch (error) {
+      console.error('Toggle saved error:', error);
       // Revert on failure
       setIsAdded(previousState);
       toast.error("Network error. Please check your connection and try again.");
@@ -214,6 +217,9 @@ const Header = ({ university }) => {
 
   const statusInfo = getStatusInfo();
   const StatusIcon = statusInfo.icon;
+
+  // Check if user is authenticated for conditional rendering
+  const isAuthenticated = status === "authenticated" && !!session?.token;
 
   return (
     <header className="bg-white shadow-sm border-b sticky top-0 z-50">
@@ -252,14 +258,16 @@ const Header = ({ university }) => {
                   variant="ghost"
                   size="sm"
                   onClick={toggleSaved}
-                  disabled={isLoading}
+                  disabled={isLoading || status === "loading"}
                   className={`relative transition-all duration-300 shrink-0 ${
                     isAdded
                       ? "text-red-500 hover:text-red-600 hover:bg-red-50"
                       : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-                  } ${isLoading ? "opacity-75" : ""}`}
+                  } ${isLoading || status === "loading" ? "opacity-75" : ""}`}
                   title={
-                    isAdded
+                    !isAuthenticated
+                      ? "Login to save universities"
+                      : isAdded
                       ? "Remove from saved universities"
                       : "Save this university"
                   }

@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useCallback, memo } from "react";
 import { MapPin, Heart, GraduationCap, DollarSign, TrendingUp, Award, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 const UniversityCard = memo(({ university }) => {
   const [isAdded, setIsAdded] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const { data: session, status } = useSession();
 
   const universityUrl = university.slug
     ? `/dashboard/university/${university.slug}`
@@ -22,25 +23,17 @@ const UniversityCard = memo(({ university }) => {
     e.stopPropagation();
     e.preventDefault();
 
-    let authData, token;
+    // Check if user is authenticated
+    if (status !== "authenticated" || !session?.user) {
+      toast.error("Please login to save universities");
+      return;
+    }
 
-    try {
-      authData = localStorage.getItem("authData");
-      if (!authData) {
-        toast.error("Please login to save universities");
-        return;
-      }
+    // Get token from session
+    const token = session?.token;
 
-      const parsedAuth = JSON.parse(authData);
-      token = parsedAuth.token;
-
-      if (!token) {
-        toast.error("Authentication expired, please login again");
-        return;
-      }
-
-    } catch (error) {
-      toast.error("Authentication error, please try again");
+    if (!token) {
+      toast.error("Authentication expired, please login again");
       return;
     }
 
@@ -95,7 +88,7 @@ const UniversityCard = memo(({ university }) => {
       setIsAdded(previousState);
       toast.error("Network error. Please check your connection and try again.");
     }
-  }, [isAdded, university?.id]);
+  }, [isAdded, university?.id, session, status]);
 
   if (!university) return null;
 

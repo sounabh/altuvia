@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import moment from "moment";
 import {
   Plus,
@@ -95,17 +97,18 @@ const SmartCalendar = () => {
   // ========================================
   // CALENDAR CONFIGURATION
   // ========================================
+const { data: session, status } = useSession();
+const router = useRouter();
 
-  useEffect(() => {
-    try {
-      const authData = JSON.parse(window.localStorage.getItem("authData") || "{}");
-      const email = authData.email || "";
-      setUserEmail(email);
-    } catch (error) {
-      console.error("Error parsing auth data:", error);
-      setUserEmail("");
-    }
-  }, []);
+
+
+useEffect(() => {
+  if (status === "authenticated" && session?.user?.email) {
+    setUserEmail(session.user.email);
+  } else if (status === "unauthenticated") {
+    setUserEmail("");
+  }
+}, [session, status]);
 
   const eventTypes = [
     { value: "deadline", label: "Deadline", color: "#dc2626", icon: "⏰" },
@@ -135,24 +138,24 @@ const SmartCalendar = () => {
 
   const fetchSavedUniversities = useCallback(async () => {
     try {
-      const authData = window.localStorage.getItem("authData");
-      if (!authData) {
-        setSavedUniversities([]);
-        return;
-      }
+      // Check authentication
+    if (status !== "authenticated" || !session?.token) {
+      setSavedUniversities([]);
+      return;
+    }
 
-      const parsedData = JSON.parse(authData);
-      const API_BASE_URL =
-        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+    const API_BASE_URL =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-      const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${parsedData.token}`,
-          "Content-Type": "application/json",
-        },
-      });
+    const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
+    
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const result = await response.json();

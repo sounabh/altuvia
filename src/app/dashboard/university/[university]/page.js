@@ -6,6 +6,7 @@ import CollegeShowcase from "./components/CollegeShowcase";
 import UniversityOverview from "./components/UniversityOverview";
 import ApplicationTabs from "./components/ApplicationTabs";
 import Header from "./components/Header";
+import { useSession } from "next-auth/react";
 
 // Skeleton Components
 const HeaderSkeleton = () => (
@@ -119,66 +120,60 @@ const UniversityPageSkeleton = () => (
 const UniversityPage = () => {
   const params = useParams();
   const slug = params?.university;
+  const { data: session, status } = useSession();
   
   const [university, setUniversity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  //console.log('University slug:', slug);
-
   useEffect(() => {
-   const fetchUniversity = async () => {
-  try {
-    setLoading(true);
+    const fetchUniversity = async () => {
+      try {
+        setLoading(true);
 
-    // ✅ Get token from localStorage
-    let token = null;
-    if (typeof window !== "undefined") {
-      const authData = localStorage.getItem("authData");
-      if (authData) {
-        try {
-          const parsed = JSON.parse(authData);
-          token = parsed.token || null;
-        } catch (err) {
-          console.error("❌ Error parsing authData:", err);
+        const API_BASE_URL =
+          process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+        // Build headers with session token if available
+        const headers = {
+          "Content-Type": "application/json",
+        };
+
+        // Add authorization header if user is authenticated
+        if (status === "authenticated" && session?.token) {
+          headers["Authorization"] = `Bearer ${session?.token}`;
         }
+
+        const response = await fetch(`${API_BASE_URL}/api/university/${slug}`, {
+          method: "GET",
+          headers,
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch university: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Fetched university data:", data);
+        setUniversity(data);
+      } catch (err) {
+        console.error("Error fetching university:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
 
-    const API_BASE_URL =
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-
-    const response = await fetch(`${API_BASE_URL}/api/university/${slug}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ Attach token if available
-      },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch university: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log("Fetched university data:", data);
-    setUniversity(data);
-  } catch (err) {
-    console.error("Error fetching university:", err);
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-    if (slug) {
+    // Wait for session to finish loading before fetching
+    // This ensures we include the token if user is logged in
+    if (status !== "loading" && slug) {
       fetchUniversity();
     }
-  }, [slug]);
+  }, [slug, session, status]);
 
-  if (loading) {
+  // Show loading skeleton while session is loading or data is being fetched
+  if (loading || status === "loading") {
     return <UniversityPageSkeleton />;
   }
 

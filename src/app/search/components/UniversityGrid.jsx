@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import UniversityCard from './UniversityCard';
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 /**
  * Modern Pagination Component
@@ -113,6 +114,11 @@ const Pagination = ({
  */
 const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   // ----------------------------
+  // NextAuth Session
+  // ----------------------------
+  const { data: session, status } = useSession();
+
+  // ----------------------------
   // State Management
   // ----------------------------
 
@@ -124,9 +130,6 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
 
   /** Error state if API fails */
   const [error, setError] = useState(null);
-
-  /** User email from localStorage */
-  const [userEmail, setUserEmail] = useState(null);
 
   /** Current page number */
   const [currentPage, setCurrentPage] = useState(1);
@@ -147,22 +150,6 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   const cacheRef = useRef(new Map());
 
   // ----------------------------
-  // Get User Email from localStorage
-  // ----------------------------
-
-  useEffect(() => {
-    try {
-      const authData = localStorage.getItem("authData");
-      if (authData) {
-        const parsedAuth = JSON.parse(authData);
-        setUserEmail(parsedAuth.email);
-      }
-    } catch (error) {
-      console.error('Error parsing auth data:', error);
-    }
-  }, []);
-
-  // ----------------------------
   // Reset page when filters change
   // ----------------------------
 
@@ -175,21 +162,27 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   // ----------------------------
 
   const searchParams = useMemo(() => {
+    // Don't create search params if session is still loading
+    if (status === "loading") return null;
+
     return JSON.stringify({
       search: searchQuery?.trim() || '',
       gmat: selectedGmat || 'all',
       ranking: selectedRanking || 'all',
-      email: userEmail || '',
+      email: session?.user?.email || '',
+      userId: session?.userId || '',
       page: currentPage,
       limit: itemsPerPage
     });
-  }, [searchQuery, selectedGmat, selectedRanking, userEmail, currentPage, itemsPerPage]);
+  }, [searchQuery, selectedGmat, selectedRanking, session, status, currentPage, itemsPerPage]);
 
   // ----------------------------
   // Data Fetching Logic
   // ----------------------------
 
   const fetchData = useCallback(async (paramsString, forceRefresh = false) => {
+    if (!paramsString) return;
+
     const cached = cacheRef.current.get(paramsString);
     const cacheValidTime = 300000; // 5 minutes
 
@@ -219,20 +212,28 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
         ranking: params.ranking,
         page: params.page.toString(),
         limit: params.limit.toString(),
-        ...(params.email && { email: params.email })
+        ...(params.email && { email: params.email }),
+        ...(params.userId && { userId: params.userId })
       });
+
+      // Include auth token in headers if available
+      const headers = {
+        'Cache-Control': 'public, max-age=300',
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.token) {
+        headers['Authorization'] = `Bearer ${session?.token}`;
+      }
 
       const response = await fetch(`/api/universities?${urlParams}`, {
         signal: abortControllerRef.current.signal,
-        headers: { 
-          'Cache-Control': 'public, max-age=300',
-        }
+        headers
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
       const result = await response.json();
-      console.log('API Response:', result); // Debug log
 
       if (result.data && Array.isArray(result.data)) {
         const responseData = {
@@ -251,7 +252,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
           timestamp: Date.now()
         });
 
-        // Limit cache size to 20 entries (more for pagination)
+        // Limit cache size to 20 entries
         if (cacheRef.current.size > 20) {
           const firstKey = cacheRef.current.keys().next().value;
           cacheRef.current.delete(firstKey);
@@ -273,19 +274,26 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [session, itemsPerPage]);
 
   // ----------------------------
   // Effects
   // ----------------------------
 
   useEffect(() => {
-    if (userEmail !== null || userEmail === null) {
+    // Wait for session to load
+    if (status === "loading") {
+      setLoading(true);
+      return;
+    }
+
+    // Only fetch if we have searchParams
+    if (searchParams) {
       const debounceTime = searchQuery?.trim() ? 300 : 0;
       const handler = setTimeout(() => fetchData(searchParams), debounceTime);
       return () => clearTimeout(handler);
     }
-  }, [searchParams, fetchData, userEmail]);
+  }, [searchParams, fetchData, status, searchQuery]);
 
   useEffect(() => {
     return () => {
@@ -301,7 +309,9 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
 
   const handleRefresh = useCallback(() => {
     cacheRef.current.clear();
-    fetchData(searchParams, true);
+    if (searchParams) {
+      fetchData(searchParams, true);
+    }
   }, [searchParams, fetchData]);
 
   const handlePageChange = useCallback((page) => {
@@ -353,7 +363,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   // Render
   // ----------------------------
 
-  if (loading) return LoadingSkeleton;
+  if (loading || status === "loading") return LoadingSkeleton;
 
   if (error) {
     return (
@@ -385,7 +395,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
                 onToggleSuccess={(newState) => {
                   setUniversities(prev => prev.map(u => 
                     u.id === university.id 
-                      ? { ...u, savedByUsers: newState ? [{ id: 'current-user' }] : [] }
+                      ? { ...u, savedByUsers: newState ? [{ id: session?.userId || 'current-user' }] : [] }
                       : u
                   ));
                 }}

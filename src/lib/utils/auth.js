@@ -50,7 +50,7 @@ export const hasCompleteProfile = (session) => {
  * @returns {boolean} True if user is authenticated
  */
 export const isAuthenticated = (session) => {
-  return !!(session && session.user && session.token);
+  return !!(session && session.user && session?.token);
 };
 
 /**

@@ -48,7 +48,7 @@ export const LoadingStep = memo(({ userData, onComplete }) => {
     toastIdRef.current = toast.loading("Creating your profile...");
 
     try {
-      const token = session.token;
+      const token = session?.token;
 
       if (!token) {
         throw new Error("Authentication token not found. Please sign in again.");

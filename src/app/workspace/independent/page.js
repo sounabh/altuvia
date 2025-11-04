@@ -7,6 +7,7 @@ import { EssayEditor } from "../components/EssayEditor";
 import { VersionManager } from "../components/VersionManager";
 import { AISuggestions } from "../components/AiSuggestion";
 import { EssayAnalytics } from "../components/EssayAnalytics";
+import { useSession } from 'next-auth/react';
 import {
   BookOpen,
   Plus,
@@ -130,13 +131,12 @@ function NewEssayModal({ onClose, onCreate, isCreating }) {
 }
 
 export default function IndependentWorkspacePage() {
-  const [userId, setUserId] = useState(null);
-  const [userEmail, setUserEmail] = useState(null);
+  const { data: session, status } = useSession();
   const [workspaceData, setWorkspaceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Active selections - works same as program workspace
+  // Active selections
   const [activeProgramId, setActiveProgramId] = useState(null);
   const [activeEssayPromptId, setActiveEssayPromptId] = useState(null);
 
@@ -164,7 +164,7 @@ export default function IndependentWorkspacePage() {
   const editorChangeRef = useRef(null);
   const activityTimeoutRef = useRef(null);
 
-  // Memoized current program and essay - SAME AS PROGRAM WORKSPACE
+  // Memoized current program and essay
   const currentProgram = useMemo(() => {
     return workspaceData?.programs?.find((p) => p.id === activeProgramId);
   }, [workspaceData, activeProgramId]);
@@ -177,34 +177,33 @@ export default function IndependentWorkspacePage() {
     return currentEssayData?.userEssay;
   }, [currentEssayData]);
 
-  // Initialize userId
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const authData = localStorage.getItem("authData");
-      if (authData) {
-        try {
-          const parsed = JSON.parse(authData);
-          setUserId(parsed.userId);
-          setUserEmail(parsed.email);
-        } catch (err) {
-          console.error("Error parsing auth data:", err);
-          setError("Invalid authentication data. Please log in again.");
-        }
-      } else {
-        setError("User authentication required. Please log in.");
-      }
-    }
-  }, []);
-
-  // Fetch workspace data - USES INDEPENDENT API
+  // Fetch workspace data
   const fetchWorkspaceData = useCallback(async () => {
-    if (!userId) return;
+    // Wait for session to load
+    if (status === "loading") {
+      return;
+    }
+
+    // Check authentication
+    if (status !== "authenticated" || !session?.token) {
+      setError("Please login to view your workspace");
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/essay/independent?userId=${userId}`);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session?.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -231,18 +230,16 @@ export default function IndependentWorkspacePage() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [session, status]);
 
   // Initial fetch
   useEffect(() => {
-    if (userId) {
-      fetchWorkspaceData();
-    }
-  }, [userId, fetchWorkspaceData]);
+    fetchWorkspaceData();
+  }, [fetchWorkspaceData]);
 
-  // Auto-save function - SAME AS PROGRAM WORKSPACE
+  // Auto-save function
   const autoSaveEssay = useCallback(async () => {
-    if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current) {
+    if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current || !session?.token) {
       return false;
     }
 
@@ -250,9 +247,14 @@ export default function IndependentWorkspacePage() {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      const response = await fetch("/api/essay/independent", {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${session?.token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           essayId: currentEssay.id,
           content: currentEssay.content,
@@ -274,9 +276,9 @@ export default function IndependentWorkspacePage() {
       setIsSaving(false);
       isUpdatingRef.current = false;
     }
-  }, [currentEssay, isSaving, hasUnsavedChanges]);
+  }, [currentEssay, isSaving, hasUnsavedChanges, session]);
 
-  // Auto-save timer - SAME AS PROGRAM WORKSPACE
+  // Auto-save timer
   useEffect(() => {
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -303,7 +305,7 @@ export default function IndependentWorkspacePage() {
     };
   }, [hasUnsavedChanges, currentEssay?.id, isSaving, lastUserActivity, isUserActive, autoSaveEssay]);
 
-  // Activity tracking - SAME AS PROGRAM WORKSPACE
+  // Activity tracking
   useEffect(() => {
     const handleUserActivity = () => {
       const now = Date.now();
@@ -336,7 +338,7 @@ export default function IndependentWorkspacePage() {
     };
   }, []);
 
-  // Update essay content - SAME AS PROGRAM WORKSPACE
+  // Update essay content
   const updateEssayContent = useCallback(
     (content, wordCount) => {
       if (isUpdatingRef.current || !currentEssay) return;
@@ -400,7 +402,7 @@ export default function IndependentWorkspacePage() {
   // Save version
   const saveVersion = useCallback(
     async (label) => {
-      if (!currentEssay || isSaving || isSavingVersion) {
+      if (!currentEssay || isSaving || isSavingVersion || !session?.token) {
         return false;
       }
 
@@ -415,9 +417,14 @@ export default function IndependentWorkspacePage() {
           }
         }
 
-        const response = await fetch("/api/essay/independent", {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+        const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            'Authorization': `Bearer ${session?.token}`,
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({
             action: "save_version",
             essayId: currentEssay.id,
@@ -443,21 +450,30 @@ export default function IndependentWorkspacePage() {
         setIsSavingVersion(false);
       }
     },
-    [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, fetchWorkspaceData]
+    [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, fetchWorkspaceData, session]
   );
 
   // Create new essay
   const handleCreateEssay = async (essayData) => {
+    if (!session?.token) {
+      setError("Authentication required");
+      return;
+    }
+
     try {
       setIsCreatingEssay(true);
       setError(null);
 
-      const response = await fetch("/api/essay/independent", {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${session?.token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           action: "create_essay",
-          userId,
           ...essayData,
         }),
       });
@@ -480,11 +496,17 @@ export default function IndependentWorkspacePage() {
   // Delete essay
   const handleDeleteEssay = async (essayId) => {
     if (!confirm("Are you sure you want to delete this essay?")) return;
+    if (!session?.token) return;
 
     try {
-      const response = await fetch("/api/essay/independent", {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${session?.token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           action: "delete_essay",
           essayId,
@@ -495,7 +517,6 @@ export default function IndependentWorkspacePage() {
 
       await fetchWorkspaceData();
       
-      // If deleted essay was active, clear selection
       if (currentEssay?.id === essayId) {
         setActiveEssayPromptId(null);
         lastContentRef.current = "";
@@ -540,7 +561,7 @@ export default function IndependentWorkspacePage() {
   }, []);
 
   // Loading state
-  if (!userId || loading) {
+  if (loading || status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
         <Card className="p-8 bg-white/70 backdrop-blur-sm shadow-xl">
@@ -572,7 +593,7 @@ export default function IndependentWorkspacePage() {
             onClick={() => (window.location.href = "/dashboard")}
             className="bg-[#3598FE] hover:bg-[#2563EB]"
           >
-            Go to dashboard
+            Go to Dashboard
           </Button>
         </Card>
       </div>
@@ -581,7 +602,7 @@ export default function IndependentWorkspacePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
-      {/* Header - SAME STRUCTURE AS PROGRAM WORKSPACE */}
+      {/* Header */}
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
@@ -687,7 +708,7 @@ export default function IndependentWorkspacePage() {
         </div>
       )}
 
-      {/* Main Content - SAME STRUCTURE AS PROGRAM WORKSPACE */}
+      {/* Main Content */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-8">
         <div className="grid grid-cols-12 gap-8">
           {/* Left Sidebar - Essay List */}
@@ -816,7 +837,7 @@ export default function IndependentWorkspacePage() {
             </Card>
           </div>
 
-          {/* Main Editor Area - USES SAME COMPONENTS */}
+          {/* Main Editor Area */}
           <div className="col-span-12 lg:col-span-6">
             <Card className="h-full shadow-xl border-0 bg-white/70 backdrop-blur-sm">
               <div className="p-8">
@@ -855,7 +876,6 @@ export default function IndependentWorkspacePage() {
                       </Button>
                     </div>
 
-                    {/* SAME EssayEditor COMPONENT */}
                     <EssayEditor
                       key={`editor-${currentEssay.id}`}
                       content={currentEssay.content}
@@ -925,7 +945,7 @@ export default function IndependentWorkspacePage() {
             </Card>
           </div>
 
-          {/* Right Sidebar - USES SAME COMPONENTS */}
+          {/* Right Sidebar */}
           <div className="col-span-12 lg:col-span-3 space-y-6">
             {showAnalytics && currentEssay && (
               <EssayAnalytics
@@ -943,7 +963,7 @@ export default function IndependentWorkspacePage() {
                     })) || []
                 }
                 essayId={currentEssay.id}
-                userId={userId}
+                userId={session?.userId}
                 universityName="independent"
               />
             )}
@@ -966,11 +986,16 @@ export default function IndependentWorkspacePage() {
                 versions={currentEssay.versions || []}
                 currentContent={currentEssay.content}
                 onRestoreVersion={async (versionId) => {
+                  if (!session?.token) return;
                   try {
                     setError(null);
-                    const response = await fetch("/api/essay/independent", {
+                    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+                    const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
                       method: "POST",
-                      headers: { "Content-Type": "application/json" },
+                      headers: { 
+                        'Authorization': `Bearer ${session?.token}`,
+                        'Content-Type': 'application/json'
+                      },
                       body: JSON.stringify({
                         action: "restore_version",
                         essayId: currentEssay.id,
@@ -992,11 +1017,16 @@ export default function IndependentWorkspacePage() {
                   }
                 }}
                 onDeleteVersion={async (versionId) => {
+                  if (!session?.token) return;
                   try {
                     setError(null);
-                    const response = await fetch("/api/essay/independent", {
+                    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+                    const response = await fetch(`${API_BASE_URL}/api/essay/independent`, {
                       method: "POST",
-                      headers: { "Content-Type": "application/json" },
+                      headers: { 
+                        'Authorization': `Bearer ${session?.token}`,
+                        'Content-Type': 'application/json'
+                      },
                       body: JSON.stringify({
                         action: "delete_version",
                         versionId,
@@ -1160,9 +1190,9 @@ export default function IndependentWorkspacePage() {
             </div>
 
             <div className="flex items-center space-x-4 text-xs text-gray-500">
-              {userEmail && (
+              {session?.user?.email && (
                 <>
-                  <span>Logged in as {userEmail}</span>
+                  <span>Logged in as {session.user.email}</span>
                   <span>•</span>
                 </>
               )}

@@ -7,7 +7,6 @@ import { Sidebar } from "./components/Sidebar";
 import { CVBuilder } from "./components/CVBuilder";
 import { PreviewPanel } from "./components/PreviewPanel";
 import SmartTipsPanel from "./components/SmartTipsPanel";
-
 import { VersionSaveDialog } from "./components/VersionSavedDialog";
 import { toast } from "sonner";
 import AIAnalysisChatPopup from "./components/AiAnalysisChatPopup";
@@ -15,6 +14,9 @@ import {
   VersionManager,
   clearVersionsCache,
 } from "./components/VersionManager";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export const CVDataContext = createContext();
 
@@ -34,6 +36,9 @@ const generateUniqueCVNumber = (userId) => {
 };
 
 const Index = () => {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
   const [cvNumber, setCvNumber] = useState("");
   const [currentCVId, setCurrentCVId] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -130,65 +135,53 @@ const Index = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showVersionManager, setShowVersionManager] = useState(false);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    try {
-      const authData = getAuthData();
-      if (authData?.userId) {
-        setUserId(authData.userId);
-        setUserEmail(authData.email);
+    if (status === "unauthenticated") {
+      toast.error("Please login to access CV Builder");
+      router.push('/');
+    }
+  }, [status, router]);
 
+  // Initialize user data from session - ONLY userId and email from session
+  useEffect(() => {
+    if (status === "authenticated" && session?.userId && session?.user?.email) {
+      setUserId(session.userId);
+      setUserEmail(session.user.email);
+
+      // CV ID and CV Number still come from localStorage
+      try {
         const savedCVId = localStorage.getItem("currentCVId");
         const savedCVNumber = localStorage.getItem("currentCVNumber");
 
         if (savedCVId && savedCVNumber) {
           setCurrentCVId(savedCVId);
           setCvNumber(savedCVNumber);
-          loadCVData(savedCVId);
+          loadCVData(savedCVId, session.user.email);
         } else {
-          const uniqueNumber = generateUniqueCVNumber(authData.userId);
+          const uniqueNumber = generateUniqueCVNumber(session.userId);
           setCvNumber(uniqueNumber);
           localStorage.setItem("currentCVNumber", uniqueNumber);
         }
+      } catch (error) {
+        console.error("Error initializing CV:", error);
+        const uniqueNumber = generateUniqueCVNumber(session.userId);
+        setCvNumber(uniqueNumber);
+        localStorage.setItem("currentCVNumber", uniqueNumber);
       }
-    } catch (error) {
-      console.error("Error initializing:", error);
     }
-  }, []);
+  }, [status, session]);
 
-  const getAuthData = () => {
+  // Load CV data using email from session
+  const loadCVData = async (cvId, email) => {
     try {
-      const authData = localStorage.getItem("authData");
-      if (authData) return JSON.parse(authData);
-
-      const sessionAuth = sessionStorage.getItem("authData");
-      if (sessionAuth) return JSON.parse(sessionAuth);
-
-      return null;
-    } catch (error) {
-      console.error("Error parsing auth data:", error);
-      return null;
-    }
-  };
-
-  const getAuthEmail = () => {
-    try {
-      const authData = getAuthData();
-      return authData?.email || null;
-    } catch (error) {
-      return null;
-    }
-  };
-
-  const loadCVData = async (cvId) => {
-    try {
-      const userEmail = getAuthEmail();
-      if (!userEmail) {
+      if (!email) {
         console.log("No user email found - skipping CV load");
         return;
       }
 
       const response = await fetch(
-        `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(userEmail)}`
+        `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
       );
 
       if (response.status === 404) {
@@ -347,65 +340,65 @@ const Index = () => {
     setShowVersionDialog(true);
   };
 
- const handleSaveWithVersion = async (versionInfo) => {
-  try {
-    setIsSaving(true);
-    setShowVersionDialog(false);
+  const handleSaveWithVersion = async (versionInfo) => {
+    try {
+      setIsSaving(true);
+      setShowVersionDialog(false);
 
-    const userEmail = getAuthEmail();
-    if (!userEmail) {
-      toast.error("Authentication required. Please log in.");
-      return;
-    }
-
-    const payload = {
-      cvData,
-      selectedTemplate,
-      themeColor,  // ADD THIS LINE - Include theme color in payload
-      cvTitle: `CV #${cvNumber}`,
-      userEmail,
-      cvId: currentCVId,
-      cvNumber: cvNumber,
-      versionInfo,
-    };
-
-    const response = await fetch("/api/cv/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.error || `HTTP error! status: ${response.status}`
-      );
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      if (result.cv.id && !currentCVId) {
-        setCurrentCVId(result.cv.id);
-        localStorage.setItem("currentCVId", result.cv.id);
+      // Use email from session instead of localStorage
+      if (!userEmail) {
+        toast.error("Authentication required. Please log in.");
+        return;
       }
 
-      clearVersionsCache(userEmail);
+      const payload = {
+        cvData,
+        selectedTemplate,
+        themeColor,
+        cvTitle: `CV #${cvNumber}`,
+        userEmail,
+        cvId: currentCVId,
+        cvNumber: cvNumber,
+        versionInfo,
+      };
 
-      const action = currentCVId ? "updated" : "created";
-      toast.success(
-        `CV ${action} successfully as version: ${versionInfo.versionName}`
-      );
-    } else {
-      throw new Error(result.error || "Failed to save CV");
+      const response = await fetch("/api/cv/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        if (result.cv.id && !currentCVId) {
+          setCurrentCVId(result.cv.id);
+          localStorage.setItem("currentCVId", result.cv.id);
+        }
+
+        clearVersionsCache(userEmail);
+
+        const action = currentCVId ? "updated" : "created";
+        toast.success(
+          `CV ${action} successfully as version: ${versionInfo.versionName}`
+        );
+      } else {
+        throw new Error(result.error || "Failed to save CV");
+      }
+    } catch (error) {
+      console.error("CV Save Error:", error);
+      toast.error(error.message || "Failed to save CV");
+    } finally {
+      setIsSaving(false);
     }
-  } catch (error) {
-    console.error("CV Save Error:", error);
-    toast.error(error.message || "Failed to save CV");
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   const handleNewCV = () => {
     if (!userId) {
@@ -593,6 +586,23 @@ const Index = () => {
       toast.error("Failed to load version");
     }
   };
+
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-cvLightBg flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#002147] mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading CV Builder...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Will redirect if unauthenticated
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   return (
     <CVDataContext.Provider value={{ cvData, updateCVData }}>

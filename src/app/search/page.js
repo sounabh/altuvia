@@ -1,25 +1,19 @@
 "use client";
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import SearchBar from "./components/SearchBar";
 import FilterSection from "./components/FilterSection";
 import UniversityGrid from "./components/UniversityGrid";
 import { Filter } from "lucide-react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 
-// Nav Component
+// Nav Component with NextAuth
 const Nav = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  // Check for token on mount (client-side only)
-  useEffect(() => {
-    try {
-      const authData = JSON.parse(localStorage.getItem("authData") || "{}");
-      const { token } = authData;
-      setIsLoggedIn(!!token); // true if token exists
-    } catch (error) {
-      console.error("Error parsing auth data:", error);
-      setIsLoggedIn(false);
-    }
-  }, []);
+  const { data: session, status } = useSession();
+  
+  // Show loading state while checking session
+  const isLoading = status === "loading";
+  const isLoggedIn = status === "authenticated" && !!session?.token;
 
   return (
     <nav className="pt-4">
@@ -32,11 +26,17 @@ const Nav = () => {
         </div>
 
         {/* Conditional button: Dashboard or Sign Up */}
-        <a href={isLoggedIn ? "/dashboard" : "/onboarding/signup"}>
-          <button className="px-3 py-3 md:px-5 md:py-3 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
-            {isLoggedIn ? "Go to Dashboard" : "Sign Up"}
-          </button>
-        </a>
+        {isLoading ? (
+          <div className="px-5 py-3 rounded-lg bg-gray-100 animate-pulse">
+            <div className="w-24 h-5 bg-gray-200 rounded"></div>
+          </div>
+        ) : (
+          <Link href={isLoggedIn ? "/dashboard" : "/auth/signin"}>
+            <button className="px-3 py-3 md:px-5 md:py-3 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
+              {isLoggedIn ? "Go to Dashboard" : "Sign In"}
+            </button>
+          </Link>
+        )}
       </div>
     </nav>
   );
