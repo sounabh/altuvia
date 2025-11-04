@@ -1,180 +1,146 @@
-import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+/*custom React hook that manages user authentication + onboarding state that uses NextAuth for authentication.* */
+
+
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ONBOARDING_STEPS, LOADING_MESSAGES, API_BASE_URL } from "@/lib/constants/onboarding";
+import { useSession } from "next-auth/react";
 
-/**
- * Custom hook for onboarding flow logic
- * Handles authentication and onboarding progression using NextAuth session only
- * @returns {Object} Onboarding state and handlers
- */
 export const useOnboardingFlow = () => {
-  const { data: session, status, update } = useSession();
   const router = useRouter();
+  const { data: session, status } = useSession(); //next auth sessio 
+  
+  const [currentStep, setCurrentStep] = useState(-1); //Tracks which onboarding step user is on (-1 = auth modal)
+  const [showAuthModal, setShowAuthModal] = useState(false); //Whether login/signup modal is visible
+  const [user, setUser] = useState(null); //Stores logged-in user info
+  const [renderKey, setRenderKey] = useState(0); //force render
+  const [hasCompleteProfile, setHasCompleteProfile] = useState(false); //Whether user’s onboarding is done
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Initializing...");
+  const [data, setData] = useState({}); //Stores collected onboarding form data
 
-  // State variables for managing onboarding flow
-  const [currentStep, setCurrentStep] = useState(-1);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [renderKey, setRenderKey] = useState(0);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES.SETUP);
-
-  // Centralized state for storing onboarding data across steps
-  const [data, setData] = useState({
-    countries: [],
-    courses: [],
-    studyLevel: "",
-    academicInfo: {},
-    paymentInfo: {},
-  });
-
-  /**
-   * Main initialization effect - handles all authentication states
-   */
+  
   useEffect(() => {
-    // Wait for session to load
-    if (status === "loading") {
-      setLoadingMessage(LOADING_MESSAGES.CHECKING_USER);
-      return;
-    }
+    const initializeOnboarding = async () => {
+      try {
+        // Wait for session to load
+        if (status === "loading") {
+          setIsLoading(true);
+          setLoadingMessage("Checking authentication...");
+          return;
+        }
 
-    // No session - show auth modal
-    if (status === "unauthenticated") {
-      setShowAuthModal(true);
-      setCurrentStep(-1);
-      setIsInitializing(false);
-      return;
-    }
+        setIsLoading(true);
+        setLoadingMessage("Loading your profile...");
 
-    // Has session - check profile completion status
-    if (status === "authenticated" && session?.user) {
-      // User has complete profile - redirect to dashboard
-      if (session.hasCompleteProfile) {
-        setLoadingMessage(LOADING_MESSAGES.PROCESSING_LOGIN);
-        setIsInitializing(false);
-        router.push("/dashboard");
-        return;
+        //checking user
+        const authUser = session?.user;
+        
+        if (authUser) {
+          // ✅ User is authenticated
+          setUser(authUser);
+          
+          //checking users profile if auth and if profile
+          const profileComplete = session?.hasCompleteProfile === true;
+          
+          /*
+          console.log("📊 Authenticated user:", {
+            email: authUser.email,
+            hasCompleteProfile: profileComplete,
+          });*/
+          
+          setHasCompleteProfile(profileComplete);
+          
+          if (profileComplete) {
+            // Profile complete → redirect to dashboard
+            setLoadingMessage("Profile complete! Redirecting...");
+            setTimeout(() => router.push("/dashboard"), 1500);
+          } else {
+            // ✅ FIX: Profile incomplete → Go directly to onboarding (skip auth modal)
+            setShowAuthModal(false); // Don't show auth modal
+            setCurrentStep(0); // Start onboarding
+            setIsLoading(false);
+          }
+        } else {
+          // ❌ Not authenticated → Show auth modal
+          setShowAuthModal(true);
+          setCurrentStep(-1);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Initialization error:", error);
+        setShowAuthModal(true);
+        setCurrentStep(-1);
+        setIsLoading(false);
       }
+    };
 
-      // User needs to complete profile - start onboarding
-      if (!session.hasCompleteProfile) {
-        setShowAuthModal(false);
-        setCurrentStep(0);
-        setIsInitializing(false);
-        return;
-      }
-    }
-
-    // Fallback
-    setShowAuthModal(true);
-    setCurrentStep(-1);
-    setIsInitializing(false);
+    initializeOnboarding();
   }, [session, status, router]);
 
-  /**
-   * Manual Authentication Handler
-   */
-  const handleAuthSuccess = useCallback(
-    async (userData, isNewUser = false) => {
-      setShowAuthModal(false);
-      setRenderKey((prev) => prev + 1);
 
-      // Update session with new data
-      await update({
-        hasCompleteProfile: userData?.user?.hasCompleteProfile || false,
-        isNewUser: isNewUser,
-      });
-
-      // New user or incomplete profile - start onboarding
-      if (isNewUser || !userData?.user?.hasCompleteProfile) {
-        setCurrentStep(0);
-      } else {
-        // Existing user with complete profile - redirect to dashboard
-        router.push("/dashboard");
-      }
-    },
-    [update, router]
-  );
-
-  /**
-   * Navigates to the next step in the onboarding flow
-   */
-  const handleNext = useCallback(() => {
-    setCurrentStep((prevStep) => {
-      const nextStep = prevStep + 1;
-      if (nextStep < ONBOARDING_STEPS.length) {
-        setRenderKey((prev) => prev + 1);
-        return nextStep;
-      }
-      return prevStep;
-    });
+  //on auth complete
+  const handleAuthSuccess = useCallback((authenticatedUser) => {
+   // console.log("🔐 Auth success, starting onboarding");
+    setUser(authenticatedUser);
+    setShowAuthModal(false);
+    setCurrentStep(0);
+    setRenderKey(prev => prev + 1);
   }, []);
 
-  /**
-   * Navigates to the previous step in the onboarding flow
-   */
+
+  //next
+  const handleNext = useCallback((stepData) => {
+    if (stepData) {
+      setData(prev => ({ ...prev, ...stepData }));
+    }
+    setCurrentStep(prev => prev + 1);
+    setRenderKey(prev => prev + 1);
+  }, []);
+
+  //prev
   const handleBack = useCallback(() => {
-    setCurrentStep((prevStep) => {
-      if (prevStep > 0) {
-        const backStep = prevStep - 1;
-        setRenderKey((prev) => prev + 1);
-        return backStep;
-      }
-      return prevStep;
-    });
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+      setRenderKey(prev => prev + 1);
+    }
+  }, [currentStep]);
+
+
+  //update data
+  const updateData = useCallback((updates) => {
+    setData(prev => ({ ...prev, ...updates }));
   }, []);
 
-  /**
-   * Updates the centralized onboarding data state
-   */
-  const updateData = useCallback((newData) => {
-    setData((prev) => ({ ...prev, ...newData }));
-  }, []);
 
-  /**
-   * Onboarding Completion Handler
-   */
-  const handleOnboardingComplete = useCallback(
-    async (responseData) => {
-      // Update session to mark profile as complete
-      await update({
-        hasCompleteProfile: true,
-        token: responseData?.token,
-        userId: responseData?.data?.userId,
-      });
+  //on profile complete 
+  const handleOnboardingComplete = useCallback(async (finalData) => {
+    try {
+      setIsLoading(true);
+      setLoadingMessage("Saving your profile...");
+      setHasCompleteProfile(true);
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      setIsLoading(false);
+    }
+  }, [data]);
 
-      // Redirect to dashboard
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 500);
-    },
-    [update, router]
-  );
 
-  /**
-   * Error fallback handler
-   */
+  //on error
   const handleErrorRetry = useCallback(() => {
-    setCurrentStep(-1);
     setShowAuthModal(true);
-    setIsInitializing(false);
+    setCurrentStep(-1);
+    setRenderKey(prev => prev + 1);
   }, []);
-
-  // Composite loading state
-  const isLoading = status === "loading" || isInitializing;
 
   return {
-    // State
     currentStep,
     showAuthModal,
-    user: session?.user || null,
+    user,
     renderKey,
-    hasCompleteProfile: session?.hasCompleteProfile || false,
+    hasCompleteProfile,
     isLoading,
     loadingMessage,
     data,
-    
-    // Handlers
     setShowAuthModal,
     handleAuthSuccess,
     handleNext,

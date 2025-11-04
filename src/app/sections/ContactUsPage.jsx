@@ -342,7 +342,7 @@ const ContactForm = ({ formRef, isVisible, formData, handleChange, focusedField,
     <div 
       ref={formRef}
       className={`
-        bg-white rounded-2xl sm:rounded-3xl border border-[#6C7280]/20 shadow-xl shadow-gray-100/20 
+         rounded-2xl sm:rounded-3xl border border-[#002147]/80 shadow-xl shadow-gray-100/20 
         p-6 sm:p-8 md:p-10 lg:p-12
         transition-all duration-1000 ease-out delay-500
         ${isVisible ? 'opacity-100 transform translate-x-0' : 'opacity-0 transform translate-x-4 sm:translate-x-8 lg:translate-x-16'}
@@ -506,7 +506,7 @@ const PremiumContactPage = () => {
   // ==========================================
   
   return (
-    <div className="min-h-screen bg-white py-28 md:py-32 lg:pt-64 lg:pb-56 px-4 lg:px-8">
+    <div className="min-h-screen  py-28 md:py-32 lg:pt-64 lg:pb-56 px-4 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
         {/* Main Content Grid Layout */}

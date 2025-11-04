@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { StatsOverview } from './components/StatsOverview';
 import { UniversityCard } from './components/UniversityCard';
-import { AddUniversityModal } from './components/AddUniversityModal';
-import { FloatingAddButton } from './components/FloatingAddButton';
+
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 
 /**
  * Skeleton loading component for stats overview
@@ -74,6 +74,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const {data:session} = useSession()
+
   /**
    * Fetches saved universities from backend API with enhanced progress data
    * Includes essays, calendar events, and task completion tracking
@@ -82,19 +84,15 @@ const Index = () => {
     const fetchSavedUniversities = async () => {
       try {
         const authData = localStorage.getItem("authData");
-        if (!authData) {
-          setError("No authentication data found");
-          setLoading(false);
-          return;
-        }
+        
 
-        const parsedData = JSON.parse(authData);
+       
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
         const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${parsedData.token}`,
+            'Authorization': `Bearer ${session.token}`,
             'Content-Type': 'application/json',
           },
         });

@@ -1,9 +1,7 @@
 /**
  * Error Fallback Component
  * Displays when there's an error in the onboarding flow
- * @param {Object} props - Component properties
- * @param {Function} props.onRetry - Retry handler
- * @returns {JSX.Element} Error fallback UI
+ * 
  */
 export const OnboardingErrorFallback = ({ onRetry }) => {
   return (

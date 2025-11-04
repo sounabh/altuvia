@@ -118,6 +118,7 @@ export const CountrySelectionStep = ({
   // ===========================================================================
   // DEBUG LOGS (Maintained as per requirements)
   // ===========================================================================
+  /*
   console.log('====================================');
   console.log(user);
   console.log('====================================');
@@ -130,7 +131,7 @@ export const CountrySelectionStep = ({
  
   console.log(process.env.NEXT_PUBLIC_API_BASE_URL);
   console.log('====================================');
-
+*/
   // ===========================================================================
   // RENDER COMPONENT
   // ===========================================================================
@@ -160,7 +161,7 @@ export const CountrySelectionStep = ({
             
             {/* FALLBACK AVATAR: Shows user initials */}
             <div 
-              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user.image ? 'hidden' : 'flex'}`}
+              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.image ? 'hidden' : 'flex'}`}
             >
               {getUserInitials()}
             </div>

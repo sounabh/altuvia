@@ -5,10 +5,7 @@ import { Button } from "@/components/ui/button";
  * Provides social authentication options (Google, LinkedIn)
  * Handles OAuth login flow with loading states
  * 
- * @param {Object} props - Component properties
- * @param {Function} props.onOAuthLogin - Callback function when OAuth button is clicked
- * @param {boolean} props.isLoading - Loading state to disable buttons
- * @returns {JSX.Element} Rendered OAuth buttons component
+ 
  */
 export const OAuthButtons = ({ onOAuthLogin, isLoading }) => {
   return (

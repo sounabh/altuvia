@@ -1,37 +1,60 @@
+// ==========================================
+// FILE: app/api/auth/[...nextauth]/route.js
+// DESCRIPTION: NextAuth.js API route configuration for authentication
+//
+//
+// ==========================================
+
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { API_BASE_URL } from "@/lib/constants/auth";
 
-import { API_BASE_URL } from "@/lib/constants/auth"; //api base url
+// ==========================================
+// AUTHENTICATION OPTIONS CONFIGURATION
+// ==========================================
 
 export const authOptions = {
-
-  //credentials provider for normal sign in 
+  // ==========================================
+  // PROVIDERS CONFIGURATION
+  // ==========================================
 
   providers: [
+    // ==========================================
+    // CREDENTIALS PROVIDER (Email/Password)
+    // ==========================================
+
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
+        isSignup: { label: "Is Signup", type: "boolean" },
       },
 
-      async authorize(credentials) { //authorize function will execute whenever have data from fields 
-
+      async authorize(credentials) {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/user/signin`, {
+          // Determine endpoint based on signup/login flow
+          const endpoint =
+            credentials.isSignup === "true"
+              ? `${API_BASE_URL}/api/user/signup`
+              : `${API_BASE_URL}/api/user/signin`;
+
+          // Make API call to backend authentication service
+          const res = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(credentials),
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+              name: credentials.email.split("@")[0], // Generate name from email
+            }),
           });
 
           const userData = await res.json();
 
+          // Return user object if authentication successful
           if (res.ok && userData.success) {
-           // console.log("✅ Credentials authentication successful");
-
-
-           //payload
             return {
               id: userData.data.userId,
               email: userData.data.email,
@@ -40,6 +63,7 @@ export const authOptions = {
               provider: "credentials",
               token: userData.token,
               hasCompleteProfile: userData.data.hasCompleteProfile || false,
+              isNewUser: credentials.isSignup === "true",
             };
           }
 
@@ -52,12 +76,19 @@ export const authOptions = {
       },
     }),
 
+    // ==========================================
+    // GOOGLE OAUTH PROVIDER
+    // ==========================================
+
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
 
-    // LinkedIn OAuth Provider
+    // ==========================================
+    // LINKEDIN OAUTH PROVIDER (Custom Implementation)
+    // ==========================================
+
     {
       id: "linkedin",
       name: "LinkedIn",
@@ -74,6 +105,8 @@ export const authOptions = {
         params: {
           grant_type: "authorization_code",
         },
+
+        // Custom token request handler for LinkedIn
         async request({ client, params, checks, provider }) {
           const redirectUri = `${
             process.env.NEXTAUTH_URL || "http://localhost:3000"
@@ -109,18 +142,17 @@ export const authOptions = {
           return { tokens };
         },
       },
+
+      // Custom userinfo request handler
       userinfo: {
         url: "https://api.linkedin.com/v2/userinfo",
         async request({ tokens, provider }) {
-          const response = await fetch(
-            "https://api.linkedin.com/v2/userinfo",
-            {
-              headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
+          const response = await fetch("https://api.linkedin.com/v2/userinfo", {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+              "Content-Type": "application/json",
+            },
+          });
 
           if (!response.ok) {
             throw new Error(`LinkedIn API request failed: ${response.status}`);
@@ -129,6 +161,8 @@ export const authOptions = {
           return await response.json();
         },
       },
+
+      // Profile transformation for LinkedIn data
       profile(profile) {
         return {
           id: profile.sub || profile.id,
@@ -147,43 +181,49 @@ export const authOptions = {
     },
   ],
 
+  // ==========================================
+  // CALLBACKS CONFIGURATION
+  // ==========================================
 
-  //These are event hooks for customizing token/session behavior.
   callbacks: {
+    // ==========================================
+    // SIGNIN CALLBACK: Handles OAuth user creation/verification
+    // ==========================================
+
     async signIn({ user, account, profile }) {
       try {
-
-       /* console.log("🔐 Sign In Attempt:", {
-          provider: account?.provider,
-          userId: user?.id,
-          hasEmail: !!user?.email,
-        });*/
-
-        // For OAuth providers, verify with backend
-
-        // if account comes from google/linkedin then send reqs to backend 
         if (account?.provider !== "credentials") {
           try {
-            const response = await fetch(`${API_BASE_URL}/api/user/oauth-signin`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email: user.email,
-                name: user.name,
-                provider: account.provider,
-                image: user.image,
-              }),
-            });
+            const response = await fetch(
+              `${API_BASE_URL}/api/user/oauth-signin`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: user.email,
+                  name: user.name,
+                  provider: account.provider,
+                  image: user.image,
+                }),
+              }
+            );
 
             if (response.ok) {
               const userData = await response.json();
-              
-              // Store backend data in user object for JWT callback
+
+              console.log("🔗 OAuth backend response:", {
+                backendUserId: userData.data.userId,
+                providerUserId: user.id,
+              });
+
+              user.id = userData.data.userId;
               user.token = userData.token;
-              user.userId = userData.data.userId;
-              user.hasCompleteProfile = userData.data.hasCompleteProfile || false;
+              user.hasCompleteProfile =
+                userData.data.hasCompleteProfile || false;
               user.isNewUser = userData.isNewUser || false;
-              
+
+              console.log("✅ User ID set to database ID:", user.id);
+
               return true;
             } else {
               console.error("❌ OAuth backend verification failed");
@@ -202,26 +242,24 @@ export const authOptions = {
       }
     },
 
+    // ==========================================
+    // JWT CALLBACK: Token creation and management
+    // ==========================================
+
     async jwt({ token, user, account, trigger, session }) {
       try {
-        // Initial sign in
+        // Handle new sign-in
         if (account && user) {
-
-        /*  console.log("🔑 JWT Token Created:", {
-            provider: account.provider,
-            userId: user.id,
-            hasCompleteProfile: user.hasCompleteProfile,
-          });*/
-
           return {
             ...token,
             provider: account.provider,
-            accessToken: user.token || account.access_token,
+            accessToken: user.token,
             refreshToken: account.refresh_token,
-            accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+            accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000,
+            // ✅ FIX: These come from your backend, not hardcoded
             hasCompleteProfile: user.hasCompleteProfile || false,
             isNewUser: user.isNewUser || false,
-            userId: user.userId || user.id,
+            userId: user.id,
             name: user.name,
             email: user.email,
             picture: user.image,
@@ -229,23 +267,25 @@ export const authOptions = {
           };
         }
 
-        // Handle session updates via update() function whenver your session is going to update after profile creation
+        // ✅ FIX: Handle session updates from profile completion
         if (trigger === "update" && session) {
-          //console.log("🔄 JWT Token Updated via session.update()");
+          console.log("🔄 JWT - Session update:", session);
           return {
             ...token,
-            ...session,
+            hasCompleteProfile:
+              session.hasCompleteProfile ?? token.hasCompleteProfile,
+            isNewUser: session.isNewUser ?? token.isNewUser,
+            accessToken: session.token ?? token.accessToken,
           };
         }
 
-        // Token still valid
+        // Check if token needs refresh
         if (token.accessTokenExpires && Date.now() < token.accessTokenExpires) {
           return token;
         }
 
-        // Token expired, refresh if possible
+        // Attempt token refresh if refresh token exists
         if (token.refreshToken) {
-         // console.log("🔄 Attempting to refresh access token");
           return await refreshAccessToken(token);
         }
 
@@ -258,29 +298,41 @@ export const authOptions = {
         };
       }
     },
+    // ==========================================
+    // SESSION CALLBACK: Session data preparation
+    // ==========================================
 
     async session({ session, token }) {
       try {
-      /*  console.log("📋 Session Created:", {
-          provider: token?.provider,
-          userId: token?.sub,
-          hasCompleteProfile: token?.hasCompleteProfile,
-        });*/
-
         if (token) {
+          /*
+          console.log("📦 Session callback - Token data:", {
+            userId: token.userId,  // Should be YOUR database ID
+            hasCompleteProfile: token.hasCompleteProfile,
+            isNewUser: token.isNewUser,
+          });
+*/
+          // Populate session with user data
           session.provider = token.provider;
-          session.userId = token.userId || token.sub;
+          session.userId = token.userId;
           session.token = token.accessToken;
           session.error = token.error;
           session.hasCompleteProfile = token.hasCompleteProfile || false;
           session.isNewUser = token.isNewUser || false;
 
+          // Populate user object in session
           if (session.user) {
-            session.user.id = token.sub;
+            session.user.id = token.userId; // ✅ Use YOUR database ID
             session.user.name = token.name || session.user.name;
             session.user.email = token.email || session.user.email;
             session.user.image = token.picture || session.user.image;
           }
+
+          console.log(
+            "✅ Session prepared with database userId:",
+            session.userId,
+            session.token
+          );
         }
 
         return session;
@@ -290,9 +342,13 @@ export const authOptions = {
       }
     },
 
+    // ==========================================
+    // REDIRECT CALLBACK: URL redirection handling
+    // ==========================================
+
     async redirect({ url, baseUrl }) {
       try {
-        // Don't redirect on error
+        // Preserve error URLs
         if (url.includes("/auth/error") || url.includes("error=")) {
           return url;
         }
@@ -302,7 +358,7 @@ export const authOptions = {
           return `${baseUrl}${url}`;
         }
 
-        // Handle same-origin URLs
+        // Validate and handle absolute URLs
         try {
           const urlObj = new URL(url);
           const baseUrlObj = new URL(baseUrl);
@@ -314,6 +370,7 @@ export const authOptions = {
           console.warn("⚠️ Invalid URL provided:", url);
         }
 
+        // Fallback to base URL
         return baseUrl;
       } catch (error) {
         console.error("❌ Redirect callback error:", error);
@@ -322,42 +379,62 @@ export const authOptions = {
     },
   },
 
+  // ==========================================
+  // EVENTS CONFIGURATION
+  // ==========================================
+
   events: {
     async signIn({ user, account, profile, isNewUser }) {
-
-     /* console.log("📝 Authentication Event - Sign In:", {
-        event: "signIn",
-        provider: account?.provider,
-        isNewUser: isNewUser,
-        userId: user?.id,
+      /*
+      console.log("🎉 Sign in event:", {
+        userId: user.id,  // Should be YOUR database ID
+        email: user.email,
+        provider: account.provider
       });*/
     },
-
     async signOut({ token }) {
-     /* console.log("📝 Authentication Event - Sign Out:", {
-        event: "signOut",
-        provider: token?.provider,
-        userId: token?.sub,
-      });*/
+      console.log("👋 Sign out event:", {
+        userId: token.userId,
+      });
     },
   },
+
+  // ==========================================
+  // SESSION CONFIGURATION
+  // ==========================================
 
   session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // 24 hours
+    strategy: "jwt", // Use JWT for session management
+    maxAge: 30 * 24 * 60 * 60, // 30 days session duration
+    updateAge: 24 * 60 * 60, // Update session every 24 hours
   },
+
+  // ==========================================
+  // JWT CONFIGURATION
+  // ==========================================
 
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60, // 30 days JWT lifetime
   },
 
+  // ==========================================
+  // DEBUGGING & LOGGING CONFIGURATION
+  // ==========================================
+
   debug: process.env.NODE_ENV === "development",
+
+  // ==========================================
+  // CUSTOM PAGE PATHS
+  // ==========================================
 
   pages: {
     signIn: "/auth/signin",
     signOut: "/auth/signout",
   },
+
+  // ==========================================
+  // LOGGER CONFIGURATION
+  // ==========================================
 
   logger: {
     error(code, metadata) {
@@ -374,8 +451,15 @@ export const authOptions = {
   },
 };
 
+// ==========================================
+// TOKEN REFRESH FUNCTION
+// DESCRIPTION: Handles access token refresh for OAuth providers
+// SECURITY: Implements proper token refresh flow with error handling
+// ==========================================
+
 async function refreshAccessToken(token) {
   try {
+    // Currently only supports Google token refresh
     if (token.provider === "google") {
       const response = await fetch("https://oauth2.googleapis.com/token", {
         headers: {
@@ -399,12 +483,13 @@ async function refreshAccessToken(token) {
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
-        accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
         refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
         error: undefined,
       };
     }
 
+    // Return original token for unsupported providers
     return token;
   } catch (error) {
     console.error("❌ Error refreshing access token:", error);
@@ -414,6 +499,10 @@ async function refreshAccessToken(token) {
     };
   }
 }
+
+// ==========================================
+// API ROUTE HANDLER
+// ==========================================
 
 const handler = NextAuth(authOptions);
 

@@ -1,4 +1,6 @@
-import React from "react";
+"use client"
+
+import React, { useEffect } from "react";
 import Nav from "./sections/Nav";
 import Hero from "./sections/Hero";
 import Steps from "./sections/Steps";
@@ -11,29 +13,26 @@ import ApplicationManagement from "./sections/ApplicationMgmt";
 import Marquee from "./sections/Marqueee";
 import ProductShowcase from "./sections/Products";
 
-const page = () => {
-
-  
-  
+const Page = () => {
  
 
   return (
-    <div className="w-full  max-w-[1130px] mx-auto px-5"> 
-      {/* The main page component that includes all sections px-4*/}
-      <Nav></Nav>
-      <Hero></Hero>
-      <Marquee></Marquee>
-      <Steps></Steps>
-      <ApplicationManagement></ApplicationManagement>
-      {/* <ImpactNumbers></ImpactNumbers>*/}
-      <PricingCards></PricingCards>
-      <Accordions></Accordions>
-      <ProductShowcase></ProductShowcase>
-
-      <ContactUsPage></ContactUsPage>
-      <AltuviaFooter></AltuviaFooter>
+    <div className="relative">
+      <div className="relative z-10 w-full max-w-[1130px] mx-auto px-5">
+        <Nav />
+      </div>
+      <Hero />
+      <div className="relative z-10 w-full max-w-[1130px] mx-auto px-5">
+        <Steps />
+        <ApplicationManagement />
+        <PricingCards />
+        <Accordions />
+        <ProductShowcase />
+        <ContactUsPage />
+        <AltuviaFooter />
+      </div>
     </div>
   );
 };
 
-export default page;
+export default Page;

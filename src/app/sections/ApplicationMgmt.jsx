@@ -99,7 +99,7 @@ export default function ModernApplicationManagement() {
           <div className={`transform transition-all duration-1000 ease-out ${
             isVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
           }`}>
-            <h1 className="font-serif font-normal text-white w-full text-3xl sm:text-4xl md:text-5xl lg:text-65l leading-tight tracking-tight mb-4">
+            <h1 className=" font-normal text-white w-full text-3xl sm:text-4xl md:text-5xl lg:text-65l leading-tight tracking-tight mb-4">
               <span className="block">Application Management</span>
               <span className="block">Made Simple</span>
             </h1>

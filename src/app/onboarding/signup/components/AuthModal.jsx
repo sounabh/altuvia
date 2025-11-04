@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { signIn, useSession } from "next-auth/react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -9,152 +10,116 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AuthForm } from "@/components/AuthForm";
-import { API_BASE_URL } from "@/lib/constants/auth";
 
-/**
- * Authentication Modal Component
- * Handles user authentication using NextAuth session
- */
-export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
-  const { data: session, update } = useSession();
+export const AuthModal = memo(({ isOpen, onClose, onSuccess }) => {
+  const { data: session } = useSession();
 
-  // State management
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(true);//togle login/signup
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Clear error when switching between login/signup modes
-  useEffect(() => {
-    setError("");
-  }, [isLogin]);
 
-  /**
-   * Initiates OAuth login flow
-   */
-  const handleOAuthLogin = async (provider) => {
+  //When modal opens or mode (login/signup) changes → clear previous error.
+  useEffect(() => {
+    if (isOpen) {
+      setError("");
+    }
+  }, [isLogin, isOpen]);
+
+
+  //oauthlogin
+
+  const handleOAuthLogin = useCallback(async (provider) => {
+    if (isLoading) return;
+    
     setIsLoading(true);
     setError("");
 
+    const toastId = toast.loading(`Connecting to ${provider}...`);
+
     try {
-      //next auth trigger
       const result = await signIn(provider, {
         redirect: false,
         callbackUrl: window.location.href,
       });
 
       if (result?.error) {
-        setError(`${provider} authentication failed. Please try again.`);
+        const errorMsg = `${provider} authentication failed. Please try again.`;
+        setError(errorMsg);
+        toast.error(errorMsg, { id: toastId });
         setIsLoading(false);
+      } else {
+        toast.success(`${provider} authentication successful!`, { id: toastId });
+        setTimeout(() => setIsLoading(false), 3000);
       }
-      // if Success then case handled by useEffect watching session
     } catch (error) {
       console.error('OAuth login error:', error);
-      setError(`${provider} authentication error. Please try again.`);
+      const errorMsg = `${provider} authentication error. Please try again.`;
+      setError(errorMsg);
+      toast.error(errorMsg, { id: toastId });
       setIsLoading(false);
     }
-  };
+  }, [isLoading]);
 
-  /**
-   * Handles email/password sign up
-   */
-  const handleSignUp = async (email, password) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/user/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          name: email.split("@")[0],
-        }),
-      });
 
-      const userData = await response.json();
-
-      if (response.ok && userData.success) {
-        // Sign in with credentials to create NextAuth session
-        const signInResult = await signIn("credentials", {
-          email,
-          password,
-          redirect: false,
-        });
-
-        if (signInResult?.ok) {
-          // Update session with backend data
-          await update({
-            token: userData.token,
-            userId: userData.data.userId,
-            hasCompleteProfile: userData.data.hasCompleteProfile || false,
-            isNewUser: true,
-          });
-
-          // Trigger success callback for new user
-          onSuccess({ user: userData.data }, true);
-          onClose();
-        } else {
-          throw new Error("Failed to create session after signup");
-        }
-      } else {
-        if (response.status === 409) {
-          throw new Error("An account with this email already exists. Please sign in instead.");
-        } else {
-          throw new Error(userData.error || "Sign up failed. Please try again.");
-        }
-      }
-    } catch (error) {
-      if (error.name === "TypeError" && error.message.includes("fetch")) {
-        throw new Error("Cannot connect to server. Please check if the backend is running.");
-      } else {
-        throw new Error(error.message || "Network error. Please try again.");
-      }
-    }
-  };
-
-  /**
-   * Handles form submission
-   */
-  const handleFormSubmit = async (error, formData) => {
+  const handleFormSubmit = useCallback(async (error, formData) => {
     if (error) {
       setError(error.message);
+      toast.error(error.message);
       return;
     }
 
     if (isLoading) return;
     setIsLoading(true);
 
+    
+    const toastId = toast.loading(isLogin ? "Signing in..." : "Creating account...");
+
+    //creds 
     try {
-      if (!isLogin) {
-        await handleSignUp(formData.email, formData.password);
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        isSignup: !isLogin,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        const errorMsg = result.error || "Authentication failed. Please try again.";
+        setError(errorMsg);
+        toast.error(errorMsg, { id: toastId });
+        setIsLoading(false);
+      } else {
+        toast.success(
+          isLogin ? "Welcome back!" : "Account created successfully!",
+          { id: toastId }
+        );
+        setTimeout(() => setIsLoading(false), 3000);
       }
-      // Login handled by credentials provider automatically
     } catch (error) {
-      setError(error.message);
-    } finally {
+      console.error('Form submission error:', error);
+      const errorMsg = error.message || "Authentication failed. Please try again.";
+      setError(errorMsg);
+      toast.error(errorMsg, { id: toastId });
       setIsLoading(false);
     }
-  };
+  }, [isLoading, isLogin]);
 
-  /**
-   * Toggles between login and signup modes
-   */
-  const handleToggleMode = () => {
+
+  const handleToggleMode = useCallback(() => {
     setIsLogin(!isLogin);
     setError("");
-  };
+  }, [isLogin]);
 
-  // Watch session for OAuth success
+  
+  //if user already there
   useEffect(() => {
-    if (session?.user && !isLoading) {
-      // Session established - check profile completion
-      const hasCompleteProfile = session.hasCompleteProfile || false;
-      
-      onSuccess(
-        { user: session.user }, 
-        session.isNewUser || !hasCompleteProfile
-      );
+    if (session?.user) {
+      setIsLoading(false);
+      onSuccess({ user: session.user });
       onClose();
     }
-  }, [session, isLoading, onSuccess, onClose]);
+  }, [session?.user, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
@@ -178,4 +143,6 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }) => {
       </DialogContent>
     </Dialog>
   );
-};
+});
+
+AuthModal.displayName = "AuthModal";

@@ -87,12 +87,12 @@ const ProductShowcase = () => {
           animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 30 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="font-serif tracking-[-1.5px] text-center sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[57px] text-[36px] sm:text-[48px] md:text-[56px] lg:text-[48px] font-medium w-full text-[#002147]">
+          <h1 className=" tracking-[-1.5px] text-center sm:tracking-[-2px] md:tracking-[-2.5px] lg:tracking-[-1.9px] leading-[45px] sm:leading-[55px] md:leading-[65px] lg:leading-[57px] text-[36px] sm:text-[48px] md:text-[56px] lg:text-[48px] font-medium w-full text-[#002147]">
             <span className="block">Ready to Take Control</span>
             <span className="block">of Your Applications?</span>
           </h1>
 
-          <p className="font-inter leading-[24px] sm:leading-[28px] md:leading-[30px] lg:leading-[32px] text-[#404245] font-normal text-base lg:text-[18px] sm:text-lg max-w-xl sm:max-w-2xl w-full px-2 sm:px-4 mx-auto text-center mt-2 lg:mt-5 md:mt-4">
+          <p className="leading-[24px] sm:leading-[28px] md:leading-[30px] lg:leading-[32px] text-[#404245] font-normal text-base lg:text-[18px] sm:text-lg max-w-xl sm:max-w-2xl w-full px-2 sm:px-4 mx-auto text-center mt-2 lg:mt-5 md:mt-4">
             <span className="block">Join thousands of successful applicants with Altuvia now.</span>
           </p>
         </motion.div>

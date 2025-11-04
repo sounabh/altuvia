@@ -114,81 +114,108 @@
 
 /* Custom component classes */
 @layer base {
-  body{
-  font-family: var(--font-roboto);
+  body {
+    font-family: var(--font-jakarta), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
- h1 {
-  font-family: var(--font-roboto);
-  font-weight: 500;
-  color: #002147;
-  width: 100%;
-  font-size: 36px;
-  line-height: 45px;
-  letter-spacing: -1px;
-}
-
-@media (min-width: 640px) {
   h1 {
-    font-size: 48px;
-    line-height: 55px;
-    letter-spacing: -2px;
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    font-weight: 700;
+    color: #002147;
+    width: 100%;
+    font-size: 36px;
+    line-height: 45px;
+    letter-spacing: -0.02em;
   }
-}
 
-@media (min-width: 768px) {
-  h1 {
-    font-size: 56px;
-    line-height: 68px;
-    letter-spacing: -1.5px;
+  @media (min-width: 640px) {
+    h1 {
+      font-size: 48px;
+      line-height: 55px;
+      letter-spacing: -0.03em;
+    }
   }
-}
 
-@media (min-width: 1024px) {
-  h1 {
-    font-size: 65px;
-    line-height: 80px;
-    letter-spacing: -0.6px;
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 56px;
+      line-height: 68px;
+      letter-spacing: -0.03em;
+    }
   }
-}
 
-p {
-  font-family: var(--font-roboto);
-  font-weight: 400;
-  color: #6C7280;
-  font-size: 16px;
-  line-height: 24px;
-  width: 100%;
-  max-width: 36rem;
-  margin: 0 auto;
-  margin-top: 0.5rem;
+  @media (min-width: 1024px) {
+    h1 {
+      font-size: 65px;
+      line-height: 80px;
+      letter-spacing: -0.02em;
+    }
+  }
 
-}
+  h2 {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    font-weight: 600;
+    color: #002147;
+  }
 
-@media (min-width: 640px) {
+  h3 {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    font-weight: 600;
+    color: #002147;
+  }
+
+  h4, h5, h6 {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    font-weight: 500;
+    color: #002147;
+  }
+
   p {
-    font-size: 18px;
-    line-height: 28px;
-    max-width: 42rem;
-    margin-top: 0.75rem;
-
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    font-weight: 400;
+    color: #6C7280;
+    font-size: 16px;
+    line-height: 24px;
+    width: 100%;
+    max-width: 36rem;
+    margin: 0 auto;
+    margin-top: 0.5rem;
   }
-}
 
-@media (min-width: 768px) {
-  p {
-    line-height: 30px;
-    margin-top: 1rem;
+  @media (min-width: 640px) {
+    p {
+      font-size: 18px;
+      line-height: 28px;
+      max-width: 42rem;
+      margin-top: 0.75rem;
+    }
   }
-}
 
-@media (min-width: 1024px) {
-  p {
-    line-height: 32px;
-    margin-top: 0.25rem;
+  @media (min-width: 768px) {
+    p {
+      line-height: 30px;
+      margin-top: 1rem;
+    }
   }
-}
 
+  @media (min-width: 1024px) {
+    p {
+      line-height: 32px;
+      margin-top: 0.25rem;
+    }
+  }
+
+  /* Better button and input typography */
+  button, input, select, textarea {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+  }
+
+  /* For code blocks if needed */
+  code, pre {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
 }
 
 @theme inline {
@@ -238,14 +265,6 @@ p {
   }
 }
 
-
-
-
-
-
-
-
-
 .loading-roller {
   display: inline-block;
   width: 20px;
@@ -258,4 +277,33 @@ p {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+
+
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #002147;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #003d7a;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #002147 #f1f1f1;
+}
+
+html {
+  scroll-behavior: auto; /* Let Lenis handle smooth scrolling */
 }
