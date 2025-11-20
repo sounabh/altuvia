@@ -1,12 +1,15 @@
 "use client";
+
+// React and hooks imports
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import UniversityCard from './UniversityCard';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
-/**
- * Modern Pagination Component
- */
+// Component and icon imports
+import UniversityCard from './UniversityCard';
+import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+
+
+// Pagination Component
 const Pagination = ({ 
   currentPage, 
   totalPages, 
@@ -14,31 +17,33 @@ const Pagination = ({
   itemsPerPage, 
   onPageChange 
 }) => {
+  // Don't render pagination if only one page
   if (totalPages <= 1) return null;
 
+  // Function to calculate visible page numbers with ellipsis
   const getVisiblePages = () => {
-    const delta = 1; // Number of pages to show on each side of current page
+    const delta = 1;
     const range = [];
     const rangeWithDots = [];
 
-    // Calculate range of pages to show
+    // Calculate range of pages to show around current page
     for (let i = Math.max(2, currentPage - delta); 
          i <= Math.min(totalPages - 1, currentPage + delta); 
          i++) {
       range.push(i);
     }
 
-    // Add first page
+    // Handle left side ellipsis
     if (currentPage - delta > 2) {
       rangeWithDots.push(1, '...');
     } else {
       rangeWithDots.push(1);
     }
 
-    // Add middle pages
+    // Add middle range
     rangeWithDots.push(...range);
 
-    // Add last page
+    // Handle right side ellipsis
     if (currentPage + delta < totalPages - 1) {
       rangeWithDots.push('...', totalPages);
     } else if (totalPages > 1) {
@@ -53,21 +58,23 @@ const Pagination = ({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-16 px-4">
-      {/* Results info */}
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-12 pt-8 border-t border-gray-200">
+      
+      {/* Results counter */}
       <div className="text-sm text-gray-600 order-2 sm:order-1">
-        Showing <span className="font-medium text-gray-900">{startItem}</span> to{' '}
-        <span className="font-medium text-gray-900">{endItem}</span> of{' '}
-        <span className="font-medium text-gray-900">{totalItems}</span> universities
+        Showing <span className="font-semibold text-[#002147]">{startItem}</span> to{' '}
+        <span className="font-semibold text-[#002147]">{endItem}</span> of{' '}
+        <span className="font-semibold text-[#002147]">{totalItems}</span> universities
       </div>
 
       {/* Pagination controls */}
       <div className="flex items-center gap-2 order-1 sm:order-2">
-        {/* Previous button */}
+        
+        {/* Previous page button */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-500 transition-colors"
+          className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-[#002147] hover:bg-[#3598FE] hover:text-white hover:border-[#3598FE] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -77,16 +84,18 @@ const Pagination = ({
           {visiblePages.map((page, index) => (
             <React.Fragment key={index}>
               {page === '...' ? (
+                // Ellipsis for hidden pages
                 <div className="flex items-center justify-center w-9 h-9 text-gray-400">
                   <MoreHorizontal className="w-4 h-4" />
                 </div>
               ) : (
+                // Page number button
                 <button
                   onClick={() => onPageChange(page)}
-                  className={`flex items-center justify-center w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center w-9 h-9 rounded-lg text-sm font-medium transition-all duration-300 ${
                     currentPage === page
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'bg-[#002147] text-white hover:bg-[#3598FE]'
+                      : 'border border-gray-200 bg-white text-[#002147] hover:bg-[#3598FE] hover:text-white hover:border-[#3598FE]'
                   }`}
                 >
                   {page}
@@ -96,11 +105,11 @@ const Pagination = ({
           ))}
         </div>
 
-        {/* Next button */}
+        {/* Next page button */}
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-500 transition-colors"
+          className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-[#002147] hover:bg-[#3598FE] hover:text-white hover:border-[#3598FE] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -109,60 +118,32 @@ const Pagination = ({
   );
 };
 
-/**
- * UniversityGrid Component with Pagination
- */
+
+// Main University Grid Component
 const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
-  // ----------------------------
-  // NextAuth Session
-  // ----------------------------
+  // Session and authentication
   const { data: session, status } = useSession();
 
-  // ----------------------------
-  // State Management
-  // ----------------------------
-
-  /** Universities data returned from API */
+  // State management
   const [universities, setUniversities] = useState([]);
-
-  /** Loading state for API request */
   const [loading, setLoading] = useState(true);
-
-  /** Error state if API fails */
   const [error, setError] = useState(null);
-
-  /** Current page number */
   const [currentPage, setCurrentPage] = useState(1);
-
-  /** Total number of pages */
   const [totalPages, setTotalPages] = useState(0);
-
-  /** Total number of items */
   const [totalItems, setTotalItems] = useState(0);
-
-  /** Items per page */
   const [itemsPerPage] = useState(6);
 
-  /** Reference to AbortController to cancel ongoing requests */
+  // Refs for abort controller and cache
   const abortControllerRef = useRef(null);
-
-  /** Simple in-memory cache for API responses */
   const cacheRef = useRef(new Map());
 
-  // ----------------------------
-  // Reset page when filters change
-  // ----------------------------
-
+  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedGmat, selectedRanking]);
 
-  // ----------------------------
-  // Derived Values
-  // ----------------------------
-
+  // Memoized search parameters for API call
   const searchParams = useMemo(() => {
-    // Don't create search params if session is still loading
     if (status === "loading") return null;
 
     return JSON.stringify({
@@ -176,17 +157,15 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     });
   }, [searchQuery, selectedGmat, selectedRanking, session, status, currentPage, itemsPerPage]);
 
-  // ----------------------------
-  // Data Fetching Logic
-  // ----------------------------
-
+  // Data fetching function with caching
   const fetchData = useCallback(async (paramsString, forceRefresh = false) => {
     if (!paramsString) return;
 
+    // Cache configuration
     const cached = cacheRef.current.get(paramsString);
     const cacheValidTime = 300000; // 5 minutes
 
-    // Serve from cache if still valid
+    // Return cached data if valid and not forcing refresh
     if (!forceRefresh && cached && Date.now() - cached.timestamp < cacheValidTime) {
       setUniversities(cached.data.universities);
       setTotalPages(cached.data.totalPages);
@@ -195,7 +174,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       return;
     }
 
-    // Cancel previous request
+    // Abort previous request if exists
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -216,16 +195,18 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
         ...(params.userId && { userId: params.userId })
       });
 
-      // Include auth token in headers if available
+      // Request headers
       const headers = {
         'Cache-Control': 'public, max-age=300',
         'Content-Type': 'application/json',
       };
 
+      // Add authorization if user is logged in
       if (session?.token) {
         headers['Authorization'] = `Bearer ${session?.token}`;
       }
 
+      // API request
       const response = await fetch(`/api/universities?${urlParams}`, {
         signal: abortControllerRef.current.signal,
         headers
@@ -242,28 +223,31 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
           totalItems: result.pagination?.totalItems || result.total || result.data.length
         };
 
+        // Update state with new data
         setUniversities(responseData.universities);
         setTotalPages(responseData.totalPages);
         setTotalItems(responseData.totalItems);
 
-        // Cache result
+        // Cache the response
         cacheRef.current.set(paramsString, {
           data: responseData,
           timestamp: Date.now()
         });
 
-        // Limit cache size to 20 entries
+        // Limit cache size
         if (cacheRef.current.size > 20) {
           const firstKey = cacheRef.current.keys().next().value;
           cacheRef.current.delete(firstKey);
         }
       } else {
+        // Handle empty or invalid response
         setUniversities([]);
         setTotalPages(0);
         setTotalItems(0);
       }
 
     } catch (error) {
+      // Handle errors (ignore abort errors)
       if (error.name !== 'AbortError') {
         console.error('Fetch error:', error);
         setError(error.message);
@@ -276,25 +260,22 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   }, [session, itemsPerPage]);
 
-  // ----------------------------
-  // Effects
-  // ----------------------------
-
+  // Effect to fetch data when parameters change
   useEffect(() => {
-    // Wait for session to load
     if (status === "loading") {
       setLoading(true);
       return;
     }
 
-    // Only fetch if we have searchParams
     if (searchParams) {
+      // Debounce search queries
       const debounceTime = searchQuery?.trim() ? 300 : 0;
       const handler = setTimeout(() => fetchData(searchParams), debounceTime);
       return () => clearTimeout(handler);
     }
   }, [searchParams, fetchData, status, searchQuery]);
 
+  // Cleanup effect for abort controller
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -303,10 +284,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     };
   }, []);
 
-  // ----------------------------
-  // Handlers
-  // ----------------------------
-
+  // Manual refresh function
   const handleRefresh = useCallback(() => {
     cacheRef.current.clear();
     if (searchParams) {
@@ -314,106 +292,85 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   }, [searchParams, fetchData]);
 
+  // Page change handler with scroll to top
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
-    // Smooth scroll to top of results
     const gridElement = document.getElementById('university-grid');
     if (gridElement) {
       gridElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, []);
 
-  // ----------------------------
-  // UI: Loading Skeleton
-  // ----------------------------
-
+  // Loading skeleton component
   const LoadingSkeleton = useMemo(() => (
     <div id="university-grid">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {Array.from({ length: itemsPerPage }, (_, i) => (
           <div 
             key={i} 
-            className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden h-80 animate-pulse border border-gray-200/60"
+            className="bg-white border border-gray-200 overflow-hidden h-80 animate-pulse rounded-lg"
           >
-            <div className="bg-gradient-to-br from-gray-200/60 to-gray-300/40 h-40 w-full" />
+            <div className="bg-gray-200 h-64 w-full" />
             <div className="p-4 space-y-3">
-              <div className="h-5 bg-gray-200/60 rounded-lg w-3/4" />
-              <div className="h-3 bg-gray-200/60 rounded-lg w-1/2" />
-              <div className="flex gap-4">
-                <div className="h-8 bg-gray-200/60 rounded-lg w-16" />
-                <div className="h-8 bg-gray-200/60 rounded-lg w-16" />
-              </div>
+              <div className="h-4 bg-gray-200 rounded w-3/4" />
+              <div className="h-3 bg-gray-200 rounded w-1/2" />
             </div>
           </div>
         ))}
       </div>
-      {/* Loading pagination skeleton */}
-      <div className="flex items-center justify-between mt-8 px-4">
-        <div className="h-5 bg-gray-200/60 rounded w-48 animate-pulse" />
-        <div className="flex gap-2">
-          {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className="w-9 h-9 bg-gray-200/60 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      </div>
     </div>
   ), [itemsPerPage]);
 
-  // ----------------------------
-  // Render
-  // ----------------------------
-
+  // Show loading state
   if (loading || status === "loading") return LoadingSkeleton;
 
+  // Show error state
   if (error) {
     return (
-      <div className="text-center py-16 relative" id="university-grid">
-        <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-xl -m-8"></div>
-        <div className="relative z-10">
-          <h3 className="text-xl font-medium text-red-600 mb-2">Error loading universities</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={handleRefresh}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
+      <div className="text-center py-16 bg-white border border-gray-200 shadow-sm rounded-lg" id="university-grid">
+        <h3 className="text-xl font-semibold text-[#3598FE] mb-2">Error loading universities</h3>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button 
+          onClick={handleRefresh}
+          className="px-6 py-3 bg-[#002147] text-white rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out transform hover:rounded-3xl font-medium"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
 
+  // Main render
   return (
     <div id="university-grid">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 mb-8">
+      
+      {/* University cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {universities.length > 0 ? (
           universities.map(university => (
-            <div key={university.id} className="relative group">
-              <div className="absolute inset-0 bg-white/30 backdrop-blur-sm rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 -m-1"></div>
-              <UniversityCard 
-                university={university} 
-                onToggleSuccess={(newState) => {
-                  setUniversities(prev => prev.map(u => 
-                    u.id === university.id 
-                      ? { ...u, savedByUsers: newState ? [{ id: session?.userId || 'current-user' }] : [] }
-                      : u
-                  ));
-                }}
-              />
-            </div>
+            <UniversityCard 
+              key={university.id}
+              university={university} 
+              onToggleSuccess={(newState) => {
+                // Update saved state locally for immediate feedback
+                setUniversities(prev => prev.map(u => 
+                  u.id === university.id 
+                    ? { ...u, savedByUsers: newState ? [{ id: session?.userId || 'current-user' }] : [] }
+                    : u
+                ));
+              }}
+            />
           ))
         ) : (
-          <div className="col-span-full text-center py-16 relative">
-            <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-xl -m-8"></div>
-            <div className="relative z-10">
-              <h3 className="text-xl font-medium text-gray-700 mb-2">No universities found</h3>
-              <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-            </div>
+          // Empty state
+          <div className="col-span-full text-center py-16 bg-white border border-gray-200 shadow-sm rounded-lg">
+            <h3 className="text-xl font-semibold text-[#002147] mb-2">No universities found</h3>
+            <p className="text-gray-600">Try adjusting your search or filter criteria</p>
           </div>
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Pagination component */}
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}

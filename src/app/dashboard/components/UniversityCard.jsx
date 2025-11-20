@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Calendar, FileText, MoreHorizontal, Trash2, CheckCircle2, Heart } from 'lucide-react';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+import { MapPin, Calendar, FileText, CheckCircle2, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
@@ -109,93 +103,6 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
   };
 
   /**
-   * Handle remove from context menu
-   */
-  const handleRemoveFromSaved = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (isRemoving) return;
-
-    // Check authentication
-    if (status !== "authenticated" || !session?.token) {
-      toast.error("Please login first", {
-        description: "Authentication required to remove universities"
-      });
-      router.push('/auth/signin');
-      return;
-    }
-
-    setIsRemoving(true);
-
-    toast("Removing university...", {
-      style: {
-        background: '#6b7280',
-        color: 'white',
-        border: 'none',
-      },
-      duration: 1500,
-    });
-
-    try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-
-      const response = await fetch(`${API_BASE_URL}/api/university/toggleSaved`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({ universityId: university?.id }),
-      });
-
-      if (response.ok) {
-        toast.success("University successfully removed", {
-          style: {
-            background: '#ef4444',
-            color: 'white',
-            border: 'none',
-          },
-          duration: 2000,
-        });
-
-        setIsAdded(false);
-
-        if (onUpdate) {
-          setTimeout(() => {
-            onUpdate();
-          }, 300);
-        }
-
-        if (onRemove) {
-          onRemove(university.id);
-        }
-      } else {
-        toast.error("Failed to remove university. Please try again.");
-        setIsRemoving(false);
-      }
-    } catch (error) {
-      console.error('Remove university error:', error);
-      toast.error("Network error. Please check your connection and try again.");
-      setIsRemoving(false);
-    }
-  };
-
-  /**
-   * Enhanced status color determination
-   */
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'submitted':
-        return 'from-green-500 to-green-600';
-      case 'in-progress':
-        return 'from-blue-500 to-blue-600';
-      default:
-        return 'from-gray-400 to-gray-500';
-    }
-  };
-
-  /**
    * Enhanced status text
    */
   const getStatusText = (status) => {
@@ -222,21 +129,6 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
       default:
         return 'Not Started';
     }
-  };
-
-  /**
-   * Get status badge styling
-   */
-  const getStatusBadgeStyle = (status) => {
-    const readyForSubmission = university.stats?.applicationHealth?.readyForSubmission;
-
-    let baseStyle = `absolute bottom-4 left-4 px-3 py-1 rounded-full text-white text-sm font-medium bg-gradient-to-r ${getStatusColor(status)}`;
-
-    if (readyForSubmission && status !== 'submitted') {
-      baseStyle += ' animate-pulse ring-2 ring-white/50';
-    }
-
-    return baseStyle;
   };
 
   const essayProgressPercentage = university.totalEssays > 0
@@ -266,18 +158,23 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
 
   return (
     <Link href={universityUrl}>
-      <div className="bg-white/70 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group cursor-pointer">
+      <div 
+        className="group relative bg-white border border-gray-200 transition-all duration-300 overflow-hidden cursor-pointer h-full flex flex-col hover:shadow-lg"
+        style={{
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        }}
+      >
         {/* University Image Section */}
-        <div className="relative h-48 overflow-hidden">
+        <div className="relative h-64 overflow-hidden">
           <img
             src={university.image || '/default-university.jpg'}
             alt={university.name || university.universityName}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             onError={(e) => {
               e.target.src = '/default-university.jpg';
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#002147]/90 via-[#002147]/40 to-transparent" />
 
           {/* Heart Button - Top Left */}
           <button
@@ -285,8 +182,8 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
             disabled={status === "loading"}
             className={`absolute top-4 left-4 p-2 rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-95 z-20 ${
               isAdded
-                ? "bg-rose-500 text-white shadow-md"
-                : "bg-white/90 text-gray-600 hover:text-rose-500 shadow-sm"
+                ? "bg-white text-[#3598FE]"
+                : "bg-white/90 text-[#002147] hover:bg-white"
             } ${status === "loading" ? "opacity-75 cursor-not-allowed" : ""}`}
             title={
               !isAuthenticated
@@ -299,36 +196,12 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
             <Heart className={`w-4 h-4 transition-all ${isAdded ? 'fill-current' : ''}`} />
           </button>
 
-          {/* Context Menu for Remove - Top Right */}
-          <ContextMenu>
-            <ContextMenuTrigger asChild>
-              <button
-                className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors z-10"
-                onClick={(e) => e.preventDefault()}
-              >
-                <MoreHorizontal className="w-4 h-4 text-slate-600" />
-              </button>
-            </ContextMenuTrigger>
-            <ContextMenuContent className="w-56">
-              <ContextMenuItem
-                onClick={handleRemoveFromSaved}
-                disabled={isRemoving || !isAuthenticated}
-                className="flex items-center gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>{isRemoving ? 'Removing...' : 'Remove University'}</span>
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-
-          {/* Enhanced Status Badge */}
-          <div className={getStatusBadgeStyle(university.status)}>
-            <div className="flex items-center gap-1">
-              {readyForSubmission && university.status !== 'submitted' && (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
-              <span>{getStatusText(university.status)}</span>
-            </div>
+          {/* Status Badge - Top Right */}
+          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+            {readyForSubmission && university.status !== 'submitted' && (
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+            )}
+            <span className="text-xs font-semibold text-[#002147]">{getStatusText(university.status)}</span>
           </div>
 
           {/* Completion Indicator Icons */}
@@ -346,21 +219,21 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
               )}
             </div>
           )}
+
+          {/* University Info Overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
+            <h3 className="text-white font-semibold text-xl mb-2 leading-tight">
+              {university.name || university.universityName}
+            </h3>
+            <div className="flex items-center text-white/90 text-sm">
+              <MapPin className="w-4 h-4 mr-1.5 flex-shrink-0" />
+              <span>{university.location}</span>
+            </div>
+          </div>
         </div>
 
         {/* Card Content Section */}
-        <div className="p-6">
-          {/* University Name */}
-          <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
-            {university.name || university.universityName}
-          </h3>
-
-          {/* Location */}
-          <div className="flex items-center text-slate-600 mb-4">
-            <MapPin className="w-4 h-4 mr-2" />
-            <span className="text-sm">{university.location}</span>
-          </div>
-
+        <div className="p-5 flex-grow flex flex-col bg-gray-50">
           <div className="space-y-4">
             {/* Deadline Info */}
             <div className="flex items-center justify-between">
@@ -531,6 +404,11 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
               </div>
             )}
           </div>
+
+          {/* CTA Button */}
+          <button className="mt-4 w-full bg-[#002147] hover:bg-[#3598FE] text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-all duration-700 ease-in-out transform hover:rounded-3xl">
+            View Details →
+          </button>
         </div>
       </div>
     </Link>

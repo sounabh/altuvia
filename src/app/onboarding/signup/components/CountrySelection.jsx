@@ -149,7 +149,7 @@ export const CountrySelectionStep = ({
             {user?.image ? (
               <img
                 src={user?.image}
-                alt={`${user?.user.name || 'User'} avatar`}
+                alt={`${user?.user?.name || 'User'} avatar`}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
                   // Fallback mechanism: Hide broken image and show initials

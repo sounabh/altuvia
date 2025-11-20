@@ -1,14 +1,18 @@
+"use client";
+
+// React and optimization imports
 import React, { memo } from 'react';
+
+// Icon imports
 import { ChevronDown } from 'lucide-react';
 
+
 /**
- * GMAT score filter options
- *
- * Each option contains:
- * - `value` → used internally for filtering logic
- * - `label` → displayed in the dropdown
- *
- * @type {{ value: string, label: string }[]}
+ * GMAT Score Filter Options
+ * 
+ * Defines the available GMAT score ranges for filtering universities.
+ * Each option includes a value for state management and a label for display.
+ * @constant {Array}
  */
 const gmatAverages = [
   { value: 'all', label: 'All Scores' },
@@ -19,13 +23,11 @@ const gmatAverages = [
 ];
 
 /**
- * University ranking filter options
- *
- * Each option contains:
- * - `value` → used internally for filtering logic
- * - `label` → displayed in the dropdown
- *
- * @type {{ value: string, label: string }[]}
+ * University Ranking Filter Options
+ * 
+ * Defines the available university ranking tiers for filtering.
+ * Ranges from top-tier institutions to broader categories.
+ * @constant {Array}
  */
 const rankings = [
   { value: 'all', label: 'All Ranks' },
@@ -35,28 +37,28 @@ const rankings = [
   { value: '100+', label: 'Ranked 100+' }
 ];
 
+
 /**
  * FilterDropdown Component
- *
- * Reusable dropdown component for selecting a filter value.
- * Uses `memo` to prevent unnecessary re-renders when parent updates.
- *
+ * 
+ * A reusable dropdown filter component with custom styling and chevron indicator.
+ * Features custom appearance with proper accessibility and hover states.
+ * 
+ * @component
  * @param {Object} props - Component props
  * @param {string} props.value - Currently selected value
- * @param {(value: string) => void} props.onChange - Callback to update selection
- * @param {{ value: string, label: string }[]} props.options - Dropdown options
- *
- * @returns {JSX.Element} Dropdown UI element
+ * @param {function} props.onChange - Callback when selection changes
+ * @param {Array} props.options - Array of option objects with value and label
  */
 const FilterDropdown = memo(({ value, onChange, options }) => (
   <div className="relative group">
-    
-    {/* Native select element styled as custom dropdown */}
+    {/* Native Select Element with Custom Styling */}
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="appearance-none bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-xl px-4 py-3 pr-10 text-slate-700 font-medium hover:bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-200 cursor-pointer shadow-sm"
+      className="appearance-none bg-white border border-gray-200 px-4 py-3 pr-10 text-gray-700 font-medium hover:border-gray-300 focus:outline-none focus:border-gray-400 transition-all duration-200 cursor-pointer shadow-sm"
     >
+      {/* Dynamically Render Options */}
       {options.map((option) => (
         <option key={option.value} value={option.value}>
           {option.label}
@@ -64,29 +66,27 @@ const FilterDropdown = memo(({ value, onChange, options }) => (
       ))}
     </select>
 
-    {/* Chevron icon overlay inside dropdown */}
-    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors duration-200" />
+    {/* Custom Chevron Indicator */}
+    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
   </div>
 ));
 
+// Display name for debugging and React DevTools
 FilterDropdown.displayName = 'FilterDropdown';
+
 
 /**
  * FilterSection Component
- *
- * Main section that renders:
- * - GMAT filter dropdown
- * - University ranking filter dropdown
- *
- * Memoized to prevent unnecessary re-renders when parent state changes.
- *
+ * 
+ * Main filter section that combines multiple filter dropdowns.
+ * Provides filtering capabilities for GMAT scores and university rankings.
+ * 
+ * @component
  * @param {Object} props - Component props
  * @param {string} props.selectedGmat - Currently selected GMAT filter value
- * @param {(value: string) => void} props.setSelectedGmat - Setter for GMAT filter
+ * @param {function} props.setSelectedGmat - Callback to update GMAT filter
  * @param {string} props.selectedRanking - Currently selected ranking filter value
- * @param {(value: string) => void} props.setSelectedRanking - Setter for ranking filter
- *
- * @returns {JSX.Element} Filter section containing two dropdowns
+ * @param {function} props.setSelectedRanking - Callback to update ranking filter
  */
 const FilterSection = memo(({
   selectedGmat,
@@ -95,16 +95,16 @@ const FilterSection = memo(({
   setSelectedRanking
 }) => {
   return (
+    // Filter Container with Responsive Layout
     <div className="flex flex-wrap gap-4 justify-center">
-      
-      {/* GMAT filter dropdown */}
+      {/* GMAT Score Filter Dropdown */}
       <FilterDropdown
         value={selectedGmat}
         onChange={setSelectedGmat}
         options={gmatAverages}
       />
 
-      {/* Ranking filter dropdown */}
+      {/* University Ranking Filter Dropdown */}
       <FilterDropdown
         value={selectedRanking}
         onChange={setSelectedRanking}
@@ -114,6 +114,7 @@ const FilterSection = memo(({
   );
 });
 
+// Display name for debugging and React DevTools
 FilterSection.displayName = 'FilterSection';
 
 export default FilterSection;

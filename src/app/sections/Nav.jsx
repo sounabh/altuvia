@@ -15,7 +15,7 @@ const Nav = () => {
     <nav className="pt-4">
       <div className="flex items-center justify-between">
         {/* Brand / Logo */}
-        <div className="font-serif font-semibold tracking-[-0.1px] leading-[28.8px] text-[22px] text-[#002147] flex items-center">
+        <div className=" font-semibold tracking-[-0.1px] leading-[28.8px] text-[22px] text-[#002147] flex items-center">
           <motion.span
             initial={{ x: -30, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
