@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import CollegeShowcase from "./components/CollegeShowcase";
-import UniversityOverview from "./components/UniversityOverview";
-import ApplicationTabs from "./components/ApplicationTabs";
-import Header from "./components/Header";
-import { useSession } from "next-auth/react";
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'next/navigation';
+import CollegeShowcase from './components/CollegeShowcase';
+import UniversityOverview from './components/UniversityOverview';
+import ApplicationTabs from './components/ApplicationTabs';
+import Header from './components/Header';
+import { useSession } from 'next-auth/react';
 
 // Skeleton Components
 const HeaderSkeleton = () => (
@@ -126,10 +126,28 @@ const UniversityPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Mounted guard to avoid setState after unmount
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // If slug is not present or session is still loading, don't fetch yet.
+    if (!slug || status === 'loading') return;
+
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     const fetchUniversity = async () => {
       try {
-        setLoading(true);
+        if (mountedRef.current) {
+          setLoading(true);
+          setError(null);
+        }
 
         const API_BASE_URL =
           process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
@@ -147,7 +165,8 @@ const UniversityPage = () => {
         const response = await fetch(`${API_BASE_URL}/api/university/${slug}`, {
           method: "GET",
           headers,
-          credentials: "include",
+          credentials: "include", // kept as-is (you said don't remove anything)
+          signal,
         });
 
         if (!response.ok) {
@@ -156,24 +175,38 @@ const UniversityPage = () => {
 
         const data = await response.json();
         console.log("Fetched university data:", data);
-        setUniversity(data);
+
+        if (!signal.aborted && mountedRef.current) {
+          setUniversity(data);
+        }
       } catch (err) {
-        console.error("Error fetching university:", err);
-        setError(err.message);
+        if (err.name === 'AbortError') {
+          // fetch was aborted, do nothing
+          console.log('Fetch aborted');
+        } else {
+          console.error("Error fetching university:", err);
+          if (mountedRef.current) {
+            setError(err.message || 'An unexpected error occurred');
+          }
+        }
       } finally {
-        setLoading(false);
+        if (mountedRef.current && !signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
-    // Wait for session to finish loading before fetching
-    // This ensures we include the token if user is logged in
-    if (status !== "loading" && slug) {
-      fetchUniversity();
-    }
-  }, [slug, session, status]);
+    fetchUniversity();
+
+    return () => {
+      controller.abort();
+    };
+    // Use stable deps: slug, status, session?.token
+    // Avoid depending on the whole session object to prevent repeated runs.
+  }, [slug, status, session?.token]);
 
   // Show loading skeleton while session is loading or data is being fetched
-  if (loading || status === "loading") {
+  if (loading || status === 'loading') {
     return <UniversityPageSkeleton />;
   }
 

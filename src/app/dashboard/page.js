@@ -283,13 +283,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <div className="px-4 py-8 max-w-7xl mx-auto">
-        <Link href={"/search"}>
-              <button 
-                className="px-6 py-3 bg-[#002147] text-white rounded-lg relative left-[64rem] mb-10 -mt-16 transition-colors"
-              >
-             Back to search
-              </button>
-            </Link>
+     
         {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-center text-[40px] tracking-[0.2px] -mt-10">
@@ -327,7 +321,7 @@ const Index = () => {
             <p className="text-slate-600 mb-6">
               Start by saving some universities to track your applications
             </p>
-            <Link href={"/search"}>
+            <Link href={"/dashboard/search"}>
               <button 
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >

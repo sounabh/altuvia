@@ -139,7 +139,7 @@ const Hero = () => {
             <Link
               href={
                 isLoggedIn && session?.hasCompleteProfile
-                  ? "/search"
+                  ? "/dashboard/search"
                   : "/onboarding/signup"
               }
             >

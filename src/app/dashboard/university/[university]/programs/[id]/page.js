@@ -582,76 +582,139 @@ const ProgramDetailsPage = () => {
               </div>
             )}
 
-            {activeTab === "admissions" && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-[#002147]">
-                      <FileText className="h-5 w-5 mr-2" />
-                      Admission Requirements
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {program.admissionRequirements ? (
-                      <div className="prose prose-sm max-w-none">
-                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                          {program.admissionRequirements}
-                        </p>
+          {activeTab === "admissions" && (
+  <div className="space-y-6">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center text-[#002147]">
+          <FileText className="h-5 w-5 mr-2" />
+          Admission Requirements
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {program.admissionRequirements ? (
+          <div className="prose prose-sm max-w-none">
+            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+              {program.admissionRequirements}
+            </p>
+          </div>
+        ) : (
+          <p className="text-gray-500 italic">Admission requirements not specified</p>
+        )}
+      </CardContent>
+    </Card>
+
+    {program.averageEntranceScore && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center text-[#002147]">
+            <Award className="h-5 w-5 mr-2" />
+            Entrance Score Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center p-6 bg-blue-50 rounded-lg">
+            <div className="text-3xl font-bold text-[#3598FE] mb-2">
+              {program.averageEntranceScore}
+            </div>
+            <div className="text-gray-600">Average Entrance Score</div>
+          </div>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Fixed Essay Prompts Section */}
+    {essayPrompts && essayPrompts.length > 0 && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center text-[#002147]">
+            <FileText className="h-5 w-5 mr-2" />
+            Essay Prompts ({essayPrompts.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {essayPrompts.map((prompt, index) => (
+              <div key={prompt.id} className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-[#3598FE] rounded-full">
+                        {index + 1}
+                      </span>
+                      <h4 className="font-semibold text-[#002147] text-lg">
+                        {prompt.promptTitle || `Essay Prompt ${index + 1}`}
+                      </h4>
+                      {prompt.isMandatory && (
+                        <span className="px-2 py-1 text-xs font-medium text-red-600 bg-red-100 rounded-full">
+                          Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mb-3">
+                  <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+                    {prompt.promptText}
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between pt-3 border-t border-blue-200">
+                  <div className="flex items-center space-x-4 text-xs text-gray-600">
+                    {prompt.wordLimit && (
+                      <div className="flex items-center">
+                        <FileText className="h-3 w-3 mr-1" />
+                        <span>Max: {prompt.wordLimit} words</span>
                       </div>
-                    ) : (
-                      <p className="text-gray-500 italic">Admission requirements not specified</p>
                     )}
-                  </CardContent>
-                </Card>
-
-                {program.averageEntranceScore && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-[#002147]">
-                        <Award className="h-5 w-5 mr-2" />
-                        Entrance Score Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center p-6 bg-blue-50 rounded-lg">
-                        <div className="text-3xl font-bold text-[#3598FE] mb-2">
-                          {program.averageEntranceScore}
-                        </div>
-                        <div className="text-gray-600">Average Entrance Score</div>
+                    {prompt.minWordCount > 0 && (
+                      <div className="flex items-center">
+                        <FileText className="h-3 w-3 mr-1" />
+                        <span>Min: {prompt.minWordCount} words</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {essayPrompts && essayPrompts.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-[#002147]">
-                        <FileText className="h-5 w-5 mr-2" />
-                        Essay Prompts
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {essayPrompts.map((prompt, index) => (
-                          <div key={prompt.id} className="p-4 bg-gray-50 rounded-lg">
-                            <h4 className="font-medium text-[#002147] mb-2">
-                              Essay {index + 1}: {prompt.title || 'Untitled'}
-                            </h4>
-                            <p className="text-gray-700 text-sm">{prompt.prompt}</p>
-                            {prompt.wordLimit && (
-                              <p className="text-xs text-gray-500 mt-2">
-                                Word limit: {prompt.wordLimit}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                    )}
+                  </div>
+                  
+                  {!prompt.isMandatory && (
+                    <span className="text-xs text-gray-500 italic">Optional</span>
+                  )}
+                </div>
               </div>
-            )}
+            ))}
+          </div>
+          
+          {/* Summary Card */}
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start">
+              <Info className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-gray-700">
+                <p className="font-medium text-gray-900 mb-1">Essay Requirements Summary</p>
+                <ul className="space-y-1 text-xs">
+                  <li>• Total Essays: {essayPrompts.length}</li>
+                  <li>• Required: {essayPrompts.filter(p => p.isMandatory).length}</li>
+                  <li>• Optional: {essayPrompts.filter(p => !p.isMandatory).length}</li>
+                  <li>• Total Word Count: {essayPrompts.reduce((sum, p) => sum + (p.wordLimit || 0), 0)} words</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Show message if no essay prompts */}
+    {(!essayPrompts || essayPrompts.length === 0) && (
+      <Card>
+        <CardContent className="text-center py-8">
+          <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-600 mb-2">No Essay Prompts</h3>
+          <p className="text-gray-500">This program does not require additional essays at this time.</p>
+        </CardContent>
+      </Card>
+    )}
+  </div>
+)}
 
             {activeTab === "fees" && (
               <div className="space-y-6">

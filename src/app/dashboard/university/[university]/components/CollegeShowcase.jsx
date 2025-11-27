@@ -149,7 +149,7 @@ const CollegeShowcase = ({ university }) => {
 
               {/* Image Overlay Content */}
               <div className="absolute bottom-6 left-6 text-white">
-                <h3 className="text-2xl md:text-3xl font-bold mb-2 leading-tight">
+                <h3 className="text-2xl md:text-2xl font-bold mb-2 leading-tight text-white">
                   {university.name || university.universityName}
                 </h3>
                 <div className="flex items-center text-sm opacity-90 mb-3">
@@ -278,7 +278,7 @@ const CollegeShowcase = ({ university }) => {
         <div className="space-y-8">
           {/* Academic Excellence Call-to-Action Section */}
           <div className="bg-gradient-to-r from-[#002147] to-[#003366] p-8 rounded-2xl text-white">
-            <h4 className="text-3xl font-bold mb-4 text-center">Explore Academic Excellence</h4>
+            <h4 className="text-3xl font-bold mb-4 text-center text-white">Explore Academic Excellence</h4>
             <p className="text-center text-blue-100 mb-8 text-lg max-w-3xl mx-auto">
               Discover our comprehensive range of departments and world-class programs designed to shape future leaders
             </p>

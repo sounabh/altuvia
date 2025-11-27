@@ -20,6 +20,80 @@ import {
  */
 const UniversityOverview = ({ university }) => {
   /**
+   * Helper: detect email or phone and render clickable link
+   */
+  const isEmail = (val) => {
+    if (!val || typeof val !== 'string') return false;
+    return /\S+@\S+\.\S+/.test(val.trim());
+  };
+
+  const isPhone = (val) => {
+    if (!val || typeof val !== 'string') return false;
+    // crude phone detection: at least 6 digits total
+    const digits = val.replace(/\D/g, '');
+    return digits.length >= 6;
+  };
+
+  const renderContactValue = (val) => {
+    if (!val) return null;
+    const text = val.trim();
+    if (isEmail(text)) {
+      return (
+        <a
+          href={`mailto:${text}`}
+          className="text-sm text-[#002147] font-medium hover:underline break-words"
+        >
+          {text}
+        </a>
+      );
+    }
+    if (isPhone(text)) {
+      const tel = text.replace(/[^+\d]/g, '');
+      return (
+        <a
+          href={`tel:${tel}`}
+          className="text-sm text-[#002147] font-medium hover:underline break-words"
+        >
+          {text}
+        </a>
+      );
+    }
+    // fallback plain text
+    return <p className="text-sm text-gray-700 break-words">{text}</p>;
+  };
+
+  /**
+   * Helper: build round-wise deadlines lines
+   * Priority:
+   *  - university.roundDeadlines (array of strings)
+   *  - university.averageDeadlines (comma / semicolon separated string)
+   *  - fallback sample rounds (Round 1: Sept; Round 2: Jan; Round 3: Apr)
+   */
+  const getRoundDeadlines = () => {
+    if (Array.isArray(university?.roundDeadlines) && university.roundDeadlines.length > 0) {
+      return university.roundDeadlines.map((d) => d.trim());
+    }
+
+    if (typeof university?.averageDeadlines === 'string' && university.averageDeadlines.trim()) {
+      // split on comma or semicolon
+      const parts = university.averageDeadlines.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+      if (parts.length > 0) {
+        // map to Round 1..n
+        return parts.map((p, idx) => `Round ${idx + 1}: ${p}`);
+      }
+    }
+
+    // fallback sample rounds (as you asked)
+    return [
+      'Round 1: Sept (approximate for full-time MBA)',
+      'Round 2: Jan (approximate for full-time MBA)',
+      'Round 3: Apr (approximate for full-time MBA)'
+    ];
+  };
+
+  const deadlineLines = getRoundDeadlines();
+
+  /**
    * Primary statistics array with formatted values and fallbacks
    * Each stat object contains an icon, label, and formatted value
    */
@@ -48,8 +122,8 @@ const UniversityOverview = ({ university }) => {
     { 
       icon: Calendar, 
       label: "Application Deadline", 
-      value: university.averageDeadlines ? 
-        university.averageDeadlines.split(',')[0].trim() : 'Rolling'
+      // Use the round lines; we store as array to render multi-line specially
+      value: deadlineLines && deadlineLines.length ? deadlineLines : ['Rolling']
     },
     { 
       icon: Users, 
@@ -98,9 +172,14 @@ const UniversityOverview = ({ university }) => {
 
   /**
    * Combined statistics array with all available stats
-   * Filters out any stats with null or 'N/A' values
+   * Filters out any stats with null or 'N/A' values.
+   * We allow stat.value to be an array (for multi-line deadlines)
    */
-  const allStats = [...stats, ...additionalStats].filter(stat => stat.value && stat.value !== 'N/A');
+  const allStats = [...stats, ...additionalStats].filter(stat => {
+    if (stat.value == null) return false;
+    if (Array.isArray(stat.value)) return stat.value.length > 0;
+    return stat.value !== 'N/A' && stat.value !== '';
+  });
 
   /**
    * Processed highlights data with icons and formatted text
@@ -134,280 +213,311 @@ const UniversityOverview = ({ university }) => {
       ];
 
   return (
-    <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 overflow-hidden">
-      <CardContent className="p-0">
-        
-        {/* Header Section */}
-        <div className="bg-[#002147] p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-2">University Overview</h2>
-              <p className="text-blue-200">
-                Comprehensive details about {university.name}
-              </p>
-            </div>
-            <div className="hidden md:flex items-center">
-              <div className="w-12 h-12 bg-[#3598FE] rounded-xl flex items-center justify-center">
-                <Award className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-8">
+    // Reverted main card width to previous behavior (full width container)
+    <div className="w-full">
+      <Card className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 overflow-hidden">
+        <CardContent className="p-0">
           
-          {/* Main Statistics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allStats.map((stat, index) => (
-              <div 
-                key={index} 
-                className="p-4 rounded-xl bg-white border border-gray-200 hover:border-[#3598FE] hover:shadow-md transition-all duration-300 group"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-[#3598FE] group-hover:bg-[#002147] transition-colors duration-300">
-                    <stat.icon className="h-4 w-4 text-white" />
-                  </div>
-                </div>
-
-                <div className="text-2xl font-bold text-[#002147] mb-1">
-                  {stat.value}
-                </div>
-                <div className="text-sm text-gray-600 font-medium">
-                  {stat.label}
+          {/* Header Section */}
+          <div className="bg-[#002147] p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight mb-2">University Overview</h2>
+                <p className="text-blue-200">
+                  Comprehensive details about {university.name}
+                </p>
+              </div>
+              <div className="hidden md:flex items-center">
+                <div className="w-12 h-12 bg-[#3598FE] rounded-xl flex items-center justify-center">
+                  <Award className="h-6 w-6 text-white" />
                 </div>
               </div>
-            ))}
+            </div>
           </div>
 
-          {/* Rankings Section - Conditionally rendered if ranking data exists */}
-          {(university.ftGlobalRanking || university.usNewsRanking || university.qsRanking || university.timesRanking) && (
-            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
-              <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
-                <Award className="h-5 w-5 mr-2 text-[#3598FE]" />
-                University Rankings
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {university.ftGlobalRanking && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <div className="text-2xl font-bold text-[#002147] mb-1">#{university.ftGlobalRanking}</div>
-                    <div className="text-sm text-gray-600">Financial Times</div>
-                  </div>
-                )}
-                
-                {university.usNewsRanking && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <div className="text-2xl font-bold text-[#002147] mb-1">#{university.usNewsRanking}</div>
-                    <div className="text-sm text-gray-600">US News</div>
-                  </div>
-                )}
-                
-                {university.qsRanking && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <div className="text-2xl font-bold text-[#002147] mb-1">#{university.qsRanking}</div>
-                    <div className="text-sm text-gray-600">QS World</div>
-                  </div>
-                )}
-                
-                {university.timesRanking && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <div className="text-2xl font-bold text-[#002147] mb-1">#{university.timesRanking}</div>
-                    <div className="text-sm text-gray-600">Times Higher Ed</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Academic Requirements Section - Conditionally rendered */}
-          {(university.languageTestRequirements || university.minimumGpa || university.gmatScoreMin) && (
-            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
-              <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
-                <School className="h-5 w-5 mr-2 text-[#3598FE]" />
-                Academic Requirements
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {university.languageTestRequirements && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 className="font-bold text-[#002147] mb-2 flex items-center">
-                      <Globe className="h-4 w-4 mr-2 text-[#3598FE]" />
-                      Language
-                    </h4>
-                    <p className="text-sm text-gray-700">{university.languageTestRequirements}</p>
-                  </div>
-                )}
-
-                {university.minimumGpa && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-                    <h4 className="font-bold text-[#002147] mb-2 flex items-center justify-center">
-                      <BookOpen className="h-4 w-4 mr-2 text-[#3598FE]" />
-                      Min GPA
-                    </h4>
-                    <div className="text-2xl font-bold text-[#3598FE]">
-                      {university.minimumGpa.toFixed(1)}
+          <div className="p-6 space-y-8">
+            
+            {/* Main Statistics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allStats.map((stat, index) => (
+                /* --------- SMALLER STAT CARD (adjusted) --------- */
+                <div 
+                  key={index} 
+                  className="p-3 rounded-lg bg-white border border-gray-200 hover:border-[#3598FE] hover:shadow-md transition-all duration-300 group"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="p-1.5 rounded-md bg-[#3598FE] group-hover:bg-[#002147] transition-colors duration-300">
+                      <stat.icon className="h-4 w-4 text-white" />
                     </div>
                   </div>
-                )}
 
-                {(university.gmatScoreMin || university.gmatAverageScore) && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-                    <h4 className="font-bold text-[#002147] mb-2 flex items-center justify-center">
-                      <TrendingUp className="h-4 w-4 mr-2 text-[#3598FE]" />
-                      GMAT
-                    </h4>
-                    <div className="text-2xl font-bold text-[#3598FE]">
-                      {university.gmatScoreMin && university.gmatScoreMax 
-                        ? `${university.gmatScoreMin}-${university.gmatScoreMax}`
-                        : `${university.gmatAverageScore}`}
+                  {/* Value: if array, render each line small & medium font */}
+                  {Array.isArray(stat.value) ? (
+                    <div className="space-y-1 mb-1">
+                      {stat.value.map((line, li) => (
+                        <div key={li} className="text-sm font-medium text-[#002147]">
+                          {line}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Financial Information Section - Conditionally rendered */}
-          {(university.scholarshipInfo || university.financialAidDetails || university.tuitionFees) && (
-            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
-              <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
-                <DollarSign className="h-5 w-5 mr-2 text-[#3598FE]" />
-                Financial Information
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {university.tuitionFees && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 className="font-bold text-[#002147] mb-2">Tuition Fees</h4>
-                    <div className="text-xl font-bold text-[#3598FE] mb-1">
-                      {university.currency || '$' } { university.tuitionFees.toLocaleString()}
+                  ) : (
+                    /* All single-line values use font-medium now (per request) */
+                    <div className="text-base font-medium text-[#002147] mb-1">
+                      {stat.value}
                     </div>
-                    {university.additionalFees && (
-                      <p className="text-sm text-gray-600">
-                        Additional: { university.currency || '$'} {university.additionalFees.toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-                )}
+                  )}
 
-                {university.scholarshipInfo && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 className="font-bold text-[#002147] mb-2 flex items-center">
-                      <CheckCircle className="h-4 w-4 mr-2 text-[#3598FE]" />
-                      Scholarships
-                    </h4>
-                    <p className="text-sm text-gray-700">{university.scholarshipInfo}</p>
-                  </div>
-                )}
-
-                {university.financialAidDetails && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 md:col-span-2">
-                    <h4 className="font-bold text-[#002147] mb-2 flex items-center">
-                      <Target className="h-4 w-4 mr-2 text-[#3598FE]" />
-                      Financial Aid
-                    </h4>
-                    <p className="text-sm text-gray-700">{university.financialAidDetails}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Why Choose Section - Always rendered */}
-          <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
-            <h3 className="text-xl font-bold text-[#002147] mb-6 text-center">
-              Why Choose {university.name}?
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {highlights.map((highlight, index) => (
-                <div key={index} className="text-center group">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-[#3598FE] rounded-xl flex items-center justify-center group-hover:bg-[#002147] transition-colors duration-300">
-                    <highlight.icon className="h-8 w-8 text-white" />
-                  </div>
-                  <h4 className="font-bold text-[#002147] text-lg mb-2 group-hover:text-[#3598FE] transition-colors duration-300">
-                    {highlight.title}
-                  </h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {highlight.description}
-                  </p>
+                  {/* label stays as small descriptor */}
+                  {!Array.isArray(stat.value) ? (
+                    <div className="text-sm text-gray-600">
+                      {stat.label}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 mt-2">
+                      <span className="font-medium text-gray-600">{stat.label}</span>
+                    </div>
+                  )}
                 </div>
+                /* --------- end stat card --------- */
               ))}
             </div>
-          </div>
 
-          {/* Contact Information Section - Conditionally rendered */}
-          {(university.admissionsOfficeContact || university.internationalOfficeContact || university.generalInquiriesContact) && (
-            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
-              <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
-                <Phone className="h-5 w-5 mr-2 text-[#3598FE]" />
-                Contact Information
+            {/* Rankings Section - Conditionally rendered if ranking data exists */}
+            {(university.ftGlobalRanking || university.usNewsRanking || university.qsRanking || university.timesRanking) && (
+              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+                <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
+                  <Award className="h-5 w-5 mr-2 text-[#3598FE]" />
+                  University Rankings
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {university.ftGlobalRanking && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <div className="text-2xl font-bold text-[#002147] mb-1">#{university.ftGlobalRanking}</div>
+                      <div className="text-sm text-gray-600">Financial Times</div>
+                    </div>
+                  )}
+                  
+                  {university.usNewsRanking && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <div className="text-2xl font-bold text-[#002147] mb-1">#{university.usNewsRanking}</div>
+                      <div className="text-sm text-gray-600">US News</div>
+                    </div>
+                  )}
+                  
+                  {university.qsRanking && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <div className="text-2xl font-bold text-[#002147] mb-1">#{university.qsRanking}</div>
+                      <div className="text-sm text-gray-600">QS World</div>
+                    </div>
+                  )}
+                  
+                  {university.timesRanking && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <div className="text-2xl font-bold text-[#002147] mb-1">#{university.timesRanking}</div>
+                      <div className="text-sm text-gray-600">Times Higher Ed</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Academic Requirements Section - Conditionally rendered */}
+            {(university.languageTestRequirements || university.minimumGpa || university.gmatScoreMin) && (
+              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+                <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
+                  <School className="h-5 w-5 mr-2 text-[#3598FE]" />
+                  Academic Requirements
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {university.languageTestRequirements && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h4 className="font-bold text-[#002147] mb-2 flex items-center">
+                        <Globe className="h-4 w-4 mr-2 text-[#3598FE]" />
+                        Language
+                      </h4>
+                      <p className="text-sm text-gray-700">{university.languageTestRequirements}</p>
+                    </div>
+                  )}
+
+                  {university.minimumGpa && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
+                      <h4 className="font-bold text-[#002147] mb-2 flex items-center justify-center">
+                        <BookOpen className="h-4 w-4 mr-2 text-[#3598FE]" />
+                        Min GPA
+                      </h4>
+                      <div className="text-2xl font-bold text-[#3598FE]">
+                        {university.minimumGpa.toFixed(1)}
+                      </div>
+                    </div>
+                  )}
+
+                  {(university.gmatScoreMin || university.gmatAverageScore) && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
+                      <h4 className="font-bold text-[#002147] mb-2 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 mr-2 text-[#3598FE]" />
+                        GMAT
+                      </h4>
+                      <div className="text-2xl font-bold text-[#3598FE]">
+                        {university.gmatScoreMin && university.gmatScoreMax 
+                          ? `${university.gmatScoreMin}-${university.gmatScoreMax}`
+                          : `${university.gmatAverageScore}`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Financial Information Section - Conditionally rendered */}
+            {(university.scholarshipInfo || university.financialAidDetails || university.tuitionFees) && (
+              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+                <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
+                  <DollarSign className="h-5 w-5 mr-2 text-[#3598FE]" />
+                  Financial Information
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {university.tuitionFees && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h4 className="font-bold text-[#002147] mb-2">Tuition Fees</h4>
+                      <div className="text-xl font-bold text-[#3598FE] mb-1">
+                        {university.currency || '$' } { university.tuitionFees.toLocaleString()}
+                      </div>
+                      {university.additionalFees && (
+                        <p className="text-sm text-gray-600">
+                          Additional: { university.currency || '$'} {university.additionalFees.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {university.scholarshipInfo && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h4 className="font-bold text-[#002147] mb-2 flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2 text-[#3598FE]" />
+                        Scholarships
+                      </h4>
+                      <p className="text-sm text-gray-700">{university.scholarshipInfo}</p>
+                    </div>
+                  )}
+
+                  {university.financialAidDetails && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 md:col-span-2">
+                      <h4 className="font-bold text-[#002147] mb-2 flex items-center">
+                        <Target className="h-4 w-4 mr-2 text-[#3598FE]" />
+                        Financial Aid
+                      </h4>
+                      <p className="text-sm text-gray-700">{university.financialAidDetails}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Why Choose Section - Always rendered */}
+            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+              <h3 className="text-xl font-bold text-[#002147] mb-6 text-center">
+                Why Choose {university.name}?
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {university.admissionsOfficeContact && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <Mail className="h-6 w-6 text-[#3598FE] mx-auto mb-2" />
-                    <h4 className="font-bold text-[#002147] mb-2">Admissions</h4>
-                    <p className="text-sm text-gray-700 break-words">{university.admissionsOfficeContact}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {highlights.map((highlight, index) => (
+                  <div key={index} className="text-center group">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-[#3598FE] rounded-xl flex items-center justify-center group-hover:bg-[#002147] transition-colors duration-300">
+                      <highlight.icon className="h-8 w-8 text-white" />
+                    </div>
+                    <h4 className="font-bold text-[#002147] text-lg mb-2 group-hover:text-[#3598FE] transition-colors duration-300">
+                      {highlight.title}
+                    </h4>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {highlight.description}
+                    </p>
                   </div>
-                )}
-
-                {university.internationalOfficeContact && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <Globe className="h-6 w-6 text-[#3598FE] mx-auto mb-2" />
-                    <h4 className="font-bold text-[#002147] mb-2">International</h4>
-                    <p className="text-sm text-gray-700 break-words">{university.internationalOfficeContact}</p>
-                  </div>
-                )}
-
-                {university.generalInquiriesContact && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
-                    <Phone className="h-6 w-6 text-[#3598FE] mx-auto mb-2" />
-                    <h4 className="font-bold text-[#002147] mb-2">General</h4>
-                    <p className="text-sm text-gray-700 break-words">{university.generalInquiriesContact}</p>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          )}
 
-          {/* Action Buttons Section */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-            {/* Apply Now Button */}
-            <Button 
-              onClick={() => window.open('/apply', '_blank')}
-              disabled
-              className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Apply Now
-            </Button>
-            
-            {/* Scholarships Button */}
-            <Button
-              onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
-              disabled
-              className="bg-[#002147] hover:bg-[#001a36] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-            >
-              <Building2 className="h-4 w-4 mr-2" />
-              Scholarships
-            </Button>
-            
-            {/* Gallery Button */}
-            <Button
-              onClick={() => window.location.href = `/university/${university.slug}/gallery`}
-              disabled
-              className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
-            >
-              <GraduationCap className="h-4 w-4 mr-2" />
-              View More Photos / Gallery
-            </Button>
+            {/* Contact Information Section - Conditionally rendered */}
+            {(university.admissionsOfficeContact || university.internationalOfficeContact || university.generalInquiriesContact) && (
+              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+                <h3 className="text-xl font-bold text-[#002147] mb-4 text-center flex items-center justify-center">
+                  <Phone className="h-5 w-5 mr-2 text-[#3598FE]" />
+                  Contact Information
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {university.admissionsOfficeContact && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <Mail className="h-6 w-6 text-[#3598FE] mx-auto mb-2" />
+                      <h4 className="font-bold text-[#002147] mb-2">Admissions</h4>
+                      <div className="flex items-center justify-center">
+                        {renderContactValue(university.admissionsOfficeContact)}
+                      </div>
+                    </div>
+                  )}
+
+                  {university.internationalOfficeContact && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <Globe className="h-6 w-6 text-[#3598FE] mx-auto mb-2" />
+                      <h4 className="font-bold text-[#002147] mb-2">International</h4>
+                      <div className="flex items-center justify-center">
+                        {renderContactValue(university.internationalOfficeContact)}
+                      </div>
+                    </div>
+                  )}
+
+                  {university.generalInquiriesContact && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 text-center hover:shadow-md transition-all duration-300">
+                      <Phone className="h-6 w-6 text-[#3598FE] mx-auto mb-2" />
+                      <h4 className="font-bold text-[#002147] mb-2">General</h4>
+                      <div className="flex items-center justify-center">
+                        {renderContactValue(university.generalInquiriesContact)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+              {/* Apply Now Button */}
+              <Button 
+                onClick={() => window.open('/apply', '_blank')}
+                disabled
+                className="bg-[#3598FE] hover:bg-[#2485ed] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Apply Now
+              </Button>
+              
+              {/* Scholarships Button */}
+              <Button
+                onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
+                disabled
+                className="bg-[#002147] hover:bg-[#001a36] text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+              >
+                <Building2 className="h-4 w-4 mr-2" />
+                Scholarships
+              </Button>
+              
+              {/* Gallery Button */}
+              <Button
+                onClick={() => window.location.href = `/university/${university.slug}/gallery`}
+                disabled
+                className="bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white py-7 px-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center"
+              >
+                <GraduationCap className="h-4 w-4 mr-2" />
+                View More Photos / Gallery
+              </Button>
+            </div>
+
           </div>
-
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

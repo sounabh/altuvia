@@ -231,7 +231,7 @@ const Header = ({ university }) => {
               variant="ghost"
               size="sm"
               className="text-gray-600 hover:text-[#002147]"
-              onClick={() => router.push(`/search`)}
+              onClick={() => router.push(`/dashboard`)}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span>Back</span>
