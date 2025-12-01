@@ -830,7 +830,7 @@ export default function IndependentWorkspacePage() {
           <p className="text-sm text-gray-600 mb-4">
             Save universities to start working on their essays
           </p>
-          <Button onClick={() => router.push("/universities")} className="bg-[#3598FE] hover:bg-[#2563EB]">
+          <Button onClick={() => router.push("/dashboard/search")} className="bg-[#3598FE] hover:bg-[#2563EB]">
             Browse Universities
           </Button>
         </Card>
