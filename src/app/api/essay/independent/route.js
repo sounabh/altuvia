@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FIXED VERSION
+// src/app/api/essay/independent/route.js - FIXED VERSION WITH NULL DEPARTMENT HANDLING
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -29,7 +29,7 @@ async function authenticateUser(request) {
     userId: session.userId,
     userEmail: session.user?.email,
     userName: session.user?.name,
-    token: session.token // Include token for external API calls
+    token: session.token
   };
 }
 
@@ -56,7 +56,6 @@ async function fetchSavedUniversitiesFromExternalAPI(token) {
 
     const data = await response.json();
     
-    // Handle different response formats
     let universities = [];
     if (Array.isArray(data)) {
       universities = data;
@@ -81,7 +80,6 @@ async function fetchSavedUniversitiesFromExternalAPI(token) {
 // ==========================================
 export async function GET(request) {
   try {
-    // Authenticate user from session
     const auth = await authenticateUser(request);
     if (!auth.authenticated) {
       return auth.error;
@@ -109,10 +107,9 @@ export async function GET(request) {
       });
     }
 
-    // Step 2: Extract university names/IDs from saved universities
     const savedUniversities = savedUnisResult.universities;
     
-    // Get university identifiers (could be id, universityId, name, or slug)
+    // Step 2: Extract university identifiers
     const universityIdentifiers = savedUniversities.map(uni => ({
       id: uni.id || uni.universityId || uni.university?.id,
       name: uni.universityName || uni.name || uni.university?.universityName || uni.university?.name,
@@ -121,7 +118,7 @@ export async function GET(request) {
 
     console.log("University identifiers:", universityIdentifiers);
 
-    // Step 3: Get user's study level preference (separate from savedUniversities)
+    // Step 3: Get user's study level preference
     let userStudyLevel = null;
     try {
       const userProfile = await prisma.userProfile.findUnique({
@@ -133,22 +130,16 @@ export async function GET(request) {
       console.warn("Could not fetch user profile:", profileError.message);
     }
 
-    // Step 4: Build query conditions for universities
+    // Step 4: Build query conditions
     const whereConditions = [];
     
     const ids = universityIdentifiers.map(u => u.id).filter(Boolean);
     const names = universityIdentifiers.map(u => u.name).filter(Boolean);
     const slugs = universityIdentifiers.map(u => u.slug).filter(Boolean);
 
-    if (ids.length > 0) {
-      whereConditions.push({ id: { in: ids } });
-    }
-    if (names.length > 0) {
-      whereConditions.push({ universityName: { in: names } });
-    }
-    if (slugs.length > 0) {
-      whereConditions.push({ slug: { in: slugs } });
-    }
+    if (ids.length > 0) whereConditions.push({ id: { in: ids } });
+    if (names.length > 0) whereConditions.push({ universityName: { in: names } });
+    if (slugs.length > 0) whereConditions.push({ slug: { in: slugs } });
 
     if (whereConditions.length === 0) {
       return NextResponse.json({
@@ -166,7 +157,7 @@ export async function GET(request) {
       });
     }
 
-    // Step 5: Fetch full university data with programs and essays from Prisma
+    // Step 5: Fetch universities with programs - NO DEPARTMENT RELATION NEEDED
     const universities = await prisma.university.findMany({
       where: {
         OR: whereConditions
@@ -175,11 +166,6 @@ export async function GET(request) {
         programs: {
           where: { isActive: true },
           include: {
-            departments: {
-              include: {
-                department: true,
-              },
-            },
             essayPrompts: {
               where: { isActive: true },
               include: {
@@ -265,69 +251,70 @@ export async function GET(request) {
       allPrograms.push(...programsWithUniversity);
     }
 
-    // Step 7: Format programs data
-    const formattedPrograms = allPrograms.map(program => ({
-      id: program.id,
-      name: program.programName,
-      slug: program.programSlug,
-      universityName: program.universityName,
-      universityId: program.universityId,
-      universitySlug: program.universitySlug,
-      universityColor: program.universityColor,
-      departmentName: program.departments?.[0]?.department?.name || "Unknown Department",
-      degreeType: program.degreeType,
-      description: program.programDescription,
-      deadlines: program.admissions?.flatMap(
-        admission =>
-          admission.deadlines?.map(deadline => ({
-            id: deadline.id,
-            type: deadline.deadlineType,
-            date: deadline.deadlineDate,
-            title: deadline.title,
-            priority: deadline.priority,
-          })) || []
-      ) || [],
-      essays: program.essayPrompts?.map(prompt => {
-        const userEssay = prompt.essays?.[0] || null;
-        return {
-          promptId: prompt.id,
-          promptTitle: prompt.promptTitle,
-          promptText: prompt.promptText,
-          wordLimit: prompt.wordLimit,
-          minWordCount: prompt.minWordCount,
-          isMandatory: prompt.isMandatory,
-          programId: program.id,
-          programName: program.programName,
-          universityName: program.universityName,
-          userEssay: userEssay
-            ? {
-                id: userEssay.id,
-                content: userEssay.content,
-                wordCount: userEssay.wordCount,
-                title: userEssay.title,
-                priority: userEssay.priority,
-                status: userEssay.status,
-                isCompleted: userEssay.isCompleted,
-                completionPercentage: userEssay.completionPercentage,
-                lastModified: userEssay.lastModified,
-                lastAutoSaved: userEssay.lastAutoSaved,
-                createdAt: userEssay.createdAt,
-                versions: userEssay.versions?.map(v => ({
-                  id: v.id,
-                  label: v.label,
-                  content: v.content,
-                  wordCount: v.wordCount,
-                  timestamp: v.timestamp,
-                  isAutoSave: v.isAutoSave,
-                  changesSinceLastVersion: v.changesSinceLastVersion,
-                  aiAnalysis: v.aiResults?.[0] || null,
-                })) || [],
-                aiResults: userEssay.aiResults || [],
-              }
-            : null,
-        };
-      }) || [],
-    }));
+    // Step 7: Format programs data - NO DEPARTMENT NEEDED
+    const formattedPrograms = allPrograms.map(program => {
+      return {
+        id: program.id,
+        name: program.programName,
+        slug: program.programSlug,
+        universityName: program.universityName,
+        universityId: program.universityId,
+        universitySlug: program.universitySlug,
+        universityColor: program.universityColor,
+        degreeType: program.degreeType,
+        description: program.programDescription,
+        deadlines: program.admissions?.flatMap(
+          admission =>
+            admission.deadlines?.map(deadline => ({
+              id: deadline.id,
+              type: deadline.deadlineType,
+              date: deadline.deadlineDate,
+              title: deadline.title,
+              priority: deadline.priority,
+            })) || []
+        ) || [],
+        essays: program.essayPrompts?.map(prompt => {
+          const userEssay = prompt.essays?.[0] || null;
+          return {
+            promptId: prompt.id,
+            promptTitle: prompt.promptTitle,
+            promptText: prompt.promptText,
+            wordLimit: prompt.wordLimit,
+            minWordCount: prompt.minWordCount,
+            isMandatory: prompt.isMandatory,
+            programId: program.id,
+            programName: program.programName,
+            universityName: program.universityName,
+            userEssay: userEssay
+              ? {
+                  id: userEssay.id,
+                  content: userEssay.content,
+                  wordCount: userEssay.wordCount,
+                  title: userEssay.title,
+                  priority: userEssay.priority,
+                  status: userEssay.status,
+                  isCompleted: userEssay.isCompleted,
+                  completionPercentage: userEssay.completionPercentage,
+                  lastModified: userEssay.lastModified,
+                  lastAutoSaved: userEssay.lastAutoSaved,
+                  createdAt: userEssay.createdAt,
+                  versions: userEssay.versions?.map(v => ({
+                    id: v.id,
+                    label: v.label,
+                    content: v.content,
+                    wordCount: v.wordCount,
+                    timestamp: v.timestamp,
+                    isAutoSave: v.isAutoSave,
+                    changesSinceLastVersion: v.changesSinceLastVersion,
+                    aiAnalysis: v.aiResults?.[0] || null,
+                  })) || [],
+                  aiResults: userEssay.aiResults || [],
+                }
+              : null,
+          };
+        }) || [],
+      };
+    });
 
     // Step 8: Calculate statistics
     const stats = {
@@ -403,6 +390,9 @@ export async function GET(request) {
   }
 }
 
+
+
+// ... rest of the file remains the same (POST, PUT, and helper functions)
 // ==========================================
 // POST: Handle all essay operations
 // ==========================================
