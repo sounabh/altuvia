@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - WITH SESSION AUTHENTICATION
+// src/app/api/essay/independent/route.js - FIXED VERSION
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -13,7 +13,7 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
 // ==========================================
 async function authenticateUser(request) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || !session.userId) {
     return {
       authenticated: false,
@@ -23,66 +23,61 @@ async function authenticateUser(request) {
       )
     };
   }
-  
+
   return {
     authenticated: true,
     userId: session.userId,
     userEmail: session.user?.email,
-    userName: session.user?.name
+    userName: session.user?.name,
+    token: session.token // Include token for external API calls
   };
 }
 
-// Helper function to get or create independent program placeholder
-async function getOrCreateIndependentProgram() {
+// ==========================================
+// FETCH SAVED UNIVERSITIES FROM EXTERNAL API
+// ==========================================
+async function fetchSavedUniversitiesFromExternalAPI(token) {
   try {
-    let independentProgram = await prisma.program.findFirst({
-      where: {
-        programSlug: "independent-essay-workspace",
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+    
+    const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
+      cache: 'no-store'
     });
 
-    if (!independentProgram) {
-      let placeholderUniversity = await prisma.university.findFirst({
-        where: {
-          slug: "independent-workspace",
-        },
-      });
-
-      if (!placeholderUniversity) {
-        placeholderUniversity = await prisma.university.create({
-          data: {
-            universityName: "Independent Workspace",
-            slug: "independent-workspace",
-            city: "Global",
-            country: "International",
-            shortDescription: "Personal essay workspace for independent writing",
-            isActive: true,
-            isFeatured: false,
-          },
-        });
-      }
-
-      independentProgram = await prisma.program.create({
-        data: {
-          universityId: placeholderUniversity.id,
-          programName: "Independent Essays",
-          programSlug: "independent-essay-workspace",
-          degreeType: "Independent",
-          programDescription: "Personal workspace for managing independent essays",
-          isActive: true,
-        },
-      });
+    if (!response.ok) {
+      console.warn("Failed to fetch saved universities from external API:", response.status);
+      return { success: false, universities: [] };
     }
 
-    return independentProgram;
+    const data = await response.json();
+    
+    // Handle different response formats
+    let universities = [];
+    if (Array.isArray(data)) {
+      universities = data;
+    } else if (data.savedUniversities) {
+      universities = data.savedUniversities;
+    } else if (data.universities) {
+      universities = data.universities;
+    } else if (data.data) {
+      universities = Array.isArray(data.data) ? data.data : [data.data];
+    }
+
+    console.log(`✅ Fetched ${universities.length} saved universities from external API`);
+    return { success: true, universities };
   } catch (error) {
-    console.error("Error in getOrCreateIndependentProgram:", error);
-    throw error;
+    console.error("Error fetching saved universities from external API:", error);
+    return { success: false, universities: [], error: error.message };
   }
 }
 
 // ==========================================
-// GET: Fetch user's independent essays
+// GET: Fetch user's essays from saved universities
 // ==========================================
 export async function GET(request) {
   try {
@@ -95,104 +90,309 @@ export async function GET(request) {
     const userId = auth.userId;
     console.log("✅ Fetching essays for authenticated user:", userId);
 
-    const independentProgram = await getOrCreateIndependentProgram();
+    // Step 1: Fetch saved universities from external API
+    const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
+    
+    if (!savedUnisResult.success || savedUnisResult.universities.length === 0) {
+      return NextResponse.json({
+        message: "No saved universities found. Please save universities to see their essays.",
+        universities: [],
+        programs: [],
+        stats: {
+          totalPrograms: 0,
+          totalEssayPrompts: 0,
+          completedEssays: 0,
+          totalWords: 0,
+          averageProgress: 0,
+          savedUniversitiesCount: 0,
+        },
+      });
+    }
 
-    const essays = await prisma.essay.findMany({
+    // Step 2: Extract university names/IDs from saved universities
+    const savedUniversities = savedUnisResult.universities;
+    
+    // Get university identifiers (could be id, universityId, name, or slug)
+    const universityIdentifiers = savedUniversities.map(uni => ({
+      id: uni.id || uni.universityId || uni.university?.id,
+      name: uni.universityName || uni.name || uni.university?.universityName || uni.university?.name,
+      slug: uni.slug || uni.university?.slug,
+    })).filter(u => u.id || u.name || u.slug);
+
+    console.log("University identifiers:", universityIdentifiers);
+
+    // Step 3: Get user's study level preference (separate from savedUniversities)
+    let userStudyLevel = null;
+    try {
+      const userProfile = await prisma.userProfile.findUnique({
+        where: { userId },
+        select: { studyLevel: true },
+      });
+      userStudyLevel = userProfile?.studyLevel?.toLowerCase();
+    } catch (profileError) {
+      console.warn("Could not fetch user profile:", profileError.message);
+    }
+
+    // Step 4: Build query conditions for universities
+    const whereConditions = [];
+    
+    const ids = universityIdentifiers.map(u => u.id).filter(Boolean);
+    const names = universityIdentifiers.map(u => u.name).filter(Boolean);
+    const slugs = universityIdentifiers.map(u => u.slug).filter(Boolean);
+
+    if (ids.length > 0) {
+      whereConditions.push({ id: { in: ids } });
+    }
+    if (names.length > 0) {
+      whereConditions.push({ universityName: { in: names } });
+    }
+    if (slugs.length > 0) {
+      whereConditions.push({ slug: { in: slugs } });
+    }
+
+    if (whereConditions.length === 0) {
+      return NextResponse.json({
+        message: "Could not identify saved universities. Please try again.",
+        universities: [],
+        programs: [],
+        stats: {
+          totalPrograms: 0,
+          totalEssayPrompts: 0,
+          completedEssays: 0,
+          totalWords: 0,
+          averageProgress: 0,
+          savedUniversitiesCount: savedUniversities.length,
+        },
+      });
+    }
+
+    // Step 5: Fetch full university data with programs and essays from Prisma
+    const universities = await prisma.university.findMany({
       where: {
-        userId,
-        programId: independentProgram.id,
+        OR: whereConditions
       },
       include: {
-        versions: {
-          orderBy: { timestamp: "desc" },
-          take: 20,
+        programs: {
+          where: { isActive: true },
           include: {
-            aiResults: {
-              orderBy: { createdAt: "desc" },
-              take: 1,
+            departments: {
+              include: {
+                department: true,
+              },
+            },
+            essayPrompts: {
+              where: { isActive: true },
+              include: {
+                essays: {
+                  where: { userId },
+                  include: {
+                    versions: {
+                      orderBy: { timestamp: "desc" },
+                      take: 20,
+                      include: {
+                        aiResults: {
+                          orderBy: { createdAt: "desc" },
+                          take: 1,
+                        },
+                      },
+                    },
+                    aiResults: {
+                      where: { essayVersionId: null },
+                      orderBy: { createdAt: "desc" },
+                      take: 5,
+                    },
+                  },
+                },
+              },
+            },
+            admissions: {
+              where: { isActive: true },
+              include: {
+                deadlines: {
+                  where: {
+                    isActive: true,
+                    deadlineDate: { gte: new Date() },
+                  },
+                  orderBy: { deadlineDate: "asc" },
+                },
+                intakes: {
+                  where: { isActive: true },
+                  orderBy: { intakeYear: "desc" },
+                },
+              },
             },
           },
         },
-        aiResults: {
-          where: { essayVersionId: null },
-          orderBy: { createdAt: "desc" },
-          take: 5,
-        },
       },
-      orderBy: { lastModified: "desc" },
     });
 
-    // Format response EXACTLY like program workspace
+    console.log(`✅ Found ${universities.length} universities in database`);
+
+    // Step 6: Process and format the data
+    const allPrograms = [];
+    const universitiesData = [];
+
+    for (const university of universities) {
+      // Filter programs by user's study level if available
+      const filteredPrograms = university.programs.filter(program => {
+        if (userStudyLevel) {
+          return program.degreeType?.toLowerCase() === userStudyLevel;
+        }
+        return true;
+      });
+
+      universitiesData.push({
+        id: university.id,
+        name: university.universityName,
+        slug: university.slug,
+        description: university.shortDescription || university.overview,
+        website: university.websiteUrl,
+        city: university.city,
+        country: university.country,
+        color: university.brandColor || "#002147",
+        programCount: filteredPrograms.length,
+      });
+
+      // Map programs with university context
+      const programsWithUniversity = filteredPrograms.map(program => ({
+        ...program,
+        universityName: university.universityName,
+        universityId: university.id,
+        universitySlug: university.slug,
+        universityColor: university.brandColor || "#002147",
+      }));
+
+      allPrograms.push(...programsWithUniversity);
+    }
+
+    // Step 7: Format programs data
+    const formattedPrograms = allPrograms.map(program => ({
+      id: program.id,
+      name: program.programName,
+      slug: program.programSlug,
+      universityName: program.universityName,
+      universityId: program.universityId,
+      universitySlug: program.universitySlug,
+      universityColor: program.universityColor,
+      departmentName: program.departments?.[0]?.department?.name || "Unknown Department",
+      degreeType: program.degreeType,
+      description: program.programDescription,
+      deadlines: program.admissions?.flatMap(
+        admission =>
+          admission.deadlines?.map(deadline => ({
+            id: deadline.id,
+            type: deadline.deadlineType,
+            date: deadline.deadlineDate,
+            title: deadline.title,
+            priority: deadline.priority,
+          })) || []
+      ) || [],
+      essays: program.essayPrompts?.map(prompt => {
+        const userEssay = prompt.essays?.[0] || null;
+        return {
+          promptId: prompt.id,
+          promptTitle: prompt.promptTitle,
+          promptText: prompt.promptText,
+          wordLimit: prompt.wordLimit,
+          minWordCount: prompt.minWordCount,
+          isMandatory: prompt.isMandatory,
+          programId: program.id,
+          programName: program.programName,
+          universityName: program.universityName,
+          userEssay: userEssay
+            ? {
+                id: userEssay.id,
+                content: userEssay.content,
+                wordCount: userEssay.wordCount,
+                title: userEssay.title,
+                priority: userEssay.priority,
+                status: userEssay.status,
+                isCompleted: userEssay.isCompleted,
+                completionPercentage: userEssay.completionPercentage,
+                lastModified: userEssay.lastModified,
+                lastAutoSaved: userEssay.lastAutoSaved,
+                createdAt: userEssay.createdAt,
+                versions: userEssay.versions?.map(v => ({
+                  id: v.id,
+                  label: v.label,
+                  content: v.content,
+                  wordCount: v.wordCount,
+                  timestamp: v.timestamp,
+                  isAutoSave: v.isAutoSave,
+                  changesSinceLastVersion: v.changesSinceLastVersion,
+                  aiAnalysis: v.aiResults?.[0] || null,
+                })) || [],
+                aiResults: userEssay.aiResults || [],
+              }
+            : null,
+        };
+      }) || [],
+    }));
+
+    // Step 8: Calculate statistics
+    const stats = {
+      totalPrograms: allPrograms.length,
+      savedUniversitiesCount: savedUniversities.length,
+      totalEssayPrompts: allPrograms.reduce(
+        (acc, p) => acc + (p.essayPrompts?.length || 0),
+        0
+      ),
+      completedEssays: allPrograms.reduce(
+        (acc, p) =>
+          acc +
+          (p.essayPrompts?.filter(prompt => {
+            const essay = prompt.essays?.[0];
+            return essay && essay.isCompleted;
+          }).length || 0),
+        0
+      ),
+      totalWords: allPrograms.reduce(
+        (acc, p) =>
+          acc +
+          (p.essayPrompts?.reduce(
+            (promptAcc, prompt) =>
+              promptAcc + (prompt.essays?.[0]?.wordCount || 0),
+            0
+          ) || 0),
+        0
+      ),
+      averageProgress: (() => {
+        const totalPrompts = allPrograms.reduce(
+          (acc, p) => acc + (p.essayPrompts?.length || 0),
+          0
+        );
+        if (totalPrompts === 0) return 0;
+
+        const totalProgress = allPrograms.reduce((acc, p) => {
+          return (
+            acc +
+            (p.essayPrompts?.reduce((essayAcc, prompt) => {
+              const essay = prompt.essays?.[0];
+              return (
+                essayAcc +
+                (essay
+                  ? Math.min(100, (essay.wordCount / prompt.wordLimit) * 100)
+                  : 0)
+              );
+            }, 0) || 0)
+          );
+        }, 0);
+
+        return totalProgress / totalPrompts;
+      })(),
+    };
+
+    // Step 9: Return formatted response
     const workspaceData = {
-      university: {
-        id: independentProgram.universityId,
-        name: "Independent Workspace",
-        slug: "independent-workspace",
-        description: "Personal essay workspace",
-        website: null,
-        city: "Global",
-        country: "International",
-        color: "#3598FE",
-      },
-      programs: [
-        {
-          id: independentProgram.id,
-          name: "My Independent Essays",
-          slug: "independent-essay-workspace",
-          departmentName: "Personal",
-          degreeType: "Independent",
-          description: "Independent essay workspace",
-          deadlines: [],
-          essays: essays.map((essay) => ({
-            promptId: essay.id,
-            promptTitle: essay.title,
-            promptText: `Personal essay: ${essay.title}`,
-            wordLimit: essay.wordLimit,
-            minWordCount: 0,
-            isMandatory: false,
-            userEssay: {
-              id: essay.id,
-              content: essay.content,
-              wordCount: essay.wordCount,
-              title: essay.title,
-              priority: essay.priority,
-              status: essay.status,
-              isCompleted: essay.isCompleted,
-              completionPercentage: essay.completionPercentage,
-              lastModified: essay.lastModified,
-              lastAutoSaved: essay.lastAutoSaved,
-              createdAt: essay.createdAt,
-              versions: essay.versions?.map((v) => ({
-                id: v.id,
-                label: v.label,
-                content: v.content,
-                wordCount: v.wordCount,
-                timestamp: v.timestamp,
-                isAutoSave: v.isAutoSave,
-                changesSinceLastVersion: v.changesSinceLastVersion,
-                aiAnalysis: v.aiResults?.[0] || null,
-              })) || [],
-              aiResults: essay.aiResults || [],
-            },
-          })),
-        },
-      ],
-      stats: {
-        totalPrograms: 1,
-        totalEssayPrompts: essays.length,
-        completedEssays: essays.filter((e) => e.isCompleted).length,
-        totalWords: essays.reduce((sum, e) => sum + e.wordCount, 0),
-        averageProgress:
-          essays.length > 0
-            ? essays.reduce((sum, e) => sum + (e.completionPercentage || 0), 0) /
-              essays.length
-            : 0,
-      },
+      universities: universitiesData,
+      programs: formattedPrograms,
+      stats,
+      studyLevel: userStudyLevel,
     };
 
     return NextResponse.json(workspaceData);
   } catch (error) {
-    console.error("Error fetching independent essays:", error);
+    console.error("Error fetching saved universities essays:", error);
     return NextResponse.json(
       {
         error: "Failed to fetch essays",
@@ -208,7 +408,6 @@ export async function GET(request) {
 // ==========================================
 export async function POST(request) {
   try {
-    // Authenticate user from session
     const auth = await authenticateUser(request);
     if (!auth.authenticated) {
       return auth.error;
@@ -217,7 +416,6 @@ export async function POST(request) {
     const body = await request.json();
     const { action } = body;
 
-    // Pass userId from session to all operations
     const operationData = {
       ...body,
       userId: auth.userId,
@@ -227,7 +425,9 @@ export async function POST(request) {
 
     switch (action) {
       case "create_essay":
-        return await createIndependentEssay(operationData);
+        return await createEssay(operationData);
+      case "update_essay":
+        return await updateEssay(operationData);
       case "save_version":
         return await saveVersion(operationData);
       case "restore_version":
@@ -240,6 +440,8 @@ export async function POST(request) {
         return await getEssayAnalytics(operationData);
       case "delete_essay":
         return await deleteEssay(operationData);
+      case "auto_save":
+        return await autoSave(operationData);
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -260,7 +462,6 @@ export async function POST(request) {
 // ==========================================
 export async function PUT(request) {
   try {
-    // Authenticate user from session
     const auth = await authenticateUser(request);
     if (!auth.authenticated) {
       return auth.error;
@@ -317,6 +518,7 @@ export async function PUT(request) {
               orderBy: { createdAt: "desc" },
               take: 3,
             },
+            essayPrompt: true,
           },
         });
       } else {
@@ -346,6 +548,7 @@ export async function PUT(request) {
             orderBy: { createdAt: "desc" },
             take: 3,
           },
+          essayPrompt: true,
         },
       });
     }
@@ -391,67 +594,258 @@ export async function PUT(request) {
 }
 
 // ==========================================
-// Create independent essay
+// Create essay
 // ==========================================
-async function createIndependentEssay(data) {
-  const { userId, title, wordLimit = 500, priority = "medium" } = data;
+async function createEssay(data) {
+  const { userId, programId, essayPromptId, applicationId } = data;
 
-  if (!title) {
+  console.log("Creating essay with:", { userId, programId, essayPromptId });
+
+  if (!userId || !programId || !essayPromptId) {
     return NextResponse.json(
-      { error: "Title is required" },
+      {
+        error: "Missing required fields: userId, programId, essayPromptId",
+      },
       { status: 400 }
     );
   }
 
-  try {
-    console.log("✅ Creating essay for user:", userId);
-    
-    const independentProgram = await getOrCreateIndependentProgram();
+  // Check if essay already exists
+  const existingEssay = await prisma.essay.findFirst({
+    where: {
+      userId,
+      programId,
+      essayPromptId,
+    },
+  });
 
-    const essay = await prisma.essay.create({
-      data: {
-        userId,
-        programId: independentProgram.id,
-        essayPromptId: null,
-        applicationId: null,
-        title,
-        content: "",
-        wordCount: 0,
-        wordLimit,
-        priority,
-        status: "DRAFT",
-        autoSaveEnabled: true,
-        isCompleted: false,
-        completionPercentage: 0,
-      },
-      include: {
-        versions: {
-          include: {
-            aiResults: {
-              orderBy: { createdAt: "desc" },
-              take: 1,
-            },
-          },
-        },
-        aiResults: true,
-      },
+  if (existingEssay) {
+    console.log("Essay already exists:", existingEssay.id);
+    return NextResponse.json({
+      essay: existingEssay,
+      message: "Essay already exists",
     });
+  }
 
-    return NextResponse.json({ essay });
-  } catch (error) {
-    console.error("Error creating independent essay:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to create essay",
-        details: error.message,
+  // Fetch essay prompt details
+  const essayPrompt = await prisma.essayPrompt.findUnique({
+    where: { id: essayPromptId },
+    include: {
+      program: {
+        include: { university: true },
       },
-      { status: 500 }
+    },
+  });
+
+  if (!essayPrompt) {
+    return NextResponse.json(
+      { error: "Essay prompt not found" },
+      { status: 404 }
     );
   }
+
+  // Create the essay
+  const essay = await prisma.essay.create({
+    data: {
+      userId,
+      programId,
+      essayPromptId,
+      applicationId: applicationId || null,
+      title: `Essay for ${essayPrompt.promptTitle}`,
+      content: "",
+      wordCount: 0,
+      wordLimit: essayPrompt.wordLimit,
+      priority: "medium",
+      status: "DRAFT",
+      autoSaveEnabled: true,
+    },
+    include: {
+      versions: {
+        include: {
+          aiResults: true,
+        },
+      },
+      aiResults: true,
+      essayPrompt: true,
+      program: {
+        include: { university: true },
+      },
+    },
+  });
+
+  console.log("Essay created successfully:", essay.id);
+  return NextResponse.json({ essay });
 }
 
 // ==========================================
-// Delete essay (with ownership verification)
+// Update essay
+// ==========================================
+async function updateEssay(data) {
+  const { essayId, content, wordCount, title, priority, status, userId } = data;
+
+  if (!essayId) {
+    return NextResponse.json(
+      { error: "Essay ID is required" },
+      { status: 400 }
+    );
+  }
+
+  // Verify ownership
+  const essay = await prisma.essay.findFirst({
+    where: {
+      id: essayId,
+      userId: userId
+    }
+  });
+
+  if (!essay) {
+    return NextResponse.json(
+      { error: "Essay not found or access denied" },
+      { status: 403 }
+    );
+  }
+
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content);
+
+  if (result.success) {
+    const additionalUpdates = {};
+    if (title !== undefined) additionalUpdates.title = title;
+    if (priority !== undefined) additionalUpdates.priority = priority;
+    if (status !== undefined) additionalUpdates.status = status;
+
+    if (Object.keys(additionalUpdates).length > 0) {
+      const finalEssay = await prisma.essay.update({
+        where: { id: essayId },
+        data: additionalUpdates,
+        include: {
+          versions: { orderBy: { timestamp: "desc" }, take: 10 },
+          aiResults: {
+            where: { essayVersionId: null },
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
+        },
+      });
+      return NextResponse.json({ essay: finalEssay });
+    }
+
+    return NextResponse.json({ essay: result.essay });
+  }
+
+  const updatedEssay = await prisma.essay.update({
+    where: { id: essayId },
+    data: {
+      ...(content !== undefined && { content }),
+      ...(wordCount !== undefined && { wordCount }),
+      ...(title !== undefined && { title }),
+      ...(priority !== undefined && { priority }),
+      ...(status !== undefined && { status }),
+      lastModified: new Date(),
+    },
+    include: {
+      versions: {
+        orderBy: { timestamp: "desc" },
+        take: 10,
+        include: {
+          aiResults: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+      aiResults: {
+        where: { essayVersionId: null },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+      },
+    },
+  });
+
+  return NextResponse.json({ essay: updatedEssay });
+}
+
+// ==========================================
+// Auto save
+// ==========================================
+async function autoSave(data) {
+  const { essayId, content, wordCount, userId } = data;
+
+  if (!essayId) {
+    return NextResponse.json(
+      { error: "Essay ID is required" },
+      { status: 400 }
+    );
+  }
+
+  // Verify ownership
+  const essay = await prisma.essay.findFirst({
+    where: {
+      id: essayId,
+      userId: userId
+    }
+  });
+
+  if (!essay) {
+    return NextResponse.json(
+      { error: "Essay not found or access denied" },
+      { status: 403 }
+    );
+  }
+
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content);
+
+  if (result.success) {
+    const finalEssay = await prisma.essay.update({
+      where: { id: essayId },
+      data: { lastAutoSaved: new Date() },
+    });
+
+    const lastVersion = await prisma.essayVersion.findFirst({
+      where: { essayId },
+      orderBy: { timestamp: "desc" },
+    });
+
+    const shouldCreateAutoSave =
+      !lastVersion ||
+      (wordCount > 0 &&
+        (Math.abs(wordCount - lastVersion.wordCount) >= 50 ||
+          new Date() - new Date(lastVersion.timestamp) > 15 * 60 * 1000));
+
+    if (shouldCreateAutoSave) {
+      await prisma.essayVersion.create({
+        data: {
+          essayId,
+          content: content || "",
+          wordCount: wordCount || 0,
+          label: `Auto-save ${new Date().toLocaleTimeString()}`,
+          isAutoSave: true,
+          changesSinceLastVersion: lastVersion
+            ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
+                wordCount - lastVersion.wordCount
+              } words`
+            : "Initial auto-save",
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true, essay: result.essay });
+  }
+
+  const updatedEssay = await prisma.essay.update({
+    where: { id: essayId },
+    data: {
+      content: content || "",
+      wordCount: wordCount || 0,
+      lastAutoSaved: new Date(),
+      lastModified: new Date(),
+    },
+  });
+
+  return NextResponse.json({ success: true, essay: updatedEssay });
+}
+
+// ==========================================
+// Delete essay
 // ==========================================
 async function deleteEssay(data) {
   const { essayId, userId } = data;
@@ -488,9 +882,14 @@ async function deleteEssay(data) {
       where: { essayId },
     });
 
-    await prisma.essayCompletionLog.deleteMany({
-      where: { essayId },
-    });
+    // Try to delete completion logs if the model exists
+    try {
+      await prisma.essayCompletionLog.deleteMany({
+        where: { essayId },
+      });
+    } catch (e) {
+      // EssayCompletionLog might not exist
+    }
 
     await prisma.essay.delete({
       where: { id: essayId },
@@ -510,7 +909,9 @@ async function deleteEssay(data) {
   }
 }
 
+// ==========================================
 // Save version
+// ==========================================
 async function saveVersion(data) {
   const {
     essayId,
@@ -536,6 +937,12 @@ async function saveVersion(data) {
     where: {
       id: essayId,
       userId: userId
+    },
+    include: {
+      essayPrompt: true,
+      program: {
+        include: { university: true }
+      }
     }
   });
 
@@ -552,9 +959,7 @@ async function saveVersion(data) {
   });
 
   const changesSinceLastVersion = lastVersion
-    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
-        wordCount - lastVersion.wordCount
-      } words`
+    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${wordCount - lastVersion.wordCount} words`
     : "Initial version";
 
   const version = await prisma.essayVersion.create({
@@ -577,12 +982,12 @@ async function saveVersion(data) {
 
   if (performAiAnalysis && content && content.length >= 50) {
     try {
-      const analysisResult = await performVersionAIAnalysis({
-        versionId: version.id,
+      const analysisResult = await performAIAnalysis({
         essayId,
+        versionId: version.id,
         content,
-        prompt: prompt || essay.title,
-        essay,
+        prompt: prompt || essay.essayPrompt?.promptText,
+        userId
       });
 
       if (analysisResult.success) {
@@ -602,7 +1007,9 @@ async function saveVersion(data) {
   });
 }
 
+// ==========================================
 // Restore version
+// ==========================================
 async function restoreVersion(data) {
   const { essayId, versionId, userId } = data;
 
@@ -660,6 +1067,10 @@ async function restoreVersion(data) {
           orderBy: { createdAt: "desc" },
           take: 5,
         },
+        essayPrompt: true,
+        program: {
+          include: { university: true }
+        }
       },
     });
 
@@ -684,7 +1095,9 @@ async function restoreVersion(data) {
   }
 }
 
+// ==========================================
 // Delete version
+// ==========================================
 async function deleteVersion(data) {
   const { versionId, essayId, userId } = data;
 
@@ -740,7 +1153,9 @@ async function deleteVersion(data) {
   }
 }
 
+// ==========================================
 // Get analytics
+// ==========================================
 async function getEssayAnalytics(data) {
   const { essayId, userId } = data;
 
@@ -767,6 +1182,10 @@ async function getEssayAnalytics(data) {
           orderBy: { createdAt: "desc" },
           take: 5,
         },
+        essayPrompt: true,
+        program: {
+          include: { university: true }
+        }
       },
     });
 
@@ -780,22 +1199,28 @@ async function getEssayAnalytics(data) {
     const allUserEssays = await prisma.essay.findMany({
       where: {
         userId,
+        essayPromptId: { not: null }
       },
+      include: {
+        essayPrompt: true
+      }
     });
 
-    const validUserEssays = allUserEssays.filter(e => e.wordLimit > 0);
+    const validUserEssays = allUserEssays.filter((e) => e.essayPrompt !== null);
 
     const analytics = {
       completion: {
         percentage: Math.min(
           100,
-          (essay.wordCount / essay.wordLimit) * 100
+          essay.essayPrompt 
+            ? (essay.wordCount / essay.essayPrompt.wordLimit) * 100
+            : (essay.wordCount / essay.wordLimit) * 100
         ),
         wordCount: essay.wordCount,
-        wordLimit: essay.wordLimit,
+        wordLimit: essay.essayPrompt?.wordLimit || essay.wordLimit,
         wordsRemaining: Math.max(
           0,
-          essay.wordLimit - essay.wordCount
+          (essay.essayPrompt?.wordLimit || essay.wordLimit) - essay.wordCount
         ),
       },
       timing: {
@@ -845,15 +1270,21 @@ async function getEssayAnalytics(data) {
             ? validUserEssays.reduce(
                 (acc, e) =>
                   acc +
-                  Math.min(100, (e.wordCount / e.wordLimit) * 100),
+                  Math.min(100, (e.wordCount / e.essayPrompt.wordLimit) * 100),
                 0
               ) / validUserEssays.length
             : 0,
         completed: validUserEssays.filter(
-          (e) => e.wordCount >= e.wordLimit * 0.8
+          (e) => e.wordCount >= e.essayPrompt.wordLimit * 0.8
         ).length,
         total: validUserEssays.length,
+        orphaned: allUserEssays.length - validUserEssays.length,
       },
+      program: essay.program ? {
+        name: essay.program.programName,
+        university: essay.program.university.universityName,
+        degreeType: essay.program.degreeType,
+      } : null,
     };
 
     return NextResponse.json({ analytics });
@@ -869,7 +1300,9 @@ async function getEssayAnalytics(data) {
   }
 }
 
-// AI Analysis - Uses same logic as program route with context adaptation
+// ==========================================
+// AI Analysis
+// ==========================================
 async function performAIAnalysis(data) {
   const {
     essayId,
@@ -896,11 +1329,17 @@ async function performAIAnalysis(data) {
   const startTime = Date.now();
 
   try {
-    // Verify ownership
+    // Verify ownership and get essay context
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
         userId: userId
+      },
+      include: {
+        essayPrompt: true,
+        program: {
+          include: { university: true }
+        }
       }
     });
 
@@ -935,15 +1374,22 @@ async function performAIAnalysis(data) {
       });
     }
 
-    // Initialize Gemini
+    const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    const completionRatio = (essay.essayPrompt?.wordLimit || essay.wordLimit) > 0 
+      ? wordCount / (essay.essayPrompt?.wordLimit || essay.wordLimit) 
+      : 0;
+
+    // Check if Gemini API is available
     if (!process.env.GOOGLE_GEMINI_API_KEY) {
       const fallbackAnalysis = generateRealisticFallbackAnalysis(
         content,
-        essay.wordCount,
-        essay.wordLimit,
-        essay.title,
-        "Independent",
-        essay.wordCount / essay.wordLimit
+        wordCount,
+        essay.essayPrompt?.wordLimit || essay.wordLimit,
+        essay.essayPrompt?.promptText || essay.title,
+        essay.program?.degreeType,
+        completionRatio
       );
 
       await saveAnalysisToDatabase(
@@ -963,7 +1409,7 @@ async function performAIAnalysis(data) {
     }
 
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-1.5-flash",
       generationConfig: {
         temperature: 0.7,
         topP: 0.8,
@@ -972,28 +1418,29 @@ async function performAIAnalysis(data) {
       },
     });
 
-    const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    const completionRatio = essay.wordLimit > 0 ? wordCount / essay.wordLimit : 0;
+    const analysisPrompt = `You are a Senior Admissions Officer at ${essay.program?.university?.universityName || "a top university"} with 15+ years of experience evaluating ${essay.program?.degreeType || "graduate"} applications.
 
-    const analysisPrompt = `You are an expert writing coach analyzing an independent essay.
+INSTITUTIONAL CONTEXT:
+- Institution: ${essay.program?.university?.universityName || "University"}
+- Program: ${essay.program?.programName || "Graduate Program"} (${essay.program?.degreeType || "Graduate"})
+- Essay Prompt: "${essay.essayPrompt?.promptText || essay.title}"
+- Word Limit: ${essay.essayPrompt?.wordLimit || essay.wordLimit}
+- Current Word Count: ${wordCount}
 
-ESSAY TITLE: ${essay.title}
-WORD COUNT: ${wordCount} / ${essay.wordLimit}
-CONTEXT: This is a personal essay for general writing improvement and skill development.
-
-ESSAY CONTENT:
+APPLICANT'S ESSAY:
 ${content}
 
-Provide detailed analysis focusing on:
-1. Overall writing quality and clarity
-2. Narrative structure and flow
-3. Use of specific examples and details
-4. Grammar, readability, and style
-5. Areas for improvement
+EVALUATION FRAMEWORK:
+1. PROMPT ADHERENCE: Does this directly answer what we asked?
+2. NARRATIVE SOPHISTICATION: Is this a compelling story or generic statements?
+3. LEADERSHIP EVIDENCE: Can I see concrete examples of impact and initiative?
+4. INTELLECTUAL CURIOSITY: Does this show deep thinking and genuine interest?
+5. PROGRAM FIT: Why specifically our program?
+6. DIFFERENTIATION: What makes this applicant unique?
+7. MATURITY & SELF-AWARENESS: Does this show genuine reflection and growth?
+8. COMMUNICATION SKILLS: Can they articulate complex ideas clearly?
 
-Return analysis in this JSON format:
+Return ONLY valid JSON in this exact format:
 {
   "overallScore": [25-95 based on quality],
   "suggestions": [
@@ -1043,9 +1490,9 @@ REQUIREMENTS:
       analysisData = generateRealisticFallbackAnalysis(
         content,
         wordCount,
-        essay.wordLimit,
-        essay.title,
-        "Independent",
+        essay.essayPrompt?.wordLimit || essay.wordLimit,
+        essay.essayPrompt?.promptText || essay.title,
+        essay.program?.degreeType,
         completionRatio
       );
     }
@@ -1053,7 +1500,7 @@ REQUIREMENTS:
     analysisData = validateAndNormalizeAnalysis(
       analysisData,
       content,
-      essay.wordLimit
+      essay.essayPrompt?.wordLimit || essay.wordLimit
     );
 
     const aiResult = await saveAnalysisToDatabase(
@@ -1061,7 +1508,7 @@ REQUIREMENTS:
       versionId,
       analysisData,
       processingTime,
-      "gemini-2.0-flash-exp"
+      "gemini-1.5-flash"
     );
 
     return NextResponse.json({
@@ -1080,24 +1527,25 @@ REQUIREMENTS:
   }
 }
 
-// Helper function for version AI analysis
-async function performVersionAIAnalysis(data) {
-  return await performAIAnalysis(data);
-}
-
+// ==========================================
 // Essay completion check
+// ==========================================
 async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
   try {
     const essay = await prisma.essay.findUnique({
       where: { id: essayId },
       include: {
         user: true,
+        essayPrompt: true,
+        program: {
+          include: { university: true }
+        }
       },
     });
 
     if (!essay) return { success: false };
 
-    const wordLimit = essay.wordLimit;
+    const wordLimit = essay.essayPrompt?.wordLimit || essay.wordLimit;
     const completionPercentage = (newWordCount / wordLimit) * 100;
 
     const COMPLETION_THRESHOLD = 0.90;
@@ -1127,7 +1575,9 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
             wordCountAtCompletion: newWordCount,
             wordLimit,
             completionMethod: 'AUTO',
-            essayPromptTitle: essay.title,
+            programId: essay.programId,
+            universityId: essay.program?.universityId,
+            essayPromptTitle: essay.essayPrompt?.promptTitle || essay.title,
           }
         });
       } catch (logError) {
@@ -1149,6 +1599,7 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
           orderBy: { createdAt: 'desc' },
           take: 3
         },
+        essayPrompt: true,
       }
     });
 
@@ -1158,14 +1609,16 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
       completionChanged: shouldBeCompleted !== wasCompleted,
       isCompleted: shouldBeCompleted
     };
-
   } catch (error) {
     console.error('Essay completion check failed:', error);
     return { success: false, error: error.message };
   }
 }
 
-// Transform stored analysis to component format
+// ==========================================
+// Helper Functions
+// ==========================================
+
 function transformStoredAnalysisToComponentFormat(aiResult) {
   try {
     const suggestions = JSON.parse(aiResult.suggestions || "[]");
@@ -1237,7 +1690,6 @@ function transformStoredAnalysisToComponentFormat(aiResult) {
   }
 }
 
-// Validate and normalize analysis
 function validateAndNormalizeAnalysis(analysisData, content, wordLimit) {
   const wordCount = content.split(" ").length;
   const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
@@ -1248,9 +1700,7 @@ function validateAndNormalizeAnalysis(analysisData, content, wordLimit) {
     suggestions: Array.isArray(analysisData.suggestions)
       ? analysisData.suggestions.map((s, idx) => ({
           id: s.id || `suggestion_${idx}`,
-          type: ["critical", "warning", "improvement", "strength"].includes(
-            s.type
-          )
+          type: ["critical", "warning", "improvement", "strength"].includes(s.type)
             ? s.type
             : "improvement",
           priority: ["high", "medium", "low"].includes(s.priority)
@@ -1261,49 +1711,26 @@ function validateAndNormalizeAnalysis(analysisData, content, wordLimit) {
           action: s.action || undefined,
         }))
       : [],
-    structureScore: Math.max(
-      0,
-      Math.min(100, analysisData.structureScore || 50)
-    ),
-    contentRelevance: Math.max(
-      0,
-      Math.min(100, analysisData.contentRelevance || 50)
-    ),
+    structureScore: Math.max(0, Math.min(100, analysisData.structureScore || 50)),
+    contentRelevance: Math.max(0, Math.min(100, analysisData.contentRelevance || 50)),
     narrativeFlow: Math.max(0, Math.min(100, analysisData.narrativeFlow || 50)),
-    leadershipEmphasis: Math.max(
-      0,
-      Math.min(100, analysisData.leadershipEmphasis || 50)
-    ),
-    specificityScore: Math.max(
-      0,
-      Math.min(100, analysisData.specificityScore || 50)
-    ),
-    readabilityScore: Math.max(
-      0,
-      Math.min(100, analysisData.readabilityScore || 50)
-    ),
+    leadershipEmphasis: Math.max(0, Math.min(100, analysisData.leadershipEmphasis || 50)),
+    specificityScore: Math.max(0, Math.min(100, analysisData.specificityScore || 50)),
+    readabilityScore: Math.max(0, Math.min(100, analysisData.readabilityScore || 50)),
     sentenceCount: analysisData.sentenceCount || sentences.length,
-    paragraphCount:
-      analysisData.paragraphCount || Math.max(1, paragraphs.length),
+    paragraphCount: analysisData.paragraphCount || Math.max(1, paragraphs.length),
     avgSentenceLength:
       analysisData.avgSentenceLength ||
-      (sentences.length > 0
-        ? Math.round((wordCount / sentences.length) * 10) / 10
-        : 0),
+      (sentences.length > 0 ? Math.round((wordCount / sentences.length) * 10) / 10 : 0),
     complexWordCount:
-      analysisData.complexWordCount ||
-      content.split(" ").filter((w) => w.length > 6).length,
+      analysisData.complexWordCount || content.split(" ").filter((w) => w.length > 6).length,
     passiveVoiceCount:
       analysisData.passiveVoiceCount ||
-      sentences.filter(
-        (s) =>
-          s.includes(" was ") || s.includes(" were ") || s.includes(" been ")
-      ).length,
+      sentences.filter((s) => s.includes(" was ") || s.includes(" were ") || s.includes(" been ")).length,
     grammarIssues: analysisData.grammarIssues || 0,
   };
 }
 
-// Save analysis to database
 async function saveAnalysisToDatabase(
   essayId,
   versionId,
@@ -1320,20 +1747,11 @@ async function saveAnalysisToDatabase(
         analysisType: "comprehensive",
         overallScore: analysisData.overallScore,
         suggestions: JSON.stringify(analysisData.suggestions),
-        strengths: JSON.stringify(
-          analysisData.suggestions.filter((s) => s.type === "strength")
-        ),
-        improvements: JSON.stringify(
-          analysisData.suggestions.filter((s) => s.type === "improvement")
-        ),
-        warnings: JSON.stringify(
-          analysisData.suggestions.filter((s) =>
-            ["critical", "warning"].includes(s.type)
-          )
-        ),
+        strengths: JSON.stringify(analysisData.suggestions.filter((s) => s.type === "strength")),
+        improvements: JSON.stringify(analysisData.suggestions.filter((s) => s.type === "improvement")),
+        warnings: JSON.stringify(analysisData.suggestions.filter((s) => ["critical", "warning"].includes(s.type))),
         aiProvider: provider,
-        modelUsed:
-          provider === "gemini" ? "gemini-2.0-flash-exp" : "local-analysis",
+        modelUsed: provider === "gemini" ? "gemini-1.5-flash" : "local-analysis",
         promptVersion: "3.0",
         status: errorMessage ? "failed" : "completed",
         processingTime,
@@ -1358,13 +1776,12 @@ async function saveAnalysisToDatabase(
   }
 }
 
-// Generate realistic fallback analysis
 function generateRealisticFallbackAnalysis(
   content,
   wordCount,
   wordLimit,
   prompt,
-  degreeType = "Independent",
+  degreeType = "Unknown",
   completionRatio = 0
 ) {
   const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
@@ -1375,35 +1792,29 @@ function generateRealisticFallbackAnalysis(
   const paragraphCount = Math.max(1, paragraphs.length);
   const avgSentenceLength = sentenceCount > 0 ? wordCount / sentenceCount : 0;
 
-  // Calculate base score with realistic expectations
   let baseScore = 45;
-  
-  // Word count impact
+
   if (completionRatio >= 0.8 && completionRatio <= 1.0) baseScore += 15;
   else if (completionRatio >= 0.6) baseScore += 8;
   else if (completionRatio < 0.3) baseScore -= 10;
-  
-  // Structure impact
+
   if (paragraphCount >= 4) baseScore += 8;
   else if (paragraphCount >= 3) baseScore += 5;
   else if (paragraphCount < 2) baseScore -= 8;
-  
-  // Sentence variety
+
   if (avgSentenceLength >= 15 && avgSentenceLength <= 25) baseScore += 5;
   else if (avgSentenceLength < 10 || avgSentenceLength > 30) baseScore -= 5;
-  
-  // Content depth indicators
+
   const hasSpecificExamples = /\b(specifically|for example|in particular|such as)\b/i.test(content);
   const hasNumbers = /\b\d+(%|dollars?|years?|months?|people|students?|percent)\b/i.test(content);
   const hasActionVerbs = /(led|managed|created|developed|implemented|achieved|improved)/gi.test(content);
-  
+
   if (hasSpecificExamples) baseScore += 8;
   if (hasNumbers) baseScore += 6;
   if (hasActionVerbs) baseScore += 5;
 
   const overallScore = Math.max(25, Math.min(85, baseScore + Math.floor(Math.random() * 10 - 5)));
 
-  // Generate contextual suggestions
   const suggestions = [];
   let suggestionId = 1;
 
@@ -1451,40 +1862,6 @@ function generateRealisticFallbackAnalysis(
     });
   }
 
-  if (!hasNumbers) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "improvement",
-      priority: "medium",
-      title: "Quantify your achievements",
-      description: "Numbers and metrics add credibility and make your accomplishments more tangible and impressive.",
-      action: "Add specific numbers, percentages, timeframes, or scale to demonstrate the impact of your experiences."
-    });
-  }
-
-  if (avgSentenceLength < 12) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "improvement",
-      priority: "low",
-      title: "Enhance sentence variety",
-      description: "Short sentences can make writing feel choppy. Varying sentence length improves flow and engagement.",
-      action: "Combine some shorter sentences and add more complex sentence structures to create better rhythm."
-    });
-  }
-
-  if (avgSentenceLength > 28) {
-    suggestions.push({
-      id: (suggestionId++).toString(),
-      type: "warning",
-      priority: "medium",
-      title: "Simplify long sentences",
-      description: "Very long sentences can be difficult to follow. Break them up for better clarity and impact.",
-      action: "Look for sentences with multiple clauses and consider splitting them into two clearer sentences."
-    });
-  }
-
-  // Always include at least one strength
   if (overallScore >= 50) {
     suggestions.push({
       id: (suggestionId++).toString(),
@@ -1520,9 +1897,7 @@ function generateRealisticFallbackAnalysis(
     paragraphCount,
     avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
     complexWordCount: words.filter((w) => w.length > 7).length,
-    passiveVoiceCount: sentences.filter(s => 
-      /(was|were|been|being)\s+\w+ed\b/i.test(s)
-    ).length,
+    passiveVoiceCount: sentences.filter(s => /(was|were|been|being)\s+\w+ed\b/i.test(s)).length,
     grammarIssues: Math.floor(sentenceCount * 0.05) + Math.floor(Math.random() * 3)
   };
 }

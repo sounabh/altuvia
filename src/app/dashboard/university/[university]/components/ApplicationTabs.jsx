@@ -430,133 +430,140 @@ const ApplicationTabs = ({ university }) => {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Essays Tab Content */}
+             {/* Essays Tab Content */}
+            {/* Essays Tab Content */}
+            {/* Essays Tab Content */}
               <TabsContent value="essays" className="mt-8">
                 <div className="space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {/* Header Section */}
+                  <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-2xl font-bold text-white">
-                        Essay Workspace
+                        Essay Requirements
                       </h3>
-                      {progressData.totalEssays > 1 && (
-                        <p className="text-white text-sm mt-1">
-                          Showing 1 of {progressData.totalEssays} essays • {progressData.completedEssays} completed
-                        </p>
-                      )}
+                      <p className="text-white/80 text-sm mt-1">
+                        {progressData.totalEssays} essays • {progressData.completedEssays} completed • {progressData.totalEssays - progressData.completedEssays} remaining
+                      </p>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2 text-sm text-white">
-                        <Save className="h-4 w-4" />
-                        <span>Draft saved 2 hours ago</span>
-                      </div>
-                      <Button
-                        onClick={() => setShowWorkspacePopup(true)}
-                        className="bg-[#3598FE] hover:bg-[#2485ed] text-white hover:shadow-lg transition-all duration-300"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        {progressData.totalEssays > 1 ? `Access All ${progressData.totalEssays} Essays` : 'Open Workspace'}
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={() => setShowWorkspacePopup(true)}
+                      className="bg-white text-[#002147] hover:bg-gray-100 font-semibold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all"
+                    >
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Workspace Editor
+                    </Button>
                   </div>
 
-                  {/* Primary Essay Display */}
-                  {primaryEssay ? (
-                    <div className="border-2 border-gray-100 rounded-2xl p-6 bg-gradient-to-br from-white to-gray-50 hover:shadow-lg transition-all duration-300">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
-                        <h4 className="font-bold text-[#002147] text-lg">
-                          {primaryEssay.title}
-                        </h4>
-                        <div className="flex items-center space-x-4 text-sm">
-                          <span className="text-gray-500">
-                            {primaryEssay.wordLimit} words max
-                          </span>
+                  {/* Essays List */}
+                  {university?.allEssayPrompts && university.allEssayPrompts.length > 0 ? (
+                    <div className="space-y-3">
+                      {university.allEssayPrompts.map((essay, index) => {
+                        // Fix progress calculation
+                        const actualProgress = essay.isComplete || essay.status === "COMPLETED"
+                          ? 100
+                          : essay.wordCount > 0 && essay.wordLimit > 0
+                          ? Math.min(Math.round((essay.wordCount / essay.wordLimit) * 100), 100)
+                          : 0;
+
+                        const statusConfig = essay.status === "COMPLETED" || essay.isComplete
+                          ? { bg: "bg-green-500", text: "text-white", label: "Completed", icon: CheckCircle }
+                          : essay.status === "IN_PROGRESS" || essay.status === "in-progress"
+                          ? { bg: "bg-blue-500", text: "text-white", label: "In Progress", icon: Clock }
+                          : essay.status === "DRAFT"
+                          ? { bg: "bg-yellow-500", text: "text-white", label: "Draft", icon: FileText }
+                          : { bg: "bg-gray-400", text: "text-white", label: "Not Started", icon: FileText };
+                        
+                        const StatusIcon = statusConfig.icon;
+
+                        return (
                           <div
-                            className={`flex items-center px-3 py-1 rounded-full ${
-                              primaryEssay.status === "in-progress"
-                                ? "bg-blue-100 text-blue-700"
-                                : primaryEssay.status === "submitted"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
+                            key={essay.id || index}
+                            className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
                           >
-                            {primaryEssay.status === "in-progress" ? (
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                            ) : primaryEssay.status === "submitted" ? (
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                            ) : (
-                              <Clock className="h-3 w-3 mr-1" />
-                            )}
-                            {primaryEssay.status.replace("-", " ")}
+                            <div className="p-4">
+                              {/* Essay Header - Single Line */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <span className="font-bold text-[#002147] text-sm whitespace-nowrap">
+                                    Essay {index + 1}
+                                  </span>
+                                  <h4 className="font-semibold text-gray-900 text-sm truncate">
+                                    {essay.title}
+                                  </h4>
+                                  {essay.isMandatory && (
+                                    <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                                      Required
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap ${statusConfig.bg} ${statusConfig.text}`}>
+                                  <StatusIcon className="h-3.5 w-3.5" />
+                                  {statusConfig.label}
+                                </div>
+                              </div>
+
+                              {/* Prompt - Compact */}
+                              <div className="bg-gray-50 rounded-md p-3 mb-3 border-l-2 border-[#002147]">
+                                <p className="text-gray-700 text-sm leading-relaxed line-clamp-2">
+                                  {essay.text}
+                                </p>
+                              </div>
+
+                              {/* Bottom Info - Single Line */}
+                              <div className="flex items-center justify-between text-xs text-gray-600">
+                                <div className="flex items-center gap-4">
+                                  <span className="flex items-center gap-1">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    {essay.wordLimit} words max
+                                  </span>
+                                  {essay.wordCount > 0 && (
+                                    <span className="font-medium text-[#002147]">
+                                      {essay.wordCount} / {essay.wordLimit} words
+                                    </span>
+                                  )}
+                                  {essay.lastEditedAt && (
+                                    <span className="flex items-center gap-1 text-gray-500">
+                                      <Clock className="h-3.5 w-3.5" />
+                                      {new Date(essay.lastEditedAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric'
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Progress Indicator */}
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 bg-gray-200 rounded-full h-1.5">
+                                    <div
+                                      className={`h-1.5 rounded-full transition-all ${
+                                        actualProgress === 100 ? 'bg-green-500' : 'bg-[#002147]'
+                                      }`}
+                                      style={{ width: `${actualProgress}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="font-semibold text-[#002147] w-10 text-right">
+                                    {actualProgress}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Essay Prompt Display */}
-                      <div className="mb-4 p-4 bg-gray-50 rounded-lg border-l-4 border-[#002147]">
-                        <h5 className="font-semibold text-gray-700 mb-2">Essay Prompt:</h5>
-                        <p className="text-gray-600 text-sm leading-relaxed">
-                          {primaryEssay.text}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="mb-4">
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>Progress</span>
-                          <span>{primaryEssay.progress}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-[#002147] h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${primaryEssay.progress}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      {/* Essay Answer Textarea */}
-                      <textarea
-                        className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-[#3598FE] focus:border-transparent transition-all duration-300 bg-white"
-                        placeholder="Start writing your essay response here..."
-                        value={essayContent}
-                        onChange={(e) => setEssayContent(e.target.value)}
-                      />
-                      
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-4">
-                        <span className="text-sm text-gray-500">
-                          {essayContent.split(" ").filter((word) => word.length > 0).length}{" "}
-                          / {primaryEssay.wordLimit} words
-                        </span>
-                        <div className="flex space-x-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-[#002147] text-[#002147] hover:bg-[#002147] hover:text-white"
-                          >
-                            <Upload className="h-3 w-3 mr-1" />
-                            Upload Draft
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-[#3598FE] hover:bg-[#2485ed] text-white hover:shadow-lg transition-all duration-300"
-                          >
-                            <Save className="h-3 w-3 mr-1" />
-                            Save Draft
-                          </Button>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h4 className="text-lg font-semibold text-white mb-2">No Essay Prompts Available</h4>
-                      <p className="text-gray-300">
-                        Essay prompts will appear here when they become available for this university.
+                    <div className="text-center py-12 bg-white/5 rounded-xl">
+                      <FileText className="h-12 w-12 text-white/40 mx-auto mb-3" />
+                      <h4 className="text-lg font-semibold text-white mb-1">No Essay Prompts</h4>
+                      <p className="text-white/60 text-sm">
+                        Essays will appear when available
                       </p>
                     </div>
                   )}
                 </div>
               </TabsContent>
-
               {/* Tasks & Events Tab Content */}
               <TabsContent value="deadlines" className="mt-8">
                 <div className="space-y-6">
@@ -697,15 +704,7 @@ const ApplicationTabs = ({ university }) => {
               </TabsContent>
             </Tabs>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <button className="flex-1 bg-[#3598FE] text-white py-4 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-[1.02] text-center" disabled>
-                Save All Progress
-              </button>
-              <button className="flex-1 border-2 border-white text-white py-4 px-6 rounded-xl font-semibold bg-transparent hover:bg-white hover:text-[#002147] transition-all duration-300 hover:scale-[1.02] text-center" disabled>
-                Export Application
-              </button>
-            </div>
+         
           </div>
         </CardContent>
       </Card>

@@ -18,6 +18,17 @@ export async function GET(request, { params }) {
     const decodedUniversityName = decodeURIComponent(universityName);
     console.log("Essay API - Decoded University Name:", decodedUniversityName);
 
+    // **NEW: Fetch user's study level preference**
+    let userStudyLevel = null;
+    if (userId) {
+      const userProfile = await prisma.userProfile.findUnique({
+        where: { userId: userId },
+        select: { studyLevel: true },
+      });
+      userStudyLevel = userProfile?.studyLevel?.toLowerCase();
+      console.log("User's Study Level:", userStudyLevel);
+    }
+
     const university = await prisma.university.findFirst({
       where: {
         OR: [
@@ -52,7 +63,16 @@ export async function GET(request, { params }) {
       },
       include: {
         programs: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            // **NEW: Filter by user's study level if available**
+            ...(userStudyLevel && {
+              degreeType: {
+                equals: userStudyLevel,
+                mode: "insensitive",
+              },
+            }),
+          },
           include: {
             departments: {
               include: {
@@ -356,13 +376,13 @@ export async function PUT(request, { params }) {
     }
 
     const completionResult = await checkEssayCompletion(
-      essayId, 
-      wordCount || 0, 
+      essayId,
+      wordCount || 0,
       content
     );
 
     if (!completionResult.success) {
-      console.warn('Completion check failed, proceeding with regular update');
+      console.warn("Completion check failed, proceeding with regular update");
     }
 
     let updatedEssay = completionResult.success ? completionResult.essay : null;
@@ -385,14 +405,14 @@ export async function PUT(request, { params }) {
         where: { id: essayId },
         data: updateData,
         include: {
-          versions: { orderBy: { timestamp: 'desc' }, take: 10 },
-          aiResults: { 
+          versions: { orderBy: { timestamp: "desc" }, take: 10 },
+          aiResults: {
             where: { essayVersionId: null },
-            orderBy: { createdAt: 'desc' }, 
-            take: 3 
+            orderBy: { createdAt: "desc" },
+            take: 3,
           },
-          essayPrompt: true
-        }
+          essayPrompt: true,
+        },
       });
     } else {
       const additionalUpdates = {};
@@ -405,14 +425,14 @@ export async function PUT(request, { params }) {
           where: { id: essayId },
           data: additionalUpdates,
           include: {
-            versions: { orderBy: { timestamp: 'desc' }, take: 10 },
-            aiResults: { 
+            versions: { orderBy: { timestamp: "desc" }, take: 10 },
+            aiResults: {
               where: { essayVersionId: null },
-              orderBy: { createdAt: 'desc' }, 
-              take: 3 
+              orderBy: { createdAt: "desc" },
+              take: 3,
+            },
+            essayPrompt: true,
           },
-            essayPrompt: true
-          }
         });
       }
     }
@@ -429,22 +449,22 @@ export async function PUT(request, { params }) {
         await prisma.essayVersion.create({
           data: {
             essayId,
-            content: content || '',
+            content: content || "",
             wordCount: wordCount || 0,
             label: `Auto-save ${new Date().toLocaleTimeString()}`,
             isAutoSave: true,
             changesSinceLastVersion: lastVersion
-              ? `${wordCount - lastVersion.wordCount > 0 ? '+' : ''}${
+              ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
                   wordCount - lastVersion.wordCount
                 } words`
-              : 'Initial content',
+              : "Initial content",
           },
         });
       }
     }
 
-    return NextResponse.json({ 
-      essay: updatedEssay
+    return NextResponse.json({
+      essay: updatedEssay,
     });
   } catch (error) {
     console.error("Error updating essay:", error);
@@ -545,11 +565,7 @@ async function updateEssay(data) {
     );
   }
 
-  const result = await checkEssayCompletion(
-    essayId,
-    wordCount || 0,
-    content
-  );
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content);
 
   if (result.success) {
     const additionalUpdates = {};
@@ -562,13 +578,13 @@ async function updateEssay(data) {
         where: { id: essayId },
         data: additionalUpdates,
         include: {
-          versions: { orderBy: { timestamp: 'desc' }, take: 10 },
-          aiResults: { 
+          versions: { orderBy: { timestamp: "desc" }, take: 10 },
+          aiResults: {
             where: { essayVersionId: null },
-            orderBy: { createdAt: 'desc' }, 
-            take: 3 
-          }
-        }
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
+        },
       });
       return NextResponse.json({ essay: finalEssay });
     }
@@ -647,7 +663,9 @@ async function saveVersion(data) {
   });
 
   const changesSinceLastVersion = lastVersion
-    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${ wordCount - lastVersion.wordCount } words`
+    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
+        wordCount - lastVersion.wordCount
+      } words`
     : "Initial version";
 
   const version = await prisma.essayVersion.create({
@@ -710,12 +728,12 @@ async function autoSave(data) {
   if (result.success) {
     const finalEssay = await prisma.essay.update({
       where: { id: essayId },
-      data: { lastAutoSaved: new Date() }
+      data: { lastAutoSaved: new Date() },
     });
 
     const lastVersion = await prisma.essayVersion.findFirst({
       where: { essayId },
-      orderBy: { timestamp: 'desc' }
+      orderBy: { timestamp: "desc" },
     });
 
     const shouldCreateAutoSave =
@@ -728,15 +746,15 @@ async function autoSave(data) {
       await prisma.essayVersion.create({
         data: {
           essayId,
-          content: content || '',
+          content: content || "",
           wordCount: wordCount || 0,
           label: `Auto-save ${new Date().toLocaleTimeString()}`,
           isAutoSave: true,
           changesSinceLastVersion: lastVersion
-            ? `${wordCount - lastVersion.wordCount > 0 ? '+' : ''}${
+            ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${
                 wordCount - lastVersion.wordCount
               } words`
-            : 'Initial auto-save',
+            : "Initial auto-save",
         },
       });
     }
@@ -789,11 +807,15 @@ async function getEssayAnalytics(data) {
 
     if (!essay.essayPrompt) {
       console.warn(`Essay ${essayId} has null essayPrompt`);
-      return NextResponse.json({
-        error: "Essay prompt data is missing",
-        essayId,
-        suggestion: "This essay may be orphaned. Consider reassigning it to a valid prompt."
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "Essay prompt data is missing",
+          essayId,
+          suggestion:
+            "This essay may be orphaned. Consider reassigning it to a valid prompt.",
+        },
+        { status: 400 }
+      );
     }
 
     // FIXED: Corrected the NOT clause structure
@@ -802,8 +824,8 @@ async function getEssayAnalytics(data) {
           where: {
             userId,
             essayPromptId: {
-              not: null  // This is the correct syntax for NOT NULL
-            }
+              not: null, // This is the correct syntax for NOT NULL
+            },
           },
           include: {
             essayPrompt: true,
@@ -812,7 +834,7 @@ async function getEssayAnalytics(data) {
       : [];
 
     // Filter out any essays that still have null essayPrompt after the query
-    const validUserEssays = allUserEssays.filter(e => e.essayPrompt !== null);
+    const validUserEssays = allUserEssays.filter((e) => e.essayPrompt !== null);
 
     const analytics = {
       completion: {
@@ -853,9 +875,12 @@ async function getEssayAnalytics(data) {
           essay.content.length > 0
             ? Math.round(
                 essay.wordCount /
-                  Math.max(1, essay.content
-                    .split(/[.!?]+/)
-                    .filter((s) => s.trim().length > 0).length)
+                  Math.max(
+                    1,
+                    essay.content
+                      .split(/[.!?]+/)
+                      .filter((s) => s.trim().length > 0).length
+                  )
               )
             : 0,
       },
@@ -893,7 +918,7 @@ async function getEssayAnalytics(data) {
       {
         error: "Failed to get analytics",
         details: error.message,
-        essayId
+        essayId,
       },
       { status: 500 }
     );
@@ -1041,7 +1066,12 @@ async function performAIAnalysis(data) {
     analysisTypes = ["comprehensive"],
   } = data;
 
-  console.log("Starting AI analysis for essay:", essayId, "version:", versionId);
+  console.log(
+    "Starting AI analysis for essay:",
+    essayId,
+    "version:",
+    versionId
+  );
 
   if (!essayId || !content) {
     return NextResponse.json(
@@ -1105,7 +1135,8 @@ async function performAIAnalysis(data) {
     });
 
     if (recentAnalysis) {
-      const transformedAnalysis = transformStoredAnalysisToComponentFormat(recentAnalysis);
+      const transformedAnalysis =
+        transformStoredAnalysisToComponentFormat(recentAnalysis);
       return NextResponse.json({
         success: true,
         analysis: transformedAnalysis,
@@ -1119,8 +1150,8 @@ async function performAIAnalysis(data) {
     let model;
     try {
       // Using Gemini 2.0 Flash for better analysis quality
-      model = genAI.getGenerativeModel({ 
-        model: "gemini-2.0-flash-exp",
+      model = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash",
         generationConfig: {
           temperature: 0.7,
           topP: 0.8,
@@ -1129,7 +1160,10 @@ async function performAIAnalysis(data) {
         },
       });
     } catch (initError) {
-      console.error("Failed to initialize Gemini 2.0, falling back to Pro:", initError);
+      console.error(
+        "Failed to initialize Gemini 2.0, falling back to Pro:",
+        initError
+      );
       try {
         model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
       } catch (fallbackError) {
@@ -1151,21 +1185,38 @@ async function performAIAnalysis(data) {
     }
 
     // Calculate essay metrics for context
-    const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    const completionRatio = essay.essayPrompt.wordLimit > 0 ? wordCount / essay.essayPrompt.wordLimit : 0;
-    
+    const wordCount = content
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
+    const sentences = content
+      .split(/[.!?]+/)
+      .filter((s) => s.trim().length > 0);
+    const paragraphs = content
+      .split(/\n\s*\n/)
+      .filter((p) => p.trim().length > 0);
+    const completionRatio =
+      essay.essayPrompt.wordLimit > 0
+        ? wordCount / essay.essayPrompt.wordLimit
+        : 0;
+
     // Get university tier and competitiveness
-    const universityTier = getUniversityTier(essay.program.university.universityName);
+    const universityTier = getUniversityTier(
+      essay.program.university.universityName
+    );
     const programType = essay.program.degreeType.toLowerCase();
-    
+
     // ENHANCED ANALYSIS PROMPT - Much more sophisticated and context-aware
     const analysisPrompt = `
-You are a Senior Admissions Officer at ${essay.program.university.universityName} with 15+ years of experience evaluating ${essay.program.degreeType} applications. You have read thousands of essays and understand exactly what makes candidates stand out in this highly competitive process.
+You are a Senior Admissions Officer at ${
+      essay.program.university.universityName
+    } with 15+ years of experience evaluating ${
+      essay.program.degreeType
+    } applications. You have read thousands of essays and understand exactly what makes candidates stand out in this highly competitive process.
 
 INSTITUTIONAL CONTEXT:
-- Institution: ${essay.program.university.universityName} (${universityTier} tier university)
+- Institution: ${
+      essay.program.university.universityName
+    } (${universityTier} tier university)
 - Program: ${essay.program.programName} (${essay.program.degreeType})
 - Competition Level: ${getCompetitionLevel(universityTier, programType)}
 - Admission Rate: ~${getAdmissionRate(universityTier, programType)}%
@@ -1178,7 +1229,9 @@ ${content}
 
 EVALUATION FRAMEWORK:
 
-As an admissions officer, I need to assess this essay against these specific criteria for ${essay.program.degreeType} programs at ${universityTier}-tier institutions:
+As an admissions officer, I need to assess this essay against these specific criteria for ${
+      essay.program.degreeType
+    } programs at ${universityTier}-tier institutions:
 
 1. PROMPT ADHERENCE: Does this directly answer what we asked? Many applicants fail here.
 2. NARRATIVE SOPHISTICATION: Is this a compelling story or generic statements?
@@ -1220,7 +1273,11 @@ Return ONLY valid JSON in this exact format:
   "readabilityScore": [25-95: clarity, grammar, sentence variety, word choice],
   "sentenceCount": ${sentences.length},
   "paragraphCount": ${Math.max(paragraphs.length, 1)},
-  "avgSentenceLength": ${sentences.length > 0 ? Math.round((wordCount / sentences.length) * 10) / 10 : 0},
+  "avgSentenceLength": ${
+    sentences.length > 0
+      ? Math.round((wordCount / sentences.length) * 10) / 10
+      : 0
+  },
   "complexWordCount": [count sophisticated vocabulary words],
   "passiveVoiceCount": [estimate passive voice instances],
   "grammarIssues": [count grammar/style issues 0-15],
@@ -1362,65 +1419,110 @@ CRITICAL INSTRUCTIONS:
 // Helper functions to add context about university tiers and competition levels
 function getUniversityTier(universityName) {
   const universityLower = universityName.toLowerCase();
-  
+
   // Ivy League and equivalent
-  if (['harvard', 'stanford', 'mit', 'yale', 'princeton', 'columbia', 'wharton', 'booth', 'kellogg', 'sloan'].some(school => universityLower.includes(school))) {
-    return 'Elite';
+  if (
+    [
+      "harvard",
+      "stanford",
+      "mit",
+      "yale",
+      "princeton",
+      "columbia",
+      "wharton",
+      "booth",
+      "kellogg",
+      "sloan",
+    ].some((school) => universityLower.includes(school))
+  ) {
+    return "Elite";
   }
-  
+
   // Top tier
-  if (['berkeley', 'michigan', 'ucla', 'nyu', 'duke', 'northwestern', 'chicago', 'cornell', 'dartmouth', 'brown'].some(school => universityLower.includes(school))) {
-    return 'Top';
+  if (
+    [
+      "berkeley",
+      "michigan",
+      "ucla",
+      "nyu",
+      "duke",
+      "northwestern",
+      "chicago",
+      "cornell",
+      "dartmouth",
+      "brown",
+    ].some((school) => universityLower.includes(school))
+  ) {
+    return "Top";
   }
-  
+
   // High tier
-  if (['texas', 'virginia', 'washington', 'georgia tech', 'carnegie mellon', 'johns hopkins'].some(school => universityLower.includes(school))) {
-    return 'High';
+  if (
+    [
+      "texas",
+      "virginia",
+      "washington",
+      "georgia tech",
+      "carnegie mellon",
+      "johns hopkins",
+    ].some((school) => universityLower.includes(school))
+  ) {
+    return "High";
   }
-  
-  return 'Competitive';
+
+  return "Competitive";
 }
 
 function getCompetitionLevel(tier, programType) {
   const competitionMatrix = {
-    'Elite': {
-      'mba': 'Extremely High (Top 1% of global applicants)',
-      'masters': 'Extremely High (Top 2% of applicants)',
-      'phd': 'Extremely High (Top 1% with research excellence)',
-      'undergraduate': 'Extremely High (Top 3% of high school students)'
+    Elite: {
+      mba: "Extremely High (Top 1% of global applicants)",
+      masters: "Extremely High (Top 2% of applicants)",
+      phd: "Extremely High (Top 1% with research excellence)",
+      undergraduate: "Extremely High (Top 3% of high school students)",
     },
-    'Top': {
-      'mba': 'Very High (Top 5% of applicants)',
-      'masters': 'Very High (Top 8% of applicants)', 
-      'phd': 'Very High (Top 3% with strong research)',
-      'undergraduate': 'Very High (Top 10% of high school students)'
+    Top: {
+      mba: "Very High (Top 5% of applicants)",
+      masters: "Very High (Top 8% of applicants)",
+      phd: "Very High (Top 3% with strong research)",
+      undergraduate: "Very High (Top 10% of high school students)",
     },
-    'High': {
-      'mba': 'High (Top 15% of applicants)',
-      'masters': 'High (Top 20% of applicants)',
-      'phd': 'High (Top 10% with research potential)',
-      'undergraduate': 'High (Top 20% of high school students)'
+    High: {
+      mba: "High (Top 15% of applicants)",
+      masters: "High (Top 20% of applicants)",
+      phd: "High (Top 10% with research potential)",
+      undergraduate: "High (Top 20% of high school students)",
     },
-    'Competitive': {
-      'mba': 'Moderate to High (Top 30% of applicants)',
-      'masters': 'Moderate (Top 40% of applicants)',
-      'phd': 'Moderate to High (Top 25% with research interest)',
-      'undergraduate': 'Moderate (Top 40% of high school students)'
-    }
+    Competitive: {
+      mba: "Moderate to High (Top 30% of applicants)",
+      masters: "Moderate (Top 40% of applicants)",
+      phd: "Moderate to High (Top 25% with research interest)",
+      undergraduate: "Moderate (Top 40% of high school students)",
+    },
   };
-  
-  return competitionMatrix[tier]?.[programType] || 'High Competition';
+
+  return competitionMatrix[tier]?.[programType] || "High Competition";
 }
 
 function getAdmissionRate(tier, programType) {
   const admissionMatrix = {
-    'Elite': { 'mba': '6-12', 'masters': '5-15', 'phd': '3-8', 'undergraduate': '3-8' },
-    'Top': { 'mba': '12-25', 'masters': '15-30', 'phd': '8-15', 'undergraduate': '8-20' },
-    'High': { 'mba': '25-40', 'masters': '30-50', 'phd': '15-25', 'undergraduate': '20-35' },
-    'Competitive': { 'mba': '40-60', 'masters': '50-70', 'phd': '25-40', 'undergraduate': '35-55' }
+    Elite: { mba: "6-12", masters: "5-15", phd: "3-8", undergraduate: "3-8" },
+    Top: { mba: "12-25", masters: "15-30", phd: "8-15", undergraduate: "8-20" },
+    High: {
+      mba: "25-40",
+      masters: "30-50",
+      phd: "15-25",
+      undergraduate: "20-35",
+    },
+    Competitive: {
+      mba: "40-60",
+      masters: "50-70",
+      phd: "25-40",
+      undergraduate: "35-55",
+    },
   };
-  
-  return admissionMatrix[tier]?.[programType] || '30-50';
+
+  return admissionMatrix[tier]?.[programType] || "30-50";
 }
 
 // Improved fallback analysis with realistic scoring
@@ -1433,7 +1535,9 @@ function generateRealisticFallbackAnalysis(
   completionRatio = 0
 ) {
   const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-  const paragraphs = content.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  const paragraphs = content
+    .split(/\n\s*\n/)
+    .filter((p) => p.trim().length > 0);
   const words = content.split(/\s+/).filter((w) => w.length > 0);
 
   const sentenceCount = sentences.length;
@@ -1442,31 +1546,41 @@ function generateRealisticFallbackAnalysis(
 
   // More realistic base scoring
   let baseScore = 45; // Start lower
-  
+
   // Word count impact (more nuanced)
   if (completionRatio >= 0.8 && completionRatio <= 1.0) baseScore += 15;
   else if (completionRatio >= 0.6) baseScore += 8;
   else if (completionRatio < 0.3) baseScore -= 10;
-  
+
   // Structure impact
   if (paragraphCount >= 4) baseScore += 8;
   else if (paragraphCount >= 3) baseScore += 5;
   else if (paragraphCount < 2) baseScore -= 8;
-  
+
   // Sentence variety
   if (avgSentenceLength >= 15 && avgSentenceLength <= 25) baseScore += 5;
   else if (avgSentenceLength < 10 || avgSentenceLength > 30) baseScore -= 5;
-  
+
   // Content depth indicators
-  const hasSpecificExamples = /\b(specifically|for example|in particular|such as)\b/i.test(content);
-  const hasNumbers = /\b\d+(%|dollars?|years?|months?|people|students?|percent)\b/i.test(content);
-  const hasActionVerbs = /(led|managed|created|developed|implemented|achieved|improved)/gi.test(content);
-  
+  const hasSpecificExamples =
+    /\b(specifically|for example|in particular|such as)\b/i.test(content);
+  const hasNumbers =
+    /\b\d+(%|dollars?|years?|months?|people|students?|percent)\b/i.test(
+      content
+    );
+  const hasActionVerbs =
+    /(led|managed|created|developed|implemented|achieved|improved)/gi.test(
+      content
+    );
+
   if (hasSpecificExamples) baseScore += 8;
   if (hasNumbers) baseScore += 6;
   if (hasActionVerbs) baseScore += 5;
 
-  const overallScore = Math.max(25, Math.min(85, baseScore + Math.floor(Math.random() * 10 - 5)));
+  const overallScore = Math.max(
+    25,
+    Math.min(85, baseScore + Math.floor(Math.random() * 10 - 5))
+  );
 
   const suggestions = [];
   let suggestionId = 1;
@@ -1478,8 +1592,11 @@ function generateRealisticFallbackAnalysis(
       type: "critical",
       priority: "high",
       title: "Essay significantly under word limit",
-      description: `At ${Math.round(completionRatio * 100)}% of target length, your essay appears incomplete to admissions readers.`,
-      action: "Expand with specific examples, deeper analysis, and more detailed storytelling."
+      description: `At ${Math.round(
+        completionRatio * 100
+      )}% of target length, your essay appears incomplete to admissions readers.`,
+      action:
+        "Expand with specific examples, deeper analysis, and more detailed storytelling.",
     });
   }
 
@@ -1489,8 +1606,10 @@ function generateRealisticFallbackAnalysis(
       type: "warning",
       priority: "medium",
       title: "Poor paragraph structure",
-      description: "Essays need clear organization with distinct paragraphs for different ideas.",
-      action: "Break content into 4-5 focused paragraphs with clear topic sentences."
+      description:
+        "Essays need clear organization with distinct paragraphs for different ideas.",
+      action:
+        "Break content into 4-5 focused paragraphs with clear topic sentences.",
     });
   }
 
@@ -1500,8 +1619,10 @@ function generateRealisticFallbackAnalysis(
       type: "improvement",
       priority: "high",
       title: "Add concrete examples",
-      description: "Generic statements weaken your narrative impact and memorability.",
-      action: "Include specific situations, numbers, names, and measurable outcomes."
+      description:
+        "Generic statements weaken your narrative impact and memorability.",
+      action:
+        "Include specific situations, numbers, names, and measurable outcomes.",
     });
   }
 
@@ -1511,8 +1632,10 @@ function generateRealisticFallbackAnalysis(
       type: "improvement",
       priority: "high",
       title: "Strengthen leadership language",
-      description: "MBA essays must demonstrate leadership through action-oriented language.",
-      action: "Use strong verbs like 'led,' 'implemented,' 'achieved' with specific results."
+      description:
+        "MBA essays must demonstrate leadership through action-oriented language.",
+      action:
+        "Use strong verbs like 'led,' 'implemented,' 'achieved' with specific results.",
     });
   }
 
@@ -1523,30 +1646,45 @@ function generateRealisticFallbackAnalysis(
       type: "strength",
       priority: "medium",
       title: "Clear writing foundation",
-      description: "Your essay demonstrates good basic writing skills and stays on topic.",
-      action: "Build on this foundation by adding more specific details and personal insights."
+      description:
+        "Your essay demonstrates good basic writing skills and stays on topic.",
+      action:
+        "Build on this foundation by adding more specific details and personal insights.",
     });
   }
 
   return {
     overallScore,
     suggestions,
-    structureScore: Math.max(20, Math.min(90, baseScore + (paragraphCount >= 4 ? 10 : -10))),
-    contentRelevance: Math.max(30, Math.min(85, baseScore + (hasSpecificExamples ? 8 : -12))),
-    narrativeFlow: Math.max(25, Math.min(80, baseScore + (avgSentenceLength > 12 ? 5 : -8))),
-    leadershipEmphasis: degreeType?.toLowerCase().includes("mba") 
+    structureScore: Math.max(
+      20,
+      Math.min(90, baseScore + (paragraphCount >= 4 ? 10 : -10))
+    ),
+    contentRelevance: Math.max(
+      30,
+      Math.min(85, baseScore + (hasSpecificExamples ? 8 : -12))
+    ),
+    narrativeFlow: Math.max(
+      25,
+      Math.min(80, baseScore + (avgSentenceLength > 12 ? 5 : -8))
+    ),
+    leadershipEmphasis: degreeType?.toLowerCase().includes("mba")
       ? Math.max(20, Math.min(85, baseScore + (hasActionVerbs ? 10 : -15)))
       : Math.max(40, Math.min(80, baseScore)),
-    specificityScore: Math.max(20, Math.min(85, baseScore + (hasNumbers ? 15 : -15))),
+    specificityScore: Math.max(
+      20,
+      Math.min(85, baseScore + (hasNumbers ? 15 : -15))
+    ),
     readabilityScore: Math.max(40, Math.min(90, baseScore + 5)),
     sentenceCount,
     paragraphCount,
     avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
     complexWordCount: words.filter((w) => w.length > 7).length,
-    passiveVoiceCount: sentences.filter(s => 
+    passiveVoiceCount: sentences.filter((s) =>
       /(was|were|been|being)\s+\w+ed\b/i.test(s)
     ).length,
-    grammarIssues: Math.floor(sentenceCount * 0.05) + Math.floor(Math.random() * 3)
+    grammarIssues:
+      Math.floor(sentenceCount * 0.05) + Math.floor(Math.random() * 3),
   };
 }
 
@@ -1785,7 +1923,9 @@ function generateAdvancedFallbackAnalysis(
       type: "warning",
       priority: "high",
       title: "Essay Length Below Target",
-      description: `Your essay is currently ${Math.round( completionRatio * 100 )}% of the recommended length. Admissions officers expect essays that fully utilize the word limit to demonstrate thoroughness and attention to detail.`,
+      description: `Your essay is currently ${Math.round(
+        completionRatio * 100
+      )}% of the recommended length. Admissions officers expect essays that fully utilize the word limit to demonstrate thoroughness and attention to detail.`,
       action:
         "Expand your examples with specific details, add more supporting evidence, or include additional relevant experiences that strengthen your narrative.",
       impact: "high",
@@ -1933,8 +2073,8 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
       include: {
         essayPrompt: true,
         user: true,
-        program: { include: { university: true } }
-      }
+        program: { include: { university: true } },
+      },
     });
 
     if (!essay?.essayPrompt) return { success: false };
@@ -1942,8 +2082,8 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
     const wordLimit = essay.essayPrompt.wordLimit;
     const completionPercentage = (newWordCount / wordLimit) * 100;
 
-    const COMPLETION_THRESHOLD = 0.90;
-    const shouldBeCompleted = newWordCount >= (wordLimit * COMPLETION_THRESHOLD);
+    const COMPLETION_THRESHOLD = 0.9;
+    const shouldBeCompleted = newWordCount >= wordLimit * COMPLETION_THRESHOLD;
     const wasCompleted = essay.isCompleted;
 
     const updateData = {
@@ -1959,9 +2099,11 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
     if (shouldBeCompleted && !wasCompleted) {
       updateData.isCompleted = true;
       updateData.completedAt = new Date();
-      updateData.status = 'COMPLETED';
+      updateData.status = "COMPLETED";
 
-      console.log(`[SILENT] Essay ${essayId} auto-completed at ${newWordCount}/${wordLimit} words`);
+      console.log(
+        `[SILENT] Essay ${essayId} auto-completed at ${newWordCount}/${wordLimit} words`
+      );
 
       try {
         await prisma.essayCompletionLog.create({
@@ -1970,20 +2112,19 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
             userId: essay.userId,
             wordCountAtCompletion: newWordCount,
             wordLimit,
-            completionMethod: 'AUTO',
+            completionMethod: "AUTO",
             programId: essay.programId,
             universityId: essay.program?.universityId,
             essayPromptTitle: essay.essayPrompt?.promptTitle,
-          }
+          },
         });
       } catch (logError) {
-        console.warn('Failed to log completion:', logError.message);
+        console.warn("Failed to log completion:", logError.message);
       }
-
     } else if (!shouldBeCompleted && wasCompleted) {
       updateData.isCompleted = false;
       updateData.completedAt = null;
-      updateData.status = newWordCount > 0 ? 'IN_PROGRESS' : 'DRAFT';
+      updateData.status = newWordCount > 0 ? "IN_PROGRESS" : "DRAFT";
 
       console.log(`[SILENT] Essay ${essayId} unmarked as completed`);
     }
@@ -1992,25 +2133,24 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
       where: { id: essayId },
       data: updateData,
       include: {
-        versions: { orderBy: { timestamp: 'desc' }, take: 10 },
+        versions: { orderBy: { timestamp: "desc" }, take: 10 },
         aiResults: {
           where: { essayVersionId: null },
-          orderBy: { createdAt: 'desc' },
-          take: 3
+          orderBy: { createdAt: "desc" },
+          take: 3,
         },
-        essayPrompt: true
-      }
+        essayPrompt: true,
+      },
     });
 
     return {
       success: true,
       essay: updatedEssay,
       completionChanged: shouldBeCompleted !== wasCompleted,
-      isCompleted: shouldBeCompleted
+      isCompleted: shouldBeCompleted,
     };
-
   } catch (error) {
-    console.error('[SILENT] Essay completion check failed:', error);
+    console.error("[SILENT] Essay completion check failed:", error);
     return { success: false, error: error.message };
   }
 }
@@ -2022,41 +2162,42 @@ async function getCompletionStats(userId = null) {
     where: whereClause,
     _count: {
       id: true,
-      isCompleted: true
+      isCompleted: true,
     },
     _avg: {
-      completionPercentage: true
-    }
+      completionPercentage: true,
+    },
   });
 
   const completedCount = await prisma.essay.count({
-    where: { ...whereClause, isCompleted: true }
+    where: { ...whereClause, isCompleted: true },
   });
 
   return {
     totalEssays: stats._count.id,
     completedEssays: completedCount,
-    completionRate: stats._count.id > 0 ? (completedCount / stats._count.id) * 100 : 0,
-    averageCompletion: stats._avg.completionPercentage || 0
+    completionRate:
+      stats._count.id > 0 ? (completedCount / stats._count.id) * 100 : 0,
+    averageCompletion: stats._avg.completionPercentage || 0,
   };
 }
 
 async function getRecentCompletions(limit = 10) {
   return await prisma.essayCompletionLog.findMany({
     take: limit,
-    orderBy: { completedAt: 'desc' },
+    orderBy: { completedAt: "desc" },
     include: {
       essay: {
         include: {
           essayPrompt: { select: { promptTitle: true } },
           program: {
             include: {
-              university: { select: { universityName: true } }
-            }
+              university: { select: { universityName: true } },
+            },
           },
-          user: { select: { name: true, email: true } }
-        }
-      }
-    }
+          user: { select: { name: true, email: true } },
+        },
+      },
+    },
   });
 }

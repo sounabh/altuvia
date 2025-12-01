@@ -85,19 +85,7 @@ const Index = () => {
         description: "",
       },
     ],
-    projects: [
-      {
-        id: "1",
-        name: "",
-        description: "",
-        technologies: "",
-        startDate: "",
-        endDate: "",
-        githubUrl: "",
-        liveUrl: "",
-        achievements: "",
-      },
-    ],
+ 
     skills: [
       {
         id: "1",
@@ -238,18 +226,6 @@ const Index = () => {
             isCurrentRole: exp.isCurrent || false,
             description: exp.description || "",
           })) || cvData.experience,
-        projects:
-          result.cv.projects?.map((proj) => ({
-            id: proj.id,
-            name: proj.name || "",
-            description: proj.description || "",
-            technologies: proj.technologies?.join(", ") || "",
-            startDate: proj.startDate || "",
-            endDate: proj.endDate || "",
-            githubUrl: proj.githubUrl || "",
-            liveUrl: proj.liveUrl || "",
-            achievements: proj.achievements?.join(", ") || "",
-          })) || cvData.projects,
         skills:
           result.cv.skills?.map((skill) => ({
             id: skill.id,
@@ -450,19 +426,7 @@ const Index = () => {
           description: "",
         },
       ],
-      projects: [
-        {
-          id: Date.now().toString(),
-          name: "",
-          description: "",
-          technologies: "",
-          startDate: "",
-          endDate: "",
-          githubUrl: "",
-          liveUrl: "",
-          achievements: "",
-        },
-      ],
+  
       skills: [
         {
           id: Date.now().toString(),
@@ -544,9 +508,6 @@ const Index = () => {
         experience: version.experienceSnapshot
           ? JSON.parse(version.experienceSnapshot)
           : cvData.experience,
-        projects: version.projectsSnapshot
-          ? JSON.parse(version.projectsSnapshot)
-          : cvData.projects,
         skills: version.skillsSnapshot
           ? JSON.parse(version.skillsSnapshot)
           : cvData.skills,

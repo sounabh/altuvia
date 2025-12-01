@@ -210,14 +210,21 @@ export const CountrySelectionStep = ({
                   {/* COUNTRY FLAG CARD */}
                   <div
                     onClick={() => !isDisabled && toggleCountry(country.name)}
-                    className={`w-28 h-30 rounded-2xl transition-all duration-300 transform cursor-pointer overflow-hidden ${
+                    className={`w-28 h-30 rounded-2xl transition-all duration-300 transform cursor-pointer overflow-hidden relative ${
                       isSelected
-                        ? "border-4 border-[#002147] shadow-xl scale-110"
-                        : "border-4 border-gray-300 hover:border-[#002147] hover:shadow-lg hover:scale-105"
+                        ? "border-[5px] border-[#002147] shadow-2xl scale-110 ring-4 ring-blue-300 ring-opacity-50"
+                        : "border-[3px] border-gray-200 hover:border-blue-400 hover:shadow-lg hover:scale-105"
                     } ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}
                   >
+                    {/* Selection Checkmark Indicator */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 bg-[#002147] text-white rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md">
+                        <span className="text-xs font-bold">✓</span>
+                      </div>
+                    )}
+                    
                     {/* RESPONSIVE IMAGE HANDLING: WebP preferred with PNG fallback */}
-                    <picture className="w-full h-full block">
+                    <picture className={`w-full h-full block transition-all duration-300 ${isSelected ? 'brightness-100' : 'brightness-95'}`}>
                       {/* WebP source (preferred format) */}
                       <source
                         type="image/webp"

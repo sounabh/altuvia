@@ -50,7 +50,7 @@ export const Header = ({
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">CV Builder</h1>
-          <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-[#002147] rounded-md text-sm font-semibold font-mono">
+          <span className="px-2.5 hidden py-0.5 bg-blue-50 border border-blue-200 text-[#002147] rounded-md text-sm font-semibold font-mono">
             #{cvNumber}
           </span>
         </div>

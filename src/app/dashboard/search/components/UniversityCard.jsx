@@ -95,16 +95,17 @@ const UniversityCard = memo(({ university }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-[#002147]/90 via-[#002147]/40 to-transparent" />
         
         {/* Top Action Bar */}
+       {/* Top Action Bar */}
         <div className="absolute top-0 left-0 right-0 p-4 flex items-start justify-between z-20">
           <button
             onClick={toggleHeart}
-            className={`p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
+            className={`px-3 py-1.5 rounded-md backdrop-blur-sm transition-all duration-200 text-xs font-medium ${
               isAdded
-                ? "bg-white text-[#3598FE]"
-                : "bg-white/90 text-[#002147] hover:bg-white"
+                ? "bg-[#3598FE] text-white"
+                : "bg-white/95 text-[#002147] hover:bg-white"
             }`}
           >
-            <Heart className={`w-5 h-5 ${isAdded ? 'fill-current' : ''}`} />
+            {isAdded ? "Added" : "Add"}
           </button>
 
           <div className="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">

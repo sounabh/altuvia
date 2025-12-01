@@ -15,7 +15,6 @@ const sections = [
   { id: "personal", label: "Personal Info", icon: User },
   { id: "education", label: "Education", icon: GraduationCap },
   { id: "experience", label: "Work Experience", icon: Briefcase },
-  { id: "projects", label: "Projects", icon: FolderOpen },
   { id: "skills", label: "Skills", icon: Code },
   { id: "achievements", label: "Achievements", icon: Award },
   { id: "volunteer", label: "Volunteer & Extra", icon: Heart },

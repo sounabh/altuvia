@@ -589,22 +589,14 @@ const ProgramsPage = () => {
                           e.stopPropagation();
                           handleProgramClick(program.slug);
                         }}
-                        className="bg-[#002147] hover:bg-[#001a36] text-white"
+                        className="bg-[#002147] hover:bg-[#001a36] text-white w-full"
                         size={viewMode === 'list' ? 'sm' : 'default'}
                       >
                         View Details
                         <ChevronRight className="h-4 w-4 ml-2" />
                       </Button>
                       
-                      <Button
-                        variant="outline"
-                        disabled
-                       //logic
-                        size={viewMode === 'list' ? 'sm' : 'default'}
-                        className="border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white"
-                      >
-                        Apply Now
-                      </Button>
+                     
                     </div>
                   </div>
                 </CardContent>

@@ -47,7 +47,7 @@ const Index = () => {
               Find Your Perfect University
             </h1>
             <p className="text-lg text-gray-600">
-              Compare and discover the world&apos;s leading universities for your academic journey
+              Compare and discover the world&apos;s leading universities for your academic journey and add to your dashboard.
             </p>
           </div>
 

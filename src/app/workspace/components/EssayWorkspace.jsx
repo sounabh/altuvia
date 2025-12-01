@@ -805,7 +805,7 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                       className="border border-gray-200 rounded-lg overflow-hidden"
                     >
                       {/* Program Header */}
-                      <div
+                    <div
                         className={`p-3 cursor-pointer transition-colors ${
                           activeProgramId === program.id
                             ? "bg-blue-50 border-l-4 border-l-blue-500"
@@ -817,7 +817,13 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                           <h4 className="text-sm font-semibold text-[#002147]">
                             {program.name}
                           </h4>
-                          <span className="text-xs text-gray-500">
+                          <span
+                            className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                              program.essays?.length > 0
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
                             {program.essays?.length || 0} essays
                           </span>
                         </div>

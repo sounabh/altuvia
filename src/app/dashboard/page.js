@@ -237,7 +237,7 @@ const Index = () => {
           {/* Dashboard Header */}
           <div className="mb-8">
             <h1 className="text-center font-semibold text-[40px] tracking-[0.2px] -mt-10">
-              My Saved Universities
+              Dashboard
             </h1>
             <p className="text-center text-slate-600">
               Track your saved universities and manage your applications
@@ -286,8 +286,8 @@ const Index = () => {
      
         {/* Dashboard Header */}
         <div className="mb-8">
-          <h1 className="text-center text-[40px] tracking-[0.2px] -mt-10">
-            My Saved Universities
+          <h1 className="text-center text-[40px] font-semibold tracking-[0.2px] -mt-10">
+           Dashboard
           </h1>
           <p className="text-center text-slate-600">
             Track your saved universities and manage your applications

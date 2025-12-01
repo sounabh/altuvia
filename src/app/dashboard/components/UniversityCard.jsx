@@ -1,5 +1,7 @@
+"use client"
+
 import React, { useState } from 'react';
-import { MapPin, Calendar, FileText, CheckCircle2, Heart } from 'lucide-react';
+import { MapPin, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
@@ -53,7 +55,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
     if (newState) {
       toast.success("University added to dashboard", {
         style: {
-          background: '#ec4899',
+          background: '#3598FE',
           color: 'white',
           border: 'none',
         },
@@ -62,7 +64,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
     } else {
       toast("University removed from dashboard", {
         style: {
-          background: '#6b7280',
+          background: '#002147',
           color: 'white',
           border: 'none',
         },
@@ -159,7 +161,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
   return (
     <Link href={universityUrl}>
       <div 
-        className="group relative bg-white border border-gray-200 transition-all duration-300 overflow-hidden cursor-pointer h-full flex flex-col hover:shadow-lg"
+        className="group relative bg-white border border-gray-200 transition-all duration-300 overflow-hidden cursor-pointer h-full flex flex-col hover:shadow-lg rounded-lg"
         style={{
           boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         }}
@@ -176,24 +178,24 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#002147]/90 via-[#002147]/40 to-transparent" />
 
-          {/* Heart Button - Top Left */}
+          {/* Add Button - Top Left (matching first card) */}
           <button
             onClick={toggleHeart}
             disabled={status === "loading"}
-            className={`absolute top-4 left-4 p-2 rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-95 z-20 ${
+            className={`absolute top-4 left-4 px-3 py-1.5 rounded-md backdrop-blur-sm transition-all duration-200 text-xs font-medium z-20 ${
               isAdded
-                ? "bg-white text-[#3598FE]"
-                : "bg-white/90 text-[#002147] hover:bg-white"
+                ? "bg-[#3598FE] text-white"
+                : "bg-white/95 text-[#002147] hover:bg-white"
             } ${status === "loading" ? "opacity-75 cursor-not-allowed" : ""}`}
             title={
               !isAuthenticated
                 ? "Login to save universities"
                 : isAdded
-                ? "Remove from saved universities"
-                : "Save this university"
+                ? "Remove from dashboard"
+                : "Add to dashboard"
             }
           >
-            <Heart className={`w-4 h-4 transition-all ${isAdded ? 'fill-current' : ''}`} />
+            {isAdded ? "Added" : "Add"}
           </button>
 
           {/* Status Badge - Top Right */}
@@ -414,3 +416,4 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
     </Link>
   );
 };
+

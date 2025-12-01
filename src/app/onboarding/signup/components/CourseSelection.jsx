@@ -132,9 +132,9 @@ export const CourseSelectionStep = ({
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
         {/* HEADER SECTION: Logo and user avatar */}
         <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
-        <span className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-white]">
-              Altu<span className="text-[#3598FE]">Via</span>
-            </span>
+          <span className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-white">
+            Altu<span className="text-[#3598FE]">Via</span>
+          </span>
           
           {/* USER AVATAR: With fallback to initials */}
           <div className="relative">
@@ -202,14 +202,23 @@ export const CourseSelectionStep = ({
                   {/* COURSE ICON CARD */}
                   <div
                     onClick={() => !isDisabled && toggleCourse(course.name)}
-                    className={`w-20 h-20 rounded-2xl transition-all duration-300 transform cursor-pointer overflow-hidden flex items-center justify-center ${
+                    className={`w-20 h-20 rounded-2xl transition-all duration-300 transform cursor-pointer overflow-hidden flex items-center justify-center relative ${
                       isSelected
-                        ? "border-4 border-[#002147] shadow-xl scale-110 bg-white"
-                        : "border-4 border-gray-300 hover:border-[#002147] hover:shadow-lg hover:scale-105 bg-white"
+                        ? "border-[5px] border-[#002147] shadow-2xl scale-110 ring-4 ring-blue-300 ring-opacity-50 bg-white"
+                        : "border-[3px] border-gray-200 hover:border-blue-400 hover:shadow-lg hover:scale-105 bg-white"
                     } ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}
                   >
+                    {/* Selection Checkmark Indicator */}
+                    {isSelected && (
+                      <div className="absolute top-1 right-1 bg-[#002147] text-white rounded-full w-5 h-5 flex items-center justify-center z-10 shadow-md">
+                        <span className="text-xs font-bold">✓</span>
+                      </div>
+                    )}
+                    
                     {/* Emoji icon for visual representation */}
-                    <span className="text-4xl">{course.icon}</span>
+                    <span className={`text-4xl transition-all duration-300 ${isSelected ? 'brightness-100' : 'brightness-95'}`}>
+                      {course.icon}
+                    </span>
                   </div>
                   <span className="text-xs font-medium text-gray-700 text-center max-w-20 leading-tight">
                     {course.name}
@@ -225,7 +234,7 @@ export const CourseSelectionStep = ({
           {/* BACK BUTTON */}
           <Button
             onClick={onBack}
-            className="bg-[#002147] hover:bg-[#003366] text-white px-11 py-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-normal font-roboto shadow-l ml-36"
+            className="bg-[#002147] hover:bg-[#003366] text-white px-11 py-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-normal font-roboto shadow-lg ml-36"
           >
             <span className="mr-2">←</span> 
             Back

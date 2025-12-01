@@ -18,8 +18,6 @@ export const CVBuilder= ({ activeSection, onSectionChange }) => {
         return <EducationForm />;
       case 'experience':
         return <ExperienceForm />;
-      case 'projects':
-        return <ProjectsForm />;
       case 'skills':
         return <SkillsForm />;
       case 'achievements':

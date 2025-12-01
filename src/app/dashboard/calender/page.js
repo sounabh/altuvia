@@ -23,6 +23,9 @@ import {
   Loader2,
   Star,
   CheckCircle2,
+  Sparkles,
+  Palette,
+  Lock,
 } from "lucide-react";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { toast } from "sonner";
@@ -81,6 +84,9 @@ const SmartCalendar = () => {
   const [savedUniversities, setSavedUniversities] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [operatingEventId, setOperatingEventId] = useState(null);
+  const [isFetchingColor, setIsFetchingColor] = useState(false);
+  const [colorSource, setColorSource] = useState(null);
+  const [colorFetchFailed, setColorFetchFailed] = useState(false);
 
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -92,30 +98,29 @@ const SmartCalendar = () => {
     description: "",
     eventStatus: "pending",
     location: "",
+    color: "#059669",
   });
 
   // ========================================
   // CALENDAR CONFIGURATION
   // ========================================
-const { data: session, status } = useSession();
-const router = useRouter();
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-
-
-useEffect(() => {
-  if (status === "authenticated" && session?.user?.email) {
-    setUserEmail(session.user.email);
-  } else if (status === "unauthenticated") {
-    setUserEmail("");
-  }
-}, [session, status]);
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.email) {
+      setUserEmail(session.user.email);
+    } else if (status === "unauthenticated") {
+      setUserEmail("");
+    }
+  }, [session, status]);
 
   const eventTypes = [
-    { value: "deadline", label: "Deadline", color: "#dc2626", icon: "⏰" },
-    { value: "interview", label: "Interview", color: "#2563eb", icon: "👥" },
-    { value: "task", label: "Task", color: "#059669", icon: "✅" },
-    { value: "workshop", label: "Workshop", color: "#d97706", icon: "🎓" },
-    { value: "meeting", label: "Meeting", color: "#7c3aed", icon: "📅" },
+    { value: "deadline", label: "Deadline", icon: "⏰" },
+    { value: "interview", label: "Interview", icon: "👥" },
+    { value: "task", label: "Task", icon: "✅" },
+    { value: "workshop", label: "Workshop", icon: "🎓" },
+    { value: "meeting", label: "Meeting", icon: "📅" },
   ];
 
   const priorities = [
@@ -136,27 +141,133 @@ useEffect(() => {
   // API FUNCTIONS
   // ========================================
 
-  const fetchSavedUniversities = useCallback(async () => {
-    try {
-      // Check authentication
-    if (status !== "authenticated" || !session?.token) {
-      setSavedUniversities([]);
-      return;
+  const fetchSchoolColorFromAI = async (universityId) => {
+    if (!universityId) {
+      setColorFetchFailed(false);
+      return null;
     }
 
-    const API_BASE_URL =
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+    setIsFetchingColor(true);
+    setColorSource(null);
+    setColorFetchFailed(false);
 
-    const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${session.token}`,
-        "Content-Type": "application/json",
-      },
-    });
+    try {
+      const response = await fetch("/api/calendar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "fetch_school_color",
+          universityId: universityId,
+          userEmail: userEmail,
+        }),
+      });
 
-    
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch school color");
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.color) {
+        // Check if this is a fallback/default color
+        const isFallback =
+          result.source === "fallback" ||
+          result.source === "default" ||
+          result.color === "#059669"; // Your default color
+
+        if (isFallback) {
+          setColorFetchFailed(true);
+          setColorSource("fallback");
+          return result.color;
+        }
+
+        setColorSource(result.source); // 'ai' or 'database'
+        setColorFetchFailed(false);
+        return result.color;
+      }
+
+      // No color returned
+      setColorFetchFailed(true);
+      setColorSource("fallback");
+      return null;
+    } catch (error) {
+      console.error("Error fetching school color:", error);
+      setColorFetchFailed(true);
+      setColorSource("error");
+      return null;
+    } finally {
+      setIsFetchingColor(false);
+    }
+  };
+
+  const handleUniversityChange = async (universityId) => {
+    setNewEvent((prev) => ({ ...prev, universityId: universityId || "" }));
+
+    if (universityId) {
+      const color = await fetchSchoolColorFromAI(universityId);
+      const uni = savedUniversities.find((u) => u.id === universityId);
+
+      if (color) {
+        setNewEvent((prev) => ({ ...prev, color: color }));
+
+        // Check colorFetchFailed after the fetch completes
+        // We need to use the state that was set in fetchSchoolColorFromAI
+        setTimeout(() => {
+          // Small delay to ensure state is updated
+        }, 0);
+
+        if (
+          colorSource === "ai" ||
+          colorSource === "database" ||
+          !colorFetchFailed
+        ) {
+          toast.success(
+            `School color applied for ${uni?.universityName || "university"}`,
+            {
+              icon: <Sparkles className="w-4 h-4 text-amber-500" />,
+            }
+          );
+        } else {
+          toast.info(`Using default color. You can customize it manually.`, {
+            icon: <Palette className="w-4 h-4 text-gray-500" />,
+          });
+        }
+      } else {
+        // AI completely failed, use default
+        setNewEvent((prev) => ({ ...prev, color: "#059669" }));
+        toast.warning("Couldn't fetch school color. Please select manually.", {
+          icon: <AlertCircle className="w-4 h-4 text-amber-500" />,
+        });
+      }
+    } else {
+      setNewEvent((prev) => ({ ...prev, color: "#059669" }));
+      setColorSource(null);
+      setColorFetchFailed(false);
+    }
+  };
+
+  const fetchSavedUniversities = useCallback(async () => {
+    try {
+      if (status !== "authenticated" || !session?.token) {
+        setSavedUniversities([]);
+        return;
+      }
+
+      const API_BASE_URL =
+        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok)
+        throw new Error(`HTTP error! status: ${response.status}`);
 
       const result = await response.json();
 
@@ -175,7 +286,7 @@ useEffect(() => {
       console.error("Error fetching saved universities:", err);
       setSavedUniversities([]);
     }
-  }, []);
+  }, [session, status]);
 
   const buildApiUrl = useCallback(
     (params = {}) => {
@@ -242,7 +353,7 @@ useEffect(() => {
         programId: event.programId,
         description: event.description,
         location: event.location,
-        color: event.color,
+        color: event.schoolColor || event.color || "#059669",
         isSystemGenerated: event.isSystemGenerated,
         hasReminders: event.hasReminders,
         reminders: event.reminders || [],
@@ -275,7 +386,7 @@ useEffect(() => {
         universityId: eventData.universityId || null,
         timezone: "UTC",
         isAllDay: false,
-        color: eventTypes.find((t) => t.value === eventData.eventType)?.color,
+        schoolColor: eventData.color || "#059669",
         userEmail: userEmail,
       };
 
@@ -438,6 +549,7 @@ useEffect(() => {
       description: newEvent.description.trim(),
       location: newEvent.location.trim(),
       universityId: newEvent.universityId || null,
+      color: newEvent.color || "#059669",
     };
 
     if (editingEvent) {
@@ -448,12 +560,9 @@ useEffect(() => {
 
     try {
       await saveEvent(eventData);
-      
-      // Refresh events after save
       await fetchEvents();
-      
       resetForm();
-      
+
       if (editingEvent) {
         toast.success("Event updated successfully", {
           className: "bg-blue-50 border-blue-200",
@@ -482,10 +591,19 @@ useEffect(() => {
       eventStatus: event.eventStatus || event.status,
       priority: event.priority,
       location: event.location || "",
+      color: event.color || "#059669",
     });
     setEditingEvent(event);
     setSelectedEvent(null);
     setShowEventModal(true);
+    // Set color source based on whether there's a university
+    if (event.universityId) {
+      setColorSource("database");
+      setColorFetchFailed(false);
+    } else {
+      setColorSource(null);
+      setColorFetchFailed(false);
+    }
   };
 
   const handleDeleteEvent = async (eventId) => {
@@ -496,10 +614,8 @@ useEffect(() => {
 
     try {
       await deleteEvent(eventId);
-      
-      // Refresh events after delete
       await fetchEvents();
-      
+
       toast.success("Event deleted successfully", {
         className: "bg-red-50 border-red-200",
       });
@@ -517,10 +633,8 @@ useEffect(() => {
 
     try {
       await completeEvent(eventId);
-      
-      // Refresh events after completion
       await fetchEvents();
-      
+
       toast.success("Event marked as completed! 🎉", {
         className: "bg-green-50 border-green-200",
       });
@@ -543,10 +657,13 @@ useEffect(() => {
       description: "",
       eventStatus: "pending",
       location: "",
+      color: "#059669",
     });
     setShowEventModal(false);
     setEditingEvent(null);
     setSaveError(null);
+    setColorSource(null);
+    setColorFetchFailed(false);
   };
 
   // ========================================
@@ -554,17 +671,17 @@ useEffect(() => {
   // ========================================
 
   const getEventStyle = useCallback((event) => {
-    const eventTypeConfig = eventTypes.find(
-      (t) => t.value === (event.eventType || event.type)
-    );
-    const baseColor = event.color || eventTypeConfig?.color || "#6b7280";
+    const isCompleted =
+      event.completionStatus === "completed" ||
+      event.status === "completed" ||
+      event.eventStatus === "completed";
 
-    const isCompleted = event.completionStatus === "completed" || event.status === "completed" || event.eventStatus === "completed";
+    const eventColor = event.color || "#059669";
 
     return {
       style: {
-        backgroundColor: isCompleted ? "#22c55e" : baseColor,
-        borderColor: isCompleted ? "#16a34a" : baseColor,
+        backgroundColor: isCompleted ? "#22c55e" : eventColor,
+        borderColor: isCompleted ? "#16a34a" : eventColor,
         color: "white",
         borderRadius: "4px",
         border: "none",
@@ -583,7 +700,8 @@ useEffect(() => {
       const matchesSchool =
         filterSchool === "all" ||
         event.universityId === filterSchool ||
-        (filterSchool === "general" && (!event.universityId || event.universityId === ""));
+        (filterSchool === "general" &&
+          (!event.universityId || event.universityId === ""));
       const matchesType =
         filterType === "all" ||
         event.eventType === filterType ||
@@ -620,7 +738,10 @@ useEffect(() => {
   const eventStats = useMemo(() => {
     const total = events.length;
     const completed = events.filter(
-      (e) => e.completionStatus === "completed" || e.status === "completed" || e.eventStatus === "completed"
+      (e) =>
+        e.completionStatus === "completed" ||
+        e.status === "completed" ||
+        e.eventStatus === "completed"
     ).length;
     const pending = events.filter(
       (e) => e.status === "pending" || e.eventStatus === "pending"
@@ -679,8 +800,52 @@ useEffect(() => {
   };
 
   const isEventCompleted = (event) => {
-    return event.completionStatus === "completed" || event.status === "completed" || event.eventStatus === "completed";
+    return (
+      event.completionStatus === "completed" ||
+      event.status === "completed" ||
+      event.eventStatus === "completed"
+    );
   };
+
+  const getEventTypeIcon = (eventType) => {
+    const type = eventTypes.find((t) => t.value === eventType);
+    return type?.icon || "📅";
+  };
+
+  const getPriorityConfig = (priority) => {
+    switch (priority) {
+      case "high":
+        return {
+          bg: "bg-red-50",
+          text: "text-red-700",
+          border: "border-red-200",
+          dot: "bg-red-500",
+        };
+      case "medium":
+        return {
+          bg: "bg-amber-50",
+          text: "text-amber-700",
+          border: "border-amber-200",
+          dot: "bg-amber-500",
+        };
+      default:
+        return {
+          bg: "bg-emerald-50",
+          text: "text-emerald-700",
+          border: "border-emerald-200",
+          dot: "bg-emerald-500",
+        };
+    }
+  };
+
+  // Check if color picker should be locked
+  const isColorPickerLocked = useMemo(() => {
+    return (
+      newEvent.universityId &&
+      !colorFetchFailed &&
+      (colorSource === "ai" || colorSource === "database")
+    );
+  }, [newEvent.universityId, colorFetchFailed, colorSource]);
 
   // ========================================
   // RENDER
@@ -700,7 +865,8 @@ useEffect(() => {
                 <h1 className="text-xl text-[#002147]">Application Calendar</h1>
               </div>
               <p className="text-sm text-gray-500 mb-4 -ml-1">
-                Track deadlines, interviews, and tasks across all your applications
+                Track deadlines, interviews, and tasks across all your
+                applications
               </p>
 
               {/* Quick Stats */}
@@ -890,7 +1056,10 @@ useEffect(() => {
                 </div>
 
                 <div className="p-5">
-                  <div style={{ height: "650px" }} className="calendar-container">
+                  <div
+                    style={{ height: "650px" }}
+                    className="calendar-container"
+                  >
                     <Calendar
                       localizer={localizer}
                       events={filteredEvents}
@@ -927,134 +1096,234 @@ useEffect(() => {
               <>
                 {/* Selected Event Details */}
                 {selectedEvent && (
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm text-gray-900 flex items-center gap-2">
-                        <Star className="w-4 h-4 text-yellow-500" />
-                        Event Details
-                      </h3>
-                      <button
-                        onClick={() => setSelectedEvent(null)}
-                        className="p-1 hover:bg-gray-50 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="text-sm text-gray-900 flex-1">
-                            {selectedEvent.title}
-                          </h4>
-                          {isEventCompleted(selectedEvent) && (
-                            <div className="ml-2 flex items-center gap-1 px-2 py-0.5 bg-green-50 border border-green-200 rounded-full">
-                              <CheckCircle2 size={12} className="text-green-600" />
-                              <span className="text-xs text-green-700 font-medium">Completed</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                          <span
-                            className="px-2 py-0.5 rounded text-xs text-white"
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                    {/* Card Header with Color Strip */}
+                    <div
+                      className="h-2 w-full"
+                      style={{
+                        backgroundColor: isEventCompleted(selectedEvent)
+                          ? "#22c55e"
+                          : selectedEvent.color || "#059669",
+                      }}
+                    />
+
+                    <div className="p-5">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm"
                             style={{
-                              backgroundColor: isEventCompleted(selectedEvent) 
-                                ? "#22c55e"
-                                : selectedEvent.color ||
-                                  eventTypes.find(
-                                    (t) => t.value === (selectedEvent.eventType || selectedEvent.type)
-                                  )?.color,
+                              backgroundColor: `${
+                                isEventCompleted(selectedEvent)
+                                  ? "#22c55e"
+                                  : selectedEvent.color || "#059669"
+                              }15`,
                             }}
                           >
-                            {eventTypes.find(
-                              (t) => t.value === (selectedEvent.eventType || selectedEvent.type)
-                            )?.icon}{" "}
-                            {selectedEvent.eventType || selectedEvent.type}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs ${
-                              selectedEvent.priority === "high"
-                                ? "bg-red-50 text-red-700"
-                                : selectedEvent.priority === "medium"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-emerald-50 text-emerald-700"
-                            }`}
-                          >
-                            {selectedEvent.priority}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                            <Clock size={14} className="text-gray-400" />
-                            <span>{moment(selectedEvent.start).format("MMM DD, YYYY h:mm A")}</span>
+                            {getEventTypeIcon(
+                              selectedEvent.eventType || selectedEvent.type
+                            )}
                           </div>
-
-                          {selectedEvent.location && (
-                            <div className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                              <MapPin size={14} className="text-gray-400" />
-                              <span>{selectedEvent.location}</span>
-                            </div>
-                          )}
-
-                          {selectedEvent.school && (
-                            <div className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                              <BookOpen size={14} className="text-gray-400" />
-                              <span>{selectedEvent.school}</span>
-                            </div>
-                          )}
-
-                          {isEventCompleted(selectedEvent) && selectedEvent.completedAt && (
-                            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 p-2 rounded">
-                              <CheckCircle2 size={14} className="text-green-600" />
-                              <span>Completed on {moment(selectedEvent.completedAt).format("MMM DD, YYYY h:mm A")}</span>
-                            </div>
-                          )}
-
-                          {selectedEvent.isSystemGenerated && (
-                            <div className="flex items-center gap-2 text-xs text-purple-600 bg-purple-50 p-2 rounded">
-                              <Bell size={14} />
-                              <span>System Generated</span>
-                            </div>
-                          )}
-
-                          {selectedEvent.description && (
-                            <div className="bg-gray-50 p-2.5 rounded">
-                              <p className="text-xs text-gray-600 leading-relaxed">
-                                {selectedEvent.description}
-                              </p>
-                            </div>
-                          )}
+                          <div>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                              Event Details
+                            </span>
+                            {isEventCompleted(selectedEvent) && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <CheckCircle2
+                                  size={12}
+                                  className="text-green-600"
+                                />
+                                <span className="text-xs text-green-600 font-medium">
+                                  Completed
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        <button
+                          onClick={() => setSelectedEvent(null)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
 
-                      <div className="flex flex-col gap-2 pt-3 border-t border-gray-100">
+                      {/* Event Title */}
+                      <h4
+                        className={`text-base font-semibold text-gray-900 mb-3 leading-snug ${
+                          isEventCompleted(selectedEvent)
+                            ? "line-through opacity-70"
+                            : ""
+                        }`}
+                      >
+                        {selectedEvent.title}
+                      </h4>
+
+                      {/* Tags Row */}
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-white shadow-sm"
+                          style={{
+                            backgroundColor: isEventCompleted(selectedEvent)
+                              ? "#22c55e"
+                              : selectedEvent.color || "#059669",
+                          }}
+                        >
+                          {getEventTypeIcon(
+                            selectedEvent.eventType || selectedEvent.type
+                          )}
+                          <span className="capitalize">
+                            {selectedEvent.eventType || selectedEvent.type}
+                          </span>
+                        </span>
+
+                        {(() => {
+                          const config = getPriorityConfig(
+                            selectedEvent.priority
+                          );
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${config.dot}`}
+                              ></span>
+                              <span className="capitalize">
+                                {selectedEvent.priority}
+                              </span>
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Info Cards */}
+                      <div className="space-y-2.5 mb-4">
+                        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-lg border border-gray-100">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                            <Clock size={14} className="text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Date & Time</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {moment(selectedEvent.start).format(
+                                "MMM DD, YYYY • h:mm A"
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {selectedEvent.location && (
+                          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-lg border border-gray-100">
+                            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                              <MapPin size={14} className="text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Location</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {selectedEvent.location}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedEvent.school && (
+                          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-lg border border-gray-100">
+                            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                              <BookOpen size={14} className="text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">School</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {selectedEvent.school}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {isEventCompleted(selectedEvent) &&
+                          selectedEvent.completedAt && (
+                            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50 to-transparent rounded-lg border border-green-100">
+                              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                                <CheckCircle2
+                                  size={14}
+                                  className="text-green-600"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-xs text-green-600">
+                                  Completed on
+                                </p>
+                                <p className="text-sm font-medium text-green-700">
+                                  {moment(selectedEvent.completedAt).format(
+                                    "MMM DD, YYYY • h:mm A"
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                      </div>
+
+                      {/* Time Ago Badge */}
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-xs text-gray-400">
+                          {moment(selectedEvent.start).fromNow()}
+                        </span>
+                        {selectedEvent.isSystemGenerated && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-50 text-purple-600 border border-purple-100">
+                            <Sparkles size={10} />
+                            Auto-generated
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      {selectedEvent.description && (
+                        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Description
+                          </p>
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {selectedEvent.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="space-y-2 pt-3 border-t border-gray-100">
                         {!isEventCompleted(selectedEvent) && (
                           <button
-                            onClick={() => handleCompleteEvent(selectedEvent.id)}
+                            onClick={() =>
+                              handleCompleteEvent(selectedEvent.id)
+                            }
                             disabled={operatingEventId === selectedEvent.id}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-sm disabled:opacity-50"
                           >
                             {operatingEventId === selectedEvent.id ? (
-                              <Loader2 size={14} className="animate-spin" />
+                              <Loader2 size={16} className="animate-spin" />
                             ) : (
-                              <CheckCircle size={14} />
+                              <CheckCircle size={16} />
                             )}
-                            Mark Complete
+                            Mark as Complete
                           </button>
                         )}
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEditEvent(selectedEvent)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-[#002147] text-white rounded-lg hover:bg-[#001a36] transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium bg-[#002147] text-white rounded-lg hover:bg-[#001a36] transition-colors"
                           >
                             <Edit2 size={14} />
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteEvent(selectedEvent.id)}
-                            disabled={selectedEvent.isSystemGenerated || operatingEventId === selectedEvent.id}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            onClick={() =>
+                              handleDeleteEvent(selectedEvent.id)
+                            }
+                            disabled={
+                              selectedEvent.isSystemGenerated ||
+                              operatingEventId === selectedEvent.id
+                            }
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {operatingEventId === selectedEvent.id ? (
                               <Loader2 size={14} className="animate-spin" />
@@ -1070,71 +1339,126 @@ useEffect(() => {
                 )}
 
                 {/* Upcoming Events */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
-                  <h3 className="text-sm text-gray-900 mb-4 flex items-center gap-2">
-                    <div className="p-1 bg-[#002147] rounded">
-                      <CalendarIcon className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    Upcoming Events
-                  </h3>
-                  <div className="space-y-3">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <div className="p-1.5 bg-[#002147] rounded-lg">
+                        <CalendarIcon className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      Upcoming Events
+                      {upcomingEvents.length > 0 && (
+                        <span className="ml-auto text-xs font-normal text-gray-400">
+                          {upcomingEvents.length} events
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+                  <div className="p-3 space-y-2">
                     {upcomingEvents.length > 0 ? (
-                      upcomingEvents.map((event) => (
-                        <div
-                          key={event.id}
-                          className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors relative"
-                          onClick={() => setSelectedEvent(event)}
-                        >
-                          {isEventCompleted(event) && (
-                            <div className="absolute top-2 right-2">
-                              <CheckCircle2 size={14} className="text-green-600" />
-                            </div>
-                          )}
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 pr-6">
-                              <h4 className={`text-xs text-gray-900 mb-1.5 ${isEventCompleted(event) ? 'line-through opacity-75' : ''}`}>
-                                {event.title}
-                              </h4>
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                                <Clock size={12} />
-                                <span>{moment(event.start).format("MMM DD, h:mm A")}</span>
-                              </div>
-                              {event.school && (
-                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                                  <BookOpen size={12} />
-                                  <span>{event.school}</span>
+                      upcomingEvents.map((event) => {
+                        const priorityConfig = getPriorityConfig(
+                          event.priority
+                        );
+                        return (
+                          <div
+                            key={event.id}
+                            className="group relative p-3 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md border border-transparent hover:border-gray-200"
+                            style={{
+                              backgroundColor: `${
+                                isEventCompleted(event)
+                                  ? "#22c55e"
+                                  : event.color || "#059669"
+                              }08`,
+                            }}
+                            onClick={() => setSelectedEvent(event)}
+                          >
+                            {/* Color indicator */}
+                            <div
+                              className="absolute left-0 top-3 bottom-3 w-1 rounded-full"
+                              style={{
+                                backgroundColor: isEventCompleted(event)
+                                  ? "#22c55e"
+                                  : event.color || "#059669",
+                              }}
+                            />
+
+                            <div className="pl-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-base">
+                                      {getEventTypeIcon(
+                                        event.eventType || event.type
+                                      )}
+                                    </span>
+                                    <h4
+                                      className={`text-sm font-medium text-gray-900 truncate ${
+                                        isEventCompleted(event)
+                                          ? "line-through opacity-70"
+                                          : ""
+                                      }`}
+                                    >
+                                      {event.title}
+                                    </h4>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                                    <Clock size={12} />
+                                    <span>
+                                      {moment(event.start).format(
+                                        "MMM DD • h:mm A"
+                                      )}
+                                    </span>
+                                  </div>
+
+                                  {event.school && (
+                                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                      <BookOpen size={11} />
+                                      <span className="truncate">
+                                        {event.school}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            <div className="ml-2 flex flex-col items-end gap-1">
-                              <span
-                                className="px-1.5 py-0.5 rounded text-xs text-white"
-                                style={{
-                                  backgroundColor: isEventCompleted(event)
-                                    ? "#22c55e"
-                                    : event.color ||
-                                      eventTypes.find((t) => t.value === (event.eventType || event.type))
-                                        ?.color,
-                                }}
-                              >
-                                {eventTypes.find((t) => t.value === (event.eventType || event.type))?.icon}
-                              </span>
-                              <span className="text-xs text-gray-400">{moment(event.start).fromNow()}</span>
+
+                                <div className="flex flex-col items-end gap-1.5">
+                                  {isEventCompleted(event) ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
+                                      <CheckCircle2 size={10} />
+                                      Done
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${priorityConfig.bg} ${priorityConfig.text}`}
+                                    >
+                                      <span
+                                        className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`}
+                                      ></span>
+                                      {event.priority}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-400">
+                                    {moment(event.start).fromNow()}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
-                      <div className="text-center py-6">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <CalendarIcon size={18} className="text-gray-400" />
+                      <div className="text-center py-8">
+                        <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                          <CalendarIcon size={24} className="text-gray-400" />
                         </div>
-                        <p className="text-xs text-gray-500 mb-2">No upcoming events</p>
+                        <p className="text-sm text-gray-500 mb-1">
+                          No upcoming events
+                        </p>
                         <button
                           onClick={() => setShowEventModal(true)}
-                          className="text-[#002147] hover:text-[#001a36] text-xs"
+                          className="text-[#002147] hover:text-[#001a36] text-sm font-medium"
                         >
-                          Create your first event
+                          Create your first event →
                         </button>
                       </div>
                     )}
@@ -1143,45 +1467,78 @@ useEffect(() => {
 
                 {/* Overdue Events */}
                 {overdueEvents.length > 0 && (
-                  <div className="bg-red-50 rounded-lg shadow-sm border border-red-100 p-5">
-                    <h3 className="text-sm text-red-900 mb-4 flex items-center gap-2">
-                      <div className="p-1 bg-red-600 rounded">
-                        <AlertCircle className="w-3.5 h-3.5 text-white" />
-                      </div>
-                      Overdue ({overdueEvents.length})
-                    </h3>
-                    <div className="space-y-3">
+                  <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl shadow-sm border border-red-100 overflow-hidden">
+                    <div className="p-4 border-b border-red-100 bg-gradient-to-r from-red-50 to-transparent">
+                      <h3 className="text-sm font-semibold text-red-900 flex items-center gap-2">
+                        <div className="p-1.5 bg-red-500 rounded-lg">
+                          <AlertCircle className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        Overdue
+                        <span className="ml-auto px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                          {overdueEvents.length}
+                        </span>
+                      </h3>
+                    </div>
+                    <div className="p-3 space-y-2">
                       {overdueEvents.map((event) => (
                         <div
                           key={event.id}
-                          className="p-3 bg-red-100/50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+                          className="group relative p-3 bg-white/70 backdrop-blur-sm rounded-xl cursor-pointer transition-all duration-200 hover:bg-white hover:shadow-md border border-red-100"
                           onClick={() => setSelectedEvent(event)}
                         >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-xs text-red-900 mb-1.5">{event.title}</h4>
-                              <div className="flex items-center gap-1.5 text-xs text-red-700 mb-1">
-                                <Clock size={12} />
-                                <span>{moment(event.start).format("MMM DD, h:mm A")}</span>
+                          <div className="absolute left-0 top-3 bottom-3 w-1 rounded-full bg-red-500" />
+
+                          <div className="pl-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-base">
+                                    {getEventTypeIcon(
+                                      event.eventType || event.type
+                                    )}
+                                  </span>
+                                  <h4 className="text-sm font-medium text-red-900 truncate">
+                                    {event.title}
+                                  </h4>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-xs text-red-600 mb-1.5">
+                                  <Clock size={12} />
+                                  <span>
+                                    {moment(event.start).format(
+                                      "MMM DD • h:mm A"
+                                    )}
+                                  </span>
+                                </div>
+
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">
+                                  <AlertCircle size={10} />
+                                  Overdue by{" "}
+                                  {moment(event.start).fromNow(true)}
+                                </span>
                               </div>
-                              <div className="text-xs text-red-600 bg-red-100 px-1.5 py-0.5 rounded inline-block">
-                                Overdue by {moment(event.start).fromNow(true)}
-                              </div>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCompleteEvent(event.id);
+                                }}
+                                disabled={operatingEventId === event.id}
+                                className="p-2 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {operatingEventId === event.id ? (
+                                  <Loader2
+                                    size={16}
+                                    className="animate-spin text-red-700"
+                                  />
+                                ) : (
+                                  <CheckCircle
+                                    size={16}
+                                    className="text-red-700"
+                                  />
+                                )}
+                              </button>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCompleteEvent(event.id);
-                              }}
-                              disabled={operatingEventId === event.id}
-                              className="p-1.5 bg-red-200 hover:bg-red-300 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                              {operatingEventId === event.id ? (
-                                <Loader2 size={14} className="animate-spin text-red-700" />
-                              ) : (
-                                <CheckCircle size={14} className="text-red-700" />
-                              )}
-                            </button>
                           </div>
                         </div>
                       ))}
@@ -1197,9 +1554,9 @@ useEffect(() => {
       {/* Event Modal */}
       {showEventModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-base text-gray-900 flex items-center gap-2">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <div className="p-1.5 bg-[#002147] rounded-lg">
                   <CalendarIcon className="w-4 h-4 text-white" />
                 </div>
@@ -1207,7 +1564,7 @@ useEffect(() => {
               </h3>
               <button
                 onClick={resetForm}
-                className="p-1 hover:bg-gray-50 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X size={18} className="text-gray-500" />
               </button>
@@ -1223,44 +1580,68 @@ useEffect(() => {
               )}
 
               <div>
-                <label className="block text-xs text-gray-600 mb-1.5">Event Title *</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Event Title *
+                </label>
                 <input
                   type="text"
                   value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
+                  onChange={(e) =>
+                    setNewEvent({ ...newEvent, title: e.target.value })
+                  }
+                  className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
                   placeholder="Enter event title"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1.5">Start Date & Time *</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Start Date & Time *
+                  </label>
                   <input
                     type="datetime-local"
                     value={moment(newEvent.start).format("YYYY-MM-DDTHH:mm")}
-                    onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
+                    min={moment().format("YYYY-MM-DDTHH:mm")}
+                    onChange={(e) =>
+                      setNewEvent({
+                        ...newEvent,
+                        start: new Date(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1.5">End Date & Time *</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    End Date & Time *
+                  </label>
                   <input
                     type="datetime-local"
                     value={moment(newEvent.end).format("YYYY-MM-DDTHH:mm")}
-                    onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
+                    min={moment(newEvent.start).format("YYYY-MM-DDTHH:mm")}
+                    onChange={(e) =>
+                      setNewEvent({
+                        ...newEvent,
+                        end: new Date(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1.5">Type *</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Type *
+                  </label>
                   <select
                     value={newEvent.eventType}
-                    onChange={(e) => setNewEvent({ ...newEvent, eventType: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, eventType: e.target.value })
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
                   >
                     {eventTypes.map((type) => (
                       <option key={type.value} value={type.value}>
@@ -1270,11 +1651,15 @@ useEffect(() => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1.5">Priority</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Priority
+                  </label>
                   <select
                     value={newEvent.priority}
-                    onChange={(e) => setNewEvent({ ...newEvent, priority: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, priority: e.target.value })
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
                   >
                     {priorities.map((priority) => (
                       <option key={priority.value} value={priority.value}>
@@ -1285,13 +1670,173 @@ useEffect(() => {
                 </div>
               </div>
 
+              {/* School Selection with AI Color */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  School
+                </label>
+                <select
+                  value={newEvent.universityId || ""}
+                  onChange={(e) => handleUniversityChange(e.target.value)}
+                  disabled={isFetchingColor}
+                  className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all disabled:opacity-50 disabled:cursor-wait"
+                >
+                  <option value="">General/No School</option>
+                  {savedUniversities.map((uni) => (
+                    <option key={uni.id} value={uni.id}>
+                      {uni.universityName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* School Color Section - Enhanced */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Palette size={14} className="text-gray-500" />
+                    School Color
+                    {isFetchingColor && (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-amber-600">
+                        <Loader2 size={12} className="animate-spin" />
+                        Fetching school color...
+                      </span>
+                    )}
+                  </div>
+                </label>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  {/* Color Preview */}
+                  <div
+                    className="w-12 h-12 rounded-xl shadow-inner border-2 border-white ring-1 ring-gray-200 transition-all duration-300"
+                    style={{ backgroundColor: newEvent.color || "#059669" }}
+                  />
+
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {newEvent.color || "#059669"}
+                      </span>
+                      {colorSource && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                            colorSource === "ai"
+                              ? "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border border-purple-200"
+                              : colorSource === "database"
+                              ? "bg-blue-50 text-blue-700 border border-blue-200"
+                              : colorSource === "custom"
+                              ? "bg-orange-50 text-orange-700 border border-orange-200"
+                              : colorSource === "error" ||
+                                colorSource === "fallback"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-gray-100 text-gray-600 border border-gray-200"
+                          }`}
+                        >
+                          {colorSource === "ai" && (
+                            <Sparkles size={10} className="text-purple-500" />
+                          )}
+                          {colorSource === "custom" && <Palette size={10} />}
+                          {(colorSource === "error" ||
+                            colorSource === "fallback") && (
+                            <AlertCircle size={10} />
+                          )}
+                          {colorSource === "ai"
+                            ? "AI Generated"
+                            : colorSource === "database"
+                            ? "Saved"
+                            : colorSource === "custom"
+                            ? "Custom"
+                            : colorSource === "error"
+                            ? "Manual Required"
+                            : colorSource === "fallback"
+                            ? "Default"
+                            : "Default"}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-gray-500">
+                      {!newEvent.universityId
+                        ? "Select a school to auto-fetch brand color"
+                        : colorFetchFailed
+                        ? "AI couldn't find school color. Please customize manually."
+                        : colorSource === "ai" || colorSource === "database"
+                        ? "Color locked to school branding"
+                        : "Color automatically fetched based on school branding"}
+                    </p>
+
+                    {/* Warning when AI fails */}
+                    {newEvent.universityId && colorFetchFailed && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={10} />
+                        Manual color selection enabled
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Manual Color Picker - Conditionally Enabled */}
+                  <div className="relative group">
+                    <input
+                      type="color"
+                      value={newEvent.color || "#059669"}
+                      onChange={(e) => {
+                        if (!isColorPickerLocked) {
+                          setNewEvent({ ...newEvent, color: e.target.value });
+                          setColorSource("custom");
+                        }
+                      }}
+                      disabled={isColorPickerLocked || isFetchingColor}
+                      className="w-10 h-10 rounded-lg cursor-pointer disabled:cursor-not-allowed"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        opacity: 0,
+                        zIndex: isColorPickerLocked ? -1 : 10,
+                      }}
+                      title={
+                        isColorPickerLocked
+                          ? "Color locked to school branding"
+                          : "Choose custom color"
+                      }
+                    />
+                    <div
+                      className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
+                        isColorPickerLocked
+                          ? "bg-gray-100 border-gray-200 cursor-not-allowed"
+                          : "bg-white border-gray-200 group-hover:border-gray-300 cursor-pointer"
+                      }`}
+                    >
+                      {isColorPickerLocked ? (
+                        <div className="relative">
+                          <Sparkles size={16} className="text-purple-400" />
+                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center">
+                            <CheckCircle2 size={8} className="text-white" />
+                          </div>
+                        </div>
+                      ) : isFetchingColor ? (
+                        <Loader2
+                          size={16}
+                          className="text-gray-400 animate-spin"
+                        />
+                      ) : (
+                        <Palette size={16} className="text-gray-500" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1.5">Status</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Status
+                  </label>
                   <select
                     value={newEvent.eventStatus}
-                    onChange={(e) => setNewEvent({ ...newEvent, eventStatus: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, eventStatus: e.target.value })
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
                   >
                     {statuses.map((status) => (
                       <option key={status.value} value={status.value}>
@@ -1301,39 +1846,31 @@ useEffect(() => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1.5">School</label>
-                  <select
-                    value={newEvent.universityId || ""}
-                    onChange={(e) => setNewEvent({ ...newEvent, universityId: e.target.value || "" })}
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
-                  >
-                    <option value="">General/No School</option>
-                    {savedUniversities.map((uni) => (
-                      <option key={uni.id} value={uni.id}>
-                        {uni.universityName}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={newEvent.location}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, location: e.target.value })
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all"
+                    placeholder="Enter location or link"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-600 mb-1.5">Location</label>
-                <input
-                  type="text"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all"
-                  placeholder="Enter location or online meeting link"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-600 mb-1.5">Description</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Description
+                </label>
                 <textarea
                   value={newEvent.description}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#002147] focus:border-[#002147] transition-all resize-none"
+                  onChange={(e) =>
+                    setNewEvent({ ...newEvent, description: e.target.value })
+                  }
+                  className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#002147]/20 focus:border-[#002147] transition-all resize-none"
                   rows={3}
                   placeholder="Add event description"
                 />
@@ -1343,16 +1880,20 @@ useEffect(() => {
             <div className="flex justify-end gap-2 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
               <button
                 onClick={resetForm}
-                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEvent}
-                disabled={!newEvent.title.trim() || operatingEventId}
-                className="px-4 py-2 text-sm bg-[#002147] text-white rounded-lg hover:bg-[#001a36] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                disabled={
+                  !newEvent.title.trim() || operatingEventId || isFetchingColor
+                }
+                className="px-5 py-2.5 text-sm font-medium bg-[#002147] text-white rounded-lg hover:bg-[#001a36] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {operatingEventId && <Loader2 size={14} className="animate-spin" />}
+                {operatingEventId && (
+                  <Loader2 size={14} className="animate-spin" />
+                )}
                 {editingEvent ? "Update Event" : "Create Event"}
               </button>
             </div>
@@ -1398,7 +1939,7 @@ useEffect(() => {
           background: #fafafa;
           border-bottom: 1px solid #f0f0f0;
           color: #374151;
-          font-weight: 400;
+          font-weight: 500;
           padding: 10px 8px;
           text-align: center;
           font-size: 12px;
@@ -1478,7 +2019,7 @@ useEffect(() => {
         }
 
         .calendar-container .rbc-date-cell.rbc-now {
-          font-weight: 500;
+          font-weight: 600;
           color: #002147;
         }
 

@@ -3,31 +3,69 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+
+// ========================================
+// AI COLOR FETCHER
+// ========================================
+async function fetchSchoolColorFromAI(universityName) {
+  try {
+    if (!process.env.GOOGLE_GEMINI_API_KEY) {
+      console.warn("Gemini API key not configured");
+      return null;
+    }
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-lite",
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 200,
+      },
+    });
+
+   const prompt = `You are a university branding expert. Return ONLY the primary brand color hex code for ${universityName}.
+
+Rules:
+- Return ONLY the hex code in format #RRGGBB
+- No explanation, no additional text
+- If uncertain, return the most commonly associated color
+- Examples: Harvard = #A51C30, MIT = #A31F34, Stanford = #8C1515
+
+University: ${universityName}
+Hex Code:`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text().trim();
+    
+    console.log(`AI Response for ${universityName}:`, responseText);
+    
+    // Extract hex code from response
+    const hexMatch = responseText.match(/#[0-9A-Fa-f]{6}/);
+    if (hexMatch) {
+      console.log(`Extracted color for ${universityName}:`, hexMatch[0]);
+      return hexMatch[0];
+    }
+
+    console.warn(`No valid hex code found for ${universityName}`);
+    return null;
+  } catch (error) {
+    console.error("Error fetching school color from AI:", error);
+    return null;
+  }
+}
 
 // ========================================
 // GET ENDPOINT - Fetch Calendar Events
 // ========================================
-
-/**
- * GET endpoint for fetching calendar events with filtering capabilities
- * Supports filtering by date range, event type, university, program, and more
- * Returns transformed events with related data for frontend consumption
- *
- * @param {Request} request - The incoming request object
- * @returns {NextResponse} JSON response with events or error
- */
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
     const { searchParams } = new URL(request.url);
     const userEmail = searchParams.get("userEmail");
     
-    // Prioritize query param over session (like universities API)
     const finalEmail = userEmail || session?.user?.email;
-
-    console.log('====================================');
-    console.log(finalEmail,userEmail);
-    console.log('====================================');
     
     if (!finalEmail) {
       return NextResponse.json(
@@ -36,7 +74,6 @@ export async function GET(request) {
       );
     }
 
-    // Extract other query parameters
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const eventType = searchParams.get("eventType") || "all";
@@ -46,7 +83,6 @@ export async function GET(request) {
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")) : undefined;
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    // Get the user by email
     const user = await prisma.user.findUnique({
       where: { email: finalEmail },
       select: { id: true },
@@ -56,7 +92,6 @@ export async function GET(request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Build filter conditions
     const where = {
       userId: user.id,
       isVisible: true,
@@ -65,24 +100,20 @@ export async function GET(request) {
       ...(programId && { programId }),
     };
 
-    // Add date range filter to capture events that overlap with the specified range
     if (startDate && endDate) {
       where.OR = [
-        // Events that start within the range
         {
           startDate: {
             gte: new Date(startDate),
             lte: new Date(endDate),
           },
         },
-        // Events that end within the range
         {
           endDate: {
             gte: new Date(startDate),
             lte: new Date(endDate),
           },
         },
-        // Events that span the entire range
         {
           AND: [
             { startDate: { lte: new Date(startDate) } },
@@ -96,7 +127,6 @@ export async function GET(request) {
       where.isSystemGenerated = false;
     }
 
-    // Fetch calendar events from database with all related data
     const events = await prisma.calendarEvent.findMany({
       where,
       take: limit,
@@ -186,10 +216,6 @@ export async function GET(request) {
       },
     });
 
-    /**
-     * Transform calendar events for frontend consumption
-     * Flattens related data and adds computed properties
-     */
     const transformedEvents = events.map((event) => ({
       id: event.id,
       title: event.title,
@@ -200,18 +226,17 @@ export async function GET(request) {
       timezone: event.timezone,
       isAllDay: event.isAllDay,
       type: event.eventType,
-      eventType: event.eventType, // Keep both for compatibility
+      eventType: event.eventType,
       status: event.eventStatus,
-      eventStatus: event.eventStatus, // Keep both for compatibility
+      eventStatus: event.eventStatus,
       priority: event.priority,
-      color: event.color || getDefaultColor(event.eventType),
+      color: event.color || "#6b7280",
+      schoolColor: event.color || "#6b7280",
       completionStatus: event.completionStatus,
       completedAt: event.completedAt?.toISOString(),
       completionNotes: event.completionNotes,
       isSystemGenerated: event.isSystemGenerated,
       hasReminders: event.hasReminders,
-
-      // Related data
       school: event.university?.universityName || "General",
       universityId: event.universityId,
       universitySlug: event.university?.slug,
@@ -221,32 +246,23 @@ export async function GET(request) {
       programId: event.programId,
       programSlug: event.program?.programSlug,
       degreeType: event.program?.degreeType,
-
-      // Application context
       applicationId: event.applicationId,
       applicationStatus: event.application?.applicationStatus,
       applicantName: event.application
         ? `${event.application.firstName} ${event.application.lastName}`
         : null,
-
-      // Additional context
       deadlineType: event.admissionDeadline?.deadlineType,
       interviewType: event.interview?.interviewType,
       interviewDuration: event.interview?.duration,
       interviewLocation: event.interview?.location || event.interview?.meetingLink,
       scholarshipAmount: event.scholarship?.amount,
       scholarshipCurrency: event.scholarship?.currency,
-
-      // Reminders
       reminders: event.reminders,
       reminderCount: event.reminders?.length || 0,
-
-      // Metadata
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
     }));
 
-    // Return successful response with pagination info
     return NextResponse.json({
       success: true,
       data: transformedEvents,
@@ -274,17 +290,8 @@ export async function GET(request) {
 }
 
 // ========================================
-// POST ENDPOINT - Create New Calendar Event
+// POST ENDPOINT - Create Event & Fetch School Color
 // ========================================
-
-/**
- * POST endpoint for creating new calendar events
- * Supports creating events with optional reminders
- * Validates input data and returns the created event
- *
- * @param {Request} request - The incoming request object
- * @returns {NextResponse} JSON response with created event or error
- */
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
@@ -299,6 +306,58 @@ export async function POST(request) {
       );
     }
 
+    // Handle AI color fetch request
+    if (eventData.action === "fetch_school_color") {
+      const { universityId } = eventData;
+      
+      console.log("Fetching school color for university ID:", universityId);
+      
+      if (!universityId) {
+        return NextResponse.json(
+          { error: "University ID is required" },
+          { status: 400 }
+        );
+      }
+
+      const university = await prisma.university.findUnique({
+        where: { id: universityId },
+        select: { universityName: true },
+      });
+
+      if (!university) {
+        console.log("University not found:", universityId);
+        return NextResponse.json(
+          { error: "University not found" },
+          { status: 404 }
+        );
+      }
+
+      console.log("University found:", university.universityName);
+
+      // Directly fetch from AI - each university has its own unique brand color
+      console.log("Fetching color from AI for:", university.universityName);
+      const aiColor = await fetchSchoolColorFromAI(university.universityName);
+      
+      if (aiColor) {
+        console.log("AI returned color:", aiColor);
+        return NextResponse.json({
+          success: true,
+          color: aiColor,
+          source: "ai",
+          universityName: university.universityName,
+        });
+      }
+
+      console.log("No color found, returning fallback");
+      return NextResponse.json({
+        success: true,
+        color: "#6b7280",
+        source: "fallback",
+        universityName: university.universityName,
+      });
+    }
+
+    // Regular event creation
     const user = await prisma.user.findUnique({
       where: { email: finalEmail },
       select: { id: true },
@@ -319,7 +378,7 @@ export async function POST(request) {
       eventType,
       eventStatus = "pending",
       priority = "medium",
-      color,
+      schoolColor,
       universityId,
       programId,
       applicationId,
@@ -332,7 +391,6 @@ export async function POST(request) {
       completionStatus = "pending",
     } = eventData;
 
-    // Validate required fields
     if (!title?.trim()) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
@@ -351,7 +409,6 @@ export async function POST(request) {
       );
     }
 
-    // Validate date order and format
     const startDate = new Date(start);
     const endDate = new Date(end);
 
@@ -369,10 +426,8 @@ export async function POST(request) {
       );
     }
 
-    // Create the calendar event with reminders in a transaction with increased timeout
     const result = await prisma.$transaction(
       async (tx) => {
-        // Create the main event
         const event = await tx.calendarEvent.create({
           data: {
             userId: user.id,
@@ -386,7 +441,7 @@ export async function POST(request) {
             eventType,
             eventStatus,
             priority,
-            color: color || getDefaultColor(eventType),
+            color: schoolColor || "#6b7280",
             universityId: universityId || null,
             programId: programId || null,
             applicationId: applicationId || null,
@@ -416,10 +471,9 @@ export async function POST(request) {
           },
         });
 
-        // Create reminders if provided
         if (reminders.length > 0) {
           const reminderData = reminders.map((reminder) => {
-            const reminderTime = reminder.time || 1440; // Default 24 hours
+            const reminderTime = reminder.time || 1440;
             const scheduledFor = new Date(
               startDate.getTime() - reminderTime * 60 * 1000
             );
@@ -443,12 +497,11 @@ export async function POST(request) {
         return event;
       },
       {
-        timeout: 15000, // Increased timeout to 15 seconds
-        maxWait: 5000, // Maximum time to wait for a connection from the pool
+        timeout: 15000,
+        maxWait: 5000,
       }
     );
 
-    // Transform the result for frontend
     const transformedResult = {
       id: result.id,
       title: result.title,
@@ -464,6 +517,7 @@ export async function POST(request) {
       eventStatus: result.eventStatus,
       priority: result.priority,
       color: result.color,
+      schoolColor: result.color,
       completionStatus: result.completionStatus,
       isSystemGenerated: result.isSystemGenerated,
       hasReminders: result.hasReminders,
@@ -499,13 +553,8 @@ export async function POST(request) {
 }
 
 // ========================================
-// PUT ENDPOINT - Update Calendar Event (Optimized)
+// PUT ENDPOINT - Update Calendar Event
 // ========================================
-
-/**
- * PUT endpoint for updating calendar events
- * SOLUTION 1: Optimized with increased timeout and batch operations
- */
 export async function PUT(request) {
   try {
     const session = await getServerSession(authOptions);
@@ -520,7 +569,6 @@ export async function PUT(request) {
       );
     }
 
-    // Get user ID from email for permission checking
     const user = await prisma.user.findUnique({
       where: { email: finalEmail },
       select: { id: true },
@@ -539,7 +587,6 @@ export async function PUT(request) {
       );
     }
 
-    // Check if event exists and user has permission
     const existingEvent = await prisma.calendarEvent.findUnique({
       where: { id },
     });
@@ -548,15 +595,12 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Check permissions (user can only edit their own events)
     if (existingEvent.userId !== user.id) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    // Process the update data with validation
     const processedData = {};
 
-    // Handle field mapping and validation
     if (eventData.title !== undefined) {
       if (!eventData.title.trim()) {
         return NextResponse.json(
@@ -597,7 +641,6 @@ export async function PUT(request) {
       processedData.endDate = endDate;
     }
 
-    // Validate date order if both dates are being updated
     const finalStartDate = processedData.startDate || existingEvent.startDate;
     const finalEndDate = processedData.endDate || existingEvent.endDate;
 
@@ -608,7 +651,6 @@ export async function PUT(request) {
       );
     }
 
-    // Map other fields
     if (eventData.eventType !== undefined) {
       processedData.eventType = eventData.eventType;
     }
@@ -629,8 +671,8 @@ export async function PUT(request) {
       processedData.isAllDay = eventData.isAllDay;
     }
 
-    if (eventData.color !== undefined) {
-      processedData.color = eventData.color;
+    if (eventData.schoolColor !== undefined || eventData.color !== undefined) {
+      processedData.color = eventData.schoolColor || eventData.color || "#6b7280";
     }
 
     if (eventData.universityId !== undefined) {
@@ -645,19 +687,15 @@ export async function PUT(request) {
       processedData.completionStatus = eventData.completionStatus;
     }
 
-    // Update reminders flag
     if (reminders !== undefined) {
       processedData.hasReminders =
         Array.isArray(reminders) && reminders.length > 0;
     }
 
-    // Set update timestamp
     processedData.updatedAt = new Date();
 
-    // SOLUTION 1: Use transaction with increased timeout and optimized queries
     const result = await prisma.$transaction(
       async (tx) => {
-        // Update the main event with minimal includes for speed
         const updatedEvent = await tx.calendarEvent.update({
           where: { id },
           data: processedData,
@@ -677,14 +715,11 @@ export async function PUT(request) {
           },
         });
 
-        // Handle reminders separately for better performance
         if (reminders && Array.isArray(reminders)) {
-          // Use a single delete operation
           await tx.eventReminder.deleteMany({
             where: { eventId: id },
           });
 
-          // Create new reminders in batch
           if (reminders.length > 0) {
             const reminderData = reminders.map((reminder) => {
               const reminderTime = reminder.time || 1440;
@@ -705,7 +740,6 @@ export async function PUT(request) {
               };
             });
 
-            // Single batch insert
             await tx.eventReminder.createMany({
               data: reminderData,
             });
@@ -715,12 +749,11 @@ export async function PUT(request) {
         return updatedEvent;
       },
       {
-        timeout: 15000, // Increased timeout to 15 seconds
-        maxWait: 5000, // Maximum time to wait for a connection
+        timeout: 15000,
+        maxWait: 5000,
       }
     );
 
-    // Fetch reminders separately if needed (outside transaction)
     const finalReminders =
       reminders && Array.isArray(reminders)
         ? await prisma.eventReminder.findMany({
@@ -728,7 +761,6 @@ export async function PUT(request) {
           })
         : [];
 
-    // Transform the result for frontend
     const transformedResult = {
       id: result.id,
       title: result.title,
@@ -744,6 +776,7 @@ export async function PUT(request) {
       eventStatus: result.eventStatus,
       priority: result.priority,
       color: result.color,
+      schoolColor: result.color,
       completionStatus: result.completionStatus,
       isSystemGenerated: result.isSystemGenerated,
       hasReminders: result.hasReminders,
@@ -778,15 +811,6 @@ export async function PUT(request) {
 // ========================================
 // DELETE ENDPOINT - Delete Calendar Event
 // ========================================
-
-/**
- * DELETE endpoint for deleting calendar events
- * Validates permissions before deletion
- * Uses cascading delete for associated reminders
- *
- * @param {Request} request - The incoming request object
- * @returns {NextResponse} JSON response with success status or error
- */
 export async function DELETE(request) {
   try {
     const session = await getServerSession(authOptions);
@@ -802,7 +826,6 @@ export async function DELETE(request) {
       );
     }
 
-    // Get user ID from email for permission checking
     const user = await prisma.user.findUnique({
       where: { email: finalEmail },
       select: { id: true },
@@ -821,7 +844,6 @@ export async function DELETE(request) {
       );
     }
 
-    // Check if event exists and user has permission
     const existingEvent = await prisma.calendarEvent.findUnique({
       where: { id },
     });
@@ -830,12 +852,10 @@ export async function DELETE(request) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Check permissions (user can only delete their own events)
     if (existingEvent.userId !== user.id) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    // Delete event (cascade will handle reminders)
     await prisma.calendarEvent.delete({
       where: { id },
     });
@@ -856,29 +876,4 @@ export async function DELETE(request) {
       { status: 500 }
     );
   }
-}
-
-// ========================================
-// HELPER FUNCTIONS
-// ========================================
-
-/**
- * Get default color for event types
- * Provides consistent color coding for different event types
- *
- * @param {string} eventType - The type of event
- * @returns {string} Hex color code for the event type
- */
-function getDefaultColor(eventType) {
-  const colors = {
-    deadline: "#ef4444", // Red
-    interview: "#3b82f6", // Blue
-    task: "#10b981", // Green
-    workshop: "#f59e0b", // Yellow/Orange
-    meeting: "#8b5cf6", // Purple
-    scholarship: "#8b5cf6", // Purple
-    reminder: "#6b7280", // Gray
-  };
-
-  return colors[eventType] || colors.task;
 }

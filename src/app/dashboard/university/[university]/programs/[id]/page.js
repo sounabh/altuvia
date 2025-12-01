@@ -346,15 +346,7 @@ const ProgramDetailsPage = () => {
               Back to Programs
             </Button>
             
-            <div className="flex items-center space-x-4">
-              <Button
-                //onClick={() => router.push(`/university/${slug}/apply/${program.slug}`)}
-                disabled
-                className="bg-[#3598FE] hover:bg-[#2980E6] text-white"
-              >
-                Apply Now
-              </Button>
-            </div>
+            
           </div>
         </div>
       </header>
@@ -853,20 +845,7 @@ const ProgramDetailsPage = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Quick Apply Card */}
-            <Card className="bg-gradient-to-br from-[#002147] to-[#3598FE] text-white">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-4">Ready to Apply?</h3>
-                <p className="text-white/80 mb-4">Start your application process today</p>
-                <Button
-                //  onClick={() => router.push(`/university/${slug}/apply/${program.slug}`)}
-                disabled
-                  className="w-full bg-white text-[#002147] hover:bg-gray-100"
-                >
-                  Start Application
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </CardContent>
-            </Card>
+       
 
             {/* University Info */}
             <Card>
