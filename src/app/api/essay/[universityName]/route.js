@@ -1,4 +1,4 @@
-///api/essay/[universityName]/route.js
+// src/app/api/essay/[universityName]/route.js - FIXED VERSION
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -18,17 +18,35 @@ export async function GET(request, { params }) {
     const decodedUniversityName = decodeURIComponent(universityName);
     console.log("Essay API - Decoded University Name:", decodedUniversityName);
 
-    // **NEW: Fetch user's study level preference**
+    // Fetch user's study level preference
     let userStudyLevel = null;
     if (userId) {
-      const userProfile = await prisma.userProfile.findUnique({
-        where: { userId: userId },
-        select: { studyLevel: true },
-      });
-      userStudyLevel = userProfile?.studyLevel?.toLowerCase();
-      console.log("User's Study Level:", userStudyLevel);
+      try {
+        const userProfile = await prisma.userProfile.findUnique({
+          where: { userId: userId },
+          select: { studyLevel: true },
+        });
+        userStudyLevel = userProfile?.studyLevel?.toLowerCase();
+        console.log("User's Study Level:", userStudyLevel);
+      } catch (profileError) {
+        console.warn("Could not fetch user profile:", profileError.message);
+      }
     }
 
+    // Build program filter conditions
+    const programWhereConditions = {
+      isActive: true,
+    };
+
+    // Add study level filter if available
+    if (userStudyLevel) {
+      programWhereConditions.degreeType = {
+        equals: userStudyLevel,
+        mode: "insensitive",
+      };
+    }
+
+    // Fetch university with programs - NO DEPARTMENT RELATION
     const university = await prisma.university.findFirst({
       where: {
         OR: [
@@ -63,22 +81,9 @@ export async function GET(request, { params }) {
       },
       include: {
         programs: {
-          where: {
-            isActive: true,
-            // **NEW: Filter by user's study level if available**
-            ...(userStudyLevel && {
-              degreeType: {
-                equals: userStudyLevel,
-                mode: "insensitive",
-              },
-            }),
-          },
+          where: programWhereConditions,
           include: {
-            departments: {
-              include: {
-                department: true,
-              },
-            },
+            // REMOVED: departments relation that was causing the error
             essayPrompts: {
               where: { isActive: true },
               include: {
@@ -172,6 +177,7 @@ export async function GET(request, { params }) {
       });
     }
 
+    // Build workspace data - NO DEPARTMENT REFERENCE
     const workspaceData = {
       university: {
         id: university.id,
@@ -187,8 +193,7 @@ export async function GET(request, { params }) {
         id: program.id,
         name: program.programName,
         slug: program.programSlug,
-        departmentName:
-          program.departments?.[0]?.department?.name || "Unknown Department",
+        // REMOVED: departmentName - no longer referencing departments
         degreeType: program.degreeType,
         description: program.programDescription,
         deadlines:
@@ -212,6 +217,9 @@ export async function GET(request, { params }) {
               wordLimit: prompt.wordLimit,
               minWordCount: prompt.minWordCount,
               isMandatory: prompt.isMandatory,
+              programId: program.id,
+              programName: program.programName,
+              universityName: university.universityName,
               userEssay: userEssay
                 ? {
                     id: userEssay.id,
@@ -220,6 +228,8 @@ export async function GET(request, { params }) {
                     title: userEssay.title,
                     priority: userEssay.priority,
                     status: userEssay.status,
+                    isCompleted: userEssay.isCompleted,
+                    completionPercentage: userEssay.completionPercentage,
                     lastModified: userEssay.lastModified,
                     lastAutoSaved: userEssay.lastAutoSaved,
                     createdAt: userEssay.createdAt,
@@ -251,7 +261,7 @@ export async function GET(request, { params }) {
             acc +
             (p.essayPrompts?.filter((prompt) => {
               const essay = prompt.essays?.[0];
-              return essay && essay.wordCount >= prompt.wordLimit * 0.8;
+              return essay && (essay.isCompleted || essay.wordCount >= prompt.wordLimit * 0.8);
             }).length || 0),
           0
         ),
@@ -290,6 +300,7 @@ export async function GET(request, { params }) {
           return totalProgress / totalPrompts;
         })(),
       },
+      studyLevel: userStudyLevel,
     };
 
     console.log(
