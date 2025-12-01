@@ -85,7 +85,7 @@ const Index = () => {
         description: "",
       },
     ],
- 
+    projects: [],
     skills: [
       {
         id: "1",
@@ -160,7 +160,7 @@ const Index = () => {
     }
   }, [status, session]);
 
-  // Load CV data using email from session
+  // Load CV data using email from session - FIXED VERSION
   const loadCVData = async (cvId, email) => {
     try {
       if (!email) {
@@ -173,7 +173,11 @@ const Index = () => {
       );
 
       if (response.status === 404) {
-        console.log("No existing CV found - this is normal for new CVs");
+        console.log("CV not found - clearing invalid ID");
+        // Clear invalid CV ID
+        setCurrentCVId(null);
+        localStorage.removeItem("currentCVId");
+        toast.info("Previous CV not found. Starting fresh.");
         return;
       }
 
@@ -226,6 +230,18 @@ const Index = () => {
             isCurrentRole: exp.isCurrent || false,
             description: exp.description || "",
           })) || cvData.experience,
+        projects:
+          result.cv.projects?.map((proj) => ({
+            id: proj.id,
+            name: proj.name || "",
+            description: proj.description || "",
+            technologies: proj.technologies?.join(", ") || "",
+            startDate: proj.startDate || "",
+            endDate: proj.endDate || "",
+            githubUrl: proj.githubUrl || "",
+            liveUrl: proj.liveUrl || "",
+            achievements: proj.achievements?.[0] || "",
+          })) || [],
         skills:
           result.cv.skills?.map((skill) => ({
             id: skill.id,
@@ -265,6 +281,11 @@ const Index = () => {
       console.log("CV data loaded successfully");
     } catch (error) {
       console.error("Error loading CV data:", error);
+      
+      // If network or server error, clear potentially invalid ID
+      if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
+        console.log("Network error - might need to clear invalid CV ID on next attempt");
+      }
     }
   };
 
@@ -316,6 +337,7 @@ const Index = () => {
     setShowVersionDialog(true);
   };
 
+  // FIXED VERSION - Handles CV not found gracefully
   const handleSaveWithVersion = async (versionInfo) => {
     try {
       setIsSaving(true);
@@ -354,23 +376,50 @@ const Index = () => {
       const result = await response.json();
 
       if (result.success) {
-        if (result.cv.id && !currentCVId) {
+        // Always update currentCVId with the returned ID
+        // This handles cases where backend created a new CV instead of updating
+        if (result.cv.id) {
           setCurrentCVId(result.cv.id);
           localStorage.setItem("currentCVId", result.cv.id);
+          
+          // Also update CV number if it changed
+          if (result.cv.cvNumber) {
+            setCvNumber(result.cv.cvNumber);
+            localStorage.setItem("currentCVNumber", result.cv.cvNumber);
+          }
         }
 
         clearVersionsCache(userEmail);
 
-        const action = currentCVId ? "updated" : "created";
+        // Show appropriate message based on whether it was a new CV or update
+        const action = result.isNewCV ? "created" : "updated";
         toast.success(
           `CV ${action} successfully as version: ${versionInfo.versionName}`
         );
+        
+        // If a new CV was created when we expected an update, inform the user
+        if (result.isNewCV && currentCVId) {
+          toast.info(
+            "A new CV was created. Previous CV may have been deleted.",
+            { duration: 5000 }
+          );
+        }
       } else {
         throw new Error(result.error || "Failed to save CV");
       }
     } catch (error) {
       console.error("CV Save Error:", error);
-      toast.error(error.message || "Failed to save CV");
+      
+      // If error mentions CV not found, clear the invalid ID
+      if (error.message?.includes("not found") || error.message?.includes("CV_NOT_FOUND")) {
+        console.log("Clearing invalid CV ID from localStorage");
+        setCurrentCVId(null);
+        localStorage.removeItem("currentCVId");
+        
+        toast.error("Previous CV not found. Please save again to create a new CV.");
+      } else {
+        toast.error(error.message || "Failed to save CV");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -426,7 +475,7 @@ const Index = () => {
           description: "",
         },
       ],
-  
+      projects: [],
       skills: [
         {
           id: Date.now().toString(),
@@ -508,6 +557,9 @@ const Index = () => {
         experience: version.experienceSnapshot
           ? JSON.parse(version.experienceSnapshot)
           : cvData.experience,
+        projects: version.projectsSnapshot
+          ? JSON.parse(version.projectsSnapshot)
+          : cvData.projects,
         skills: version.skillsSnapshot
           ? JSON.parse(version.skillsSnapshot)
           : cvData.skills,
