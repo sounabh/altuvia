@@ -84,13 +84,16 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const [expandedPhases, setExpandedPhases] = useState({});
   const [expandedTasks, setExpandedTasks] = useState({});
   const [completedTasks, setCompletedTasks] = useState({});
+  const [savingTasks, setSavingTasks] = useState({});
   const [error, setError] = useState(null);
   const [loadingTimelines, setLoadingTimelines] = useState({});
   const [debugMode, setDebugMode] = useState(false);
+  const [abortController, setAbortController] = useState(null); // ✅ FIX 2: Add abort controller state
   const { data: session } = useSession();
 
   // ✅ Helper function to get essay counts - Prioritizes fresh metadata from API
   const getEssayCounts = useCallback(() => {
+    // ✅ FIX 6: Prioritize metadata from API (which uses 98% completion logic)
     if (metadata && typeof metadata.essaysRequired === 'number') {
       return {
         completed: metadata.essaysCompleted ?? 0,
@@ -101,6 +104,7 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
       };
     }
 
+    // ✅ Fallback to university data if no metadata yet
     if (selectedUniversity) {
       const completed = selectedUniversity.completedEssays ?? 0;
       const total = selectedUniversity.totalEssays ?? 0;
@@ -218,10 +222,10 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   // ✅ Count completed tasks from timeline
   const getTimelineTaskStats = useCallback(() => {
     if (!timeline?.phases) return { total: 0, completed: 0 };
-    
+
     let total = 0;
     let completed = 0;
-    
+
     timeline.phases.forEach((phase, phaseIdx) => {
       phase.tasks?.forEach((task, taskIdx) => {
         total++;
@@ -230,30 +234,47 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         }
       });
     });
-    
+
     return { total, completed };
   }, [timeline, completedTasks]);
 
+  // ✅ FIX 1: Only set first university as selected, DON'T auto-generate
   useEffect(() => {
     if (universities && universities.length > 0 && !selectedUniversity) {
       setSelectedUniversity(universities[0]);
-      generateTimeline(universities[0]);
+      // Don't call generateTimeline here - wait for user action
     }
-  }, [universities]);
+  }, [universities, selectedUniversity]);
 
   const calculateUniversityProgress = (uni) => {
     if (!uni) return 0;
     return uni.overallProgress || uni.stats?.applicationHealth?.overallProgress || 0;
   };
 
+  // ✅ FIX 3: Fix generateTimeline function with abort controller
   const generateTimeline = useCallback(async (university, forceRegenerate = false) => {
     if (!university || !session?.token) return;
 
+    // ✅ FIX: Abort previous request if still running
+    if (abortController) {
+      abortController.abort();
+      console.log('🚫 Aborted previous timeline request');
+    }
+
+    const newAbortController = new AbortController();
+    setAbortController(newAbortController);
+
+    // ✅ FIX: Set loading state ONLY for this specific university
     setGeneratingTimeline(true);
     setLoadingTimelines(prev => ({ ...prev, [university.id]: true }));
     setError(null);
+    
+    // ✅ FIX: Clear timeline/metadata BEFORE fetching new data
     setTimeline(null);
     setMetadata(null);
+    setCompletedTasks({}); // ✅ CRITICAL: Reset completed tasks
+    setExpandedPhases({});
+    setExpandedTasks({});
 
     try {
       const userId = session?.user?.id || session?.userId || session?.user?.sub;
@@ -281,6 +302,8 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         images: university.images || []
       };
 
+      console.log(`🎯 Fetching timeline for: ${university.id} - ${university.universityName}`);
+
       const response = await fetch('/api/generate-timeline', {
         method: 'POST',
         headers: {
@@ -292,7 +315,8 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
           userProfile: userProfile || {},
           userId: userId,
           forceRegenerate: forceRegenerate
-        })
+        }),
+        signal: newAbortController.signal // ✅ FIX: Add abort signal
       });
 
       const data = await response.json();
@@ -302,6 +326,8 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
       }
 
       if (data.success && data.timeline) {
+        console.log(`✅ Timeline loaded for: ${university.id}`);
+        
         setTimeline(data.timeline);
         setMetadata(data.metadata || null);
 
@@ -322,38 +348,47 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         });
         setExpandedPhases(initialExpanded);
 
-        // ✅ Initialize completed tasks from API response with validation
+        // ✅ FIX: Initialize completed tasks from API response with strict validation
         const initialCompleted = {};
         let completedCount = 0;
-        
+
         data.timeline.phases?.forEach((phase, phaseIdx) => {
           phase.tasks?.forEach((task, taskIdx) => {
-            const isCompleted = task.completed || task.status === 'completed';
+            // ✅ CRITICAL: Only mark as complete if explicitly true in response
+            const isCompleted = task.completed === true || task.status === 'completed';
             if (isCompleted) {
               initialCompleted[`${phaseIdx}-${taskIdx}`] = true;
               completedCount++;
             }
           });
         });
-        
+
         setCompletedTasks(initialCompleted);
-        
+
         // ✅ Validation log
-        console.log('✅ Task Completion Sync:', {
+        console.log('✅ Task Completion Initialized:', {
+          university: university.universityName,
           totalCompletedTasks: completedCount,
           essaysCompleted: data.metadata?.essaysCompleted,
           eventsCompleted: data.metadata?.calendarEventsCompleted
         });
-        
+
       } else {
         throw new Error(data.error || 'Failed to generate timeline');
       }
     } catch (err) {
+      // ✅ FIX: Don't show error if request was aborted
+      if (err.name === 'AbortError') {
+        console.log('⏸️ Request aborted');
+        return;
+      }
+      
       console.error('Error generating timeline:', err);
       setError(err.message || 'Failed to generate timeline. Please try again.');
     } finally {
       setGeneratingTimeline(false);
       setLoadingTimelines(prev => ({ ...prev, [university.id]: false }));
+      setAbortController(null);
     }
   }, [session, userProfile]);
 
@@ -372,23 +407,122 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     }));
   };
 
+  // ✅ toggleTaskComplete function with database persistence
   const toggleTaskComplete = async (phaseIndex, taskIndex) => {
     const key = `${phaseIndex}-${taskIndex}`;
     const newCompletedState = !completedTasks[key];
-    
+    const task = timeline?.phases?.[phaseIndex]?.tasks?.[taskIndex];
+
+    if (!task || !session?.token) {
+      console.error('Missing task or session');
+      return;
+    }
+
+    // Mark as saving
+    setSavingTasks(prev => ({ ...prev, [key]: true }));
+
+    // Optimistically update UI
     setCompletedTasks(prev => ({
       ...prev,
       [key]: newCompletedState
     }));
+
+    try {
+      const userId = session?.user?.id || session?.userId || session?.user?.sub;
+
+      // Get task ID from database (should be task.id from TimelineTask table)
+      const taskId = task.id;
+
+      if (!taskId) {
+        throw new Error('Task ID not found - task may not be saved in database');
+      }
+
+      // Save to database
+      const response = await fetch('/api/update-task-completion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.token}`
+        },
+        body: JSON.stringify({
+          taskId: taskId,
+          isCompleted: newCompletedState,
+          userId: userId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update task');
+      }
+
+      console.log('✅ Task completion saved to database:', {
+        taskId,
+        title: task.title?.substring(0, 40),
+        isCompleted: newCompletedState,
+        newProgress: data.newProgress
+      });
+
+      // Update metadata with new progress if returned
+      if (data.newProgress !== undefined) {
+        setMetadata(prev => ({
+          ...prev,
+          currentProgress: data.newProgress,
+          overallProgress: data.newProgress
+        }));
+      }
+
+      // Update timeline with new progress
+      if (timeline) {
+        setTimeline(prev => ({
+          ...prev,
+          currentProgress: data.newProgress || prev.currentProgress
+        }));
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to save task completion:', error);
+
+      // Revert optimistic update on error
+      setCompletedTasks(prev => ({
+        ...prev,
+        [key]: !newCompletedState
+      }));
+
+      // Show error to user
+      setError(`Failed to save: ${error.message}`);
+      setTimeout(() => setError(null), 5000);
+
+    } finally {
+      // Remove saving state
+      setSavingTasks(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
+    }
   };
 
+  // ✅ FIX 4: Fix handleUniversityChange - Don't auto-generate
   const handleUniversityChange = (university) => {
+    console.log(`🔄 User selected: ${university.id} - ${university.universityName}`);
+    
+    // ✅ FIX: Abort any ongoing request
+    if (abortController) {
+      abortController.abort();
+    }
+    
+    // ✅ FIX: Clear ALL state before switching universities
     setSelectedUniversity(university);
     setTimeline(null);
     setMetadata(null);
     setExpandedTasks({});
-    setCompletedTasks({});
-    generateTimeline(university);
+    setCompletedTasks({}); // ✅ CRITICAL: Reset tasks
+    setExpandedPhases({});
+    setError(null);
+    
+    // ✅ DON'T auto-generate - user must click "Generate Timeline" button
   };
 
   const handleRegenerate = () => {
@@ -507,10 +641,24 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      {/* ✅ Error Toast Notification */}
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="font-medium">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-2 hover:bg-red-600 rounded-lg p-1 transition-colors"
+          >
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 rounded-2xl p-8 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyek0zNiAyNnYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
-        
+
         <div className="relative flex items-start justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
@@ -581,7 +729,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               <button
                 key={uni.id}
                 onClick={() => handleUniversityChange(uni)}
-                disabled={isLoading}
+                disabled={generatingTimeline} // ✅ FIX 5: Disable ALL during generation
                 className={`p-5 rounded-xl border-2 transition-all text-left hover:shadow-lg disabled:opacity-50 group ${
                   isSelected
                     ? 'border-indigo-500 bg-indigo-50 shadow-lg ring-2 ring-indigo-500/20'
@@ -617,7 +765,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     <Loader2 className="w-6 h-6 text-gray-400 animate-spin flex-shrink-0" />
                   ) : null}
                 </div>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500 flex items-center gap-1">
@@ -641,6 +789,20 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             );
           })}
         </div>
+
+        {/* ✅ FIX 5: Add "Generate Timeline" button AFTER university selector */}
+        {selectedUniversity && !timeline && !generatingTimeline && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => generateTimeline(selectedUniversity)}
+              disabled={generatingTimeline}
+              className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold inline-flex items-center gap-3 shadow-lg shadow-indigo-600/25"
+            >
+              <Sparkles className="w-5 h-5" />
+              Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Timeline Content */}
@@ -673,7 +835,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             </span>
           </div>
         </div>
-      ) : error ? (
+      ) : error && !timeline ? (
         <div className="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-2xl p-10 text-center">
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <XCircle className="w-10 h-10 text-red-600" />
@@ -695,19 +857,19 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {/* Deadline Card */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 30 
-                  ? 'border-red-200 bg-red-50/50' 
+                metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 30
+                  ? 'border-red-200 bg-red-50/50'
                   : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2.5 rounded-xl ${
-                    metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14 
-                      ? 'bg-red-100' 
+                    metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14
+                      ? 'bg-red-100'
                       : 'bg-orange-100'
                   }`}>
                     <Timer className={`w-5 h-5 ${
-                      metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14 
-                        ? 'text-red-600' 
+                      metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14
+                        ? 'text-red-600'
                         : 'text-orange-600'
                     }`} />
                   </div>
@@ -732,10 +894,10 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
 
               {/* Essays Card - Color coded by completion */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                essayCounts.rate === 100 
-                  ? 'border-green-200 bg-green-50/50' 
-                  : essayCounts.rate >= 50 
-                    ? 'border-purple-200' 
+                essayCounts.rate === 100
+                  ? 'border-green-200 bg-green-50/50'
+                  : essayCounts.rate >= 50
+                    ? 'border-purple-200'
                     : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
@@ -775,10 +937,10 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
 
               {/* Tests Card */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                testStatus.allComplete 
-                  ? 'border-green-200 bg-green-50/50' 
-                  : testStatus.needed.length > 0 
-                    ? 'border-amber-200' 
+                testStatus.allComplete
+                  ? 'border-green-200 bg-green-50/50'
+                  : testStatus.needed.length > 0
+                    ? 'border-amber-200'
                     : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
@@ -821,8 +983,8 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
 
               {/* Calendar Events Card */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                calendarStats.overdue > 0 
-                  ? 'border-red-200 bg-red-50/50' 
+                calendarStats.overdue > 0
+                  ? 'border-red-200 bg-red-50/50'
                   : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
@@ -875,14 +1037,14 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                       {metadata?.acceptanceRate || selectedUniversity?.acceptanceRate}%
                     </div>
                     <div className={`text-xs mt-1 font-semibold px-2 py-0.5 rounded-full inline-block ${
-                      (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 15 
-                        ? 'text-red-700 bg-red-100' 
-                        : (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 30 
-                          ? 'text-amber-700 bg-amber-100' 
+                      (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 15
+                        ? 'text-red-700 bg-red-100'
+                        : (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 30
+                          ? 'text-amber-700 bg-amber-100'
                           : 'text-green-700 bg-green-100'
                     }`}>
                       {(metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 15 ? 'Highly Selective' :
-                       (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 30 ? 'Competitive' : 'Moderate'}
+                        (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 30 ? 'Competitive' : 'Moderate'}
                     </div>
                   </>
                 ) : (
@@ -896,7 +1058,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-8 text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl"></div>
-            
+
             <div className="relative">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
                 <div className="text-center md:text-left">
@@ -990,7 +1152,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                 const colors = getPhaseColor(idx);
                 const isCompleted = progress === 100;
                 const isInProgress = phase.status === 'in-progress';
-                
+
                 return (
                   <button
                     key={idx}
@@ -999,27 +1161,27 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                       document.getElementById(`phase-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
                     className={`relative p-4 rounded-xl border-2 transition-all hover:shadow-lg group ${
-                      isCompleted 
-                        ? 'bg-green-50 border-green-300' 
-                        : isInProgress 
-                          ? `${colors.bg} ${colors.border} shadow-md` 
+                      isCompleted
+                        ? 'bg-green-50 border-green-300'
+                        : isInProgress
+                          ? `${colors.bg} ${colors.border} shadow-md`
                           : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     {isInProgress && (
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
                     )}
-                    
+
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 mx-auto transition-transform group-hover:scale-110 ${
-                      isCompleted 
-                        ? 'bg-green-500 text-white' 
-                        : isInProgress 
-                          ? colors.iconActive 
+                      isCompleted
+                        ? 'bg-green-500 text-white'
+                        : isInProgress
+                          ? colors.iconActive
                           : colors.icon
                     }`}>
                       {isCompleted ? <Trophy className="w-5 h-5" /> : getPhaseIcon(idx)}
                     </div>
-                    
+
                     <div className="text-center">
                       <div className={`text-xs font-bold mb-1 ${
                         isCompleted ? 'text-green-600' : isInProgress ? colors.accent : 'text-gray-500'
@@ -1056,7 +1218,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               const colors = getPhaseColor(phaseIndex);
               const isCompleted = phaseProgress === 100;
               const isInProgress = phase.status === 'in-progress';
-              const completedTasksCount = phase.tasks?.filter((t, i) => 
+              const completedTasksCount = phase.tasks?.filter((t, i) =>
                 completedTasks[`${phaseIndex}-${i}`] || t.completed || t.status === 'completed'
               ).length || 0;
 
@@ -1065,19 +1227,19 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                   key={phase.id || phaseIndex}
                   id={`phase-${phaseIndex}`}
                   className={`bg-white rounded-2xl shadow-sm border-2 overflow-hidden transition-all ${
-                    isCompleted 
-                      ? 'border-green-300' 
-                      : isInProgress 
-                        ? `${colors.border} shadow-lg ring-2 ${colors.ring}/20` 
+                    isCompleted
+                      ? 'border-green-300'
+                      : isInProgress
+                        ? `${colors.border} shadow-lg ring-2 ${colors.ring}/20`
                         : 'border-gray-200'
                   }`}
                 >
                   {/* Phase Header - Color Gradient */}
                   <div className={`${
-                    isCompleted 
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-600' 
-                      : isInProgress 
-                        ? colors.headerBg 
+                    isCompleted
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                      : isInProgress
+                        ? colors.headerBg
                         : 'bg-gradient-to-r from-gray-400 to-gray-500'
                   }`}>
                     <button
@@ -1102,16 +1264,16 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <span className="text-white/70 text-sm font-medium">Phase {phaseIndex + 1}</span>
                             <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                              isCompleted 
-                                ? 'bg-white/30 text-white' 
-                                : isInProgress 
-                                  ? 'bg-white/30 text-white' 
+                              isCompleted
+                                ? 'bg-white/30 text-white'
+                                : isInProgress
+                                  ? 'bg-white/30 text-white'
                                   : 'bg-white/20 text-white/80'
                             }`}>
                               {isCompleted ? '✓ Completed' : isInProgress ? '● In Progress' : '○ Upcoming'}
                             </span>
                           </div>
-                          
+
                           <h3 className="text-xl font-bold text-white mb-2">{phase.name}</h3>
 
                           <div className="flex items-center gap-4 text-sm text-white/80 flex-wrap">
@@ -1196,7 +1358,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                           <div>
                             <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                               <BookOpen className={`w-5 h-5 ${colors.accent}`} />
-                              Tasks 
+                              Tasks
                               <span className={`text-sm font-normal ml-2 px-2 py-0.5 rounded-full ${colors.badge}`}>
                                 {completedTasksCount}/{phase.tasks.length} completed
                               </span>
@@ -1206,30 +1368,39 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                                 const taskKey = `${phaseIndex}-${taskIndex}`;
                                 const isTaskCompleted = completedTasks[taskKey] || task.completed || task.status === 'completed';
                                 const isExpanded = expandedTasks[taskKey];
+                                const isSaving = savingTasks[taskKey];
 
                                 return (
                                   <div
                                     key={task.id || taskIndex}
                                     className={`rounded-xl border-2 transition-all ${
-                                      isTaskCompleted 
-                                        ? 'bg-green-50/50 border-green-200' 
+                                      isTaskCompleted
+                                        ? 'bg-green-50/50 border-green-200'
                                         : `bg-white ${colors.border} hover:shadow-md`
                                     }`}
                                   >
                                     <div className="p-5">
                                       <div className="flex items-start gap-4">
+                                        {/* ✅ Checkbox button with loading state */}
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             toggleTaskComplete(phaseIndex, taskIndex);
                                           }}
-                                          className={`mt-0.5 w-7 h-7 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                            isTaskCompleted 
-                                              ? 'bg-green-500 border-green-500 text-white shadow-lg shadow-green-500/25' 
-                                              : `border-gray-300 hover:${colors.border} hover:${colors.light}`
+                                          disabled={isSaving}
+                                          className={`mt-0.5 w-7 h-7 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                                            isSaving
+                                              ? 'border-gray-300 bg-gray-100'
+                                              : isTaskCompleted
+                                                ? 'bg-green-500 border-green-500 text-white shadow-lg shadow-green-500/25'
+                                                : `border-gray-300 hover:${colors.border} hover:${colors.light}`
                                           }`}
                                         >
-                                          {isTaskCompleted && <Check className="w-4 h-4" />}
+                                          {isSaving ? (
+                                            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                                          ) : isTaskCompleted ? (
+                                            <Check className="w-4 h-4" />
+                                          ) : null}
                                         </button>
 
                                         <div className="flex-1 min-w-0">

@@ -44,7 +44,7 @@ function parseTestScores(testScoresString) {
 }
 
 /**
- * Enhanced essay completion logic (98% word count = complete)
+ * ✅ FIX 4: Enhanced essay completion logic (98% word count = complete) - Stricter check
  */
 function calculateEssayCompletion(essays) {
   return essays.map(essay => {
@@ -52,16 +52,17 @@ function calculateEssayCompletion(essays) {
       ? (essay.wordCount / essay.wordLimit) * 100 
       : 0;
     
+    // ✅ FIX: Stricter completion check - must be explicit true or meet criteria
     const isActuallyCompleted = 
-      essay.isCompleted || 
-      essay.status === 'COMPLETED' || 
-      essay.status === 'SUBMITTED' || 
-      wordCountPercentage >= 98;
+      (essay.isCompleted === true) || 
+      (essay.status === 'COMPLETED') || 
+      (essay.status === 'SUBMITTED') || 
+      (wordCountPercentage >= 98); // Must be 98% or more
     
     return {
       ...essay,
       actualCompletionPercentage: Math.min(wordCountPercentage, 100),
-      isActuallyCompleted: isActuallyCompleted,
+      isActuallyCompleted: isActuallyCompleted, // ✅ Boolean
       completionReason: isActuallyCompleted 
         ? (essay.status === 'COMPLETED' || essay.status === 'SUBMITTED' ? 'status' 
            : wordCountPercentage >= 98 ? 'word_count_98_percent' 
@@ -144,7 +145,7 @@ async function fetchFreshMetadata(userId, universityId) {
     const totalEssayPromptsCount = allEssayPrompts.length;
     
     const enhancedEssays = calculateEssayCompletion(freshEssays);
-    const completedEssaysCount = enhancedEssays.filter(e => e.isActuallyCompleted).length;
+    const completedEssaysCount = enhancedEssays.filter(e => e.isActuallyCompleted === true).length;
     const notStartedEssaysCount = totalEssayPromptsCount - freshEssays.length;
     
     // Get fresh calendar events
@@ -216,7 +217,8 @@ async function fetchFreshMetadata(userId, universityId) {
 }
 
 /**
- * Match essay task to user's essay using database relationship (essayPromptId)
+ * ✅ FIX 3: Match essay task to user's essay using database relationship (essayPromptId)
+ * Added detailed logging for debugging
  */
 function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
   const taskTitleLower = (taskTitle || '').toLowerCase();
@@ -225,6 +227,9 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
   if (!taskTitleLower.includes('essay') && !taskTitleLower.includes('writing') && !taskTitleLower.includes('prompt')) {
     return { isTaskComplete: false, relatedEssayId: null, matchType: 'not_essay_task' };
   }
+  
+  // ✅ ADD LOGGING
+  console.log(`🔍 Matching essay task: "${taskTitle}"`);
   
   // Strategy 1: Extract essay number from task title (e.g., "Essay #1", "Essay 2", "1st Essay")
   const essayNumberMatch = taskTitleLower.match(/essay\s*#?(\d+)/i) || 
@@ -245,21 +250,24 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
       );
       
       if (matchingEssay) {
-        console.log(`✅ MATCHED Essay #${essayNumber}:`, {
-          taskTitle: taskTitle,
+        // ✅ ADD DETAILED LOGGING
+        console.log(`  ✅ Found Essay #${essayNumber}:`, {
           promptId: targetPrompt.id,
-          promptTitle: targetPrompt.promptTitle,
+          promptTitle: targetPrompt.promptTitle?.substring(0, 40),
           essayId: matchingEssay.id,
-          isComplete: matchingEssay.isActuallyCompleted
+          isActuallyComplete: matchingEssay.isActuallyCompleted,
+          wordCount: matchingEssay.wordCount,
+          wordLimit: matchingEssay.wordLimit || targetPrompt.wordLimit,
+          completionPercentage: matchingEssay.actualCompletionPercentage
         });
         
         return {
-          isTaskComplete: matchingEssay.isActuallyCompleted,
+          isTaskComplete: matchingEssay.isActuallyCompleted === true, // ✅ Explicit check
           relatedEssayId: matchingEssay.id,
           matchType: 'essay_number_db_match'
         };
       } else {
-        console.log(`⚠️ Essay #${essayNumber} not started (prompt exists, no user essay)`);
+        console.log(`  ⚠️ Essay #${essayNumber} not started (prompt exists, no user essay)`);
         return {
           isTaskComplete: false,
           relatedEssayId: null,
@@ -271,9 +279,11 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
   
   // Strategy 2: Check if it's a general "complete all essays" task
   if (taskTitleLower.includes('all essay') || taskTitleLower.includes('essay drafts') || taskTitleLower.includes('finalize essays')) {
-    const completedCount = enhancedEssays.filter(e => e.isActuallyCompleted).length;
+    const completedCount = enhancedEssays.filter(e => e.isActuallyCompleted === true).length;
     const totalCount = allEssayPrompts.length;
     const allComplete = completedCount === totalCount && totalCount > 0;
+    
+    console.log(`  📊 All essays check: ${completedCount}/${totalCount} complete`);
     
     return {
       isTaskComplete: allComplete,
@@ -298,8 +308,13 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
       );
       
       if (matchingEssay) {
+        console.log(`  ✅ Keyword match for Essay #${i + 1}:`, {
+          promptTitle: prompt.promptTitle?.substring(0, 40),
+          isComplete: matchingEssay.isActuallyCompleted
+        });
+        
         return {
-          isTaskComplete: matchingEssay.isActuallyCompleted,
+          isTaskComplete: matchingEssay.isActuallyCompleted === true,
           relatedEssayId: matchingEssay.id,
           matchType: 'keyword_match'
         };
@@ -307,11 +322,12 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     }
   }
   
+  console.log(`  ❌ No match found for task: "${taskTitle}"`);
   return { isTaskComplete: false, relatedEssayId: null, matchType: 'no_match' };
 }
 
 /**
- * Check if timeline already exists in database - WITH FRESH METADATA AND DB SYNC
+ * ✅ FIX 2: Check if timeline already exists in database - WITH FRESH METADATA AND DB SYNC
  */
 async function getExistingTimeline(userId, universityId, programId) {
   try {
@@ -402,42 +418,49 @@ async function getExistingTimeline(userId, universityId, programId) {
           proTips: phase.proTips || [],
           commonMistakes: phase.commonMistakes || [],
           tasks: phase.tasks.map((task, taskIdx) => {
-            // Start with database value
-            let isTaskComplete = task.isCompleted;
+            // ✅ FIX: Start with database value - DON'T override without reason
+            let isTaskComplete = task.isCompleted; // Get from database
             const originalStatus = task.isCompleted;
-            let matchReason = 'no_change';
+            let matchReason = 'database_value';
             
-            // Check test completion with fresh data
-            if (task.requiresGMAT && freshMetadata.userHasGMAT) {
+            // ✅ FIX: Only check test completion if task explicitly requires test
+            if (task.requiresGMAT === true && freshMetadata.userHasGMAT) {
               isTaskComplete = true;
               matchReason = 'gmat_complete';
             }
-            if (task.requiresGRE && freshMetadata.userHasGRE) {
+            if (task.requiresGRE === true && freshMetadata.userHasGRE) {
               isTaskComplete = true;
               matchReason = 'gre_complete';
             }
-            if (task.requiresIELTS && freshMetadata.userHasIELTS) {
+            if (task.requiresIELTS === true && freshMetadata.userHasIELTS) {
               isTaskComplete = true;
               matchReason = 'ielts_complete';
             }
-            if (task.requiresTOEFL && freshMetadata.userHasTOEFL) {
+            if (task.requiresTOEFL === true && freshMetadata.userHasTOEFL) {
               isTaskComplete = true;
               matchReason = 'toefl_complete';
             }
             
-            // Check essay completion using DB relationships
+            // ✅ FIX: Check essay completion using DB relationships
             const essayMatch = matchEssayTaskToUserEssay(
               task.title,
               freshMetadata.allEssayPrompts || [],
               freshMetadata.enhancedEssays || []
             );
             
-            if (essayMatch.isTaskComplete) {
-              isTaskComplete = true;
-              matchReason = essayMatch.matchType;
+            // ✅ CRITICAL FIX: Only mark complete if essay is ACTUALLY complete
+            if (essayMatch.matchType !== 'not_essay_task' && essayMatch.matchType !== 'no_match') {
+              if (essayMatch.isTaskComplete === true) {
+                isTaskComplete = true;
+                matchReason = essayMatch.matchType;
+              } else {
+                // ✅ FIX: If essay exists but NOT complete, mark as incomplete
+                isTaskComplete = false;
+                matchReason = 'essay_not_complete';
+              }
             }
             
-            // ✅ TRACK CHANGES FOR DATABASE UPDATE
+            // ✅ FIX: Track changes for database update
             if (originalStatus !== isTaskComplete) {
               taskUpdates.push({
                 id: task.id,
@@ -449,13 +472,14 @@ async function getExistingTimeline(userId, universityId, programId) {
             }
             
             return {
-              id: task.taskNumber,
+              ...task,
+              id: task.id, // ✅ CRITICAL: Include database ID for task completion persistence
               taskNumber: task.taskNumber,
               title: task.title,
               description: task.description || task.detailedGuide,
               estimatedTime: task.estimatedTime,
               priority: task.priority,
-              completed: isTaskComplete,
+              completed: isTaskComplete, // ✅ Use computed value
               status: isTaskComplete ? 'completed' : task.status,
               actionSteps: task.actionSteps || [],
               tips: task.tips || [],
@@ -471,9 +495,11 @@ async function getExistingTimeline(userId, universityId, programId) {
         }))
       };
 
-      // ========== SYNC TASK COMPLETION TO DATABASE ==========
+      // ========== ✅ FIX 6: SYNC TASK COMPLETION TO DATABASE WITH LOGGING ==========
       if (taskUpdates.length > 0) {
         console.log(`\n🔄 SYNCING ${taskUpdates.length} TASK UPDATES TO DATABASE:`);
+        console.log(`   University ID: ${universityId}`);
+        console.log(`   Timeline ID: ${existingTimeline.id}`);
         
         try {
           await Promise.all(
@@ -497,7 +523,7 @@ async function getExistingTimeline(userId, universityId, programId) {
           // Also update the timeline's overall progress
           const totalTasks = timeline.phases.reduce((sum, p) => sum + p.tasks.length, 0);
           const completedTasks = timeline.phases.reduce(
-            (sum, p) => sum + p.tasks.filter(t => t.completed).length, 0
+            (sum, p) => sum + p.tasks.filter(t => t.completed === true).length, 0
           );
           const newProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
           
@@ -725,8 +751,8 @@ async function saveTimelineToDatabase(userId, universityId, programId, timeline,
                   estimatedTime: task.estimatedTime || "1-2 hours",
                   priority: task.priority || 'medium',
                   category: 'general',
-                  status: task.completed ? 'completed' : 'pending',
-                  isCompleted: task.completed || false,
+                  status: task.completed === true ? 'completed' : 'pending',
+                  isCompleted: task.completed === true,
                   detailedGuide: task.description?.substring(0, 2000) || "",
                   actionSteps: (task.actionSteps || []).slice(0, 8),
                   tips: (task.tips || []).slice(0, 6),
@@ -936,7 +962,7 @@ function buildEssayStatusForPrompt(allEssayPrompts, enhancedEssays) {
     );
     
     const essayNumber = i + 1;
-    const isComplete = essay?.isActuallyCompleted || false;
+    const isComplete = essay?.isActuallyCompleted === true;
     const status = isComplete ? '✅ COMPLETED' : 
                    essay ? `🔄 IN PROGRESS (${essay.wordCount}/${essay.wordLimit || prompt.wordLimit} words)` : 
                    '⚪ NOT STARTED';
@@ -950,12 +976,16 @@ export async function POST(request) {
     const body = await request.json();
     const { university, userProfile, userId, forceRegenerate = false } = body;
 
-    if (!university) {
+    // ✅ FIX 1: Add validation at the start
+    if (!university || !university.id) {
+      console.error("❌ Invalid university data received");
       return NextResponse.json(
-        { error: "University data is required" },
+        { error: "Invalid university data" },
         { status: 400 }
       );
     }
+
+    console.log(`🎯 API Request for University: ${university.id} - ${university.universityName || university.name}`);
 
     if (!userId) {
       return NextResponse.json(
@@ -1080,7 +1110,7 @@ export async function POST(request) {
     // Get ALL essay prompts from programs
     const allEssayPrompts = universityPrograms.flatMap(p => p.essayPrompts || []);
     const totalEssayPromptsCount = allEssayPrompts.length;
-    const completedEssaysCount = enhancedEssays.filter(e => e.isActuallyCompleted).length;
+    const completedEssaysCount = enhancedEssays.filter(e => e.isActuallyCompleted === true).length;
     const notStartedEssaysCount = totalEssayPromptsCount - userEssays.length;
 
     console.log(`Essay completion: ${completedEssaysCount}/${totalEssayPromptsCount} (using 98% logic)`);
@@ -1097,7 +1127,7 @@ export async function POST(request) {
         promptTitle: prompt.promptTitle?.substring(0, 40),
         hasUserEssay: !!essay,
         essayId: essay?.id || null,
-        isComplete: essay?.isActuallyCompleted || false
+        isComplete: essay?.isActuallyCompleted === true
       });
     });
     console.log('=== END MAPPING ===\n');
@@ -1431,14 +1461,14 @@ PHASE 5: Application Assembly & Submission (2-3 weeks)
         {
           "id": 1,
           "title": "Essay #1: [Topic from first prompt]",
-          "completed": ${allEssayPrompts.length > 0 && enhancedEssays.find(e => e.essayPromptId === allEssayPrompts[0]?.id)?.isActuallyCompleted ? 'true' : 'false'},
+          "completed": ${allEssayPrompts.length > 0 && enhancedEssays.find(e => e.essayPromptId === allEssayPrompts[0]?.id)?.isActuallyCompleted === true ? 'true' : 'false'},
           "description": "Write the first essay about...",
           "priority": "high"
         },
         {
           "id": 2,
           "title": "Essay #2: [Topic from second prompt]",
-          "completed": ${allEssayPrompts.length > 1 && enhancedEssays.find(e => e.essayPromptId === allEssayPrompts[1]?.id)?.isActuallyCompleted ? 'true' : 'false'},
+          "completed": ${allEssayPrompts.length > 1 && enhancedEssays.find(e => e.essayPromptId === allEssayPrompts[1]?.id)?.isActuallyCompleted === true ? 'true' : 'false'},
           "description": "Write the second essay about...",
           "priority": "high"
         }
@@ -1515,15 +1545,15 @@ Generate the complete timeline JSON now:`;
         phaseNumber: phaseIndex + 1,
         status: phase.status || (phaseIndex === 0 ? 'in-progress' : 'upcoming'),
         tasks: (phase.tasks || []).map((task, taskIndex) => {
-          let isTaskComplete = task.completed || false;
+          let isTaskComplete = task.completed === true; // ✅ Explicit check
           let relatedEssayId = null;
           let relatedCalendarEventId = null;
           
           // Check test completion
-          if (task.requiresGMAT && userTestScores.hasGMAT) isTaskComplete = true;
-          if (task.requiresGRE && userTestScores.hasGRE) isTaskComplete = true;
-          if (task.requiresIELTS && userTestScores.hasIELTS) isTaskComplete = true;
-          if (task.requiresTOEFL && userTestScores.hasTOEFL) isTaskComplete = true;
+          if (task.requiresGMAT === true && userTestScores.hasGMAT) isTaskComplete = true;
+          if (task.requiresGRE === true && userTestScores.hasGRE) isTaskComplete = true;
+          if (task.requiresIELTS === true && userTestScores.hasIELTS) isTaskComplete = true;
+          if (task.requiresTOEFL === true && userTestScores.hasTOEFL) isTaskComplete = true;
           
           // Check essay completion using DB relationships
           const essayMatch = matchEssayTaskToUserEssay(
@@ -1533,7 +1563,7 @@ Generate the complete timeline JSON now:`;
           );
           
           if (essayMatch.matchType !== 'not_essay_task' && essayMatch.matchType !== 'no_match') {
-            isTaskComplete = essayMatch.isTaskComplete;
+            isTaskComplete = essayMatch.isTaskComplete === true;
             relatedEssayId = essayMatch.relatedEssayId;
           }
           
@@ -1588,7 +1618,7 @@ Generate the complete timeline JSON now:`;
       phase3.tasks.forEach((task, i) => {
         console.log(`  Task ${i + 1}: "${task.title?.substring(0, 50)}" - completed: ${task.completed}`);
       });
-      const completedTaskCount = phase3.tasks.filter(t => t.completed).length;
+      const completedTaskCount = phase3.tasks.filter(t => t.completed === true).length;
       console.log(`\n✅ Essay tasks completed: ${completedTaskCount}/${phase3.tasks.length}`);
       console.log(`Expected based on data: ${completedEssaysCount}/${totalEssayPromptsCount}`);
     }
@@ -1674,12 +1704,36 @@ Generate the complete timeline JSON now:`;
       metadata.dbError = dbError.message;
     }
 
-    // ====== STEP 13: RETURN SUCCESS RESPONSE ======
+    // ====== ✅ FIX 5: STEP 13: VALIDATE AND RETURN SUCCESS RESPONSE ======
+    // Validate timeline data before sending
+    if (!timelineData || !timelineData.phases || timelineData.phases.length === 0) {
+      console.error('❌ Invalid timeline data generated');
+      return NextResponse.json(
+        { error: 'Invalid timeline structure generated' },
+        { status: 500 }
+      );
+    }
+
+    // ✅ Log final stats
+    console.log('📤 Sending response:', {
+      universityId: university.id,
+      universityName: universityName,
+      phasesCount: timelineData.phases.length,
+      totalTasks: timelineData.phases.reduce((sum, p) => sum + (p.tasks?.length || 0), 0),
+      completedTasks: timelineData.phases.reduce(
+        (sum, p) => sum + (p.tasks?.filter(t => t.completed === true).length || 0), 0
+      ),
+      essaysCompleted: metadata.essaysCompleted,
+      essaysTotal: metadata.essaysRequired
+    });
+
     return NextResponse.json({
       success: true,
       timeline: timelineData,
       metadata: metadata,
       debug: {
+        universityId: university.id,
+        universityName: universityName,
         totalEssayPrompts: totalEssayPromptsCount,
         completedEssays: completedEssaysCount,
         notStartedEssays: notStartedEssaysCount,
