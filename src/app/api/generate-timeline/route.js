@@ -7,6 +7,114 @@ import { prisma } from "@/lib/prisma";
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY_SECOND);
 
 /**
+ * ✅ FIX 1: Add database retry logic with exponential backoff
+ */
+async function saveTimelineWithRetry(userId, universityId, programId, timeline, metadata, maxRetries = 3) {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`💾 Database save attempt ${attempt}/${maxRetries}...`);
+      
+      const result = await saveTimelineToDatabase(userId, universityId, programId, timeline, metadata);
+      
+      console.log(`✅ Database save successful on attempt ${attempt}`);
+      return result;
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Database save attempt ${attempt} failed:`, error.message);
+      
+      const isConnectionError = 
+        error.message.includes("Can't reach database") ||
+        error.message.includes("connection") ||
+        error.message.includes("timeout");
+      
+      if (!isConnectionError || attempt === maxRetries) {
+        break;
+      }
+      
+      const delayMs = Math.pow(2, attempt) * 1000;
+      console.log(`⏳ Retrying in ${delayMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  throw new Error(`Database save failed after ${maxRetries} attempts: ${lastError?.message}`);
+}
+
+/**
+ * ✅ FIX 2: Levenshtein distance algorithm for string similarity
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+}
+
+function calculateStringSimilarity(str1, str2) {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+}
+
+/**
+ * ✅ FIX 2: Stricter calendar event matching
+ */
+function matchCalendarEventToTask(task, calendarEvents) {
+  if (!task?.title || !calendarEvents || calendarEvents.length === 0) {
+    return null;
+  }
+  
+  const taskTitleLower = task.title.toLowerCase().trim();
+  
+  const matchedEvent = calendarEvents.find(event => {
+    const eventTitleLower = (event.title || '').toLowerCase().trim();
+    
+    if (eventTitleLower.length < 10 || taskTitleLower.length < 10) {
+      return false;
+    }
+    
+    const similarity = calculateStringSimilarity(taskTitleLower, eventTitleLower);
+    
+    if (similarity >= 0.8) {
+      console.log(`✅ Calendar match (${Math.round(similarity * 100)}%): "${event.title}" → "${task.title}"`);
+      return true;
+    }
+    
+    return false;
+  });
+  
+  return matchedEvent || null;
+}
+
+/**
  * Parse test scores from JSON string
  */
 function parseTestScores(testScoresString) {
@@ -44,7 +152,7 @@ function parseTestScores(testScoresString) {
 }
 
 /**
- * ✅ FIX 4: Enhanced essay completion logic (98% word count = complete) - Stricter check
+ * ✅ FIX 4: Enhanced essay completion logic
  */
 function calculateEssayCompletion(essays) {
   return essays.map(essay => {
@@ -52,17 +160,16 @@ function calculateEssayCompletion(essays) {
       ? (essay.wordCount / essay.wordLimit) * 100 
       : 0;
     
-    // ✅ FIX: Stricter completion check - must be explicit true or meet criteria
     const isActuallyCompleted = 
       (essay.isCompleted === true) || 
       (essay.status === 'COMPLETED') || 
       (essay.status === 'SUBMITTED') || 
-      (wordCountPercentage >= 98); // Must be 98% or more
+      (wordCountPercentage >= 98);
     
     return {
       ...essay,
       actualCompletionPercentage: Math.min(wordCountPercentage, 100),
-      isActuallyCompleted: isActuallyCompleted, // ✅ Boolean
+      isActuallyCompleted: isActuallyCompleted,
       completionReason: isActuallyCompleted 
         ? (essay.status === 'COMPLETED' || essay.status === 'SUBMITTED' ? 'status' 
            : wordCountPercentage >= 98 ? 'word_count_98_percent' 
@@ -73,12 +180,10 @@ function calculateEssayCompletion(essays) {
 }
 
 /**
- * Fetch fresh metadata for an existing timeline
- * This ensures essay counts, test status, and calendar events are always up-to-date
+ * ✅ FIXED: Fetch fresh metadata - Always filter programs by user's studyLevel
  */
 async function fetchFreshMetadata(userId, universityId) {
   try {
-    // Get fresh user profile
     const freshUserProfile = await prisma.userProfile.findUnique({
       where: { userId: userId },
       select: { 
@@ -91,17 +196,17 @@ async function fetchFreshMetadata(userId, universityId) {
     
     const userStudyLevel = freshUserProfile?.studyLevel?.toLowerCase();
     
-    // Get fresh programs with essay prompts
+    // ✅ FIXED: Always filter programs by user's studyLevel to get correct essays
+    console.log(`📚 Fetching programs for studyLevel: ${userStudyLevel}`);
+    
     const freshPrograms = await prisma.program.findMany({
       where: {
         universityId: universityId,
         isActive: true,
-        ...(userStudyLevel && {
-          degreeType: {
-            equals: userStudyLevel,
-            mode: "insensitive",
-          },
-        }),
+        degreeType: userStudyLevel ? {
+          equals: userStudyLevel,
+          mode: "insensitive"
+        } : undefined
       },
       include: {
         essayPrompts: {
@@ -122,7 +227,6 @@ async function fetchFreshMetadata(userId, universityId) {
       }
     });
     
-    // Get fresh user essays
     const programIds = freshPrograms.map(p => p.id);
     const freshEssays = await prisma.essay.findMany({
       where: {
@@ -140,7 +244,6 @@ async function fetchFreshMetadata(userId, universityId) {
       }
     });
     
-    // Calculate fresh essay counts using 98% completion logic
     const allEssayPrompts = freshPrograms.flatMap(p => p.essayPrompts || []);
     const totalEssayPromptsCount = allEssayPrompts.length;
     
@@ -148,7 +251,6 @@ async function fetchFreshMetadata(userId, universityId) {
     const completedEssaysCount = enhancedEssays.filter(e => e.isActuallyCompleted === true).length;
     const notStartedEssaysCount = totalEssayPromptsCount - freshEssays.length;
     
-    // Get fresh calendar events
     const freshCalendarEvents = await prisma.calendarEvent.findMany({
       where: {
         userId: userId,
@@ -165,14 +267,10 @@ async function fetchFreshMetadata(userId, universityId) {
       return eventDate < now && e.completionStatus === 'pending';
     }).length;
     
-    // Parse fresh test scores
     const testScores = parseTestScores(freshUserProfile?.testScores);
-    
-    // Get acceptance rate from programs
     const acceptanceRate = freshPrograms[0]?.admissions?.[0]?.acceptanceRate || null;
     
     return {
-      // Essay stats (FRESH)
       essaysRequired: totalEssayPromptsCount,
       essaysCompleted: completedEssaysCount,
       essaysRemaining: Math.max(0, totalEssayPromptsCount - completedEssaysCount),
@@ -181,13 +279,11 @@ async function fetchFreshMetadata(userId, universityId) {
         ? Math.round((completedEssaysCount / totalEssayPromptsCount) * 100) 
         : 0,
       
-      // Calendar stats (FRESH)
       calendarEventsTotal: freshCalendarEvents.length,
       calendarEventsCompleted: completedEvents,
       calendarEventsPending: pendingEvents,
       calendarEventsOverdue: overdueEvents,
       
-      // Test scores (FRESH)
       userHasGMAT: testScores.hasGMAT,
       userHasGRE: testScores.hasGRE,
       userHasIELTS: testScores.hasIELTS,
@@ -197,41 +293,41 @@ async function fetchFreshMetadata(userId, universityId) {
       ieltsScore: testScores.ieltsScore,
       toeflScore: testScores.toeflScore,
       
-      // User profile (FRESH)
       userGPA: freshUserProfile?.gpa,
       userStudyLevel: userStudyLevel,
       userHasWorkExperience: !!freshUserProfile?.workExperience,
       
-      // Program info
       programsFound: freshPrograms.length,
       acceptanceRate: acceptanceRate,
       
-      // Enhanced essays for task matching
       enhancedEssays: enhancedEssays,
       allEssayPrompts: allEssayPrompts
     };
   } catch (error) {
-    console.error("Error fetching fresh metadata:", error);
-    return null;
+    console.error("⚠️ Error fetching fresh metadata:", error);
+    // ✅ Throw error so caller can handle it properly
+    throw error;
   }
 }
 
 /**
- * ✅ FIX 3: Match essay task to user's essay using database relationship (essayPromptId)
- * Added detailed logging for debugging
+ * ✅ FIX 5: Match essay task to user's essay
  */
 function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
   const taskTitleLower = (taskTitle || '').toLowerCase();
   
-  // Check if this is an essay-related task
   if (!taskTitleLower.includes('essay') && !taskTitleLower.includes('writing') && !taskTitleLower.includes('prompt')) {
     return { isTaskComplete: false, relatedEssayId: null, matchType: 'not_essay_task' };
   }
   
-  // ✅ ADD LOGGING
-  console.log(`🔍 Matching essay task: "${taskTitle}"`);
+  if (!allEssayPrompts || allEssayPrompts.length === 0) {
+    return { isTaskComplete: false, relatedEssayId: null, matchType: 'no_prompts' };
+  }
   
-  // Strategy 1: Extract essay number from task title (e.g., "Essay #1", "Essay 2", "1st Essay")
+  if (!enhancedEssays || enhancedEssays.length === 0) {
+    return { isTaskComplete: false, relatedEssayId: null, matchType: 'no_user_essays' };
+  }
+  
   const essayNumberMatch = taskTitleLower.match(/essay\s*#?(\d+)/i) || 
                             taskTitleLower.match(/(\d+)(?:st|nd|rd|th)?\s*essay/i) ||
                             taskTitleLower.match(/prompt\s*#?(\d+)/i);
@@ -243,31 +339,18 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
       const promptIndex = essayNumber - 1;
       const targetPrompt = allEssayPrompts[promptIndex];
       
-      // Find user's essay by essayPromptId (DATABASE RELATIONSHIP)
       const matchingEssay = enhancedEssays.find(essay => 
         essay.essayPromptId === targetPrompt.id || 
         essay.essayPrompt?.id === targetPrompt.id
       );
       
       if (matchingEssay) {
-        // ✅ ADD DETAILED LOGGING
-        console.log(`  ✅ Found Essay #${essayNumber}:`, {
-          promptId: targetPrompt.id,
-          promptTitle: targetPrompt.promptTitle?.substring(0, 40),
-          essayId: matchingEssay.id,
-          isActuallyComplete: matchingEssay.isActuallyCompleted,
-          wordCount: matchingEssay.wordCount,
-          wordLimit: matchingEssay.wordLimit || targetPrompt.wordLimit,
-          completionPercentage: matchingEssay.actualCompletionPercentage
-        });
-        
         return {
-          isTaskComplete: matchingEssay.isActuallyCompleted === true, // ✅ Explicit check
+          isTaskComplete: matchingEssay.isActuallyCompleted === true,
           relatedEssayId: matchingEssay.id,
           matchType: 'essay_number_db_match'
         };
       } else {
-        console.log(`  ⚠️ Essay #${essayNumber} not started (prompt exists, no user essay)`);
         return {
           isTaskComplete: false,
           relatedEssayId: null,
@@ -277,13 +360,10 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     }
   }
   
-  // Strategy 2: Check if it's a general "complete all essays" task
   if (taskTitleLower.includes('all essay') || taskTitleLower.includes('essay drafts') || taskTitleLower.includes('finalize essays')) {
     const completedCount = enhancedEssays.filter(e => e.isActuallyCompleted === true).length;
     const totalCount = allEssayPrompts.length;
     const allComplete = completedCount === totalCount && totalCount > 0;
-    
-    console.log(`  📊 All essays check: ${completedCount}/${totalCount} complete`);
     
     return {
       isTaskComplete: allComplete,
@@ -292,12 +372,10 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     };
   }
   
-  // Strategy 3: Try to match by prompt title keywords
   for (let i = 0; i < allEssayPrompts.length; i++) {
     const prompt = allEssayPrompts[i];
     const promptTitleLower = (prompt.promptTitle || '').toLowerCase();
     
-    // Check if task title contains key words from prompt title
     const promptWords = promptTitleLower.split(/\s+/).filter(w => w.length > 4);
     const matchingWords = promptWords.filter(word => taskTitleLower.includes(word));
     
@@ -308,11 +386,6 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
       );
       
       if (matchingEssay) {
-        console.log(`  ✅ Keyword match for Essay #${i + 1}:`, {
-          promptTitle: prompt.promptTitle?.substring(0, 40),
-          isComplete: matchingEssay.isActuallyCompleted
-        });
-        
         return {
           isTaskComplete: matchingEssay.isActuallyCompleted === true,
           relatedEssayId: matchingEssay.id,
@@ -322,20 +395,27 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     }
   }
   
-  console.log(`  ❌ No match found for task: "${taskTitle}"`);
   return { isTaskComplete: false, relatedEssayId: null, matchType: 'no_match' };
 }
 
 /**
- * ✅ FIX 2: Check if timeline already exists in database - WITH FRESH METADATA AND DB SYNC
+ * ✅ FIXED: Check if timeline exists in database - Simplified to use ONLY userId + universityId
  */
-async function getExistingTimeline(userId, universityId, programId) {
+async function getExistingTimeline(userId, universityId) {
   try {
+    console.log('\n🔍 ========== TIMELINE SEARCH DEBUG ==========');
+    console.log(`📋 Search Parameters:`, {
+      userId,
+      universityId
+    });
+    
+    // ✅ FIXED: Search for timeline using ONLY userId + universityId
+    console.log(`\n🎯 Searching for timeline with userId=${userId}, universityId=${universityId}`);
+    
     const existingTimeline = await prisma.aITimeline.findFirst({
       where: {
         userId: userId,
         universityId: universityId,
-        ...(programId ? { programId: programId } : {}),
         isActive: true
       },
       include: {
@@ -343,282 +423,270 @@ async function getExistingTimeline(userId, universityId, programId) {
           orderBy: { displayOrder: 'asc' },
           include: {
             tasks: {
-              orderBy: { displayOrder: 'asc' }
+              orderBy: { displayOrder: 'asc' },
+              select: {
+                id: true,
+                taskNumber: true,
+                title: true,
+                description: true,
+                estimatedTime: true,
+                priority: true,
+                status: true,
+                isCompleted: true,
+                completedAt: true,
+                actionSteps: true,
+                tips: true,
+                resources: true,
+                requiresGMAT: true,
+                requiresGRE: true,
+                requiresIELTS: true,
+                requiresTOEFL: true,
+                relatedEventId: true,
+                relatedEssayId: true,
+                displayOrder: true
+              }
             }
           }
         }
       }
     });
 
-    if (existingTimeline) {
-      console.log(`Found existing timeline for user ${userId}, university ${universityId}`);
-      
-      // ALWAYS FETCH FRESH METADATA
-      const freshMetadata = await fetchFreshMetadata(userId, universityId);
-      
-      if (!freshMetadata) {
-        console.log("Could not fetch fresh metadata, returning null to regenerate");
-        return null;
-      }
-      
-      let userProfileData = {};
-      let universityData = {};
-      
-      try {
-        if (existingTimeline.userProfileSnapshot) {
-          userProfileData = typeof existingTimeline.userProfileSnapshot === 'string' 
-            ? JSON.parse(existingTimeline.userProfileSnapshot) 
-            : existingTimeline.userProfileSnapshot;
-        }
-      } catch (e) {
-        console.log("Could not parse userProfileSnapshot");
-      }
-      
-      try {
-        if (existingTimeline.universitySnapshot) {
-          universityData = typeof existingTimeline.universitySnapshot === 'string'
-            ? JSON.parse(existingTimeline.universitySnapshot)
-            : existingTimeline.universitySnapshot;
-        }
-      } catch (e) {
-        console.log("Could not parse universitySnapshot");
-      }
-      
-      // Get test requirements from university data
-      const requiresGMAT = universityData.requiresGMAT || false;
-      const requiresGRE = universityData.requiresGRE || false;
-      const requiresIELTS = universityData.requiresIELTS || false;
-      const requiresTOEFL = universityData.requiresTOEFL || false;
-      
-      // Calculate which tests are still needed
-      const testsNeeded = [];
-      if (requiresGMAT && !freshMetadata.userHasGMAT) testsNeeded.push("GMAT");
-      if (requiresGRE && !freshMetadata.userHasGRE) testsNeeded.push("GRE");
-      if (requiresIELTS && !freshMetadata.userHasIELTS) testsNeeded.push("IELTS");
-      if (requiresTOEFL && !freshMetadata.userHasTOEFL) testsNeeded.push("TOEFL");
-      
-      // ========== BUILD TIMELINE WITH FRESH COMPLETION STATUS ==========
-      // Track tasks that need database updates
-      const taskUpdates = [];
-      
-      const timeline = {
-        overview: userProfileData.overview || `Application timeline for ${existingTimeline.timelineName}`,
-        totalDuration: existingTimeline.totalDuration || "4-6 months",
-        currentProgress: existingTimeline.overallProgress || 0,
-        phases: existingTimeline.phases.map((phase, phaseIdx) => ({
-          id: phase.phaseNumber,
-          phaseNumber: phase.phaseNumber,
-          name: phase.phaseName,
-          description: phase.description || phase.overview,
-          duration: phase.duration,
-          timeframe: phase.timeframe,
-          status: phase.status,
-          objectives: phase.objectives || [],
-          milestones: phase.milestones || [],
-          proTips: phase.proTips || [],
-          commonMistakes: phase.commonMistakes || [],
-          tasks: phase.tasks.map((task, taskIdx) => {
-            // ✅ FIX: Start with database value - DON'T override without reason
-            let isTaskComplete = task.isCompleted; // Get from database
-            const originalStatus = task.isCompleted;
-            let matchReason = 'database_value';
-            
-            // ✅ FIX: Only check test completion if task explicitly requires test
-            if (task.requiresGMAT === true && freshMetadata.userHasGMAT) {
-              isTaskComplete = true;
-              matchReason = 'gmat_complete';
-            }
-            if (task.requiresGRE === true && freshMetadata.userHasGRE) {
-              isTaskComplete = true;
-              matchReason = 'gre_complete';
-            }
-            if (task.requiresIELTS === true && freshMetadata.userHasIELTS) {
-              isTaskComplete = true;
-              matchReason = 'ielts_complete';
-            }
-            if (task.requiresTOEFL === true && freshMetadata.userHasTOEFL) {
-              isTaskComplete = true;
-              matchReason = 'toefl_complete';
-            }
-            
-            // ✅ FIX: Check essay completion using DB relationships
-            const essayMatch = matchEssayTaskToUserEssay(
-              task.title,
-              freshMetadata.allEssayPrompts || [],
-              freshMetadata.enhancedEssays || []
-            );
-            
-            // ✅ CRITICAL FIX: Only mark complete if essay is ACTUALLY complete
-            if (essayMatch.matchType !== 'not_essay_task' && essayMatch.matchType !== 'no_match') {
-              if (essayMatch.isTaskComplete === true) {
-                isTaskComplete = true;
-                matchReason = essayMatch.matchType;
-              } else {
-                // ✅ FIX: If essay exists but NOT complete, mark as incomplete
-                isTaskComplete = false;
-                matchReason = 'essay_not_complete';
-              }
-            }
-            
-            // ✅ FIX: Track changes for database update
-            if (originalStatus !== isTaskComplete) {
-              taskUpdates.push({
-                id: task.id,
-                title: task.title,
-                wasComplete: originalStatus,
-                nowComplete: isTaskComplete,
-                reason: matchReason
-              });
-            }
-            
-            return {
-              ...task,
-              id: task.id, // ✅ CRITICAL: Include database ID for task completion persistence
-              taskNumber: task.taskNumber,
-              title: task.title,
-              description: task.description || task.detailedGuide,
-              estimatedTime: task.estimatedTime,
-              priority: task.priority,
-              completed: isTaskComplete, // ✅ Use computed value
-              status: isTaskComplete ? 'completed' : task.status,
-              actionSteps: task.actionSteps || [],
-              tips: task.tips || [],
-              resources: task.resources || [],
-              requiresGMAT: task.requiresGMAT || false,
-              requiresGRE: task.requiresGRE || false,
-              requiresIELTS: task.requiresIELTS || false,
-              requiresTOEFL: task.requiresTOEFL || false,
-              relatedCalendarEventId: task.relatedEventId,
-              relatedEssayId: essayMatch.relatedEssayId || task.relatedEssayId
-            };
-          })
-        }))
-      };
-
-      // ========== ✅ FIX 6: SYNC TASK COMPLETION TO DATABASE WITH LOGGING ==========
-      if (taskUpdates.length > 0) {
-        console.log(`\n🔄 SYNCING ${taskUpdates.length} TASK UPDATES TO DATABASE:`);
-        console.log(`   University ID: ${universityId}`);
-        console.log(`   Timeline ID: ${existingTimeline.id}`);
-        
-        try {
-          await Promise.all(
-            taskUpdates.map(async (update) => {
-              try {
-                await prisma.timelineTask.update({
-                  where: { id: update.id },
-                  data: { 
-                    isCompleted: update.nowComplete,
-                    status: update.nowComplete ? 'completed' : 'pending',
-                    completedAt: update.nowComplete ? new Date() : null
-                  }
-                });
-                console.log(`  ✅ "${update.title.substring(0, 50)}": ${update.wasComplete ? 'completed' : 'pending'} → ${update.nowComplete ? 'COMPLETED' : 'PENDING'} (${update.reason})`);
-              } catch (updateErr) {
-                console.error(`  ❌ Failed to update task ${update.id}:`, updateErr.message);
-              }
-            })
-          );
-          
-          // Also update the timeline's overall progress
-          const totalTasks = timeline.phases.reduce((sum, p) => sum + p.tasks.length, 0);
-          const completedTasks = timeline.phases.reduce(
-            (sum, p) => sum + p.tasks.filter(t => t.completed === true).length, 0
-          );
-          const newProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-          
-          await prisma.aITimeline.update({
-            where: { id: existingTimeline.id },
-            data: {
-              overallProgress: newProgress,
-              lastRegeneratedAt: new Date()
-            }
-          });
-          
-          console.log(`  📊 Updated timeline progress: ${newProgress}%`);
-          console.log(`✅ Database sync complete\n`);
-          
-        } catch (syncError) {
-          console.error('⚠️ Database sync error:', syncError.message);
-          // Don't throw - still return the correct timeline to frontend
-        }
-      } else {
-        console.log('ℹ️ No task completion changes to sync');
-      }
-
-      // Calculate overall progress based on fresh data
-      const essayProgress = freshMetadata.essayCompletionRate;
-      const eventProgress = freshMetadata.calendarEventsTotal > 0 
-        ? Math.round((freshMetadata.calendarEventsCompleted / freshMetadata.calendarEventsTotal) * 100) 
-        : 0;
-      const testProgress = testsNeeded.length === 0 ? 100 : 
-        Math.round((4 - testsNeeded.length) / 4 * 100);
-      const overallProgress = Math.round((essayProgress + eventProgress + testProgress) / 3);
-
-      // Update timeline progress value
-      timeline.currentProgress = overallProgress;
-
-      return {
-        timeline,
-        metadata: {
-          timelineId: existingTimeline.id,
-          fromDatabase: true,
-          tasksSynced: taskUpdates.length,
-          lastGenerated: existingTimeline.lastRegeneratedAt,
-          generatedAt: existingTimeline.generatedAt,
-          universityName: universityData.universityName || existingTimeline.timelineName,
-          location: universityData.location,
-          deadline: universityData.deadline,
-          daysUntilDeadline: universityData.deadline 
-            ? Math.ceil((new Date(universityData.deadline) - new Date()) / (1000 * 60 * 60 * 24))
-            : null,
-          
-          acceptanceRate: freshMetadata.acceptanceRate || universityData.acceptanceRate,
-          
-          // Essay stats (FRESH)
-          essaysRequired: freshMetadata.essaysRequired,
-          essaysCompleted: freshMetadata.essaysCompleted,
-          essaysRemaining: freshMetadata.essaysRemaining,
-          essaysNotStarted: freshMetadata.essaysNotStarted,
-          essayCompletionRate: freshMetadata.essayCompletionRate,
-          
-          // Calendar stats (FRESH)
-          calendarEventsTotal: freshMetadata.calendarEventsTotal,
-          calendarEventsCompleted: freshMetadata.calendarEventsCompleted,
-          calendarEventsPending: freshMetadata.calendarEventsPending,
-          calendarEventsOverdue: freshMetadata.calendarEventsOverdue,
-          
-          // Test requirements
-          requiresGMAT: requiresGMAT,
-          requiresGRE: requiresGRE,
-          requiresIELTS: requiresIELTS,
-          requiresTOEFL: requiresTOEFL,
-          
-          // Test scores (FRESH)
-          userHasGMAT: freshMetadata.userHasGMAT,
-          userHasGRE: freshMetadata.userHasGRE,
-          userHasIELTS: freshMetadata.userHasIELTS,
-          userHasTOEFL: freshMetadata.userHasTOEFL,
-          testsNeeded: testsNeeded,
-          allTestsComplete: testsNeeded.length === 0,
-          
-          // Progress (FRESH)
-          currentProgress: overallProgress,
-          essayProgress: essayProgress,
-          eventProgress: eventProgress,
-          testProgress: testProgress,
-          
-          // User profile (FRESH)
-          userGPA: freshMetadata.userGPA,
-          userStudyLevel: freshMetadata.userStudyLevel,
-          programsFound: freshMetadata.programsFound
-        }
-      };
+    if (!existingTimeline) {
+      console.log(`\n❌ ========== TIMELINE NOT FOUND ==========\n`);
+      return null;
     }
 
-    return null;
+    console.log(`\n✅ ========== TIMELINE FOUND ==========`);
+    console.log(`Timeline Details:`, {
+      id: existingTimeline.id,
+      timelineName: existingTimeline.timelineName,
+      programId: existingTimeline.programId,
+      totalPhases: existingTimeline.phases?.length || 0,
+      totalTasks: existingTimeline.phases?.reduce((sum, p) => sum + (p.tasks?.length || 0), 0) || 0,
+      generatedAt: existingTimeline.generatedAt,
+      lastRegenerated: existingTimeline.lastRegeneratedAt
+    });
+    
+    // ✅ Fetch fresh metadata with proper error handling
+    let freshMetadata;
+    try {
+      console.log(`\n📊 Fetching fresh metadata...`);
+      freshMetadata = await fetchFreshMetadata(userId, universityId);
+      console.log('✅ Fresh metadata fetched successfully:', {
+        essays: `${freshMetadata.essaysCompleted}/${freshMetadata.essaysRequired}`,
+        calendar: `${freshMetadata.calendarEventsCompleted}/${freshMetadata.calendarEventsTotal}`,
+        tests: `GMAT:${freshMetadata.userHasGMAT}, GRE:${freshMetadata.userHasGRE}`
+      });
+    } catch (metaError) {
+      console.error('⚠️ Error fetching fresh metadata:', metaError.message);
+      // Extract metadata from database snapshots as fallback
+      try {
+        const userSnap = typeof existingTimeline.userProfileSnapshot === 'string' 
+          ? JSON.parse(existingTimeline.userProfileSnapshot) 
+          : existingTimeline.userProfileSnapshot;
+        const uniSnap = typeof existingTimeline.universitySnapshot === 'string'
+          ? JSON.parse(existingTimeline.universitySnapshot)
+          : existingTimeline.universitySnapshot;
+        
+        freshMetadata = userSnap?.metadata || {
+          essaysRequired: 0,
+          essaysCompleted: 0,
+          essaysRemaining: 0,
+          essaysNotStarted: 0,
+          essayCompletionRate: 0,
+          calendarEventsTotal: 0,
+          calendarEventsCompleted: 0,
+          calendarEventsPending: 0,
+          calendarEventsOverdue: 0,
+          userHasGMAT: false,
+          userHasGRE: false,
+          userHasIELTS: false,
+          userHasTOEFL: false,
+          gmatScore: null,
+          greScore: null,
+          ieltsScore: null,
+          toeflScore: null,
+          userGPA: null,
+          userStudyLevel: null,
+          userHasWorkExperience: false,
+          programsFound: 0,
+          acceptanceRate: uniSnap?.acceptanceRate || null,
+          enhancedEssays: [],
+          allEssayPrompts: []
+        };
+        console.log('⚠️ Using metadata from database snapshot as fallback');
+      } catch (snapError) {
+        console.error('❌ Could not extract metadata from snapshots:', snapError.message);
+        freshMetadata = null;
+      }
+    }
+    
+    // If still no metadata, use zeros
+    if (!freshMetadata) {
+      console.warn("⚠️ No metadata available, using zero defaults");
+      freshMetadata = {
+        essaysRequired: 0,
+        essaysCompleted: 0,
+        essaysRemaining: 0,
+        essaysNotStarted: 0,
+        essayCompletionRate: 0,
+        calendarEventsTotal: 0,
+        calendarEventsCompleted: 0,
+        calendarEventsPending: 0,
+        calendarEventsOverdue: 0,
+        userHasGMAT: false,
+        userHasGRE: false,
+        userHasIELTS: false,
+        userHasTOEFL: false,
+        gmatScore: null,
+        greScore: null,
+        ieltsScore: null,
+        toeflScore: null,
+        userGPA: null,
+        userStudyLevel: null,
+        userHasWorkExperience: false,
+        programsFound: 0,
+        acceptanceRate: null,
+        enhancedEssays: [],
+        allEssayPrompts: []
+      };
+    }
+    
+    let userProfileData = {};
+    let universityData = {};
+    
+    try {
+      if (existingTimeline.userProfileSnapshot) {
+        userProfileData = typeof existingTimeline.userProfileSnapshot === 'string' 
+          ? JSON.parse(existingTimeline.userProfileSnapshot) 
+          : existingTimeline.userProfileSnapshot;
+      }
+    } catch (e) {
+      console.log("Could not parse userProfileSnapshot");
+    }
+    
+    try {
+      if (existingTimeline.universitySnapshot) {
+        universityData = typeof existingTimeline.universitySnapshot === 'string'
+          ? JSON.parse(existingTimeline.universitySnapshot)
+          : existingTimeline.universitySnapshot;
+      }
+    } catch (e) {
+      console.log("Could not parse universitySnapshot");
+    }
+    
+    const requiresGMAT = universityData.requiresGMAT || false;
+    const requiresGRE = universityData.requiresGRE || false;
+    const requiresIELTS = universityData.requiresIELTS || false;
+    const requiresTOEFL = universityData.requiresTOEFL || false;
+    
+    const testsNeeded = [];
+    if (requiresGMAT && !freshMetadata.userHasGMAT) testsNeeded.push("GMAT");
+    if (requiresGRE && !freshMetadata.userHasGRE) testsNeeded.push("GRE");
+    if (requiresIELTS && !freshMetadata.userHasIELTS) testsNeeded.push("IELTS");
+    if (requiresTOEFL && !freshMetadata.userHasTOEFL) testsNeeded.push("TOEFL");
+    
+    // Build timeline using database task completion as SOURCE OF TRUTH
+    const timeline = {
+      overview: userProfileData.overview || `Application timeline for ${existingTimeline.timelineName}`,
+      totalDuration: existingTimeline.totalDuration || "4-6 months",
+      currentProgress: existingTimeline.overallProgress || 0,
+      phases: existingTimeline.phases.map((phase, phaseIdx) => ({
+        id: phase.phaseNumber,
+        phaseNumber: phase.phaseNumber,
+        name: phase.phaseName,
+        description: phase.description || phase.overview,
+        duration: phase.duration,
+        timeframe: phase.timeframe,
+        status: phase.status,
+        objectives: phase.objectives || [],
+        milestones: phase.milestones || [],
+        proTips: phase.proTips || [],
+        commonMistakes: phase.commonMistakes || [],
+        tasks: phase.tasks.map((task, taskIdx) => {
+          const dbIsCompleted = task.isCompleted === true;
+          
+          console.log(`📝 Task loaded from DB: "${task.title?.substring(0, 40)}" | DB Status: ${dbIsCompleted} | ID: ${task.id}`);
+          
+          return {
+            id: task.id,
+            taskNumber: task.taskNumber,
+            title: task.title,
+            description: task.description,
+            estimatedTime: task.estimatedTime,
+            priority: task.priority,
+            completed: dbIsCompleted,
+            status: task.status,
+            actionSteps: task.actionSteps || [],
+            tips: task.tips || [],
+            resources: task.resources || [],
+            requiresGMAT: task.requiresGMAT || false,
+            requiresGRE: task.requiresGRE || false,
+            requiresIELTS: task.requiresIELTS || false,
+            requiresTOEFL: task.requiresTOEFL || false,
+            relatedCalendarEventId: task.relatedEventId,
+            relatedEssayId: task.relatedEssayId
+          };
+        })
+      }))
+    };
+
+    // Calculate progress from database task completion
+    const totalTasks = timeline.phases.reduce((sum, p) => sum + p.tasks.length, 0);
+    const completedTasks = timeline.phases.reduce(
+      (sum, p) => sum + p.tasks.filter(t => t.completed === true).length, 0
+    );
+    const currentProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    console.log(`\n✅ Timeline loaded from DB: ${completedTasks}/${totalTasks} tasks completed (${currentProgress}%)`);
+    console.log(`========== END TIMELINE SEARCH ==========\n`);
+
+    return {
+      timeline,
+      metadata: {
+        timelineId: existingTimeline.id,
+        fromDatabase: true,
+        tasksCompletedFromDb: completedTasks,
+        totalTasksFromDb: totalTasks,
+        lastGenerated: existingTimeline.lastRegeneratedAt,
+        generatedAt: existingTimeline.generatedAt,
+        universityName: universityData.universityName || existingTimeline.timelineName,
+        location: universityData.location,
+        deadline: universityData.deadline,
+        daysUntilDeadline: universityData.deadline 
+          ? Math.ceil((new Date(universityData.deadline) - new Date()) / (1000 * 60 * 60 * 24))
+          : null,
+        acceptanceRate: freshMetadata.acceptanceRate || universityData.acceptanceRate,
+        essaysRequired: freshMetadata.essaysRequired,
+        essaysCompleted: freshMetadata.essaysCompleted,
+        essaysRemaining: freshMetadata.essaysRemaining,
+        essaysNotStarted: freshMetadata.essaysNotStarted,
+        essayCompletionRate: freshMetadata.essayCompletionRate,
+        calendarEventsTotal: freshMetadata.calendarEventsTotal,
+        calendarEventsCompleted: freshMetadata.calendarEventsCompleted,
+        calendarEventsPending: freshMetadata.calendarEventsPending,
+        calendarEventsOverdue: freshMetadata.calendarEventsOverdue,
+        requiresGMAT: requiresGMAT,
+        requiresGRE: requiresGRE,
+        requiresIELTS: requiresIELTS,
+        requiresTOEFL: requiresTOEFL,
+        userHasGMAT: freshMetadata.userHasGMAT,
+        userHasGRE: freshMetadata.userHasGRE,
+        userHasIELTS: freshMetadata.userHasIELTS,
+        userHasTOEFL: freshMetadata.userHasTOEFL,
+        testsNeeded: testsNeeded,
+        allTestsComplete: testsNeeded.length === 0,
+        currentProgress: currentProgress,
+        overallProgress: currentProgress,
+        userGPA: freshMetadata.userGPA,
+        userStudyLevel: freshMetadata.userStudyLevel,
+        programsFound: freshMetadata.programsFound
+      }
+    };
   } catch (error) {
-    console.error("Error fetching existing timeline:", error);
+    console.error("\n❌ ========== ERROR IN TIMELINE SEARCH ==========");
+    console.error("Error details:", error);
+    console.error("========== END ERROR ==========\n");
     return null;
   }
 }
@@ -628,13 +696,14 @@ async function getExistingTimeline(userId, universityId, programId) {
  */
 async function saveTimelineToDatabase(userId, universityId, programId, timeline, metadata) {
   try {
-    console.log(`Saving timeline to database for user ${userId}, university ${universityId}`);
+    console.log(`Saving timeline to database for user ${userId}, university ${universityId}, program ${programId || 'NULL'}`);
 
+    // ✅ FIXED: Find existing timeline by userId + universityId only (ignore programId)
     const existingTimeline = await prisma.aITimeline.findFirst({
       where: {
         userId: userId,
         universityId: universityId,
-        ...(programId ? { programId: programId } : {})
+        isActive: true
       }
     });
 
@@ -686,7 +755,7 @@ async function saveTimelineToDatabase(userId, universityId, programId, timeline,
           totalDuration: timeline.totalDuration || "4-6 months",
           totalPhases: timeline.phases?.length || 0,
           totalTasks: timeline.phases?.reduce((sum, p) => sum + (p.tasks?.length || 0), 0) || 0,
-          aiModel: metadata.model || "gemini-2.5-flash-lite",
+          aiModel: metadata.model || "gemini-1.5-pro",
           promptVersion: "2.0",
           generationTime: metadata.processingTime,
           userProfileSnapshot: JSON.stringify({
@@ -745,7 +814,7 @@ async function saveTimelineToDatabase(userId, universityId, programId, timeline,
                 data: {
                   timelineId: savedTimeline.id,
                   phaseId: savedPhase.id,
-                  taskNumber: task.id || taskIndex + 1,
+                  taskNumber: task.taskNumber || taskIndex + 1,
                   title: task.title?.substring(0, 200) || `Task ${taskIndex + 1}`,
                   description: task.description?.substring(0, 1000) || "",
                   estimatedTime: task.estimatedTime || "1-2 hours",
@@ -793,6 +862,177 @@ async function saveTimelineToDatabase(userId, universityId, programId, timeline,
 }
 
 /**
+ * ✅ CRITICAL FIX: Reload timeline from database after saving to get proper database IDs
+ */
+async function reloadTimelineFromDatabase(timelineId) {
+  try {
+    console.log(`🔄 Reloading timeline ${timelineId} from database...`);
+    
+    const savedTimeline = await prisma.aITimeline.findUnique({
+      where: { id: timelineId },
+      include: {
+        phases: {
+          orderBy: { displayOrder: 'asc' },
+          include: {
+            tasks: {
+              orderBy: { displayOrder: 'asc' },
+              select: {
+                id: true,
+                taskNumber: true,
+                title: true,
+                description: true,
+                estimatedTime: true,
+                priority: true,
+                status: true,
+                isCompleted: true,
+                completedAt: true,
+                actionSteps: true,
+                tips: true,
+                resources: true,
+                requiresGMAT: true,
+                requiresGRE: true,
+                requiresIELTS: true,
+                requiresTOEFL: true,
+                relatedEventId: true,
+                relatedEssayId: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!savedTimeline) {
+      console.warn(`⚠️ Could not find timeline with ID: ${timelineId}`);
+      return null;
+    }
+
+    // Build timeline object with database values
+    const timeline = {
+      overview: savedTimeline.timelineName || "University Timeline",
+      totalDuration: savedTimeline.totalDuration || "4-6 months",
+      currentProgress: savedTimeline.overallProgress || 0,
+      phases: savedTimeline.phases.map(phase => ({
+        id: phase.phaseNumber,
+        phaseNumber: phase.phaseNumber,
+        name: phase.phaseName,
+        description: phase.description,
+        duration: phase.duration,
+        timeframe: phase.timeframe,
+        status: phase.status,
+        objectives: phase.objectives || [],
+        milestones: phase.milestones || [],
+        proTips: phase.proTips || [],
+        commonMistakes: phase.commonMistakes || [],
+        tasks: phase.tasks.map(task => ({
+          // ✅ CRITICAL: Use database ID and completion status
+          id: task.id,
+          taskNumber: task.taskNumber,
+          title: task.title,
+          description: task.description,
+          estimatedTime: task.estimatedTime,
+          priority: task.priority,
+          // ✅ CRITICAL: Use database isCompleted value
+          completed: task.isCompleted === true,
+          status: task.status,
+          actionSteps: task.actionSteps || [],
+          tips: task.tips || [],
+          resources: task.resources || [],
+          requiresGMAT: task.requiresGMAT || false,
+          requiresGRE: task.requiresGRE || false,
+          requiresIELTS: task.requiresIELTS || false,
+          requiresTOEFL: task.requiresTOEFL || false,
+          relatedCalendarEventId: task.relatedEventId,
+          relatedEssayId: task.relatedEssayId
+        }))
+      }))
+    };
+
+    console.log(`✅ Timeline reloaded: ${timeline.phases.reduce((sum, p) => sum + p.tasks.length, 0)} tasks with database IDs`);
+    return timeline;
+  } catch (error) {
+    console.error('Error reloading timeline from database:', error);
+    return null;
+  }
+}
+
+/**
+ * ✅ FIX 4: Validate task completion in timeline BEFORE returning to frontend
+ */
+function validateAndFixTaskCompletion(timeline, essayCompletionFlags, testStatus, calendarEvents) {
+  console.log('\n🔍 VALIDATING TASK COMPLETION AGAINST DATABASE...\n');
+  
+  let fixedCount = 0;
+  let totalTasks = 0;
+  
+  timeline.phases?.forEach((phase, phaseIdx) => {
+    phase.tasks?.forEach((task, taskIdx) => {
+      totalTasks++;
+      
+      let shouldBeCompleted = false;
+      let reason = 'not_started';
+      
+      if (task.requiresGMAT === true && testStatus.hasGMAT) {
+        shouldBeCompleted = true;
+        reason = 'gmat_completed';
+      } else if (task.requiresGRE === true && testStatus.hasGRE) {
+        shouldBeCompleted = true;
+        reason = 'gre_completed';
+      } else if (task.requiresIELTS === true && testStatus.hasIELTS) {
+        shouldBeCompleted = true;
+        reason = 'ielts_completed';
+      } else if (task.requiresTOEFL === true && testStatus.hasTOEFL) {
+        shouldBeCompleted = true;
+        reason = 'toefl_completed';
+      }
+      
+      const essayMatch = task.title?.match(/essay\s*#?(\d+)/i);
+      if (essayMatch) {
+        const essayNum = parseInt(essayMatch[1]);
+        if (essayNum > 0 && essayNum <= essayCompletionFlags.length) {
+          const isEssayComplete = essayCompletionFlags[essayNum - 1] === 'true';
+          if (isEssayComplete) {
+            shouldBeCompleted = true;
+            reason = `essay_${essayNum}_completed`;
+          } else {
+            shouldBeCompleted = false;
+            reason = `essay_${essayNum}_not_started`;
+          }
+        }
+      }
+      
+      if (!shouldBeCompleted) {
+        const matchedEvent = matchCalendarEventToTask(task, calendarEvents);
+        if (matchedEvent?.completionStatus === 'completed') {
+          shouldBeCompleted = true;
+          reason = 'calendar_event_completed';
+        }
+      }
+      
+      if (task.completed === true && shouldBeCompleted === false) {
+        console.log(`🔧 FIXING: "${task.title}" - AI said complete, but NO DATABASE PROOF`);
+        task.completed = false;
+        task.status = 'pending';
+        fixedCount++;
+      } else if (task.completed === false && shouldBeCompleted === true) {
+        console.log(`✅ ENABLING: "${task.title}" - Database proof: ${reason}`);
+        task.completed = true;
+        task.status = 'completed';
+      }
+      
+      task.completionReason = reason;
+    });
+  });
+  
+  console.log(`\n📊 VALIDATION COMPLETE:`);
+  console.log(`   Total tasks: ${totalTasks}`);
+  console.log(`   Fixed incorrect completions: ${fixedCount}`);
+  console.log(`   Final completed count: ${timeline.phases.reduce((sum, p) => sum + p.tasks.filter(t => t.completed).length, 0)}\n`);
+  
+  return timeline;
+}
+
+/**
  * Robust JSON parser with optimized fallback strategies
  */
 function parseAIResponse(responseText) {
@@ -805,7 +1045,6 @@ function parseAIResponse(responseText) {
     .replace(/[\r\n]+\s*$/, '')
     .trim();
 
-  // Strategy 1: Direct parse
   try {
     const parsed = JSON.parse(cleanText);
     console.log("✅ Strategy 1 (direct parse) succeeded");
@@ -820,7 +1059,6 @@ function parseAIResponse(responseText) {
   }
   cleanText = cleanText.substring(jsonStart);
 
-  // Strategy 2: Find complete JSON by brace matching
   try {
     let braceCount = 0;
     let inString = false;
@@ -861,7 +1099,6 @@ function parseAIResponse(responseText) {
     console.log("Strategy 2 failed:", e.message);
   }
 
-  // Strategy 3: Extract phases and rebuild
   try {
     const phases = [];
     const phaseRegex = /\{\s*"id"\s*:\s*\d+\s*,\s*"name"\s*:/g;
@@ -898,7 +1135,6 @@ function parseAIResponse(responseText) {
           const phase = JSON.parse(cleanText.substring(phaseStart, phaseEnd));
           phases.push(phase);
         } catch (e) {
-          // Skip invalid phase
         }
       }
     }
@@ -927,6 +1163,257 @@ function parseAIResponse(responseText) {
 }
 
 /**
+ * ✅ NEW: Check if AI response contains all 5 phases
+ */
+function isResponseComplete(text) {
+  try {
+    const phase1 = /"id"\s*:\s*1\s*,\s*"name"\s*:\s*"Research/i.test(text);
+    const phase2 = /"id"\s*:\s*2\s*,\s*"name"\s*:\s*"Standardized/i.test(text);
+    const phase3 = /"id"\s*:\s*3\s*,\s*"name"\s*:\s*"Essay/i.test(text);
+    const phase4 = /"id"\s*:\s*4\s*,\s*"name"\s*:\s*"Recommendation/i.test(text);
+    const phase5 = /"id"\s*:\s*5\s*,\s*"name"\s*:\s*"Application/i.test(text);
+    
+    const hasAllPhases = phase1 && phase2 && phase3 && phase4 && phase5;
+    
+    if (!hasAllPhases) {
+      console.log(`Phase check: 1=${phase1}, 2=${phase2}, 3=${phase3}, 4=${phase4}, 5=${phase5}`);
+      return false;
+    }
+    
+    const trimmed = text.trim();
+    const hasProperEnding = /\}\s*\]\s*\}$/.test(trimmed);
+    
+    if (!hasProperEnding) {
+      console.log(`Response doesn't have proper JSON ending. Last 50 chars: ${trimmed.substring(trimmed.length - 50)}`);
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    console.log("Error checking response completeness:", e.message);
+    return false;
+  }
+}
+
+/**
+ * ✅ NEW: Generate continuation prompt to get remaining phases
+ */
+function buildContinuationPrompt(partialResponse, missingPhases) {
+  const lastContent = partialResponse.substring(partialResponse.length - 300);
+  
+  return `You were generating a JSON timeline and got cut off. Continue EXACTLY from where you stopped.
+
+The response ended with:
+"""
+${lastContent}
+"""
+
+MISSING PHASES NEEDED: ${missingPhases.join(', ')}
+
+CRITICAL RULES:
+1. Continue the JSON exactly - do NOT start fresh
+2. Do NOT include \`\`\`json or any markdown
+3. Complete the remaining phases with the SAME structure as before
+4. Each phase needs: id, name, description, duration, timeframe, status, objectives, milestones, proTips, commonMistakes, tasks
+5. End with the proper closing: }]} to close the phases array and root object
+6. Output ONLY the continuation JSON, nothing else
+
+Continue now:`;
+}
+
+/**
+ * ✅ NEW: Merge partial responses into complete JSON
+ */
+function mergeResponses(original, continuation) {
+  let cleanOriginal = original
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/gi, '')
+    .trim();
+    
+  let cleanContinuation = continuation
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/gi, '')
+    .trim();
+  
+  let cutPoint = cleanOriginal.length;
+  
+  let braceCount = 0;
+  let bracketCount = 0;
+  let inString = false;
+  let escapeNext = false;
+  let lastBalancedPos = 0;
+  
+  for (let i = 0; i < cleanOriginal.length; i++) {
+    const char = cleanOriginal[i];
+    
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') braceCount++;
+      if (char === '}') braceCount--;
+      if (char === '[') bracketCount++;
+      if (char === ']') bracketCount--;
+      
+      if (char === '}' || char === ']') {
+        lastBalancedPos = i + 1;
+      }
+    }
+  }
+  
+  if (braceCount !== 0 || bracketCount !== 0) {
+    const lastComma = cleanOriginal.lastIndexOf(',\n');
+    const lastBrace = cleanOriginal.lastIndexOf('},');
+    const lastBracket = cleanOriginal.lastIndexOf('],');
+    
+    cutPoint = Math.max(lastComma, lastBrace + 1, lastBracket + 1, lastBalancedPos);
+    cleanOriginal = cleanOriginal.substring(0, cutPoint);
+  }
+  
+  let contStart = 0;
+  
+  while (contStart < cleanContinuation.length && 
+         (cleanContinuation[contStart] === ' ' || 
+          cleanContinuation[contStart] === '\n' || 
+          cleanContinuation[contStart] === ',')) {
+    contStart++;
+  }
+  
+  cleanContinuation = cleanContinuation.substring(contStart);
+  
+  let merged;
+  const originalEndsWithComma = cleanOriginal.trim().endsWith(',');
+  const continuationStartsWithBrace = cleanContinuation.trim().startsWith('{');
+  
+  if (originalEndsWithComma && continuationStartsWithBrace) {
+    merged = cleanOriginal + '\n' + cleanContinuation;
+  } else if (!originalEndsWithComma && continuationStartsWithBrace) {
+    merged = cleanOriginal + ',\n' + cleanContinuation;
+  } else {
+    merged = cleanOriginal + cleanContinuation;
+  }
+  
+  return merged;
+}
+
+/**
+ * ✅ NEW: Identify which phases are missing from the response
+ */
+function getMissingPhases(text) {
+  const missing = [];
+  
+  if (!/"id"\s*:\s*1\s*,\s*"name"\s*:\s*"Research/i.test(text)) {
+    missing.push("Phase 1: Research & Strategic Planning");
+  }
+  if (!/"id"\s*:\s*2\s*,\s*"name"\s*:\s*"Standardized/i.test(text)) {
+    missing.push("Phase 2: Standardized Testing");
+  }
+  if (!/"id"\s*:\s*3\s*,\s*"name"\s*:\s*"Essay/i.test(text)) {
+    missing.push("Phase 3: Essay Writing");
+  }
+  if (!/"id"\s*:\s*4\s*,\s*"name"\s*:\s*"Recommendation/i.test(text)) {
+    missing.push("Phase 4: Recommendations & Documents");
+  }
+  if (!/"id"\s*:\s*5\s*,\s*"name"\s*:\s*"Application/i.test(text)) {
+    missing.push("Phase 5: Application Assembly & Submission");
+  }
+  
+  return missing;
+}
+
+/**
+ * ✅ NEW: Create fallback phase when missing
+ */
+function createFallbackPhase(phaseNumber) {
+  const phaseNames = [
+    "Research & Strategic Planning",
+    "Standardized Testing", 
+    "Essay Writing",
+    "Recommendations & Documents",
+    "Application Assembly & Submission"
+  ];
+  
+  return {
+    id: phaseNumber,
+    name: phaseNames[phaseNumber - 1] || `Phase ${phaseNumber}`,
+    description: `Phase ${phaseNumber} content`,
+    duration: "4-6 weeks",
+    timeframe: "TBD",
+    status: "upcoming",
+    objectives: ["Complete research", "Prepare documents", "Meet deadlines"],
+    milestones: ["Research done", "Documents ready", "Submission complete"],
+    proTips: ["Start early", "Stay organized", "Double-check everything"],
+    commonMistakes: ["Procrastination", "Incomplete documents", "Missing deadlines"],
+    tasks: Array.from({length: 6}, (_, i) => ({
+      taskNumber: i + 1,
+      title: `Task ${i + 1}`,
+      description: "Complete this task",
+      estimatedTime: "1-2 days",
+      priority: "medium",
+      completed: false,
+      actionSteps: ["Step 1", "Step 2"],
+      tips: ["Be thorough", "Check requirements"],
+      resources: ["University website", "Application portal"]
+    }))
+  };
+}
+
+/**
+ * ✅ NEW: Generate complete timeline with continuation support
+ */
+async function generateCompleteTimeline(model, prompt, maxRetries = 2, maxContinuations = 2) {
+  let fullResponse = "";
+  let continuationCount = 0;
+  
+  console.log("Starting initial AI generation...");
+  const result = await generateWithRetry(model, prompt, maxRetries);
+  fullResponse = result.response.text();
+  console.log(`Initial response length: ${fullResponse.length}`);
+  
+  while (!isResponseComplete(fullResponse) && continuationCount < maxContinuations) {
+    continuationCount++;
+    const missingPhases = getMissingPhases(fullResponse);
+    
+    if (missingPhases.length === 0) {
+      break;
+    }
+    
+    console.log(`⚠️ Response incomplete. Missing ${missingPhases.length} phases. Requesting continuation ${continuationCount}...`);
+    console.log(`Missing: ${missingPhases.join(', ')}`);
+    
+    const continuationPrompt = buildContinuationPrompt(fullResponse, missingPhases);
+    
+    try {
+      const continuationResult = await generateWithRetry(model, continuationPrompt, maxRetries);
+      const continuationText = continuationResult.response.text();
+      console.log(`Continuation ${continuationCount} length: ${continuationText.length}`);
+      
+      fullResponse = mergeResponses(fullResponse, continuationText);
+      console.log(`Merged response length: ${fullResponse.length}`);
+      
+    } catch (contError) {
+      console.error(`Continuation ${continuationCount} failed:`, contError.message);
+      break;
+    }
+  }
+  
+  if (continuationCount > 0) {
+    console.log(`✅ Timeline generation completed with ${continuationCount} continuation(s)`);
+  }
+  
+  return fullResponse;
+}
+
+/**
  * Retry wrapper for AI calls
  */
 async function generateWithRetry(model, prompt, maxRetries = 2) {
@@ -952,31 +1439,11 @@ async function generateWithRetry(model, prompt, maxRetries = 2) {
   throw lastError;
 }
 
-/**
- * Build essay status string for AI prompt
- */
-function buildEssayStatusForPrompt(allEssayPrompts, enhancedEssays) {
-  return allEssayPrompts.map((prompt, i) => {
-    const essay = enhancedEssays.find(e => 
-      e.essayPromptId === prompt.id || e.essayPrompt?.id === prompt.id
-    );
-    
-    const essayNumber = i + 1;
-    const isComplete = essay?.isActuallyCompleted === true;
-    const status = isComplete ? '✅ COMPLETED' : 
-                   essay ? `🔄 IN PROGRESS (${essay.wordCount}/${essay.wordLimit || prompt.wordLimit} words)` : 
-                   '⚪ NOT STARTED';
-    
-    return `Essay #${essayNumber}: "${prompt.promptTitle}" - ${status}${isComplete ? ' ← SET completed: true' : ' ← SET completed: false'}`;
-  }).join('\n');
-}
-
 export async function POST(request) {
   try {
     const body = await request.json();
     const { university, userProfile, userId, forceRegenerate = false } = body;
 
-    // ✅ FIX 1: Add validation at the start
     if (!university || !university.id) {
       console.error("❌ Invalid university data received");
       return NextResponse.json(
@@ -996,7 +1463,28 @@ export async function POST(request) {
 
     const startTime = Date.now();
 
-    // ====== STEP 1: FETCH COMPREHENSIVE USER DATA ======
+    // ====== STEP 1: CHECK FOR EXISTING TIMELINE FIRST ======
+    // ✅ FIXED: Check for existing timeline using ONLY userId + universityId
+    if (!forceRegenerate) {
+      const existingData = await getExistingTimeline(userId, university.id);
+
+      if (existingData) {
+        console.log("✅ Returning existing timeline with database completion state");
+        const processingTime = Date.now() - startTime;
+        
+        return NextResponse.json({
+          success: true,
+          timeline: existingData.timeline,
+          metadata: {
+            ...existingData.metadata,
+            processingTime: processingTime,
+            fromDatabase: true
+          }
+        });
+      }
+    }
+
+    // ====== STEP 2: FETCH COMPREHENSIVE USER DATA ======
     let userStudyLevel = null;
     let userTestScores = {
       hasGMAT: false,
@@ -1031,17 +1519,18 @@ export async function POST(request) {
       }
     }
 
-    // ====== STEP 2: FETCH UNIVERSITY-SPECIFIC PROGRAMS ======
+    // ====== STEP 3: FETCH PROGRAMS FILTERED BY USER'S STUDY LEVEL ======
+    // ✅ FIXED: Always filter by studyLevel to get correct essay prompts
+    console.log(`📚 Fetching programs for user's studyLevel: ${userStudyLevel || 'NOT SET'}`);
+    
     const universityPrograms = await prisma.program.findMany({
       where: {
         universityId: university.id,
         isActive: true,
-        ...(userStudyLevel && {
-          degreeType: {
-            equals: userStudyLevel,
-            mode: "insensitive",
-          },
-        }),
+        degreeType: userStudyLevel ? {
+          equals: userStudyLevel,
+          mode: "insensitive"
+        } : undefined
       },
       include: {
         essayPrompts: {
@@ -1081,9 +1570,17 @@ export async function POST(request) {
     });
 
     console.log(`Found ${universityPrograms.length} programs for study level: ${userStudyLevel}`);
+    
+    // ✅ FIXED: Validate we have programs before fetching essays
+    if (universityPrograms.length === 0) {
+      console.warn(`⚠️ No programs found for studyLevel: ${userStudyLevel} at university ${university.id}`);
+      console.warn(`⚠️ User may have wrong studyLevel set or programs not configured`);
+    }
 
-    // ====== STEP 3: FETCH ALL USER'S ESSAYS ======
+    // ====== STEP 4: FETCH ALL USER'S ESSAYS ======
     const programIds = universityPrograms.map(p => p.id);
+    console.log(`📝 Fetching essays for ${programIds.length} program(s):`, programIds);
+    
     const userEssays = await prisma.essay.findMany({
       where: {
         userId: userId,
@@ -1104,10 +1601,8 @@ export async function POST(request) {
 
     console.log(`Found ${userEssays.length} user essays for this university`);
 
-    // Apply enhanced essay completion logic (98% = complete)
     const enhancedEssays = calculateEssayCompletion(userEssays);
     
-    // Get ALL essay prompts from programs
     const allEssayPrompts = universityPrograms.flatMap(p => p.essayPrompts || []);
     const totalEssayPromptsCount = allEssayPrompts.length;
     const completedEssaysCount = enhancedEssays.filter(e => e.isActuallyCompleted === true).length;
@@ -1116,23 +1611,17 @@ export async function POST(request) {
     console.log(`Essay completion: ${completedEssaysCount}/${totalEssayPromptsCount} (using 98% logic)`);
     console.log(`Essays not started: ${notStartedEssaysCount}`);
 
-    // Debug: Log essay prompt to essay mapping
-    console.log('\n=== ESSAY PROMPT TO USER ESSAY MAPPING ===');
-    allEssayPrompts.forEach((prompt, i) => {
+    const essayCompletionFlags = allEssayPrompts.map((prompt, idx) => {
       const essay = enhancedEssays.find(e => 
         e.essayPromptId === prompt.id || e.essayPrompt?.id === prompt.id
       );
-      console.log(`Essay #${i + 1}:`, {
-        promptId: prompt.id,
-        promptTitle: prompt.promptTitle?.substring(0, 40),
-        hasUserEssay: !!essay,
-        essayId: essay?.id || null,
-        isComplete: essay?.isActuallyCompleted === true
-      });
+      const isComplete = essay?.isActuallyCompleted === true;
+      return isComplete ? 'true' : 'false';
     });
-    console.log('=== END MAPPING ===\n');
 
-    // ====== STEP 4: FETCH ALL USER'S CALENDAR EVENTS ======
+    console.log('📝 Essay Completion Flags for AI Prompt:', essayCompletionFlags);
+
+    // ====== STEP 5: FETCH ALL USER'S CALENDAR EVENTS ======
     const userCalendarEvents = await prisma.calendarEvent.findMany({
       where: {
         userId: userId,
@@ -1154,7 +1643,6 @@ export async function POST(request) {
       return eventDate < now && e.completionStatus === 'pending';
     }).length;
 
-    // Use university object data for requirements
     const requiresGMAT = university.requiresGMAT || false;
     const requiresGRE = university.requiresGRE || false;
     const requiresIELTS = university.requiresIELTS || false;
@@ -1162,56 +1650,10 @@ export async function POST(request) {
     const acceptanceRate = university.acceptanceRate || 
                           universityPrograms[0]?.admissions?.[0]?.acceptanceRate || null;
 
-    // ====== STEP 5: CHECK FOR EXISTING TIMELINE ======
-    if (!forceRegenerate) {
-      const existingData = await getExistingTimeline(
-        userId, 
-        university.id, 
-        universityPrograms[0]?.id
-      );
-
-      if (existingData) {
-        console.log("Returning existing timeline from database (with fresh data sync)");
-        const processingTime = Date.now() - startTime;
-        
-        return NextResponse.json({
-          success: true,
-          timeline: existingData.timeline,
-          metadata: {
-            ...existingData.metadata,
-            universityName: existingData.metadata.universityName || university.universityName || university.name,
-            location: existingData.metadata.location || university.location,
-            deadline: existingData.metadata.deadline,
-            acceptanceRate: acceptanceRate,
-            fromDatabase: true,
-            processingTime: processingTime,
-            essaysRequired: totalEssayPromptsCount,
-            essaysCompleted: completedEssaysCount,
-            essaysRemaining: Math.max(0, totalEssayPromptsCount - completedEssaysCount),
-            essaysNotStarted: notStartedEssaysCount,
-            essayCompletionRate: totalEssayPromptsCount > 0 
-              ? Math.round((completedEssaysCount / totalEssayPromptsCount) * 100) 
-              : 0,
-            calendarEventsTotal: userCalendarEvents.length,
-            calendarEventsCompleted: completedEvents,
-            requiresGMAT: requiresGMAT,
-            requiresGRE: requiresGRE,
-            requiresIELTS: requiresIELTS,
-            requiresTOEFL: requiresTOEFL,
-            userHasGMAT: userTestScores.hasGMAT,
-            userHasGRE: userTestScores.hasGRE,
-            userHasIELTS: userTestScores.hasIELTS,
-            userHasTOEFL: userTestScores.hasTOEFL
-          }
-        });
-      }
-    }
-
     // ====== STEP 6: PREPARE DATA FOR AI PROMPT ======
     const universityName = university.universityName || university.name || "Your University";
     const location = university.location || `${university.city || ''}, ${university.country || ''}`.replace(/^, |, $/g, '') || "Location not specified";
     
-    // Collect ALL deadlines
     const allDeadlinesFromDB = [];
     universityPrograms.forEach(program => {
       program.admissions?.forEach(adm => {
@@ -1245,12 +1687,10 @@ export async function POST(request) {
       ? Math.ceil((new Date(mainDeadline) - now) / (1000 * 60 * 60 * 24))
       : null;
 
-    // Format deadlines for prompt
     const deadlinesList = allDeadlines.slice(0, 10).map((d, i) => 
       `${i + 1}. ${d.title} (${d.source}): ${new Date(d.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} [${d.priority || 'normal'} priority]`
     ).join('\n');
 
-    // Format ALL calendar events
     const allCalendarEventsList = userCalendarEvents
       .slice(0, 15)
       .map((e, i) => {
@@ -1259,15 +1699,6 @@ export async function POST(request) {
         return `${i + 1}. [${status}] ${e.title} - ${e.eventType} - ${new Date(e.startDate).toLocaleDateString()} (${e.priority} priority)${e.description ? ' - ' + e.description.substring(0, 50) : ''}`;
       }).join('\n');
 
-    // Essay status for AI prompt (with completion markers)
-    const essayStatusForPrompt = buildEssayStatusForPrompt(allEssayPrompts, enhancedEssays);
-
-    // All essay prompts with full details
-    const essayPromptsList = allEssayPrompts.map((p, i) => 
-      `${i + 1}. "${p.promptTitle}" - ${p.wordLimit} words - ${p.isMandatory ? 'REQUIRED' : 'Optional'}\n   Prompt: ${p.promptText?.substring(0, 150)}...`
-    ).join('\n\n');
-
-    // Test status
     const testStatus = [];
     const testNeeded = [];
     
@@ -1295,7 +1726,6 @@ export async function POST(request) {
       testNeeded.push("TOEFL");
     }
 
-    // Calculate overall progress
     const essayProgress = totalEssayPromptsCount > 0 
       ? Math.round((completedEssaysCount / totalEssayPromptsCount) * 100) 
       : 0;
@@ -1306,7 +1736,6 @@ export async function POST(request) {
       Math.round(((testStatus.length / (testStatus.length + testNeeded.length)) * 100));
     const overallProgress = Math.round((essayProgress + eventProgress + testProgress) / 3);
 
-    // Admission requirements
     const admissionReqs = university.admissionRequirements || 
                           universityPrograms[0]?.admissions?.[0] || {};
     const applicationFee = admissionReqs.applicationFee;
@@ -1330,7 +1759,7 @@ export async function POST(request) {
         temperature: 0.7,
         topP: 0.9,
         topK: 40,
-        maxOutputTokens: 16384,
+        maxOutputTokens: 65536,
       },
     });
 
@@ -1355,11 +1784,32 @@ export async function POST(request) {
 ${testStatus.length > 0 ? testStatus.join('\n') : '❌ No tests completed yet'}
 ${testNeeded.length > 0 ? `\n🎯 STILL NEEDED: ${testNeeded.join(', ')}` : '\n✅ All required tests DONE'}
 
-📝 ESSAY COMPLETION STATUS (${completedEssaysCount}/${totalEssayPromptsCount} completed):
-${essayStatusForPrompt || '❌ No essays available'}
+═══════════════════════════════════════════════════════════════════
+🚨 CRITICAL TASK COMPLETION RULES - READ CAREFULLY:
+═══════════════════════════════════════════════════════════════════
+
+1. ✅ **NEVER mark tasks as completed unless EXPLICITLY stated below**
+2. ✅ **Default ALL tasks to completed: false**
+3. ✅ **Only set completed: true if you see "✅ USER COMPLETED THIS" marker**
+
+📝 ESSAY COMPLETION STATUS - FOLLOW EXACTLY:
+${essayCompletionFlags.map((flag, idx) => 
+  `Essay #${idx + 1}: completed: ${flag} ${flag === 'true' ? '← ✅ USER COMPLETED THIS' : '← ❌ NOT STARTED - SET completed: false'}`
+).join('\n')}
+
+⚠️ VERIFICATION CHECKLIST (you MUST follow this):
+□ I have set ALL tasks to completed: false by default
+□ I have ONLY marked tasks complete that have "✅ USER COMPLETED THIS" marker
+□ I have NOT assumed any tasks are complete based on phase status
+□ I have NOT marked calendar events as completed tasks
+□ I have read the essay completion status and copied values EXACTLY
+
+═══════════════════════════════════════════════════════════════════
 
 📋 ALL ESSAY PROMPTS FOR ${universityName}:
-${essayPromptsList || 'No essay prompts available'}
+${allEssayPrompts.map((p, i) => 
+  `${i + 1}. "${p.promptTitle}" - ${p.wordLimit} words - ${p.isMandatory ? 'REQUIRED' : 'Optional'}\n   Prompt: ${p.promptText?.substring(0, 150)}...`
+).join('\n\n') || 'No essay prompts available'}
 
 📅 STUDENT'S CALENDAR EVENTS (${completedEvents}/${userCalendarEvents.length} completed):
 ${allCalendarEventsList || '❌ No events scheduled yet'}
@@ -1376,19 +1826,30 @@ ${deadlinesList || '❌ No deadlines found - CHECK UNIVERSITY WEBSITE'}
 • Work Exp Required: ${needsWorkExp ? 'YES' : 'No'}
 
 ═══════════════════════════════════════════════════════════════════
-🎯 YOUR TASK: Generate a 5-phase timeline with SPECIFIC, ACTIONABLE tasks
+🎯 YOUR TASK: Generate EXACTLY 5 PHASES with SPECIFIC, ACTIONABLE tasks
 ═══════════════════════════════════════════════════════════════════
+
+⚠️ CRITICAL REQUIREMENT: You MUST create EXACTLY 5 phases. Do not skip any phase. Do not combine phases.
 
 PHASE 1: Research & Strategic Planning (4-6 weeks)
 - Deep research on ${universityName} (faculty, culture, alumni network)
-- Connect with current students and alumni
+- Connect with current students and alumni on LinkedIn
 - Understand program fit and career outcomes
-- 5-8 tasks with specific action steps
+- Attend virtual information sessions
+- Identify potential 2-3 recommenders
+- Research scholarship opportunities
+- 6-8 tasks with specific action steps
 
 PHASE 2: Standardized Testing (8-12 weeks)
 ${testNeeded.length > 0 ? `- MUST COMPLETE: ${testNeeded.join(', ')}` : '- Tests already done - focus on score submission'}
-- Diagnostic test → Study plan → Practice → Official test → Score sending
-- 5-8 tasks with specific preparation steps
+- Register for required tests
+- Complete diagnostic test to establish baseline
+- Create detailed study plan with timeline
+- Take regular practice tests
+- Schedule official test date
+- Take official test
+- Send scores to ${universityName}
+- 6-8 tasks with specific preparation steps
 
 PHASE 3: Essay Writing (6-8 weeks) 
 ⚠️ CRITICAL REQUIREMENT: You MUST create exactly ${totalEssayPromptsCount} essay tasks, one for each essay prompt.
@@ -1398,23 +1859,29 @@ MANDATORY ESSAY TASK NAMING FORMAT:
 - Example: "Essay #1: Draft Career Goals Statement"
 - Example: "Essay #2: Write Leadership Experience Essay"
 
-ESSAY COMPLETION STATUS - USE THESE TO SET completed:true or completed:false:
-${essayStatusForPrompt}
-
 PHASE 4: Recommendations & Documents (4-6 weeks)
-- Select and brief 2-3 recommenders
-- Request official transcripts from all universities
-- Prepare tailored resume/CV for ${universityName}
-- Gather passport, financial docs, language certificates
-- 5-8 tasks with specific documents needed
+- Brief your 2-3 selected recommenders about ${universityName}
+- Provide recommenders with your resume and career goals
+- Request official transcripts from ALL universities attended
+- Prepare tailored resume/CV specifically for ${universityName}
+- Gather passport copies
+- Prepare financial documents (bank statements, sponsor letters)
+- Get language test certificates ready
+- Create document checklist
+- 6-8 tasks with specific documents needed
 
 PHASE 5: Application Assembly & Submission (2-3 weeks)
-- Complete online application forms
-- Upload all documents (essays, transcripts, test scores, resume, recommendations)
+- Complete all online application forms for ${universityName}
+- Upload all ${totalEssayPromptsCount} essays
+- Upload official transcripts
+- Verify test scores have been received
+- Upload resume/CV
+- Confirm all recommendations have been submitted
 - Pay application fee (${applicationFee ? applicationFee + ' ' + currency : 'amount TBD'})
-- Triple-check everything
-- Submit 5-7 days BEFORE deadline
-- 5-8 tasks with specific submission checklist
+- Triple-check every section for errors
+- Submit 5-7 days BEFORE deadline (${mainDeadline ? new Date(mainDeadline).toLocaleDateString() : 'TBD'})
+- Save confirmation receipt
+- 6-8 tasks with specific submission checklist
 
 ═══════════════════════════════════════════════════════════════════
 📋 REQUIRED JSON FORMAT:
@@ -1461,14 +1928,14 @@ PHASE 5: Application Assembly & Submission (2-3 weeks)
         {
           "id": 1,
           "title": "Essay #1: [Topic from first prompt]",
-          "completed": ${allEssayPrompts.length > 0 && enhancedEssays.find(e => e.essayPromptId === allEssayPrompts[0]?.id)?.isActuallyCompleted === true ? 'true' : 'false'},
+          "completed": ${essayCompletionFlags[0] || 'false'},
           "description": "Write the first essay about...",
           "priority": "high"
         },
         {
           "id": 2,
           "title": "Essay #2: [Topic from second prompt]",
-          "completed": ${allEssayPrompts.length > 1 && enhancedEssays.find(e => e.essayPromptId === allEssayPrompts[1]?.id)?.isActuallyCompleted === true ? 'true' : 'false'},
+          "completed": ${essayCompletionFlags[1] || 'false'},
           "description": "Write the second essay about...",
           "priority": "high"
         }
@@ -1478,30 +1945,45 @@ PHASE 5: Application Assembly & Submission (2-3 weeks)
 }
 
 ═══════════════════════════════════════════════════════════════════
-🚨 CRITICAL RULES:
+🚨 CRITICAL RULES - READ CAREFULLY:
 ═══════════════════════════════════════════════════════════════════
-1. ✅ Include EXACTLY 5-8 tasks per phase
-2. ✅ Phase 3 MUST have ${totalEssayPromptsCount} essay tasks with titles like "Essay #1:", "Essay #2:", etc.
-3. ✅ Check the ESSAY COMPLETION STATUS above and set completed:true for essays marked "COMPLETED"
-4. ✅ Set completed:false for essays marked "NOT STARTED" or "IN PROGRESS"
-5. ✅ All content must be ${universityName}-specific
-6. ✅ Return ONLY valid JSON - NO markdown, NO code blocks
-7. ✅ Each task needs 6-8 actionSteps, 4-5 tips, 4-5 resources
+1. ✅ You MUST generate EXACTLY 5 phases - no more, no less. Count them before responding.
+2. ✅ Each phase MUST have MINIMUM 6-8 tasks (not 5, not 4 - at least 6)
+3. ✅ Phase 3 MUST have ${totalEssayPromptsCount} essay tasks with titles like "Essay #1:", "Essay #2:", etc.
+4. ✅ Check the ESSAY COMPLETION STATUS above and set completed:true for essays marked "COMPLETED"
+5. ✅ Set completed:false for essays marked "NOT STARTED" or "IN PROGRESS"
+6. ✅ All content must be ${universityName}-specific (mention university name in tasks)
+7. ✅ Return ONLY valid JSON - NO markdown, NO code blocks, NO explanation
+8. ✅ Each task needs 6-8 actionSteps, 4-5 tips, 4-5 resources
+9. ✅ VERIFY: Count your phases before responding. If not exactly 5, add missing phases.
+10. ✅ Phase names must be: "Research & Strategic Planning", "Standardized Testing", "Essay Writing", "Recommendations & Documents", "Application Assembly & Submission"
+
+⚠️ IMPORTANT: BE CONCISE TO FIT IN TOKEN LIMIT
+1. Keep phase descriptions to 2-3 sentences max
+2. Each task description: 1-2 sentences max
+3. Limit arrays to 3-5 items max:
+   - objectives: 3 items
+   - milestones: 3 items  
+   - proTips: 3 items
+   - commonMistakes: 3 items
+   - actionSteps: 3 items
+   - tips: 2 items
+   - resources: 2 items
+4. Use abbreviations where possible (e.g., "app" for application)
+5. DO NOT include repetitive content
 
 Generate the complete timeline JSON now:`;
 
-    // ====== STEP 8: CALL AI API ======
-    let result;
+    // ====== STEP 8: CALL AI API WITH CONTINUATION SUPPORT ======
     let timelineData;
 
     try {
-      result = await generateWithRetry(model, prompt, 2);
-      const responseText = result.response.text();
-      console.log("AI Response length:", responseText.length);
+      const responseText = await generateCompleteTimeline(model, prompt, 2, 2);
+      console.log("Final AI Response length:", responseText.length);
       
       try {
         timelineData = parseAIResponse(responseText);
-        console.log("✅ AI timeline parsed successfully");
+        console.log(`✅ AI timeline parsed successfully with ${timelineData.phases?.length || 0} phases`);
       } catch (parseError) {
         console.error("❌ JSON parsing failed:", parseError.message);
         return NextResponse.json(
@@ -1526,8 +2008,8 @@ Generate the complete timeline JSON now:`;
     }
 
     // ====== STEP 9: VALIDATE TIMELINE STRUCTURE ======
-    if (!timelineData.phases || !Array.isArray(timelineData.phases) || timelineData.phases.length === 0) {
-      console.error("❌ Invalid timeline structure");
+    if (!timelineData.phases || !Array.isArray(timelineData.phases)) {
+      console.error("❌ Invalid timeline structure - no phases array");
       return NextResponse.json(
         {
           error: "Invalid timeline generated",
@@ -1537,92 +2019,51 @@ Generate the complete timeline JSON now:`;
       );
     }
 
-    // ====== STEP 10: ENHANCE TIMELINE WITH REAL USER DATA ======
-    timelineData.phases = timelineData.phases.map((phase, phaseIndex) => {
-      return {
-        ...phase,
-        id: phase.id || phaseIndex + 1,
-        phaseNumber: phaseIndex + 1,
-        status: phase.status || (phaseIndex === 0 ? 'in-progress' : 'upcoming'),
-        tasks: (phase.tasks || []).map((task, taskIndex) => {
-          let isTaskComplete = task.completed === true; // ✅ Explicit check
-          let relatedEssayId = null;
-          let relatedCalendarEventId = null;
-          
-          // Check test completion
-          if (task.requiresGMAT === true && userTestScores.hasGMAT) isTaskComplete = true;
-          if (task.requiresGRE === true && userTestScores.hasGRE) isTaskComplete = true;
-          if (task.requiresIELTS === true && userTestScores.hasIELTS) isTaskComplete = true;
-          if (task.requiresTOEFL === true && userTestScores.hasTOEFL) isTaskComplete = true;
-          
-          // Check essay completion using DB relationships
-          const essayMatch = matchEssayTaskToUserEssay(
-            task.title,
-            allEssayPrompts,
-            enhancedEssays
-          );
-          
-          if (essayMatch.matchType !== 'not_essay_task' && essayMatch.matchType !== 'no_match') {
-            isTaskComplete = essayMatch.isTaskComplete === true;
-            relatedEssayId = essayMatch.relatedEssayId;
-          }
-          
-          // Check calendar event completion
-          const relatedEvent = userCalendarEvents.find(e => {
-            const eventTitleLower = (e.title || '').toLowerCase();
-            const taskTitleLower = (task.title || '').toLowerCase();
-            const taskTitleShort = taskTitleLower.substring(0, 15);
-            const eventTitleShort = eventTitleLower.substring(0, 15);
-            return eventTitleLower.includes(taskTitleShort) ||
-                   taskTitleLower.includes(eventTitleShort);
-          });
-          
-          if (relatedEvent) {
-            if (relatedEvent.completionStatus === 'completed') {
-              isTaskComplete = true;
-            }
-            relatedCalendarEventId = relatedEvent.id;
-          }
-          
-          return {
-            ...task,
-            id: task.id || taskIndex + 1,
-            taskNumber: taskIndex + 1,
-            completed: isTaskComplete,
-            status: isTaskComplete ? 'completed' : 'pending',
-            actionSteps: task.actionSteps || [],
-            tips: task.tips || [],
-            resources: task.resources || [],
-            requiresGMAT: task.requiresGMAT || false,
-            requiresGRE: task.requiresGRE || false,
-            requiresIELTS: task.requiresIELTS || false,
-            requiresTOEFL: task.requiresTOEFL || false,
-            relatedEssayId: relatedEssayId,
-            relatedCalendarEventId: relatedCalendarEventId
-          };
-        }),
-        objectives: phase.objectives || [],
-        milestones: phase.milestones || [],
-        proTips: phase.proTips || [],
-        commonMistakes: phase.commonMistakes || []
-      };
-    });
-
-    // Debug: Log essay task matching results
-    console.log('\n=== ESSAY TASK MATCHING DEBUG ===');
-    const phase3 = timelineData.phases.find(p => 
-      p.name?.toLowerCase().includes('essay') || p.id === 3
-    );
-    if (phase3) {
-      console.log('Phase 3 (Essay Writing) Tasks:');
-      phase3.tasks.forEach((task, i) => {
-        console.log(`  Task ${i + 1}: "${task.title?.substring(0, 50)}" - completed: ${task.completed}`);
-      });
-      const completedTaskCount = phase3.tasks.filter(t => t.completed === true).length;
-      console.log(`\n✅ Essay tasks completed: ${completedTaskCount}/${phase3.tasks.length}`);
-      console.log(`Expected based on data: ${completedEssaysCount}/${totalEssayPromptsCount}`);
+    if (timelineData.phases.length < 4) {
+      console.error(`❌ AI generated only ${timelineData.phases.length} phases`);
+      return NextResponse.json(
+        {
+          error: "Incomplete timeline generated",
+          message: `The AI generated only ${timelineData.phases.length} phases. Please click "Regenerate" to try again.`,
+          details: `Expected 5 phases but got ${timelineData.phases.length}`,
+          phasesReceived: timelineData.phases.map(p => p.name)
+        },
+        { status: 500 }
+      );
     }
-    console.log('=== END DEBUG ===\n');
+
+    if (timelineData.phases.length === 4) {
+      console.log("⚠️ Got 4 phases, checking which one is missing...");
+      const phaseNames = timelineData.phases.map(p => p.name?.toLowerCase() || '');
+      
+      const hasSubmissionPhase = phaseNames.some(n => 
+        n.includes('submission') || n.includes('assembly') || n.includes('application')
+      );
+      
+      if (!hasSubmissionPhase) {
+        console.log("Adding placeholder Phase 5: Application Assembly & Submission");
+        timelineData.phases.push(createFallbackPhase(5));
+      }
+    }
+
+    console.log(`✅ Validated: Timeline has ${timelineData.phases.length} phases`);
+
+    // ====== STEP 10: ENHANCE TIMELINE WITH REAL USER DATA ======
+    timelineData = validateAndFixTaskCompletion(
+      timelineData,
+      essayCompletionFlags,
+      userTestScores,
+      userCalendarEvents
+    );
+
+    const totalTasks = timelineData.phases.reduce((sum, p) => sum + (p.tasks?.length || 0), 0);
+    const completedWithProof = timelineData.phases.reduce((sum, p) => 
+      sum + (p.tasks?.filter(t => t.completed === true).length || 0), 0
+    );
+
+    console.log('\n🔍 TASK COMPLETION VERIFICATION:');
+    console.log(`Total tasks: ${totalTasks}`);
+    console.log(`Completed with DB proof: ${completedWithProof}`);
 
     const processingTime = Date.now() - startTime;
 
@@ -1635,7 +2076,6 @@ Generate the complete timeline JSON now:`;
       acceptanceRate: acceptanceRate,
       applicationFee: applicationFee,
       
-      // Essay stats
       essaysRequired: totalEssayPromptsCount,
       essaysCompleted: completedEssaysCount,
       essaysRemaining: Math.max(0, totalEssayPromptsCount - completedEssaysCount),
@@ -1644,7 +2084,6 @@ Generate the complete timeline JSON now:`;
         ? Math.round((completedEssaysCount / totalEssayPromptsCount) * 100) 
         : 0,
       
-      // Test stats
       testsCompleted: testStatus,
       testsNeeded: testNeeded,
       allTestsComplete: testNeeded.length === 0,
@@ -1657,55 +2096,76 @@ Generate the complete timeline JSON now:`;
       userHasIELTS: userTestScores.hasIELTS,
       userHasTOEFL: userTestScores.hasTOEFL,
       
-      // Calendar stats
+      calendarEventsTotal: userCalendarEvents.length,
+      calendarEventsCompleted: completedEvents,
+      calendarEventsPending: pendingEvents,
+      calendarEventsOverdue: overdueEvents,
       totalCalendarEvents: userCalendarEvents.length,
       completedCalendarEvents: completedEvents,
       pendingCalendarEvents: pendingEvents,
       overdueCalendarEvents: overdueEvents,
       
-      // User profile
       userGPA: userGPA,
       userStudyLevel: userStudyLevel,
       userHasWorkExperience: hasWorkExp,
       workExperienceRequired: needsWorkExp,
       
-      // Timeline metadata
       processingTime: processingTime,
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-1.5-pro",
       generatedAt: new Date().toISOString(),
       fromDatabase: false,
       
-      // Progress tracking
       overallProgress: overallProgress,
       essayProgress: essayProgress,
       eventProgress: eventProgress,
       testProgress: testProgress,
       
-      // Program info
       programsFound: universityPrograms.length,
       filteredByStudyLevel: userStudyLevel
     };
 
-    // ====== STEP 12: SAVE TO DATABASE ======
+    // ====== STEP 12: SAVE TO DATABASE AND RELOAD FOR DATABASE IDs ======
+    let timelineId;
+    let savedToDatabase = false;
+
     try {
-      const timelineId = await saveTimelineToDatabase(
+      // ✅ Save timeline to database
+      timelineId = await saveTimelineWithRetry(
         userId,
         university.id,
         universityPrograms[0]?.id,
         timelineData,
-        metadata
+        metadata,
+        3
       );
-      metadata.timelineId = timelineId;
-      metadata.savedToDatabase = true;
+      
+      savedToDatabase = true;
+      
       console.log(`✅ Timeline saved to database with ID: ${timelineId}`);
+      
+      // ✅ CRITICAL: Reload timeline from database to get proper database IDs and completion status
+      const reloadedTimeline = await reloadTimelineFromDatabase(timelineId);
+      
+      if (reloadedTimeline) {
+        // ✅ Replace the AI-generated timeline with database-loaded timeline
+        timelineData = reloadedTimeline;
+        console.log('✅ Timeline replaced with database version (has proper IDs and completion status)');
+      } else {
+        console.warn('⚠️ Could not reload timeline from database, using AI-generated version');
+      }
+      
     } catch (dbError) {
-      console.error("❌ Failed to save timeline to database:", dbError);
-      metadata.savedToDatabase = false;
+      console.error("❌ Failed to save timeline to database after retries:", dbError.message);
+      savedToDatabase = false;
       metadata.dbError = dbError.message;
+      metadata.warningMessage = "Timeline generated but could not be saved to database. Task completion will not persist.";
     }
 
-    // ====== ✅ FIX 5: STEP 13: VALIDATE AND RETURN SUCCESS RESPONSE ======
-    // Validate timeline data before sending
+    // Update metadata with save status
+    metadata.timelineId = timelineId;
+    metadata.savedToDatabase = savedToDatabase;
+
+    // ====== STEP 13: VALIDATE AND RETURN SUCCESS RESPONSE ======
     if (!timelineData || !timelineData.phases || timelineData.phases.length === 0) {
       console.error('❌ Invalid timeline data generated');
       return NextResponse.json(
@@ -1724,31 +2184,20 @@ Generate the complete timeline JSON now:`;
         (sum, p) => sum + (p.tasks?.filter(t => t.completed === true).length || 0), 0
       ),
       essaysCompleted: metadata.essaysCompleted,
-      essaysTotal: metadata.essaysRequired
+      essaysTotal: metadata.essaysRequired,
+      tasksWithDatabaseIds: timelineData.phases.reduce(
+        (sum, p) => sum + (p.tasks?.filter(t => t.id && typeof t.id === 'string' && t.id.length > 10).length || 0), 0
+      ),
+      savedToDatabase: savedToDatabase
     });
 
     return NextResponse.json({
       success: true,
       timeline: timelineData,
       metadata: metadata,
-      debug: {
-        universityId: university.id,
-        universityName: universityName,
-        totalEssayPrompts: totalEssayPromptsCount,
-        completedEssays: completedEssaysCount,
-        notStartedEssays: notStartedEssaysCount,
-        totalCalendarEvents: userCalendarEvents.length,
-        completedEvents: completedEvents,
-        programsFound: universityPrograms.length,
-        studyLevelFilter: userStudyLevel,
-        enhancedEssayLogicUsed: true,
-        databaseSaved: metadata.savedToDatabase,
-        acceptanceRate: acceptanceRate,
-        requiresGMAT: requiresGMAT,
-        requiresGRE: requiresGRE,
-        requiresIELTS: requiresIELTS,
-        requiresTOEFL: requiresTOEFL
-      }
+      warnings: savedToDatabase ? [] : [
+        "Database connection failed. Timeline displayed but changes won't be saved. Please regenerate."
+      ]
     });
 
   } catch (error) {

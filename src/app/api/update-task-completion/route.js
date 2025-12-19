@@ -1,5 +1,3 @@
-// src/app/api/update-task-completion/route.js
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -8,9 +6,18 @@ export async function POST(request) {
     const body = await request.json();
     const { taskId, isCompleted, userId } = body;
 
-    if (!taskId) {
+    // Validate inputs
+    if (!taskId || typeof taskId !== 'string') {
+      console.error('❌ Invalid task ID:', { taskId, type: typeof taskId });
       return NextResponse.json(
-        { error: "Task ID is required" },
+        { error: "Valid task ID (string CUID) is required" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof isCompleted !== 'boolean') {
+      return NextResponse.json(
+        { error: "isCompleted must be a boolean" },
         { status: 400 }
       );
     }
@@ -22,11 +29,15 @@ export async function POST(request) {
       );
     }
 
-    // Update task completion status
+    console.log('🔄 Updating task:', {
+      taskId,
+      isCompleted,
+      userId
+    });
+
+    // ✅ Update task with transaction for consistency
     const updatedTask = await prisma.timelineTask.update({
-      where: { 
-        id: taskId 
-      },
+      where: { id: taskId },
       data: {
         isCompleted: isCompleted,
         status: isCompleted ? 'completed' : 'pending',
@@ -34,13 +45,24 @@ export async function POST(request) {
       }
     });
 
-    // Get timeline to recalculate progress
+    console.log('✅ Task updated in database:', {
+      id: updatedTask.id,
+      title: updatedTask.title?.substring(0, 40),
+      isCompleted: updatedTask.isCompleted
+    });
+
+    // Get timeline for progress recalculation
     const timeline = await prisma.aITimeline.findUnique({
       where: { id: updatedTask.timelineId },
       include: {
         phases: {
           include: {
-            tasks: true
+            tasks: {
+              select: {
+                id: true,
+                isCompleted: true
+              }
+            }
           }
         }
       }
@@ -60,31 +82,38 @@ export async function POST(request) {
         ? Math.round((completedTasks / totalTasks) * 100) 
         : 0;
 
-      // Update timeline progress
-      await prisma.aITimeline.update({
-        where: { id: timeline.id },
-        data: {
-          overallProgress: newProgress
-        }
+      console.log('📊 Progress update:', {
+        completedTasks,
+        totalTasks,
+        progress: newProgress
       });
 
-      // Update phase completion percentages
-      for (const phase of timeline.phases) {
-        const phaseTotalTasks = phase.tasks.length;
-        const phaseCompletedTasks = phase.tasks.filter(t => t.isCompleted).length;
-        const phaseProgress = phaseTotalTasks > 0 
-          ? (phaseCompletedTasks / phaseTotalTasks) * 100 
-          : 0;
-
-        await prisma.timelinePhase.update({
-          where: { id: phase.id },
+      // Update timeline and phase progress
+      await prisma.$transaction([
+        prisma.aITimeline.update({
+          where: { id: timeline.id },
           data: {
-            completionPercentage: phaseProgress,
-            status: phaseProgress === 100 ? 'completed' : 
-                    phaseProgress > 0 ? 'in-progress' : 'upcoming'
+            overallProgress: newProgress,
+            lastRegeneratedAt: new Date()
           }
-        });
-      }
+        }),
+        ...timeline.phases.map(phase => {
+          const phaseTotalTasks = phase.tasks.length;
+          const phaseCompletedTasks = phase.tasks.filter(t => t.isCompleted).length;
+          const phaseProgress = phaseTotalTasks > 0 
+            ? (phaseCompletedTasks / phaseTotalTasks) * 100 
+            : 0;
+
+          return prisma.timelinePhase.update({
+            where: { id: phase.id },
+            data: {
+              completionPercentage: phaseProgress,
+              status: phaseProgress === 100 ? 'completed' : 
+                      phaseProgress > 0 ? 'in-progress' : 'upcoming'
+            }
+          });
+        })
+      ]);
 
       return NextResponse.json({
         success: true,
@@ -101,7 +130,15 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error("Error updating task completion:", error);
+    console.error("❌ Error updating task:", error);
+    
+    if (error.code === 'P2025') {
+      return NextResponse.json(
+        { error: "Task not found in database" },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
       {
         error: "Failed to update task completion",

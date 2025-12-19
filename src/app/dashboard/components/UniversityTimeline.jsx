@@ -10,71 +10,76 @@ import {
   Flame, Trophy, Rocket, Flag
 } from 'lucide-react';
 
-// ✅ Phase color configurations - Each phase has unique colors
+// ✅ Updated Phase color configurations with brand colors
 const PHASE_COLORS = {
-  0: { // Phase 1: Research - Blue
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    headerBg: 'bg-gradient-to-r from-blue-500 to-blue-600',
-    icon: 'bg-blue-100 text-blue-600',
-    iconActive: 'bg-blue-500 text-white',
-    progress: 'bg-blue-500',
-    badge: 'bg-blue-100 text-blue-700 border-blue-200',
-    light: 'bg-blue-50',
-    accent: 'text-blue-600',
-    ring: 'ring-blue-500'
+  0: { // Phase 1: Research - Brand Blue/Navy
+    bg: 'bg-[#EFF6FF]',
+    border: 'border-[#BFDBFE]',
+    headerBg: 'bg-[#002147]',
+    icon: 'bg-[#DBEAFE] text-[#002147]',
+    iconActive: 'bg-[#002147] text-white',
+    progress: 'bg-[#002147]',
+    badge: 'bg-[#DBEAFE] text-[#1E40AF] border-[#BFDBFE]',
+    light: 'bg-[#EFF6FF]',
+    accent: 'text-[#002147]',
+    ring: 'ring-[#002147]'
   },
-  1: { // Phase 2: Testing - Purple
-    bg: 'bg-purple-50',
-    border: 'border-purple-200',
-    headerBg: 'bg-gradient-to-r from-purple-500 to-purple-600',
-    icon: 'bg-purple-100 text-purple-600',
-    iconActive: 'bg-purple-500 text-white',
-    progress: 'bg-purple-500',
-    badge: 'bg-purple-100 text-purple-700 border-purple-200',
-    light: 'bg-purple-50',
-    accent: 'text-purple-600',
-    ring: 'ring-purple-500'
+  1: { // Phase 2: Testing - Purple (secondary accent)
+    bg: 'bg-[#F5F3FF]',
+    border: 'border-[#DDD6FE]',
+    headerBg: 'bg-[#5B21B6]',
+    icon: 'bg-[#EDE9FE] text-[#5B21B6]',
+    iconActive: 'bg-[#5B21B6] text-white',
+    progress: 'bg-[#5B21B6]',
+    badge: 'bg-[#EDE9FE] text-[#5B21B6] border-[#DDD6FE]',
+    light: 'bg-[#F5F3FF]',
+    accent: 'text-[#5B21B6]',
+    ring: 'ring-[#5B21B6]'
   },
-  2: { // Phase 3: Essays - Pink/Rose
-    bg: 'bg-rose-50',
-    border: 'border-rose-200',
-    headerBg: 'bg-gradient-to-r from-rose-500 to-pink-600',
-    icon: 'bg-rose-100 text-rose-600',
-    iconActive: 'bg-rose-500 text-white',
-    progress: 'bg-rose-500',
-    badge: 'bg-rose-100 text-rose-700 border-rose-200',
-    light: 'bg-rose-50',
-    accent: 'text-rose-600',
-    ring: 'ring-rose-500'
+  2: { // Phase 3: Essays - Rose
+    bg: 'bg-[#FDF2F8]',
+    border: 'border-[#FBCFE8]',
+    headerBg: 'bg-[#BE123C]',
+    icon: 'bg-[#FCE7F3] text-[#BE123C]',
+    iconActive: 'bg-[#BE123C] text-white',
+    progress: 'bg-[#BE123C]',
+    badge: 'bg-[#FCE7F3] text-[#BE123C] border-[#FBCFE8]',
+    light: 'bg-[#FDF2F8]',
+    accent: 'text-[#BE123C]',
+    ring: 'ring-[#BE123C]'
   },
-  3: { // Phase 4: Recommendations - Orange/Amber
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
-    headerBg: 'bg-gradient-to-r from-amber-500 to-orange-500',
-    icon: 'bg-amber-100 text-amber-600',
-    iconActive: 'bg-amber-500 text-white',
-    progress: 'bg-amber-500',
-    badge: 'bg-amber-100 text-amber-700 border-amber-200',
-    light: 'bg-amber-50',
-    accent: 'text-amber-600',
-    ring: 'ring-amber-500'
+  3: { // Phase 4: Recommendations - Amber/Warning
+    bg: 'bg-[#FFFBEB]',
+    border: 'border-[#FDE68A]',
+    headerBg: 'bg-[#D97706]',
+    icon: 'bg-[#FEF3C7] text-[#D97706]',
+    iconActive: 'bg-[#D97706] text-white',
+    progress: 'bg-[#D97706]',
+    badge: 'bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]',
+    light: 'bg-[#FFFBEB]',
+    accent: 'text-[#D97706]',
+    ring: 'ring-[#D97706]'
   },
-  4: { // Phase 5: Submission - Green/Emerald
-    bg: 'bg-emerald-50',
-    border: 'border-emerald-200',
-    headerBg: 'bg-gradient-to-r from-emerald-500 to-teal-500',
-    icon: 'bg-emerald-100 text-emerald-600',
-    iconActive: 'bg-emerald-500 text-white',
-    progress: 'bg-emerald-500',
-    badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    light: 'bg-emerald-50',
-    accent: 'text-emerald-600',
-    ring: 'ring-emerald-500'
+  4: { // Phase 5: Submission - Green/Success
+    bg: 'bg-[#ECFDF5]',
+    border: 'border-[#A7F3D0]',
+    headerBg: 'bg-[#047857]',
+    icon: 'bg-[#D1FAE5] text-[#047857]',
+    iconActive: 'bg-[#047857] text-white',
+    progress: 'bg-[#047857]',
+    badge: 'bg-[#D1FAE5] text-[#047857] border-[#A7F3D0]',
+    light: 'bg-[#ECFDF5]',
+    accent: 'text-[#047857]',
+    ring: 'ring-[#047857]'
   }
 };
 
 const getPhaseColor = (index) => PHASE_COLORS[index % 5];
+
+// ✅ Helper function to validate task ID is a proper CUID
+const isValidTaskId = (id) => {
+  return id && typeof id === 'string' && id.length >= 20;
+};
 
 const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const [selectedUniversity, setSelectedUniversity] = useState(null);
@@ -83,17 +88,17 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const [generatingTimeline, setGeneratingTimeline] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState({});
   const [expandedTasks, setExpandedTasks] = useState({});
-  const [completedTasks, setCompletedTasks] = useState({});
   const [savingTasks, setSavingTasks] = useState({});
   const [error, setError] = useState(null);
   const [loadingTimelines, setLoadingTimelines] = useState({});
   const [debugMode, setDebugMode] = useState(false);
-  const [abortController, setAbortController] = useState(null); // ✅ FIX 2: Add abort controller state
+  const [abortController, setAbortController] = useState(null);
+  const [invalidTasksCount, setInvalidTasksCount] = useState(0);
+  const [hoveredEventCard, setHoveredEventCard] = useState(null);
   const { data: session } = useSession();
 
   // ✅ Helper function to get essay counts - Prioritizes fresh metadata from API
   const getEssayCounts = useCallback(() => {
-    // ✅ FIX 6: Prioritize metadata from API (which uses 98% completion logic)
     if (metadata && typeof metadata.essaysRequired === 'number') {
       return {
         completed: metadata.essaysCompleted ?? 0,
@@ -104,7 +109,6 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
       };
     }
 
-    // ✅ Fallback to university data if no metadata yet
     if (selectedUniversity) {
       const completed = selectedUniversity.completedEssays ?? 0;
       const total = selectedUniversity.totalEssays ?? 0;
@@ -209,40 +213,76 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     };
   }, [metadata]);
 
-  // ✅ Helper function to get progress stats
   const getProgressStats = useCallback(() => {
+    // Calculate essay progress from metadata
+    const essayProgress = metadata?.essayCompletionRate ??
+      (metadata?.essaysRequired > 0
+        ? Math.round((metadata.essaysCompleted / metadata.essaysRequired) * 100)
+        : 0);
+
+    // Calculate event progress from metadata
+    const eventProgress = metadata?.calendarEventsTotal > 0
+      ? Math.round((metadata.calendarEventsCompleted / metadata.calendarEventsTotal) * 100)
+      : 0;
+
+    // Calculate test progress
+    const testProgress = (() => {
+      const testsNeeded = [];
+      const testsCompleted = [];
+
+      if (metadata?.requiresGMAT) {
+        testsNeeded.push('GMAT');
+        if (metadata?.userHasGMAT) testsCompleted.push('GMAT');
+      }
+      if (metadata?.requiresGRE) {
+        testsNeeded.push('GRE');
+        if (metadata?.userHasGRE) testsCompleted.push('GRE');
+      }
+      if (metadata?.requiresIELTS) {
+        testsNeeded.push('IELTS');
+        if (metadata?.userHasIELTS) testsCompleted.push('IELTS');
+      }
+      if (metadata?.requiresTOEFL) {
+        testsNeeded.push('TOEFL');
+        if (metadata?.userHasTOEFL) testsCompleted.push('TOEFL');
+      }
+
+      return testsNeeded.length > 0 
+        ? Math.round((testsCompleted.length / testsNeeded.length) * 100)
+        : 0;
+    })();
+
     return {
       overall: metadata?.overallProgress ?? metadata?.currentProgress ?? 0,
-      essays: metadata?.essayProgress ?? 0,
-      events: metadata?.eventProgress ?? 0,
-      tests: metadata?.testProgress ?? 0
+      essays: essayProgress,
+      events: eventProgress,
+      tests: testProgress
     };
   }, [metadata]);
 
-  // ✅ Count completed tasks from timeline
+  // ✅ Count completed tasks from timeline (UPDATED: Use timeline state directly)
   const getTimelineTaskStats = useCallback(() => {
     if (!timeline?.phases) return { total: 0, completed: 0 };
 
     let total = 0;
     let completed = 0;
 
-    timeline.phases.forEach((phase, phaseIdx) => {
-      phase.tasks?.forEach((task, taskIdx) => {
+    timeline.phases.forEach((phase) => {
+      phase.tasks?.forEach((task) => {
         total++;
-        if (completedTasks[`${phaseIdx}-${taskIdx}`] || task.completed || task.status === 'completed') {
+        if (task.completed === true || task.status === 'completed') {
           completed++;
         }
       });
     });
 
     return { total, completed };
-  }, [timeline, completedTasks]);
+  }, [timeline]);
 
   // ✅ FIX 1: Only set first university as selected, DON'T auto-generate
   useEffect(() => {
     if (universities && universities.length > 0 && !selectedUniversity) {
       setSelectedUniversity(universities[0]);
-      // Don't call generateTimeline here - wait for user action
     }
   }, [universities, selectedUniversity]);
 
@@ -255,7 +295,6 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const generateTimeline = useCallback(async (university, forceRegenerate = false) => {
     if (!university || !session?.token) return;
 
-    // ✅ FIX: Abort previous request if still running
     if (abortController) {
       abortController.abort();
       console.log('🚫 Aborted previous timeline request');
@@ -264,15 +303,13 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     const newAbortController = new AbortController();
     setAbortController(newAbortController);
 
-    // ✅ FIX: Set loading state ONLY for this specific university
     setGeneratingTimeline(true);
     setLoadingTimelines(prev => ({ ...prev, [university.id]: true }));
     setError(null);
-    
-    // ✅ FIX: Clear timeline/metadata BEFORE fetching new data
+    setInvalidTasksCount(0);
+
     setTimeline(null);
     setMetadata(null);
-    setCompletedTasks({}); // ✅ CRITICAL: Reset completed tasks
     setExpandedPhases({});
     setExpandedTasks({});
 
@@ -316,7 +353,7 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
           userId: userId,
           forceRegenerate: forceRegenerate
         }),
-        signal: newAbortController.signal // ✅ FIX: Add abort signal
+        signal: newAbortController.signal
       });
 
       const data = await response.json();
@@ -327,11 +364,10 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
 
       if (data.success && data.timeline) {
         console.log(`✅ Timeline loaded for: ${university.id}`);
-        
+
         setTimeline(data.timeline);
         setMetadata(data.metadata || null);
 
-        // ✅ Debug: Log data sync info
         console.log('📊 Timeline Data Sync Check:', {
           essaysFromMetadata: data.metadata?.essaysCompleted,
           essaysTotal: data.metadata?.essaysRequired,
@@ -339,7 +375,6 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
           fromDatabase: data.metadata?.fromDatabase
         });
 
-        // Auto-expand phases that are in-progress or first phase
         const initialExpanded = {};
         data.timeline.phases?.forEach((phase, idx) => {
           if (phase.status === 'in-progress' || idx === 0) {
@@ -348,41 +383,63 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         });
         setExpandedPhases(initialExpanded);
 
-        // ✅ FIX: Initialize completed tasks from API response with strict validation
-        const initialCompleted = {};
+        // ✅ FIX: Validate tasks and count invalid IDs
+        const invalidTasks = [];
+        let validTaskCount = 0;
         let completedCount = 0;
 
         data.timeline.phases?.forEach((phase, phaseIdx) => {
           phase.tasks?.forEach((task, taskIdx) => {
-            // ✅ CRITICAL: Only mark as complete if explicitly true in response
-            const isCompleted = task.completed === true || task.status === 'completed';
-            if (isCompleted) {
-              initialCompleted[`${phaseIdx}-${taskIdx}`] = true;
+            if (!isValidTaskId(task.id)) {
+              invalidTasks.push({ 
+                phaseIdx, 
+                taskIdx, 
+                title: task.title?.substring(0, 40),
+                id: task.id,
+                idType: typeof task.id
+              });
+              console.warn(`⚠️ Task missing valid ID: Phase ${phaseIdx + 1}, Task ${taskIdx + 1} - "${task.title?.substring(0, 30)}"`);
+            }
+
+            if (isValidTaskId(task.id)) {
+              validTaskCount++;
+            }
+
+            // Count completed tasks from timeline data
+            if (task.completed === true || task.status === 'completed') {
               completedCount++;
             }
           });
         });
 
-        setCompletedTasks(initialCompleted);
+        // ✅ Track invalid tasks count for UI warning
+        if (invalidTasks.length > 0) {
+          setInvalidTasksCount(invalidTasks.length);
+          console.warn(`⚠️ ${invalidTasks.length} tasks have invalid IDs:`, invalidTasks);
+          
+          // Only show error if ALL tasks are invalid (timeline wasn't saved to DB)
+          if (validTaskCount === 0 && data.timeline.phases?.length > 0) {
+            setError(`Timeline tasks don't have database IDs. Task completion cannot be saved. Please regenerate the timeline.`);
+          }
+        }
 
-        // ✅ Validation log
         console.log('✅ Task Completion Initialized:', {
           university: university.universityName,
           totalCompletedTasks: completedCount,
+          validTasks: validTaskCount,
+          invalidTasks: invalidTasks.length,
           essaysCompleted: data.metadata?.essaysCompleted,
           eventsCompleted: data.metadata?.calendarEventsCompleted
         });
-
       } else {
         throw new Error(data.error || 'Failed to generate timeline');
       }
     } catch (err) {
-      // ✅ FIX: Don't show error if request was aborted
       if (err.name === 'AbortError') {
         console.log('⏸️ Request aborted');
         return;
       }
-      
+
       console.error('Error generating timeline:', err);
       setError(err.message || 'Failed to generate timeline. Please try again.');
     } finally {
@@ -407,37 +464,69 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     }));
   };
 
-  // ✅ toggleTaskComplete function with database persistence
+  // ✅ CRITICAL FIX: Updated toggleTaskComplete function to use timeline state directly
   const toggleTaskComplete = async (phaseIndex, taskIndex) => {
-    const key = `${phaseIndex}-${taskIndex}`;
-    const newCompletedState = !completedTasks[key];
     const task = timeline?.phases?.[phaseIndex]?.tasks?.[taskIndex];
 
-    if (!task || !session?.token) {
-      console.error('Missing task or session');
+    if (!task) {
+      console.error('❌ Task not found');
+      setError('Task not found');
       return;
     }
 
-    // Mark as saving
-    setSavingTasks(prev => ({ ...prev, [key]: true }));
+    if (!session?.token) {
+      console.error('❌ No session token');
+      setError('Please log in to save changes');
+      return;
+    }
 
-    // Optimistically update UI
-    setCompletedTasks(prev => ({
-      ...prev,
-      [key]: newCompletedState
-    }));
+    const taskId = task.id;
+
+    // ✅ Validate ID is a proper CUID string (at least 20 characters)
+    if (!isValidTaskId(taskId)) {
+      console.error('❌ Invalid task ID:', {
+        id: taskId,
+        type: typeof taskId,
+        length: taskId?.length,
+        taskNumber: task.taskNumber,
+        title: task.title?.substring(0, 40)
+      });
+
+      // ✅ Show user-friendly error
+      setError('Cannot save task: Invalid task ID. Please click "Regenerate" to fix this issue.');
+      setTimeout(() => setError(null), 8000);
+      return;
+    }
+
+    const newCompletedState = !task.completed;
+    const taskKey = `${phaseIndex}-${taskIndex}`;
+
+    // Mark as saving
+    setSavingTasks(prev => ({ ...prev, [taskKey]: true }));
+
+    // ✅ CRITICAL: Update timeline state immediately for UI (single source of truth)
+    setTimeline(prevTimeline => {
+      const newTimeline = JSON.parse(JSON.stringify(prevTimeline));
+      const targetTask = newTimeline.phases[phaseIndex].tasks[taskIndex];
+      targetTask.completed = newCompletedState;
+      targetTask.status = newCompletedState ? 'completed' : 'pending';
+      return newTimeline;
+    });
 
     try {
       const userId = session?.user?.id || session?.userId || session?.user?.sub;
 
-      // Get task ID from database (should be task.id from TimelineTask table)
-      const taskId = task.id;
-
-      if (!taskId) {
-        throw new Error('Task ID not found - task may not be saved in database');
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
-      // Save to database
+      console.log('💾 Saving task completion:', {
+        taskId: taskId,
+        title: task.title?.substring(0, 40),
+        newState: newCompletedState
+      });
+
+      // ✅ Save to database with validated CUID
       const response = await fetch('/api/update-task-completion', {
         method: 'POST',
         headers: {
@@ -473,22 +562,17 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         }));
       }
 
-      // Update timeline with new progress
-      if (timeline) {
-        setTimeline(prev => ({
-          ...prev,
-          currentProgress: data.newProgress || prev.currentProgress
-        }));
-      }
-
     } catch (error) {
       console.error('❌ Failed to save task completion:', error);
 
-      // Revert optimistic update on error
-      setCompletedTasks(prev => ({
-        ...prev,
-        [key]: !newCompletedState
-      }));
+      // ✅ Revert optimistic update on error
+      setTimeline(prevTimeline => {
+        const newTimeline = JSON.parse(JSON.stringify(prevTimeline));
+        const targetTask = newTimeline.phases[phaseIndex].tasks[taskIndex];
+        targetTask.completed = !newCompletedState;
+        targetTask.status = !newCompletedState ? 'completed' : 'pending';
+        return newTimeline;
+      });
 
       // Show error to user
       setError(`Failed to save: ${error.message}`);
@@ -498,7 +582,7 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
       // Remove saving state
       setSavingTasks(prev => {
         const newState = { ...prev };
-        delete newState[key];
+        delete newState[taskKey];
         return newState;
       });
     }
@@ -507,22 +591,18 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   // ✅ FIX 4: Fix handleUniversityChange - Don't auto-generate
   const handleUniversityChange = (university) => {
     console.log(`🔄 User selected: ${university.id} - ${university.universityName}`);
-    
-    // ✅ FIX: Abort any ongoing request
+
     if (abortController) {
       abortController.abort();
     }
-    
-    // ✅ FIX: Clear ALL state before switching universities
+
     setSelectedUniversity(university);
     setTimeline(null);
     setMetadata(null);
     setExpandedTasks({});
-    setCompletedTasks({}); // ✅ CRITICAL: Reset tasks
     setExpandedPhases({});
     setError(null);
-    
-    // ✅ DON'T auto-generate - user must click "Generate Timeline" button
+    setInvalidTasksCount(0);
   };
 
   const handleRegenerate = () => {
@@ -534,7 +614,7 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const getStatusColor = (status, phaseIndex = 0) => {
     const colors = getPhaseColor(phaseIndex);
     switch (status?.toLowerCase()) {
-      case 'completed': return 'bg-green-100 text-green-700 border-green-300';
+      case 'completed': return 'bg-emerald-100 text-emerald-700 border-emerald-300';
       case 'in-progress': return `${colors.badge}`;
       case 'upcoming': return 'bg-gray-100 text-gray-600 border-gray-300';
       default: return 'bg-gray-100 text-gray-600 border-gray-300';
@@ -543,10 +623,10 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'critical': return 'text-red-700 bg-red-100 border-red-300 font-bold';
-      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
-      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      case 'high': return 'text-[#BE123C] bg-rose-50 border-rose-200';
+      case 'critical': return 'text-[#BE123C] bg-rose-100 border-rose-300 font-bold';
+      case 'medium': return 'text-[#D97706] bg-amber-50 border-amber-200';
+      case 'low': return 'text-[#047857] bg-emerald-50 border-emerald-200';
       default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
@@ -572,28 +652,28 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     return icons[phaseIndex] || <Circle className="w-6 h-6" />;
   };
 
+  // ✅ UPDATED: Calculate phase progress using timeline state directly
   const calculatePhaseProgress = (phase, phaseIndex) => {
     if (!phase.tasks || phase.tasks.length === 0) return 0;
-    const completed = phase.tasks.filter((task, taskIdx) =>
-      completedTasks[`${phaseIndex}-${taskIdx}`] || task.completed || task.status === 'completed'
+    const completed = phase.tasks.filter(task =>
+      task.completed === true || task.status === 'completed'
     ).length;
     return Math.round((completed / phase.tasks.length) * 100);
   };
 
+  // ✅ UPDATED: Calculate overall progress using timeline state directly
   const calculateOverallProgress = () => {
     if (!timeline?.phases) return metadata?.currentProgress || metadata?.overallProgress || 0;
 
     let totalTasks = 0;
     let completedCount = 0;
 
-    timeline.phases.forEach((phase, phaseIdx) => {
+    timeline.phases.forEach((phase) => {
       if (phase.tasks) {
         totalTasks += phase.tasks.length;
-        phase.tasks.forEach((task, taskIdx) => {
-          if (completedTasks[`${phaseIdx}-${taskIdx}`] || task.completed || task.status === 'completed') {
-            completedCount++;
-          }
-        });
+        completedCount += phase.tasks.filter(task => 
+          task.completed === true || task.status === 'completed'
+        ).length;
       }
     });
 
@@ -610,11 +690,11 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   };
 
   const getDeadlineUrgency = (daysUntilDeadline) => {
-    if (daysUntilDeadline <= 0) return { color: 'text-red-600', label: 'Passed', bg: 'bg-red-50', border: 'border-red-200' };
-    if (daysUntilDeadline <= 14) return { color: 'text-red-600', label: 'Urgent', bg: 'bg-red-50', border: 'border-red-200' };
-    if (daysUntilDeadline <= 30) return { color: 'text-orange-600', label: 'Soon', bg: 'bg-orange-50', border: 'border-orange-200' };
-    if (daysUntilDeadline <= 60) return { color: 'text-amber-600', label: 'Approaching', bg: 'bg-amber-50', border: 'border-amber-200' };
-    return { color: 'text-green-600', label: 'On Track', bg: 'bg-green-50', border: 'border-green-200' };
+    if (daysUntilDeadline <= 0) return { color: 'text-[#BE123C]', label: 'Passed', bg: 'bg-rose-50', border: 'border-rose-200' };
+    if (daysUntilDeadline <= 14) return { color: 'text-[#BE123C]', label: 'Urgent', bg: 'bg-rose-50', border: 'border-rose-200' };
+    if (daysUntilDeadline <= 30) return { color: 'text-[#D97706]', label: 'Soon', bg: 'bg-amber-50', border: 'border-amber-200' };
+    if (daysUntilDeadline <= 60) return { color: 'text-[#D97706]', label: 'Approaching', bg: 'bg-amber-50', border: 'border-amber-200' };
+    return { color: 'text-[#047857]', label: 'On Track', bg: 'bg-emerald-50', border: 'border-emerald-200' };
   };
 
   // Get computed values
@@ -624,12 +704,23 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const progressStats = getProgressStats();
   const taskStats = getTimelineTaskStats();
 
+  // ✅ UPDATED: Helper to check if task is completed (from timeline state)
+  const isTaskCompleted = (phaseIndex, taskIndex) => {
+    return timeline?.phases?.[phaseIndex]?.tasks?.[taskIndex]?.completed === true;
+  };
+
+  // ✅ UPDATED: Helper to get completed tasks count per phase
+  const getCompletedTasksCount = (phase) => {
+    if (!phase.tasks) return 0;
+    return phase.tasks.filter(task => task.completed === true || task.status === 'completed').length;
+  };
+
   // Empty state
   if (!universities || universities.length === 0) {
     return (
       <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-200">
-        <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Calendar className="w-10 h-10 text-indigo-500" />
+        <div className="w-20 h-20 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-6">
+          <Calendar className="w-10 h-10 text-[#002147]" />
         </div>
         <h3 className="text-2xl font-bold text-gray-800 mb-3">No Universities Saved</h3>
         <p className="text-gray-500 max-w-md mx-auto mb-6">
@@ -643,30 +734,48 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     <div className="max-w-7xl mx-auto space-y-6">
       {/* ✅ Error Toast Notification */}
       {error && (
-        <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top">
+        <div className="fixed top-4 right-4 z-50 bg-[#BE123C] text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top max-w-lg">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="font-medium">{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 hover:bg-red-600 rounded-lg p-1 transition-colors"
-          >
+          <span className="font-medium text-sm">{error}</span>
+          <button onClick={() => setError(null)} className="ml-2 hover:bg-rose-700 rounded-lg p-1 transition-colors">
             <XCircle className="w-5 h-5" />
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 rounded-2xl p-8 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyek0zNiAyNnYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
+      {/* ✅ NEW: Invalid Tasks Warning Banner */}
+      {invalidTasksCount > 0 && timeline && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-amber-600" />
+            <div>
+              <p className="font-semibold text-amber-800">
+                {invalidTasksCount} task{invalidTasksCount > 1 ? 's have' : ' has'} invalid ID{invalidTasksCount > 1 ? 's' : ''}
+              </p>
+              <p className="text-sm text-amber-700">
+                Task completion for these items won't be saved. Click Regenerate to fix.
+              </p>
+            </div>
+          </div>
+          <button onClick={handleRegenerate} disabled={generatingTimeline} className="px-4 py-2 bg-[#D97706] text-white rounded-lg hover:bg-[#B45309] transition-colors font-medium flex items-center gap-2 disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${generatingTimeline ? 'animate-spin' : ''}`} />
+            Regenerate
+          </button>
+        </div>
+      )}
 
+      {/* Header */}
+      <div className="bg-[#002147] rounded-2xl p-8 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyek0zNiAyNnYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
+        
         <div className="relative flex items-start justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
               <Sparkles className="w-8 h-8 text-yellow-300" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-2">AI Application Timeline</h1>
-              <p className="text-indigo-200 text-lg">
+              <h1 className="text-3xl font-bold text-white mb-2">AI Application Timeline</h1>
+              <p className="text-blue-200 text-lg">
                 Your personalized step-by-step guide from research to submission
               </p>
             </div>
@@ -697,8 +806,9 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         <div className="bg-slate-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-auto">
           <div className="font-bold text-white mb-2">📊 Data Sync Debug Info:</div>
           <pre className="whitespace-pre-wrap">
-{`Essays: ${essayCounts.completed}/${essayCounts.total} (${essayCounts.rate}%)
+            {`Essays: ${essayCounts.completed}/${essayCounts.total} (${essayCounts.rate}%)
 Tasks in UI: ${taskStats.completed}/${taskStats.total}
+Invalid Task IDs: ${invalidTasksCount}
 Calendar: ${calendarStats.completed}/${calendarStats.total}
 Tests Needed: ${testStatus.needed.join(', ') || 'None'}
 Tests Complete: ${testStatus.completed.map(t => t.display).join(', ') || 'None'}
@@ -712,9 +822,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
       {/* University Selector */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <label className="text-lg font-bold text-gray-900">
-            Select University
-          </label>
+          <label className="text-lg font-bold text-gray-900">Select University</label>
           <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
             {universities.length} {universities.length === 1 ? 'university' : 'universities'} saved
           </span>
@@ -729,11 +837,11 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               <button
                 key={uni.id}
                 onClick={() => handleUniversityChange(uni)}
-                disabled={generatingTimeline} // ✅ FIX 5: Disable ALL during generation
+                disabled={generatingTimeline}
                 className={`p-5 rounded-xl border-2 transition-all text-left hover:shadow-lg disabled:opacity-50 group ${
                   isSelected
-                    ? 'border-indigo-500 bg-indigo-50 shadow-lg ring-2 ring-indigo-500/20'
-                    : 'border-gray-200 hover:border-indigo-300 bg-white'
+                    ? 'border-[#002147] bg-[#EFF6FF] shadow-lg ring-2 ring-[#002147]/20'
+                    : 'border-gray-200 hover:border-[#002147] bg-white'
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -745,12 +853,12 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                         className="w-12 h-12 rounded-xl object-cover border border-gray-200"
                       />
                     ) : (
-                      <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
                         <Building2 className="w-6 h-6 text-gray-500" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                      <h3 className="font-bold text-gray-900 line-clamp-1 group-hover:text-[#002147] transition-colors">
                         {uni.universityName || uni.name}
                       </h3>
                       <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
@@ -760,7 +868,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     </div>
                   </div>
                   {isSelected ? (
-                    <CheckCircle2 className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+                    <CheckCircle2 className="w-6 h-6 text-[#002147] flex-shrink-0" />
                   ) : isLoading ? (
                     <Loader2 className="w-6 h-6 text-gray-400 animate-spin flex-shrink-0" />
                   ) : null}
@@ -778,7 +886,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                       <div
                         className={`h-2.5 rounded-full transition-all duration-500 ${
-                          isSelected ? 'bg-gradient-to-r from-indigo-500 to-purple-600' : 'bg-gray-400'
+                          isSelected ? 'bg-[#002147]' : 'bg-gray-400'
                         }`}
                         style={{ width: `${progress}%` }}
                       />
@@ -796,7 +904,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             <button
               onClick={() => generateTimeline(selectedUniversity)}
               disabled={generatingTimeline}
-              className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold inline-flex items-center gap-3 shadow-lg shadow-indigo-600/25"
+              className="px-8 py-4 bg-[#002147] text-white rounded-xl hover:bg-[#001122] transition-all font-semibold inline-flex items-center gap-3 shadow-lg"
             >
               <Sparkles className="w-5 h-5" />
               Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
@@ -809,24 +917,24 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
       {generatingTimeline ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
           <div className="relative w-24 h-24 mx-auto mb-8">
-            <div className="absolute inset-0 bg-indigo-100 rounded-full animate-ping opacity-50" />
-            <div className="absolute inset-2 bg-indigo-200 rounded-full animate-pulse" />
-            <div className="relative w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+            <div className="absolute inset-0 bg-[#DBEAFE] rounded-full animate-ping opacity-50" />
+            <div className="absolute inset-2 bg-[#BFDBFE] rounded-full animate-pulse" />
+            <div className="relative w-24 h-24 bg-[#002147] rounded-full flex items-center justify-center">
               <Loader2 className="w-12 h-12 text-white animate-spin" />
             </div>
           </div>
           <h3 className="text-2xl font-bold text-gray-900 mb-3">Generating Your Timeline</h3>
           <p className="text-gray-600 max-w-lg mx-auto mb-6">
-            AI is analyzing <strong className="text-indigo-600">{selectedUniversity?.universityName || selectedUniversity?.name}</strong>&apos;s
+            AI is analyzing <strong className="text-[#002147]">{selectedUniversity?.universityName || selectedUniversity?.name}</strong>'s
             requirements and your profile...
           </p>
           <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
             <span className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               Analyzing
             </span>
             <span className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+              <Loader2 className="w-5 h-5 animate-spin text-[#002147]" />
               Creating phases
             </span>
             <span className="flex items-center gap-2">
@@ -836,16 +944,13 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           </div>
         </div>
       ) : error && !timeline ? (
-        <div className="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-2xl p-10 text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <XCircle className="w-10 h-10 text-red-600" />
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-10 text-center">
+          <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <XCircle className="w-10 h-10 text-[#BE123C]" />
           </div>
-          <h3 className="text-2xl font-bold text-red-900 mb-3">Error Generating Timeline</h3>
-          <p className="text-red-700 mb-8 max-w-md mx-auto">{error}</p>
-          <button
-            onClick={handleRegenerate}
-            className="px-8 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-semibold inline-flex items-center gap-2 shadow-lg shadow-red-600/25"
-          >
+          <h3 className="text-2xl font-bold text-rose-900 mb-3">Error Generating Timeline</h3>
+          <p className="text-rose-700 mb-8 max-w-md mx-auto">{error}</p>
+          <button onClick={handleRegenerate} className="px-8 py-3 bg-[#BE123C] text-white rounded-xl hover:bg-[#9F1239] transition-colors font-semibold inline-flex items-center gap-2">
             <RefreshCw className="w-5 h-5" />
             Try Again
           </button>
@@ -857,20 +962,14 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {/* Deadline Card */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 30
-                  ? 'border-red-200 bg-red-50/50'
-                  : 'border-gray-200'
+                metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 30 ? 'border-rose-200 bg-rose-50/50' : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2.5 rounded-xl ${
-                    metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14
-                      ? 'bg-red-100'
-                      : 'bg-orange-100'
+                    metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14 ? 'bg-rose-100' : 'bg-amber-100'
                   }`}>
                     <Timer className={`w-5 h-5 ${
-                      metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14
-                        ? 'text-red-600'
-                        : 'text-orange-600'
+                      metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14 ? 'text-[#BE123C]' : 'text-[#D97706]'
                     }`} />
                   </div>
                   <span className="text-sm font-medium text-gray-500">Deadline</span>
@@ -895,17 +994,17 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               {/* Essays Card - Color coded by completion */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
                 essayCounts.rate === 100
-                  ? 'border-green-200 bg-green-50/50'
+                  ? 'border-emerald-200 bg-emerald-50/50'
                   : essayCounts.rate >= 50
                     ? 'border-purple-200'
                     : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2.5 rounded-xl ${
-                    essayCounts.rate === 100 ? 'bg-green-100' : 'bg-purple-100'
+                    essayCounts.rate === 100 ? 'bg-emerald-100' : 'bg-purple-100'
                   }`}>
                     <FileText className={`w-5 h-5 ${
-                      essayCounts.rate === 100 ? 'text-green-600' : 'text-purple-600'
+                      essayCounts.rate === 100 ? 'text-emerald-600' : 'text-purple-600'
                     }`} />
                   </div>
                   <span className="text-sm font-medium text-gray-500">Essays</span>
@@ -925,7 +1024,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div
                         className={`h-2 rounded-full transition-all duration-500 ${
-                          essayCounts.rate === 100 ? 'bg-green-500' : 'bg-purple-500'
+                          essayCounts.rate === 100 ? 'bg-emerald-500' : 'bg-purple-500'
                         }`}
                         style={{ width: `${essayCounts.rate}%` }}
                       />
@@ -938,17 +1037,17 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               {/* Tests Card */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
                 testStatus.allComplete
-                  ? 'border-green-200 bg-green-50/50'
+                  ? 'border-emerald-200 bg-emerald-50/50'
                   : testStatus.needed.length > 0
                     ? 'border-amber-200'
                     : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2.5 rounded-xl ${
-                    testStatus.allComplete ? 'bg-green-100' : 'bg-blue-100'
+                    testStatus.allComplete ? 'bg-emerald-100' : 'bg-blue-100'
                   }`}>
                     <GraduationCap className={`w-5 h-5 ${
-                      testStatus.allComplete ? 'text-green-600' : 'text-blue-600'
+                      testStatus.allComplete ? 'text-emerald-600' : 'text-blue-600'
                     }`} />
                   </div>
                   <span className="text-sm font-medium text-gray-500">Tests</span>
@@ -957,8 +1056,8 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                   <div className="text-sm text-gray-400">No tests required</div>
                 ) : testStatus.allComplete ? (
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
-                    <span className="text-lg font-bold text-green-600">Complete!</span>
+                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                    <span className="text-lg font-bold text-emerald-600">Complete!</span>
                   </div>
                 ) : (
                   <>
@@ -973,7 +1072,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                 {testStatus.completed.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {testStatus.completed.map((test, idx) => (
-                      <span key={idx} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                      <span key={idx} className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
                         ✓ {test.name}
                       </span>
                     ))}
@@ -982,17 +1081,18 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               </div>
 
               {/* Calendar Events Card */}
-              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                calendarStats.overdue > 0
-                  ? 'border-red-200 bg-red-50/50'
-                  : 'border-gray-200'
-              }`}>
+              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md relative ${
+                calendarStats.overdue > 0 ? 'border-rose-200 bg-rose-50/50' : 'border-gray-200'
+              }`}
+                onMouseEnter={() => setHoveredEventCard('calendar')}
+                onMouseLeave={() => setHoveredEventCard(null)}
+              >
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2.5 rounded-xl ${
-                    calendarStats.overdue > 0 ? 'bg-red-100' : 'bg-indigo-100'
+                    calendarStats.overdue > 0 ? 'bg-rose-100' : 'bg-blue-100'
                   }`}>
                     <Calendar className={`w-5 h-5 ${
-                      calendarStats.overdue > 0 ? 'text-red-600' : 'text-indigo-600'
+                      calendarStats.overdue > 0 ? 'text-[#BE123C]' : 'text-[#002147]'
                     }`} />
                   </div>
                   <span className="text-sm font-medium text-gray-500">Events</span>
@@ -1003,7 +1103,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                   <span className="text-lg text-gray-600">{calendarStats.total}</span>
                 </div>
                 {calendarStats.overdue > 0 && (
-                  <div className="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                  <div className="text-xs text-[#BE123C] mt-1 font-semibold flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     {calendarStats.overdue} overdue!
                   </div>
@@ -1013,11 +1113,68 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
-                          className="bg-indigo-500 h-2 rounded-full transition-all"
+                          className="bg-[#002147] h-2 rounded-full transition-all"
                           style={{ width: `${calendarStats.rate}%` }}
                         />
                       </div>
                       <span className="text-xs font-bold text-gray-600">{calendarStats.rate}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hover Tooltip Popup for Calendar Events */}
+                {hoveredEventCard === 'calendar' && calendarStats.total > 0 && (
+                  <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#002147] p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-3">
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-2 border-b-2 border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-[#002147]" />
+                          <span className="text-sm font-bold text-gray-900">Calendar Events</span>
+                        </div>
+                        <span className="text-xs font-semibold text-[#002147] bg-[#DBEAFE] px-2 py-1 rounded-full">
+                          {calendarStats.total} total
+                        </span>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                            <span className="text-xs text-emerald-700 font-medium">Completed</span>
+                          </div>
+                          <div className="text-lg font-bold text-emerald-700">{calendarStats.completed}</div>
+                        </div>
+
+                        <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-xs text-blue-700 font-medium">Pending</span>
+                          </div>
+                          <div className="text-lg font-bold text-blue-700">{calendarStats.pending}</div>
+                        </div>
+
+                        {calendarStats.overdue > 0 && (
+                          <div className="col-span-2 bg-rose-50 rounded-lg p-2 border-2 border-rose-300">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-[#BE123C] rounded-full animate-pulse"></div>
+                                <span className="text-xs text-[#BE123C] font-medium">Overdue</span>
+                              </div>
+                              <div className="text-lg font-bold text-[#BE123C]">{calendarStats.overdue}</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Note */}
+                      <div className="pt-2 border-t border-gray-100">
+                        <div className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                          <Info className="w-3 h-3" />
+                          <span>View full calendar details in Events tab</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1026,8 +1183,8 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               {/* Acceptance Rate Card */}
               <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-5 transition-all hover:shadow-md">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2.5 bg-teal-100 rounded-xl">
-                    <TrendingUp className="w-5 h-5 text-teal-600" />
+                  <div className="p-2.5 bg-emerald-100 rounded-xl">
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
                   </div>
                   <span className="text-sm font-medium text-gray-500">Acceptance</span>
                 </div>
@@ -1038,10 +1195,10 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     </div>
                     <div className={`text-xs mt-1 font-semibold px-2 py-0.5 rounded-full inline-block ${
                       (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 15
-                        ? 'text-red-700 bg-red-100'
+                        ? 'text-[#BE123C] bg-rose-100'
                         : (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 30
-                          ? 'text-amber-700 bg-amber-100'
-                          : 'text-green-700 bg-green-100'
+                          ? 'text-[#D97706] bg-amber-100'
+                          : 'text-emerald-700 bg-emerald-100'
                     }`}>
                       {(metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 15 ? 'Highly Selective' :
                         (metadata?.acceptanceRate || selectedUniversity?.acceptanceRate) < 30 ? 'Competitive' : 'Moderate'}
@@ -1055,41 +1212,41 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           )}
 
           {/* Timeline Overview - Enhanced */}
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-8 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl"></div>
+          <div className="bg-[#002147] rounded-2xl p-8 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#002147]/20 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#002147]/20 rounded-full blur-3xl"></div>
 
             <div className="relative">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
                 <div className="text-center md:text-left">
-                  <div className="text-slate-400 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
                     <Clock className="w-4 h-4" />
                     Duration
                   </div>
                   <div className="text-3xl font-bold">{timeline.totalDuration || '4-6 months'}</div>
                 </div>
                 <div className="text-center md:text-left">
-                  <div className="text-slate-400 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
                     <TrendingUp className="w-4 h-4" />
                     Progress
                   </div>
                   <div className="text-3xl font-bold">{calculateOverallProgress()}%</div>
                 </div>
                 <div className="text-center md:text-left">
-                  <div className="text-slate-400 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
                     <Flag className="w-4 h-4" />
                     Phases
                   </div>
                   <div className="text-3xl font-bold">{timeline.phases?.length || 0}</div>
                 </div>
                 <div className="text-center md:text-left">
-                  <div className="text-slate-400 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
                     <ClipboardList className="w-4 h-4" />
                     Tasks
                   </div>
                   <div className="text-3xl font-bold">
-                    <span className="text-green-400">{taskStats.completed}</span>
-                    <span className="text-slate-500">/</span>
+                    <span className="text-emerald-400">{taskStats.completed}</span>
+                    <span className="text-blue-300">/</span>
                     {taskStats.total}
                   </div>
                 </div>
@@ -1098,42 +1255,42 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               {/* Enhanced Progress Bar */}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-slate-300 font-medium">Overall Progress</span>
+                  <span className="text-sm text-blue-200 font-medium">Overall Progress</span>
                   <span className="text-sm font-bold text-white">{calculateOverallProgress()}%</span>
                 </div>
-                <div className="w-full bg-slate-700/50 rounded-full h-4 overflow-hidden backdrop-blur-sm">
+                <div className="w-full bg-blue-900/50 rounded-full h-4 overflow-hidden backdrop-blur-sm">
                   <div
-                    className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-4 rounded-full transition-all duration-700 relative"
+                    className="bg-[#002147] h-4 rounded-full transition-all duration-700 relative"
                     style={{ width: `${calculateOverallProgress()}%` }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
+                    <div className="absolute inset-0 bg-white/20"></div>
                   </div>
                 </div>
               </div>
 
               {/* Progress Breakdown */}
               {metadata && (
-                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-700/50">
+                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-blue-800/50">
                   <div className="text-center p-4 bg-white/5 rounded-xl backdrop-blur-sm">
                     <FileText className="w-5 h-5 mx-auto mb-2 text-purple-400" />
-                    <div className="text-slate-400 text-xs mb-1">Essays</div>
+                    <div className="text-blue-200 text-xs mb-1">Essays</div>
                     <div className="text-xl font-bold">{progressStats.essays}%</div>
                   </div>
                   <div className="text-center p-4 bg-white/5 rounded-xl backdrop-blur-sm">
                     <Calendar className="w-5 h-5 mx-auto mb-2 text-blue-400" />
-                    <div className="text-slate-400 text-xs mb-1">Events</div>
+                    <div className="text-blue-200 text-xs mb-1">Events</div>
                     <div className="text-xl font-bold">{progressStats.events}%</div>
                   </div>
                   <div className="text-center p-4 bg-white/5 rounded-xl backdrop-blur-sm">
-                    <GraduationCap className="w-5 h-5 mx-auto mb-2 text-green-400" />
-                    <div className="text-slate-400 text-xs mb-1">Tests</div>
+                    <GraduationCap className="w-5 h-5 mx-auto mb-2 text-emerald-400" />
+                    <div className="text-blue-200 text-xs mb-1">Tests</div>
                     <div className="text-xl font-bold">{progressStats.tests}%</div>
                   </div>
                 </div>
               )}
 
               {timeline.overview && (
-                <p className="text-slate-300 leading-relaxed mt-6 pt-6 border-t border-slate-700/50 text-center md:text-left">
+                <p className="text-blue-100 leading-relaxed mt-6 pt-6 border-t border-blue-800/50 text-center md:text-left">
                   {timeline.overview}
                 </p>
               )}
@@ -1143,7 +1300,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           {/* Phase Progress Overview - Color Coded */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h3 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
-              <Flag className="w-5 h-5 text-indigo-600" />
+              <Flag className="w-5 h-5 text-[#002147]" />
               Phase Progress Overview
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -1162,19 +1319,19 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     }}
                     className={`relative p-4 rounded-xl border-2 transition-all hover:shadow-lg group ${
                       isCompleted
-                        ? 'bg-green-50 border-green-300'
+                        ? 'bg-emerald-50 border-emerald-300'
                         : isInProgress
                           ? `${colors.bg} ${colors.border} shadow-md`
                           : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     {isInProgress && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#002147] rounded-full animate-pulse"></div>
                     )}
 
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 mx-auto transition-transform group-hover:scale-110 ${
                       isCompleted
-                        ? 'bg-green-500 text-white'
+                        ? 'bg-emerald-500 text-white'
                         : isInProgress
                           ? colors.iconActive
                           : colors.icon
@@ -1184,7 +1341,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
 
                     <div className="text-center">
                       <div className={`text-xs font-bold mb-1 ${
-                        isCompleted ? 'text-green-600' : isInProgress ? colors.accent : 'text-gray-500'
+                        isCompleted ? 'text-emerald-600' : isInProgress ? colors.accent : 'text-gray-500'
                       }`}>
                         Phase {idx + 1}
                       </div>
@@ -1194,13 +1351,13 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                       <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className={`h-2 rounded-full transition-all duration-500 ${
-                            isCompleted ? 'bg-green-500' : colors.progress
+                            isCompleted ? 'bg-emerald-500' : colors.progress
                           }`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
                       <div className={`text-xs font-bold mt-1 ${
-                        isCompleted ? 'text-green-600' : 'text-gray-600'
+                        isCompleted ? 'text-emerald-600' : 'text-gray-600'
                       }`}>
                         {progress}%
                       </div>
@@ -1218,9 +1375,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
               const colors = getPhaseColor(phaseIndex);
               const isCompleted = phaseProgress === 100;
               const isInProgress = phase.status === 'in-progress';
-              const completedTasksCount = phase.tasks?.filter((t, i) =>
-                completedTasks[`${phaseIndex}-${i}`] || t.completed || t.status === 'completed'
-              ).length || 0;
+              const completedTasksCount = getCompletedTasksCount(phase);
 
               return (
                 <div
@@ -1228,19 +1383,19 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                   id={`phase-${phaseIndex}`}
                   className={`bg-white rounded-2xl shadow-sm border-2 overflow-hidden transition-all ${
                     isCompleted
-                      ? 'border-green-300'
+                      ? 'border-emerald-300'
                       : isInProgress
                         ? `${colors.border} shadow-lg ring-2 ${colors.ring}/20`
                         : 'border-gray-200'
                   }`}
                 >
-                  {/* Phase Header - Color Gradient */}
+                  {/* Phase Header - Color Solid */}
                   <div className={`${
                     isCompleted
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                      ? 'bg-emerald-500'
                       : isInProgress
                         ? colors.headerBg
-                        : 'bg-gradient-to-r from-gray-400 to-gray-500'
+                        : 'bg-gray-500'
                   }`}>
                     <button
                       onClick={() => togglePhase(phaseIndex)}
@@ -1255,7 +1410,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                           )}
                           {isInProgress && !isCompleted && (
                             <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center">
-                              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                              <div className="w-3 h-3 bg-[#002147] rounded-full animate-pulse"></div>
                             </div>
                           )}
                         </div>
@@ -1366,40 +1521,46 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                             <div className="space-y-3">
                               {phase.tasks.map((task, taskIndex) => {
                                 const taskKey = `${phaseIndex}-${taskIndex}`;
-                                const isTaskCompleted = completedTasks[taskKey] || task.completed || task.status === 'completed';
+                                const isTaskCompleted = task.completed === true || task.status === 'completed';
                                 const isExpanded = expandedTasks[taskKey];
                                 const isSaving = savingTasks[taskKey];
+                                const hasValidId = isValidTaskId(task.id);
 
                                 return (
                                   <div
                                     key={task.id || taskIndex}
                                     className={`rounded-xl border-2 transition-all ${
                                       isTaskCompleted
-                                        ? 'bg-green-50/50 border-green-200'
+                                        ? 'bg-emerald-50/50 border-emerald-200'
                                         : `bg-white ${colors.border} hover:shadow-md`
                                     }`}
                                   >
                                     <div className="p-5">
                                       <div className="flex items-start gap-4">
-                                        {/* ✅ Checkbox button with loading state */}
+                                        {/* Checkbox button with loading state and invalid ID indicator */}
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             toggleTaskComplete(phaseIndex, taskIndex);
                                           }}
                                           disabled={isSaving}
+                                          title={!hasValidId ? 'Task cannot be saved (invalid ID). Click Regenerate to fix.' : ''}
                                           className={`mt-0.5 w-7 h-7 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                                             isSaving
                                               ? 'border-gray-300 bg-gray-100'
                                               : isTaskCompleted
-                                                ? 'bg-green-500 border-green-500 text-white shadow-lg shadow-green-500/25'
-                                                : `border-gray-300 hover:${colors.border} hover:${colors.light}`
+                                                ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                                                : !hasValidId
+                                                  ? 'border-amber-400 bg-amber-50 hover:bg-amber-100'
+                                                  : `border-gray-300 hover:border-[#002147] hover:bg-blue-50`
                                           }`}
                                         >
                                           {isSaving ? (
                                             <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
                                           ) : isTaskCompleted ? (
                                             <Check className="w-4 h-4" />
+                                          ) : !hasValidId ? (
+                                            <AlertTriangle className="w-3 h-3 text-amber-500" />
                                           ) : null}
                                         </button>
 
@@ -1409,6 +1570,13 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                                               <h5 className={`font-semibold ${isTaskCompleted ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                                                 {task.title}
                                               </h5>
+                                              {/* Show warning badge if task has invalid ID */}
+                                              {!hasValidId && (
+                                                <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-lg font-medium flex items-center gap-1">
+                                                  <AlertTriangle className="w-3 h-3" />
+                                                  Can't save
+                                                </span>
+                                              )}
                                               {/* Test badges */}
                                               {task.requiresGMAT && (
                                                 <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-lg font-medium">GMAT</span>
@@ -1447,7 +1615,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                                               {task.priority?.charAt(0).toUpperCase() + task.priority?.slice(1)}
                                             </span>
                                             {isTaskCompleted && (
-                                              <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-green-100 text-green-700 font-medium">
+                                              <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 font-medium">
                                                 <CheckCircle2 className="w-3 h-3" />
                                                 Completed
                                               </span>
@@ -1494,14 +1662,14 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                                           {/* Tips */}
                                           {task.tips && task.tips.length > 0 && (
                                             <div className="bg-amber-50 rounded-xl p-5 border border-amber-200">
-                                              <div className="flex items-center gap-2 text-sm font-bold text-amber-700 mb-4">
+                                              <div className="flex items-center gap-2 text-sm font-bold text-[#D97706] mb-4">
                                                 <Lightbulb className="w-4 h-4" />
                                                 Pro Tips
                                               </div>
                                               <ul className="space-y-3">
                                                 {task.tips.map((tip, idx) => (
-                                                  <li key={idx} className="flex items-start gap-3 text-sm text-amber-900">
-                                                    <Star className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                                  <li key={idx} className="flex items-start gap-3 text-sm text-[#92400E]">
+                                                    <Star className="w-4 h-4 text-[#D97706] flex-shrink-0 mt-0.5" />
                                                     <span>{tip}</span>
                                                   </li>
                                                 ))}
@@ -1512,13 +1680,13 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                                           {/* Resources */}
                                           {task.resources && task.resources.length > 0 && (
                                             <div className="bg-emerald-50 rounded-xl p-5 border border-emerald-200">
-                                              <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 mb-4">
+                                              <div className="flex items-center gap-2 text-sm font-bold text-[#047857] mb-4">
                                                 <ExternalLink className="w-4 h-4" />
                                                 Resources
                                               </div>
                                               <div className="flex flex-wrap gap-2">
                                                 {task.resources.map((resource, idx) => (
-                                                  <span key={idx} className="text-xs px-3 py-2 bg-white text-emerald-700 rounded-lg border border-emerald-200 hover:bg-emerald-100 cursor-pointer transition-colors font-medium">
+                                                  <span key={idx} className="text-xs px-3 py-2 bg-white text-[#047857] rounded-lg border border-emerald-200 hover:bg-emerald-100 cursor-pointer transition-colors font-medium">
                                                     {resource}
                                                   </span>
                                                 ))}
@@ -1558,14 +1726,14 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                           {phase.proTips && phase.proTips.length > 0 && (
                             <div>
                               <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <Lightbulb className="w-5 h-5 text-purple-600" />
+                                <Lightbulb className="w-5 h-5 text-[#5B21B6]" />
                                 Expert Tips
                               </h4>
-                              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-200 p-5">
+                              <div className="bg-purple-50 rounded-xl border border-purple-200 p-5">
                                 <ul className="space-y-3">
                                   {phase.proTips.map((tip, idx) => (
-                                    <li key={idx} className="flex items-start gap-3 text-sm text-purple-900">
-                                      <Sparkles className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+                                    <li key={idx} className="flex items-start gap-3 text-sm text-[#5B21B6]">
+                                      <Sparkles className="w-4 h-4 text-[#5B21B6] flex-shrink-0 mt-0.5" />
                                       <span>{tip}</span>
                                     </li>
                                   ))}
@@ -1577,14 +1745,14 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                           {phase.commonMistakes && phase.commonMistakes.length > 0 && (
                             <div>
                               <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <AlertTriangle className="w-5 h-5 text-red-600" />
+                                <AlertTriangle className="w-5 h-5 text-[#BE123C]" />
                                 Avoid These Mistakes
                               </h4>
-                              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-200 p-5">
+                              <div className="bg-rose-50 rounded-xl border border-rose-200 p-5">
                                 <ul className="space-y-3">
                                   {phase.commonMistakes.map((mistake, idx) => (
-                                    <li key={idx} className="flex items-start gap-3 text-sm text-red-900">
-                                      <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                    <li key={idx} className="flex items-start gap-3 text-sm text-[#BE123C]">
+                                      <XCircle className="w-4 h-4 text-[#BE123C] flex-shrink-0 mt-0.5" />
                                       <span>{mistake}</span>
                                     </li>
                                   ))}
@@ -1603,7 +1771,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
 
           {/* Footer Metadata */}
           {metadata && (
-            <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200 p-6">
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between flex-wrap gap-4 text-sm text-gray-500">
                 <div className="flex items-center gap-4 flex-wrap">
                   <span className="flex items-center gap-1.5">
@@ -1611,15 +1779,21 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     {new Date(metadata.generatedAt).toLocaleString()}
                   </span>
                   {metadata.fromDatabase && (
-                    <span className="flex items-center gap-1.5 text-green-600 font-medium">
+                    <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
                       <CheckCircle2 className="w-4 h-4" />
                       Synced from database
                     </span>
                   )}
                   {metadata.tasksSynced > 0 && (
-                    <span className="flex items-center gap-1.5 text-blue-600 font-medium">
+                    <span className="flex items-center gap-1.5 text-[#002147] font-medium">
                       <RefreshCw className="w-4 h-4" />
                       {metadata.tasksSynced} tasks updated
+                    </span>
+                  )}
+                  {invalidTasksCount > 0 && (
+                    <span className="flex items-center gap-1.5 text-[#D97706] font-medium">
+                      <AlertTriangle className="w-4 h-4" />
+                      {invalidTasksCount} tasks need fix
                     </span>
                   )}
                   {metadata.processingTime && (
@@ -1632,7 +1806,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                 <button
                   onClick={handleRegenerate}
                   disabled={generatingTimeline}
-                  className="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                  className="text-[#002147] hover:text-[#001122] font-semibold flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-[#EFF6FF] transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-4 h-4 ${generatingTimeline ? 'animate-spin' : ''}`} />
                   Regenerate Timeline
@@ -1643,8 +1817,8 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
-          <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-8">
-            <Sparkles className="w-12 h-12 text-indigo-600" />
+          <div className="w-24 h-24 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-8">
+            <Sparkles className="w-12 h-12 text-[#002147]" />
           </div>
           <h3 className="text-2xl font-bold text-gray-900 mb-4">Ready to Generate Your Timeline</h3>
           <p className="text-gray-600 max-w-lg mx-auto mb-8">
@@ -1654,7 +1828,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             <button
               onClick={() => generateTimeline(selectedUniversity)}
               disabled={generatingTimeline}
-              className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white rounded-xl hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 transition-all font-semibold inline-flex items-center gap-3 disabled:opacity-50 shadow-lg shadow-indigo-600/25"
+              className="px-8 py-4 bg-[#002147] text-white rounded-xl hover:bg-[#001122] transition-all font-semibold inline-flex items-center gap-3 disabled:opacity-50"
             >
               <Sparkles className="w-5 h-5" />
               Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
