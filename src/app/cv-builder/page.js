@@ -27,12 +27,10 @@ export const useCVData = () => {
 };
 
 const generateUniqueCVNumber = (userId) => {
-  const userIdPart = userId.slice(-6);
-  const randomPart = Math.floor(Math.random() * 9999)
-    .toString()
-    .padStart(4, "0");
-  const timestamp = Date.now().toString().slice(-4);
-  return `${userIdPart}${timestamp}${randomPart}`;
+  const userIdPart = userId.slice(-4); // Shorter user ID part
+  const timestamp = Date.now().toString();
+  const randomPart = Math.floor(Math.random() * 999).toString().padStart(3, "0");
+  return `cv-${userIdPart}-${timestamp}-${randomPart}`;
 };
 
 const Index = () => {
@@ -161,133 +159,151 @@ const Index = () => {
   }, [status, session]);
 
   // Load CV data using email from session - FIXED VERSION
-  const loadCVData = async (cvId, email) => {
-    try {
-      if (!email) {
-        console.log("No user email found - skipping CV load");
+// Load CV data using email from session - IMPROVED VERSION
+const loadCVData = async (cvId, email) => {
+  try {
+    if (!email) {
+      console.log("No user email found - skipping CV load");
+      return;
+    }
+
+    const response = await fetch(
+      `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
+    );
+
+    // Handle 404 - CV not found
+    if (response.status === 404) {
+      console.log("CV not found - clearing invalid ID");
+      setCurrentCVId(null);
+      localStorage.removeItem("currentCVId");
+      toast.info("Previous CV not found. Starting fresh.");
+      return;
+    }
+
+    // Handle other HTTP errors
+    if (!response.ok) {
+      console.warn(`Failed to load CV: ${response.status}`);
+      
+      // For 401, 403 - auth issues
+      if (response.status === 401 || response.status === 403) {
+        toast.error("Authentication error. Please log in again.");
         return;
       }
+      
+      // For other errors, don't clear the ID yet
+      return;
+    }
 
-      const response = await fetch(
-        `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
-      );
+    const text = await response.text();
 
-      if (response.status === 404) {
-        console.log("CV not found - clearing invalid ID");
-        // Clear invalid CV ID
+    if (!text || text.trim() === "") {
+      console.log("Empty response - no CV data available");
+      return;
+    }
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (parseError) {
+      console.error("Failed to parse CV data:", parseError);
+      return;
+    }
+
+    if (!result.success || !result.cv) {
+      console.log("Invalid CV data structure received");
+      
+      // If specific error code for CV not found
+      if (result.code === "CV_NOT_FOUND") {
         setCurrentCVId(null);
         localStorage.removeItem("currentCVId");
-        toast.info("Previous CV not found. Starting fresh.");
-        return;
+        toast.info("CV not found. Starting fresh.");
       }
-
-      if (!response.ok) {
-        console.warn(`Failed to load CV: ${response.status}`);
-        return;
-      }
-
-      const text = await response.text();
-
-      if (!text || text.trim() === "") {
-        console.log("Empty response - no CV data available");
-        return;
-      }
-
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (parseError) {
-        console.error("Failed to parse CV data:", parseError);
-        return;
-      }
-
-      if (!result.success || !result.cv) {
-        console.log("Invalid CV data structure received");
-        return;
-      }
-
-      setCvData({
-        personal: result.cv.personalInfo || cvData.personal,
-        education:
-          result.cv.educations?.map((edu) => ({
-            id: edu.id,
-            institution: edu.institution || "",
-            degree: edu.degree || "",
-            field: edu.fieldOfStudy || "",
-            startDate: edu.startDate || "",
-            endDate: edu.endDate || "",
-            gpa: edu.gpa || "",
-            description: edu.description || "",
-          })) || cvData.education,
-        experience:
-          result.cv.experiences?.map((exp) => ({
-            id: exp.id,
-            company: exp.company || "",
-            position: exp.position || "",
-            location: exp.location || "",
-            startDate: exp.startDate || "",
-            endDate: exp.endDate || "",
-            isCurrentRole: exp.isCurrent || false,
-            description: exp.description || "",
-          })) || cvData.experience,
-        projects:
-          result.cv.projects?.map((proj) => ({
-            id: proj.id,
-            name: proj.name || "",
-            description: proj.description || "",
-            technologies: proj.technologies?.join(", ") || "",
-            startDate: proj.startDate || "",
-            endDate: proj.endDate || "",
-            githubUrl: proj.githubUrl || "",
-            liveUrl: proj.liveUrl || "",
-            achievements: proj.achievements?.[0] || "",
-          })) || [],
-        skills:
-          result.cv.skills?.map((skill) => ({
-            id: skill.id,
-            name: skill.categoryName || "",
-            skills: skill.skills || [],
-          })) || cvData.skills,
-        achievements:
-          result.cv.achievements?.map((ach) => ({
-            id: ach.id,
-            title: ach.title || "",
-            organization: ach.organization || "",
-            date: ach.date || "",
-            type: ach.type || "",
-            description: ach.description || "",
-          })) || cvData.achievements,
-        volunteer:
-          result.cv.volunteers?.map((vol) => ({
-            id: vol.id,
-            organization: vol.organization || "",
-            role: vol.role || "",
-            location: vol.location || "",
-            startDate: vol.startDate || "",
-            endDate: vol.endDate || "",
-            description: vol.description || "",
-            impact: vol.impact || "",
-          })) || cvData.volunteer,
-      });
-
-      if (result.cv.templateId) {
-        setSelectedTemplate(result.cv.templateId);
-      }
-
-      if (result.cv.colorScheme) {
-        setThemeColor(result.cv.colorScheme);
-      }
-
-      console.log("CV data loaded successfully");
-    } catch (error) {
-      console.error("Error loading CV data:", error);
-      
-      // If network or server error, clear potentially invalid ID
-      if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
-        console.log("Network error - might need to clear invalid CV ID on next attempt");
-      }
+      return;
     }
-  };
+
+    // Successfully loaded - update state
+    setCvData({
+      personal: result.cv.personalInfo || cvData.personal,
+      education:
+        result.cv.educations?.map((edu) => ({
+          id: edu.id,
+          institution: edu.institution || "",
+          degree: edu.degree || "",
+          field: edu.fieldOfStudy || "",
+          startDate: edu.startDate || "",
+          endDate: edu.endDate || "",
+          gpa: edu.gpa || "",
+          description: edu.description || "",
+        })) || cvData.education,
+      experience:
+        result.cv.experiences?.map((exp) => ({
+          id: exp.id,
+          company: exp.company || "",
+          position: exp.position || "",
+          location: exp.location || "",
+          startDate: exp.startDate || "",
+          endDate: exp.endDate || "",
+          isCurrentRole: exp.isCurrent || false,
+          description: exp.description || "",
+        })) || cvData.experience,
+      projects:
+        result.cv.projects?.map((proj) => ({
+          id: proj.id,
+          name: proj.name || "",
+          description: proj.description || "",
+          technologies: proj.technologies?.join(", ") || "",
+          startDate: proj.startDate || "",
+          endDate: proj.endDate || "",
+          githubUrl: proj.githubUrl || "",
+          liveUrl: proj.liveUrl || "",
+          achievements: proj.achievements?.[0] || "",
+        })) || [],
+      skills:
+        result.cv.skills?.map((skill) => ({
+          id: skill.id,
+          name: skill.categoryName || "",
+          skills: skill.skills || [],
+        })) || cvData.skills,
+      achievements:
+        result.cv.achievements?.map((ach) => ({
+          id: ach.id,
+          title: ach.title || "",
+          organization: ach.organization || "",
+          date: ach.date || "",
+          type: ach.type || "",
+          description: ach.description || "",
+        })) || cvData.achievements,
+      volunteer:
+        result.cv.volunteers?.map((vol) => ({
+          id: vol.id,
+          organization: vol.organization || "",
+          role: vol.role || "",
+          location: vol.location || "",
+          startDate: vol.startDate || "",
+          endDate: vol.endDate || "",
+          description: vol.description || "",
+          impact: vol.impact || "",
+        })) || cvData.volunteer,
+    });
+
+    if (result.cv.templateId) {
+      setSelectedTemplate(result.cv.templateId);
+    }
+
+    if (result.cv.colorScheme) {
+      setThemeColor(result.cv.colorScheme);
+    }
+
+    console.log("CV data loaded successfully");
+  } catch (error) {
+    console.error("Error loading CV data:", error);
+    
+    // Network error - might be temporary
+    if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
+      toast.error("Network error. Please check your connection.");
+    }
+  }
+};
 
   const updateCVData = (section, data) => {
     setCvData((prev) => ({

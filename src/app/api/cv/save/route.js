@@ -1,9 +1,119 @@
-// app/api/cv/save/route.js - FIXED VERSION WITH VALIDATION
+// app/api/cv/save/route.js
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
+// ========================================
+// GET HANDLER - Load CV Data
+// ========================================
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const cvId = searchParams.get("cvId");
+    const userEmail = searchParams.get("userEmail");
+
+    if (!userEmail) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    if (!cvId) {
+      return NextResponse.json(
+        { error: "CV ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Find CV by ID and verify ownership
+    const cv = await prisma.cV.findFirst({
+      where: {
+        id: cvId,
+        userId: user.id,
+      },
+      include: {
+        personalInfo: true,
+        educations: {
+          orderBy: { displayOrder: 'asc' }
+        },
+        experiences: {
+          orderBy: { displayOrder: 'asc' }
+        },
+        projects: {
+          orderBy: { displayOrder: 'asc' }
+        },
+        skills: {
+          orderBy: { displayOrder: 'asc' }
+        },
+        achievements: {
+          orderBy: { displayOrder: 'asc' }
+        },
+        volunteers: {
+          orderBy: { displayOrder: 'asc' }
+        },
+      },
+    });
+
+    if (!cv) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: "CV not found or access denied",
+          code: "CV_NOT_FOUND"
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      cv: {
+        id: cv.id,
+        cvNumber: cv.slug,
+        title: cv.title,
+        templateId: cv.templateId,
+        colorScheme: cv.colorScheme,
+        personalInfo: cv.personalInfo,
+        educations: cv.educations,
+        experiences: cv.experiences,
+        projects: cv.projects,
+        skills: cv.skills,
+        achievements: cv.achievements,
+        volunteers: cv.volunteers,
+        createdAt: cv.createdAt,
+        updatedAt: cv.updatedAt,
+      },
+    });
+
+  } catch (error) {
+    console.error("CV Load Error:", error);
+    return NextResponse.json(
+      { 
+        error: "Failed to load CV",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// ========================================
+// POST HANDLER - Save/Update CV
+// ========================================
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
@@ -31,6 +141,7 @@ export async function POST(request) {
     }
 
     const { cvData, selectedTemplate, themeColor, cvTitle, cvId, versionInfo } = body;
+    let { cvNumber } = body;
 
     let cv;
     let isNewCV = false;
@@ -51,13 +162,37 @@ export async function POST(request) {
       }
     }
 
-    // If cvId is provided but CV doesn't exist, OR if no cvId provided - create new CV
+    // CREATE NEW CV (if no cvId or CV doesn't exist)
     if (!cvId || shouldCreateNewCV) {
-      // CREATE NEW CV
       isNewCV = true;
 
-      // Use the unique CV number from frontend
-      const cvSlug = body.cvNumber || `cv-${Date.now()}`;
+      // ========================================
+      // FIX: Handle duplicate slug gracefully
+      // ========================================
+      let cvSlug = cvNumber || `cv-${Date.now()}`;
+      let slugAttempt = 0;
+      let isSlugUnique = false;
+
+      // Try to find a unique slug (max 10 attempts)
+      while (!isSlugUnique && slugAttempt < 10) {
+        const existingCVWithSlug = await prisma.cV.findUnique({
+          where: { slug: cvSlug },
+        });
+
+        if (!existingCVWithSlug) {
+          isSlugUnique = true;
+        } else {
+          // Append random suffix to make it unique
+          slugAttempt++;
+          const randomSuffix = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
+          cvSlug = `${cvNumber || `cv-${Date.now()}`}-${randomSuffix}`;
+        }
+      }
+
+      if (!isSlugUnique) {
+        // Fallback: use timestamp + random
+        cvSlug = `cv-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      }
 
       cv = await prisma.cV.create({
         data: {

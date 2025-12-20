@@ -20,7 +20,7 @@ const studyLevels = [
     subtitle: "Graduate degree programs",
     icon: "📚",
     description: "1-2 year advanced programs",
-    available: true // Added available property
+    available: false // Added available property
   },
   {
     id: "mba",
