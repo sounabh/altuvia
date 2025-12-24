@@ -407,33 +407,7 @@ const getFormattedDeadlines = () => {
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              <Button 
-                onClick={() => window.open('/apply', '_blank')}
-                className="bg-[#3598FE] hover:bg-[#2080e8] text-white h-11 px-5 text-sm rounded-lg font-medium transition-colors inline-flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Apply Now
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={() => window.location.href = `/university/${university.slug}/scholarships`}
-                className="bg-[#002147] hover:bg-[#001a38] text-white h-11 px-5 text-sm rounded-lg font-medium transition-colors inline-flex items-center gap-2"
-              >
-                <DollarSign className="h-4 w-4" />
-                Scholarships
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={() => window.location.href = `/university/${university.slug}/gallery`}
-                className="bg-white border-2 border-gray-200 text-[#002147] hover:border-[#3598FE] hover:bg-gray-50 h-11 px-5 text-sm rounded-lg font-medium transition-colors inline-flex items-center gap-2"
-              >
-                <Building2 className="h-4 w-4" />
-                View Gallery
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
+           
           </div>
         </CardContent>
       </Card>

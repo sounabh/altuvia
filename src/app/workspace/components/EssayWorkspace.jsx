@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 export function EssayWorkspace({ universityName, userId, userEmail }) {
- // console.log("EssayWorkspace props:", { universityName, userId, userEmail });
+  // console.log("EssayWorkspace props:", { universityName, userId, userEmail });
 
   // Core state management
   const [workspaceData, setWorkspaceData] = useState(null);
@@ -36,12 +36,20 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
   const [showAI, setShowAI] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(true);
 
+  // Panel order management - NEW STATE
+  const [panelOrder, setPanelOrder] = useState(['versions', 'analytics', 'ai']); // Default order
+
+  // Add panel toggle handler - NEW FUNCTION
+  const handlePanelToggle = useCallback((panelName, currentState) => {
+    if (!currentState) {
+      // If turning ON, move to front
+      setPanelOrder(prev => [panelName, ...prev.filter(p => p !== panelName)]);
+    }
+  }, []);
+
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
   const [isUserActive, setIsUserActive] = useState(true);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
-
-  // Add activity tracking ref
-  const activityTimeoutRef = useRef(null);
 
   // Auto-save state - FIXED
   const [lastSaved, setLastSaved] = useState(null);
@@ -54,6 +62,9 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
   const lastContentRef = useRef("");
   const isUpdatingRef = useRef(false);
   const editorChangeRef = useRef(null);
+
+  // Add activity tracking ref
+  const activityTimeoutRef = useRef(null);
 
   // Memoized current program and essay data
   const currentProgram = useMemo(() => {
@@ -314,6 +325,7 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
       const responseData = await response.json();
 
       if (response.ok && responseData.essay) {
+        // ✅ FIX: Update local state instead of fetching all data
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -511,7 +523,38 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
         );
 
         if (response.ok) {
-          await fetchWorkspaceData();
+          const result = await response.json();
+          
+          // ✅ FIX: Update local state with new version instead of fetching all data
+          if (result.version) {
+            setWorkspaceData((prev) => {
+              if (!prev) return prev;
+
+              return {
+                ...prev,
+                programs: prev.programs.map((program) =>
+                  program.id === activeProgramId
+                    ? {
+                        ...program,
+                        essays: program.essays.map((essayData) =>
+                          essayData.promptId === activeEssayPromptId
+                            ? {
+                                ...essayData,
+                                userEssay: {
+                                  ...essayData.userEssay,
+                                  versions: [result.version, ...(essayData.userEssay?.versions || [])],
+                                  lastModified: new Date(),
+                                },
+                              }
+                            : essayData
+                        ),
+                      }
+                    : program
+                ),
+              };
+            });
+          }
+          
           return true;
         } else {
           const errorData = await response.json().catch(() => ({}));
@@ -533,7 +576,8 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
       hasUnsavedChanges,
       autoSaveEssay,
       universityName,
-      fetchWorkspaceData,
+      activeProgramId,
+      activeEssayPromptId,
     ]
   );
 
@@ -737,17 +781,22 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                 </div>
               )}
 
-              {/* Panel Toggle Buttons */}
+              {/* Panel Toggle Buttons - FIXED UI */}
               <div className="flex items-center space-x-3">
                 <Button
                   variant={showAnalytics ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setShowAnalytics(!showAnalytics)}
-                  className={
-                    showAnalytics
-                      ? "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white border-0"
-                      : "border-purple-500 text-purple-600 hover:bg-purple-50"
-                  }
+                  onClick={() => {
+                    handlePanelToggle('analytics', showAnalytics);
+                    setShowAnalytics(!showAnalytics);
+                  }}
+                  className={`
+                    transition-all duration-200 font-medium shadow-sm
+                    ${showAnalytics
+                      ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-purple-200 hover:shadow-lg hover:scale-105"
+                      : "bg-white border-2 border-purple-500 text-purple-600 hover:bg-purple-50 hover:border-purple-600 hover:shadow-md active:scale-95"
+                    }
+                  `}
                 >
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Analytics
@@ -756,12 +805,17 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                 <Button
                   variant={showAI ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setShowAI(!showAI)}
-                  className={
-                    showAI
-                      ? "bg-gradient-to-r from-[#3598FE] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white border-0"
-                      : "border-[#3598FE] text-[#3598FE] hover:bg-blue-50"
-                  }
+                  onClick={() => {
+                    handlePanelToggle('ai', showAI);
+                    setShowAI(!showAI);
+                  }}
+                  className={`
+                    transition-all duration-200 font-medium shadow-sm
+                    ${showAI
+                      ? "bg-gradient-to-r from-[#3598FE] to-[#2563EB] text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105"
+                      : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                    }
+                  `}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   AI Assistant
@@ -805,7 +859,7 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                       className="border border-gray-200 rounded-lg overflow-hidden"
                     >
                       {/* Program Header */}
-                    <div
+                      <div
                         className={`p-3 cursor-pointer transition-colors ${
                           activeProgramId === program.id
                             ? "bg-blue-50 border-l-4 border-l-blue-500"
@@ -917,11 +971,21 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                         </div>
                       </div>
 
+                      {/* Better Versions Button - FIXED UI */}
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setShowVersions(!showVersions)}
-                        className="border-[#3598FE] text-[#3598FE] hover:bg-[#3598FE] hover:text-white"
+                        onClick={() => {
+                          handlePanelToggle('versions', showVersions);
+                          setShowVersions(!showVersions);
+                        }}
+                        className={`
+                          transition-all duration-200 font-medium shadow-sm
+                          ${showVersions
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105"
+                            : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                          }
+                        `}
                       >
                         Versions ({currentEssay?.versions?.length || 0})
                       </Button>
@@ -1057,112 +1121,123 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
             </Card>
           </div>
 
-          {/* Right Sidebar - Analytics, AI, and Versions */}
+          {/* Right Sidebar - Panels in Order */}
           <div className="col-span-12 lg:col-span-3 space-y-6">
-            {/* Essay Analytics Panel */}
-            {showAnalytics && currentEssay && (
-              <EssayAnalytics
-                key={`analytics-${currentEssay.id}`}
-                essay={{
-                  ...currentEssay,
-                  wordLimit: currentEssayData.wordLimit,
-                  priority: currentEssay.priority || "medium",
-                }}
-                allEssays={workspaceData.programs.flatMap(
-                  (p) =>
-                    p.essays
-                      ?.filter((e) => e.userEssay)
-                      .map((e) => ({
-                        ...e.userEssay,
-                        wordLimit: e.wordLimit,
-                      })) || []
-                )}
-                essayId={currentEssay.id}
-                userId={userId}
-                universityName={universityName}
-              />
-            )}
+            {/* Render panels based on order */}
+            {panelOrder.map((panelName) => {
+              // Versions Panel
+              if (panelName === 'versions' && showVersions && currentEssay) {
+                return (
+                  <VersionManager
+                    key={`versions-${currentEssay.id}`}
+                    versions={currentEssay.versions || []}
+                    currentContent={currentEssay.content}
+                    onRestoreVersion={async (versionId) => {
+                      try {
+                        setError(null);
+                        const response = await fetch(
+                          `/api/essay/${encodeURIComponent(universityName)}`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "restore_version",
+                              essayId: currentEssay.id,
+                              versionId,
+                            }),
+                          }
+                        );
 
-            {/* AI Suggestions Panel */}
-            {showAI && currentEssay && (
-              <AISuggestions
-                key={`ai-${currentEssay.id}`}
-                content={currentEssay.content}
-                prompt={currentEssayData.promptText}
-                wordCount={currentEssay.wordCount}
-                wordLimit={currentEssayData.wordLimit}
-                essayId={currentEssay.id}
-                universityName={universityName}
-              />
-            )}
-
-            {/* Version Manager Panel */}
-            {showVersions && currentEssay && (
-              <VersionManager
-                key={`versions-${currentEssay.id}`}
-                versions={currentEssay.versions || []}
-                currentContent={currentEssay.content}
-                onRestoreVersion={async (versionId) => {
-                  try {
-                    setError(null);
-                    const response = await fetch(
-                      `/api/essay/${encodeURIComponent(universityName)}`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          action: "restore_version",
-                          essayId: currentEssay.id,
-                          versionId,
-                        }),
+                        if (response.ok) {
+                          await fetchWorkspaceData();
+                          setHasUnsavedChanges(false);
+                          setLastSaved(new Date());
+                        } else {
+                          const errorData = await response.json();
+                          setError(errorData.error || "Failed to restore version");
+                        }
+                      } catch (error) {
+                        console.error("Error restoring version:", error);
+                        setError("Error restoring version");
                       }
-                    );
+                    }}
+                    onDeleteVersion={async (versionId) => {
+                      try {
+                        setError(null);
+                        const response = await fetch(
+                          `/api/essay/${encodeURIComponent(universityName)}`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "delete_version",
+                              versionId,
+                              essayId: currentEssay.id,
+                            }),
+                          }
+                        );
 
-                    if (response.ok) {
-                      await fetchWorkspaceData();
-                      setHasUnsavedChanges(false);
-                      setLastSaved(new Date());
-                    } else {
-                      const errorData = await response.json();
-                      setError(errorData.error || "Failed to restore version");
-                    }
-                  } catch (error) {
-                    console.error("Error restoring version:", error);
-                    setError("Error restoring version");
-                  }
-                }}
-                onDeleteVersion={async (versionId) => {
-                  try {
-                    setError(null);
-                    const response = await fetch(
-                      `/api/essay/${encodeURIComponent(universityName)}`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          action: "delete_version",
-                          versionId,
-                          essayId: currentEssay.id,
-                        }),
+                        if (response.ok) {
+                          await fetchWorkspaceData();
+                        } else {
+                          const errorData = await response.json();
+                          setError(errorData.error || "Failed to delete version");
+                        }
+                      } catch (error) {
+                        console.error("Error deleting version:", error);
+                        setError("Error deleting version");
                       }
-                    );
+                    }}
+                    essayId={currentEssay.id}
+                    universityName={universityName}
+                    isLoading={loading}
+                  />
+                );
+              }
 
-                    if (response.ok) {
-                      await fetchWorkspaceData();
-                    } else {
-                      const errorData = await response.json();
-                      setError(errorData.error || "Failed to delete version");
-                    }
-                  } catch (error) {
-                    console.error("Error deleting version:", error);
-                    setError("Error deleting version");
-                  }
-                }}
-                essayId={currentEssay.id}
-                universityName={universityName}
-                isLoading={loading}
-              />
-            )}
+              // Analytics Panel
+              if (panelName === 'analytics' && showAnalytics && currentEssay) {
+                return (
+                  <EssayAnalytics
+                    key={`analytics-${currentEssay.id}`}
+                    essay={{
+                      ...currentEssay,
+                      wordLimit: currentEssayData.wordLimit,
+                      priority: currentEssay.priority || "medium",
+                    }}
+                    allEssays={workspaceData.programs.flatMap(
+                      (p) =>
+                        p.essays
+                          ?.filter((e) => e.userEssay)
+                          .map((e) => ({
+                            ...e.userEssay,
+                            wordLimit: e.wordLimit,
+                          })) || []
+                    )}
+                    essayId={currentEssay.id}
+                    userId={userId}
+                    universityName={universityName}
+                  />
+                );
+              }
+
+              // AI Panel
+              if (panelName === 'ai' && showAI && currentEssay) {
+                return (
+                  <AISuggestions
+                    key={`ai-${currentEssay.id}`}
+                    content={currentEssay.content}
+                    prompt={currentEssayData.promptText}
+                    wordCount={currentEssay.wordCount}
+                    wordLimit={currentEssayData.wordLimit}
+                    essayId={currentEssay.id}
+                    universityName={universityName}
+                  />
+                );
+              }
+
+              return null;
+            })}
 
             {/* Help Panel - Show when no essay is selected */}
             {!currentEssay && (
@@ -1243,7 +1318,7 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
               </Card>
             )}
 
-            {/* Quick Actions Panel */}
+            {/* Quick Actions Panel - Only show if essay exists */}
             {currentEssay && (
               <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm">
                 <div className="p-6">
@@ -1277,7 +1352,10 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowVersions(!showVersions)}
+                      onClick={() => {
+                        handlePanelToggle('versions', showVersions);
+                        setShowVersions(!showVersions);
+                      }}
                       className="w-full justify-start bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                     >
                       <Clock className="w-4 h-4 mr-2" />
