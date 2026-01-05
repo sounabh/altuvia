@@ -86,12 +86,14 @@ export const EducationForm = () => {
                     <SelectValue placeholder="Select degree type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
+                    {/** <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
                     <SelectItem value="master">Master's Degree</SelectItem>
-                    <SelectItem value="phd">PhD</SelectItem>
-                    <SelectItem value="associate">Associate Degree</SelectItem>
+                    <SelectItem value="phd">PhD</SelectItem> <SelectItem value="associate">Associate Degree</SelectItem>
                     <SelectItem value="diploma">Diploma</SelectItem>
-                    <SelectItem value="certificate">Certificate</SelectItem>
+                    <SelectItem value="certificate">Certificate</SelectItem>*/}
+                   
+                     <SelectItem value="master">MBA</SelectItem>
+                    
                   </SelectContent>
                 </Select>
               </div>

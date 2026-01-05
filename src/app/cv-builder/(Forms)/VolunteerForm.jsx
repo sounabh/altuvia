@@ -41,7 +41,7 @@ export const VolunteerForm = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold cv-heading mb-2">Volunteer & Extracurricular</h2>
-        <p className="cv-body">Showcase your community involvement, leadership roles, and extracurricular activities</p>
+        <p className="ml-14">Showcase your community involvement, leadership roles, and extracurricular activities</p>
       </div>
 
       {experiences.map((experience, index) => (

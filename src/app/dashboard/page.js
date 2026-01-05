@@ -5,8 +5,9 @@ import { StatsOverview } from './components/StatsOverview';
 import { UniversityCard } from './components/UniversityCard';
 import UniversityTimeline from './components/UniversityTimeline';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { Calendar, LayoutDashboard } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const Index = () => {
   const [universities, setUniversities] = useState([]);
@@ -22,6 +23,36 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Helper function to handle JWT errors and redirect
+  const handleAuthError = async (errorMessage) => {
+    console.error("Authentication error:", errorMessage);
+    
+    // Check if it's a JWT-related error
+    const isJWTError = errorMessage?.toLowerCase().includes('jwt') || 
+                       errorMessage?.toLowerCase().includes('token') ||
+                       errorMessage?.toLowerCase().includes('expired') ||
+                       errorMessage?.toLowerCase().includes('invalid');
+    
+    if (isJWTError) {
+      // Clear the session
+      await signOut({ redirect: false });
+      
+      // Redirect to onboarding signup
+      router.push('/onboarding/signup');
+    } else {
+      setError(errorMessage);
+      setLoading(false);
+    }
+  };
+
+  // Check authentication status first
+  useEffect(() => {
+    if (status !== "loading" && status !== "authenticated") {
+      router.push('/onboarding/signup');
+    }
+  }, [status, router]);
 
   useEffect(() => {
     const fetchSavedUniversities = async () => {
@@ -30,8 +61,8 @@ const Index = () => {
       }
 
       if (status !== "authenticated" || !session?.token) {
-        setError("Please login to view your saved universities");
-        setLoading(false);
+        // If not authenticated, redirect to onboarding
+        router.push('/onboarding/signup');
         return;
       }
 
@@ -45,6 +76,13 @@ const Index = () => {
             'Content-Type': 'application/json',
           },
         });
+
+        // Check for authentication errors
+        if (response.status === 401) {
+          const errorData = await response.json();
+          await handleAuthError(errorData.error || 'Authentication failed');
+          return;
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -61,18 +99,36 @@ const Index = () => {
           
         } else {
           const errorData = await response.json();
-          setError(errorData.error || 'Failed to fetch saved universities');
+          
+          // Check if error message indicates JWT issue
+          if (errorData.error) {
+            await handleAuthError(errorData.error);
+          } else {
+            setError('Failed to fetch saved universities');
+            setLoading(false);
+          }
         }
       } catch (err) {
         console.error('Error fetching saved universities:', err);
-        setError('Error loading saved universities');
+        
+        // Check if the error is network-related or JWT-related
+        if (err.message?.toLowerCase().includes('jwt') || 
+            err.message?.toLowerCase().includes('token')) {
+          await handleAuthError(err.message);
+        } else {
+          setError('Error loading saved universities');
+          setLoading(false);
+        }
       } finally {
-        setLoading(false);
+        // Only set loading to false if we're not redirecting
+        if (!error?.toLowerCase().includes('jwt')) {
+          setLoading(false);
+        }
       }
     };
 
     fetchSavedUniversities();
-  }, [session, status]);
+  }, [session, status, router]);
 
   const handleRemoveUniversity = async (universityId) => {
     if (!session?.token) {
@@ -92,6 +148,13 @@ const Index = () => {
         body: JSON.stringify({ universityId }),
       });
 
+      // Check for authentication errors
+      if (response.status === 401) {
+        const errorData = await response.json();
+        await handleAuthError(errorData.error || 'Authentication failed');
+        return;
+      }
+
       if (response.ok) {
         const updatedUniversities = universities.filter(u => u.id !== universityId);
         setUniversities(updatedUniversities);
@@ -104,10 +167,21 @@ const Index = () => {
         };
         setStats(newStats);
       } else {
-        console.error('Failed to remove university');
+        const errorData = await response.json();
+        if (errorData.error) {
+          await handleAuthError(errorData.error);
+        } else {
+          console.error('Failed to remove university');
+        }
       }
     } catch (err) {
       console.error('Error removing university:', err);
+      
+      // Check for JWT errors
+      if (err.message?.toLowerCase().includes('jwt') || 
+          err.message?.toLowerCase().includes('token')) {
+        await handleAuthError(err.message);
+      }
     }
   };
 
@@ -158,7 +232,7 @@ const Index = () => {
     );
   };
 
-  // ✅ Skeleton Components
+  // Skeleton Components
   const StatsSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       {[1, 2, 3, 4].map((i) => (
@@ -213,7 +287,6 @@ const Index = () => {
 
   const TimelineSkeleton = () => (
     <div className="space-y-6">
-      {/* Header Skeleton */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 rounded-2xl p-8 animate-pulse">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 bg-white/20 rounded-2xl"></div>
@@ -224,7 +297,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-5 animate-pulse">
@@ -238,7 +310,6 @@ const Index = () => {
         ))}
       </div>
 
-      {/* Overview Skeleton */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-8 animate-pulse">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           {[1, 2, 3, 4].map((i) => (
@@ -251,7 +322,6 @@ const Index = () => {
         <div className="h-4 bg-white/20 rounded-full w-full"></div>
       </div>
 
-      {/* Phase Cards Skeleton */}
       {[1, 2, 3].map((i) => (
         <div key={i} className="bg-white rounded-2xl shadow-sm border-2 border-gray-200 overflow-hidden animate-pulse">
           <div className="bg-gradient-to-r from-gray-400 to-gray-500 p-6">
@@ -269,7 +339,6 @@ const Index = () => {
     </div>
   );
 
-  // ✅ Loading State with Skeletons
   if (loading || status === "loading") {
     return (
       <div className="min-h-screen">
@@ -283,13 +352,11 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Tab Navigation Skeleton */}
           <div className="flex gap-4 mb-8 border-b border-gray-200">
             <div className="h-12 bg-gray-200 rounded w-48 animate-pulse"></div>
             <div className="h-12 bg-gray-200 rounded w-32 animate-pulse"></div>
           </div>
 
-          {/* Content Skeleton based on active tab */}
           {activeTab === 'dashboard' ? (
             <>
               <StatsSkeleton />
@@ -303,6 +370,18 @@ const Index = () => {
           ) : (
             <TimelineSkeleton />
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Don't show error if we're unauthenticated (will redirect)
+  if (status !== "authenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -327,7 +406,6 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <div className="px-4 py-8 max-w-7xl mx-auto">
-        {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-center text-[40px] font-semibold tracking-[0.2px] -mt-10">
             Dashboard
@@ -337,7 +415,6 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Tab Navigation */}
         <div className="flex gap-4 mb-8 border-b border-gray-200">
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -369,7 +446,6 @@ const Index = () => {
           </button>
         </div>
 
-        {/* Content based on active tab */}
         {activeTab === 'dashboard' ? (
           <>
             <StatsOverview stats={stats} />

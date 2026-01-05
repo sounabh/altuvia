@@ -14,9 +14,12 @@ const THEME_COLORS = [
   { name: "Teal", value: "#0d9488", light: "#ccfbf1" },
   { name: "Indigo", value: "#4f46e5", light: "#e0e7ff" },
   { name: "Slate", value: "#475569", light: "#e2e8f0" },
+  { name: "Black", value: "#000000", light: "#f3f4f6" },
 ];
 
 export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#1e40af", onThemeColorChange }) => {
+  console.log("PreviewPanel - cvData received:", cvData);
+  
   const formatDate = (date) => {
     if (!date) return "";
     const [year, month] = date.split("-");
@@ -76,15 +79,99 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     volunteer: Array.isArray(cvData.volunteer) ? cvData.volunteer : [],
   };
 
+  console.log("PreviewPanel - safeData:", safeData);
+
+  // Strict validation: item has data only if at least one field has meaningful content
+  const hasMeaningfulValue = (value) => {
+    if (value === null || value === undefined) return false;
+    
+    if (Array.isArray(value)) {
+      return value.length > 0 && value.some(item => hasMeaningfulValue(item));
+    }
+    
+    const stringValue = value.toString().trim();
+    if (stringValue === "") return false;
+    
+    // Check for placeholder text or minimal content
+    const minimalPatterns = [
+      /^[.\-\s]*$/, // Only dots, dashes, or whitespace
+      /^n\/a$/i, // n/a or N/A
+      /^not specified$/i,
+      /^enter /i, // Enter something
+      /^your /i, // Your something
+      /^add /i, // Add something
+      /^\[.*\]$/, // [Something in brackets]
+      /^\(.*\)$/, // (Something in parentheses)
+    ];
+    
+    // If value matches any minimal pattern, consider it empty
+    if (minimalPatterns.some(pattern => pattern.test(stringValue))) {
+      return false;
+    }
+    
+    return true;
+  };
+
   const hasData = (section) => {
-    if (!section || !Array.isArray(section)) return false;
-    return section.some((item) => {
-      if (!item) return false;
-      return Object.values(item).some((value) => {
-        if (Array.isArray(value)) return value.length > 0;
-        return value && value.toString().trim() !== "";
+    if (!section || !Array.isArray(section)) {
+      console.log(`hasData: section is invalid`, section);
+      return false;
+    }
+    
+    const result = section.some((item, index) => {
+      if (!item || typeof item !== 'object') {
+        console.log(`hasData: item ${index} is invalid`, item);
+        return false;
+      }
+      
+      // Skip the 'id' field when checking for meaningful content
+      const filteredItem = { ...item };
+      delete filteredItem.id; // Remove id field from consideration
+      
+      const hasMeaningfulContent = Object.values(filteredItem).some(value => {
+        const hasValue = hasMeaningfulValue(value);
+        if (hasValue) {
+          console.log(`hasData: item ${index} has meaningful value:`, value);
+        }
+        return hasValue;
       });
+      
+      console.log(`hasData: item ${index} has meaningful content (excluding id): ${hasMeaningfulContent}`, filteredItem);
+      return hasMeaningfulContent;
     });
+    
+    console.log(`hasData for ${section.length} items: ${result}`);
+    return result;
+  };
+
+  const hasSectionData = (sectionName) => {
+    const section = safeData[sectionName];
+    console.log(`hasSectionData called for ${sectionName}:`, section);
+    
+    if (sectionName === 'personal') {
+      // Check personal section - exclude fullName from validation
+      const { fullName, ...otherPersonalData } = section;
+      const hasOtherData = Object.values(otherPersonalData).some(value => hasMeaningfulValue(value));
+      console.log(`hasSectionData personal: fullName="${fullName}", hasOtherData=${hasOtherData}`);
+      return hasMeaningfulValue(fullName) || hasOtherData;
+    }
+    
+    const result = hasData(section);
+    console.log(`hasSectionData for ${sectionName}: ${result}`);
+    return result;
+  };
+
+  const hasContactInfo = () => {
+    const { fullName, ...contactFields } = safeData.personal;
+    const result = Object.values(contactFields).some(value => hasMeaningfulValue(value));
+    console.log("hasContactInfo:", result, contactFields);
+    return result;
+  };
+
+  const hasSummary = () => {
+    const result = hasMeaningfulValue(safeData.personal?.summary);
+    console.log("hasSummary:", result, safeData.personal?.summary);
+    return result;
   };
 
   const currentTheme = THEME_COLORS.find(t => t.value === themeColor) || THEME_COLORS[0];
@@ -92,13 +179,13 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
   const renderTemplate = () => {
     switch (selectedTemplate) {
       case "modern":
-        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} />;
+        return <ModernPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
       case "classic":
-        return <ClassicPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} />;
+        return <ClassicPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
       case "minimal":
-        return <MinimalPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} />;
+        return <MinimalPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
       default:
-        return <ModernPreview data={safeData} formatDate={formatDate} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} />;
+        return <ModernPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
     }
   };
 
@@ -157,22 +244,28 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
   );
 };
 
-const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColor }) => (
+const ModernPreview = ({ data, formatDate, hasSectionData, hasData, renderDescription, themeColor, hasContactInfo, hasSummary }) => {
+  console.log("ModernPreview rendering with data:", data);
+  
+  return (
   <div className="p-8 text-sm antialiased" style={{ fontFamily: 'Calibri, Arial, sans-serif' }}>
     <div className="mb-8">
       <h1 className="text-4xl font-bold mb-2 tracking-tight" style={{ color: themeColor.value, fontFamily: 'Georgia, serif' }}>
         {data.personal?.fullName || "Your Name"}
       </h1>
     
-      <div className="flex flex-wrap gap-4 text-sm text-gray-700">
-        {data.personal?.email && <span className="flex items-center gap-1">✉ {data.personal.email}</span>}
-        {data.personal?.phone && <span className="flex items-center gap-1">📞 {data.personal.phone}</span>}
-        {data.personal?.location && <span className="flex items-center gap-1">📍 {data.personal.location}</span>}
-        {data.personal?.linkedin && <span className="flex items-center gap-1">💼 {data.personal.linkedin}</span>}
-      </div>
+      {hasContactInfo() && (
+        <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+          {data.personal?.email && <span className="flex items-center gap-1">✉ {data.personal.email}</span>}
+          {data.personal?.phone && <span className="flex items-center gap-1">📞 {data.personal.phone}</span>}
+          {data.personal?.location && <span className="flex items-center gap-1">📍 {data.personal.location}</span>}
+          {data.personal?.linkedin && <span className="flex items-center gap-1">💼 {data.personal.linkedin}</span>}
+          {data.personal?.website && <span className="flex items-center gap-1">🌐 {data.personal.website}</span>}
+        </div>
+      )}
     </div>
 
-    {data.personal?.summary && (
+    {hasSummary() && (
       <div className="mb-8">
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -184,7 +277,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
 
-    {hasData(data.education) && (
+    {hasSectionData('education') && (
       <div className="mb-8">
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -199,11 +292,13 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
                 <h3 className="font-bold text-gray-900">
                   {edu.degree || "Degree"} in {edu.field || "Field"}
                 </h3>
-                <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                  {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                </span>
+                {(edu.startDate || edu.endDate) && (
+                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                    {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-800 mb-1 font-semibold">{edu.institution}</p>
+              {edu.institution && <p className="text-sm text-gray-800 mb-1 font-semibold">{edu.institution}</p>}
               {edu.gpa && <p className="text-sm text-gray-700">GPA: {edu.gpa}</p>}
               {edu.description && <p className="text-sm text-gray-700 mt-1">{edu.description}</p>}
             </div>
@@ -212,7 +307,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
 
-    {hasData(data.experience) && (
+    {hasSectionData('experience') && (
       <div className="mb-8">
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -224,16 +319,20 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
           (exp.company || exp.position) && (
             <div key={i} className="mb-4">
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900">{exp.position}</h3>
-                <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                  {formatDate(exp.startDate)} -{" "}
-                  {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                </span>
+                {exp.position && <h3 className="font-bold text-gray-900">{exp.position}</h3>}
+                {(exp.startDate || exp.endDate) && (
+                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                    {formatDate(exp.startDate)} -{" "}
+                    {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-800 mb-2 font-semibold">
-                {exp.company}
-                {exp.location && ` • ${exp.location}`}
-              </p>
+              {exp.company && (
+                <p className="text-sm text-gray-800 mb-2 font-semibold">
+                  {exp.company}
+                  {exp.location && ` • ${exp.location}`}
+                </p>
+              )}
               {exp.description && renderDescription(exp.description)}
             </div>
           )
@@ -241,7 +340,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
 
-    {hasData(data.projects) && (
+    {hasSectionData('projects') && (
       <div className="mb-8">
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -283,7 +382,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
 
-    {hasData(data.skills) && (
+    {hasSectionData('skills') && (
       <div className="mb-8">
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -294,12 +393,12 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
         <div className="grid grid-cols-2 gap-4">
           {data.skills.map((category, i) => {
             const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            return skillsList.length > 0 ? (
+            return (category.name || skillsList.length > 0) ? (
               <div key={i}>
-                <h4 className="font-bold text-gray-900 mb-1">
-                  {category.name || "Skills"}
-                </h4>
-                <p className="text-sm text-gray-700 leading-relaxed">{skillsList.join(", ")}</p>
+                {category.name && <h4 className="font-bold text-gray-900 mb-1">{category.name}</h4>}
+                {skillsList.length > 0 && (
+                  <p className="text-sm text-gray-700 leading-relaxed">{skillsList.join(", ")}</p>
+                )}
               </div>
             ) : null;
           })}
@@ -307,7 +406,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
 
-    {hasData(data.achievements) && (
+    {hasSectionData('achievements') && (
       <div className="mb-8">
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -333,7 +432,7 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
 
-    {hasData(data.volunteer) && (
+    {hasSectionData('volunteer') && (
       <div>
         <h2 
           className="text-xl font-bold mb-3 pb-2 border-b-2" 
@@ -345,15 +444,19 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
           (vol.organization || vol.role) && (
             <div key={i} className="mb-4">
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900">{vol.role}</h3>
-                <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                  {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
-                </span>
+                {vol.role && <h3 className="font-bold text-gray-900">{vol.role}</h3>}
+                {(vol.startDate || vol.endDate) && (
+                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                    {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-800 mb-2 font-semibold">
-                {vol.organization}
-                {vol.location && ` • ${vol.location}`}
-              </p>
+              {vol.organization && (
+                <p className="text-sm text-gray-800 mb-2 font-semibold">
+                  {vol.organization}
+                  {vol.location && ` • ${vol.location}`}
+                </p>
+              )}
               {vol.description && renderDescription(vol.description)}
               {vol.impact && (
                 <p className="text-sm text-gray-700 italic mt-2">{vol.impact}</p>
@@ -364,23 +467,30 @@ const ModernPreview = ({ data, formatDate, hasData, renderDescription, themeColo
       </div>
     )}
   </div>
-);
+  );
+};
 
-const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeColor }) => (
+const ClassicPreview = ({ data, formatDate, hasSectionData, hasData, renderDescription, themeColor, hasContactInfo, hasSummary }) => {
+  console.log("ClassicPreview rendering with data:", data);
+  
+  return (
   <div className="p-8 text-sm antialiased" style={{ fontFamily: 'Times New Roman, serif' }}>
     <div className="text-center mb-8 border-b-2 pb-4" style={{ borderColor: themeColor.value }}>
       <h1 className="text-3xl font-bold mb-2 tracking-wide" style={{ color: themeColor.value }}>
         {data.personal?.fullName || "Your Name"}
       </h1>
-      <div className="text-sm space-y-1 text-gray-800">
-        {data.personal?.email && <p>{data.personal.email}</p>}
-        {data.personal?.phone && <p>{data.personal.phone}</p>}
-        {data.personal?.location && <p>{data.personal.location}</p>}
-        {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
-      </div>
+      {hasContactInfo() && (
+        <div className="text-sm space-y-1 text-gray-800">
+          {data.personal?.email && <p>{data.personal.email}</p>}
+          {data.personal?.phone && <p>{data.personal.phone}</p>}
+          {data.personal?.location && <p>{data.personal.location}</p>}
+          {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
+          {data.personal?.website && <p>{data.personal.website}</p>}
+        </div>
+      )}
     </div>
 
-    {data.personal?.summary && (
+    {hasSummary() && (
       <div className="mb-6">
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Professional Summary
@@ -391,7 +501,7 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.education) && (
+    {hasSectionData('education') && (
       <div className="mb-6">
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Education
@@ -403,11 +513,13 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
                 <strong className="text-gray-900">
                   {edu.degree || "Degree"} in {edu.field || "Field"}
                 </strong>
-                <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                  {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                </span>
+                {(edu.startDate || edu.endDate) && (
+                  <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
+                    {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
+                  </span>
+                )}
               </div>
-              <em className="text-gray-800 block mb-1">{edu.institution}</em>
+              {edu.institution && <em className="text-gray-800 block mb-1">{edu.institution}</em>}
               {edu.gpa && (
                 <p className="text-sm text-gray-800">
                   <strong>GPA:</strong> {edu.gpa}
@@ -419,7 +531,7 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.experience) && (
+    {hasSectionData('experience') && (
       <div className="mb-6">
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Professional Experience
@@ -428,16 +540,20 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
           (exp.company || exp.position) && (
             <div key={i} className="mb-4">
               <div className="flex justify-between mb-1">
-                <strong className="text-gray-900">{exp.position}</strong>
-                <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                  {formatDate(exp.startDate)} -{" "}
-                  {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                </span>
+                {exp.position && <strong className="text-gray-900">{exp.position}</strong>}
+                {(exp.startDate || exp.endDate) && (
+                  <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
+                    {formatDate(exp.startDate)} -{" "}
+                    {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                  </span>
+                )}
               </div>
-              <em className="text-gray-800 block mb-2">
-                {exp.company}
-                {exp.location && ` • ${exp.location}`}
-              </em>
+              {exp.company && (
+                <em className="text-gray-800 block mb-2">
+                  {exp.company}
+                  {exp.location && ` • ${exp.location}`}
+                </em>
+              )}
               {exp.description && renderDescription(exp.description)}
             </div>
           )
@@ -445,7 +561,7 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.projects) && (
+    {hasSectionData('projects') && (
       <div className="mb-6">
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Projects
@@ -486,7 +602,7 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.skills) && (
+    {hasSectionData('skills') && (
       <div className="mb-6">
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Technical Skills
@@ -494,10 +610,12 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
         <div className="text-sm space-y-2">
           {data.skills.map((category, i) => {
             const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            return skillsList.length > 0 ? (
+            return (category.name || skillsList.length > 0) ? (
               <div key={i}>
-                <strong className="text-gray-900">{category.name || "Skills"}:</strong>{" "}
-                <span className="text-gray-800">{skillsList.join(", ")}</span>
+                {category.name && <strong className="text-gray-900">{category.name}:</strong>}
+                {skillsList.length > 0 && (
+                  <span className="text-gray-800"> {skillsList.join(", ")}</span>
+                )}
               </div>
             ) : null;
           })}
@@ -505,7 +623,7 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.achievements) && (
+    {hasSectionData('achievements') && (
       <div className="mb-6">
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Achievements
@@ -530,7 +648,7 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.volunteer) && (
+    {hasSectionData('volunteer') && (
       <div>
         <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
           Volunteer
@@ -543,11 +661,13 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
                   <strong className="text-gray-900">
                     {vol.role || "Volunteer"}
                   </strong>
-                  <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                    {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
-                  </span>
+                  {(vol.startDate || vol.endDate) && (
+                    <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
+                      {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
+                    </span>
+                  )}
                 </div>
-                <p className="text-sm text-gray-800">{vol.organization}</p>
+                {vol.organization && <p className="text-sm text-gray-800">{vol.organization}</p>}
                 {vol.description && renderDescription(vol.description)}
                 {vol.impact && (
                   <p className="text-sm text-gray-800 italic">{vol.impact}</p>
@@ -559,31 +679,38 @@ const ClassicPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
   </div>
-);
+  );
+};
 
-const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeColor }) => (
+const MinimalPreview = ({ data, formatDate, hasSectionData, hasData, renderDescription, themeColor, hasContactInfo, hasSummary }) => {
+  console.log("MinimalPreview rendering with data:", data);
+  
+  return (
   <div className="p-8 text-sm antialiased" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
     <div className="mb-8">
       <h1 className="text-4xl font-normal mb-2 tracking-tight" style={{ color: themeColor.value }}>
         {data.personal?.fullName || "Your Name"}
       </h1>
      
-      <div className="text-sm text-gray-600 space-y-1">
-        {data.personal?.email && <p>{data.personal.email}</p>}
-        {data.personal?.phone && <p>{data.personal.phone}</p>}
-        {data.personal?.location && <p>{data.personal.location}</p>}
-        {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
-      </div>
+      {hasContactInfo() && (
+        <div className="text-sm text-gray-600 space-y-1">
+          {data.personal?.email && <p>{data.personal.email}</p>}
+          {data.personal?.phone && <p>{data.personal.phone}</p>}
+          {data.personal?.location && <p>{data.personal.location}</p>}
+          {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
+          {data.personal?.website && <p>{data.personal.website}</p>}
+        </div>
+      )}
     </div>
 
-    {data.personal?.summary && (
+    {hasSummary() && (
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Summary</h2>
         <p className="text-sm text-gray-800 leading-relaxed">{data.personal.summary}</p>
       </div>
     )}
 
-    {hasData(data.education) && (
+    {hasSectionData('education') && (
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Education</h2>
         {data.education.map((edu, i) => (
@@ -593,11 +720,13 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
                 <h3 className="font-semibold text-gray-900">
                   {edu.degree || "Degree"} in {edu.field || "Field"}
                 </h3>
-                <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                  {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
-                </span>
+                {(edu.startDate || edu.endDate) && (
+                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                    {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-700">{edu.institution}</p>
+              {edu.institution && <p className="text-sm text-gray-700">{edu.institution}</p>}
               {edu.gpa && <p className="text-sm text-gray-600">GPA: {edu.gpa}</p>}
             </div>
           )
@@ -605,20 +734,22 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.experience) && (
+    {hasSectionData('experience') && (
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Experience</h2>
         {data.experience.map((exp, i) => (
           (exp.company || exp.position) && (
             <div key={i} className="mb-4">
               <div className="flex justify-between items-baseline mb-1">
-                <h3 className="font-semibold text-gray-900">{exp.position}</h3>
-                <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                  {formatDate(exp.startDate)} —{" "}
-                  {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                </span>
+                {exp.position && <h3 className="font-semibold text-gray-900">{exp.position}</h3>}
+                {(exp.startDate || exp.endDate) && (
+                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                    {formatDate(exp.startDate)} —{" "}
+                    {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-700 mb-2">{exp.company}</p>
+              {exp.company && <p className="text-sm text-gray-700 mb-2">{exp.company}</p>}
               {exp.description && renderDescription(exp.description)}
             </div>
           )
@@ -626,7 +757,7 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.projects) && (
+    {hasSectionData('projects') && (
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Projects</h2>
         {data.projects.map((proj, i) => (
@@ -663,18 +794,22 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.skills) && (
+    {hasSectionData('skills') && (
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Skills</h2>
         <div className="space-y-2 text-sm">
           {data.skills.map((category, i) => {
             const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            return skillsList.length > 0 ? (
+            return (category.name || skillsList.length > 0) ? (
               <div key={i}>
-                <span className="font-semibold text-gray-900">
-                  {category.name || "Skills"}:
-                </span>{" "}
-                <span className="text-gray-700">{skillsList.join(", ")}</span>
+                {category.name && (
+                  <span className="font-semibold text-gray-900">
+                    {category.name}:
+                  </span>
+                )}
+                {skillsList.length > 0 && (
+                  <span className="text-gray-700"> {skillsList.join(", ")}</span>
+                )}
               </div>
             ) : null;
           })}
@@ -682,7 +817,7 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.achievements) && (
+    {hasSectionData('achievements') && (
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Achievements</h2>
         <div className="space-y-3 text-sm">
@@ -705,7 +840,7 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
 
-    {hasData(data.volunteer) && (
+    {hasSectionData('volunteer') && (
       <div>
         <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Volunteer</h2>
         <div className="space-y-3 text-sm">
@@ -716,11 +851,13 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
                   <span className="font-semibold text-gray-900">
                     {vol.role || "Volunteer"}
                   </span>
-                  <span className="text-gray-600 whitespace-nowrap ml-4">
-                    {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
-                  </span>
+                  {(vol.startDate || vol.endDate) && (
+                    <span className="text-gray-600 whitespace-nowrap ml-4">
+                      {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
+                    </span>
+                  )}
                 </div>
-                <p className="text-gray-700">{vol.organization}</p>
+                {vol.organization && <p className="text-gray-700">{vol.organization}</p>}
                 {vol.description && renderDescription(vol.description)}
                 {vol.impact && (
                   <p className="text-gray-700 italic">{vol.impact}</p>
@@ -732,6 +869,7 @@ const MinimalPreview = ({ data, formatDate, hasData, renderDescription, themeCol
       </div>
     )}
   </div>
-);
+  );
+};
 
 export default PreviewPanel;

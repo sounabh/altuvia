@@ -164,24 +164,32 @@ export async function GET(request) {
     /**
      * Transform DB records to API response format
      */
-    const transformed = universities.map((u) => ({
-      id: u.id,
-      slug: u.slug,
-      name: u.universityName,
-      location: `${u.city}, ${u.country}`,
-      image: u.images[0]?.imageUrl || "/default-university.jpg",
-      rank: u.ftGlobalRanking || "N/A",
-      gmatAvg: u.gmatAverageScore || "N/A",
-      acceptRate: u.acceptanceRate || "N/A",
-      tuitionFee: u.tuitionFees ? `$${u.tuitionFees.toLocaleString()}` : "N/A",
-      applicationFee: u.additionalFees
-        ? `$${u.additionalFees.toLocaleString()}`
-        : "N/A",
-      pros: u.whyChooseHighlights || [],
-      cons: [], // No admissionRequirements in schema
-      isAdded: u.savedByUsers?.length > 0 || false, // Transform to boolean with fallback
-      savedByUsers: u.savedByUsers || [], // Keep original for debugging if needed
-    }));
+    // Update the transformation section in your GET function:
+// Update the transformation section in your GET function:
+
+const transformed = universities.map((u) => ({
+  id: u.id,
+  slug: u.slug,
+  name: u.universityName,
+  location: `${u.city}, ${u.country}`,
+  image: u.images[0]?.imageUrl || "/default-university.jpg",
+  
+  // ALL rankings - check priority: FT Global > US News > QS > Times > FT Regional
+  ftGlobalRank: u.ftGlobalRanking || null,
+  ftRegionalRank: u.ftRegionalRanking || null,
+  usNewsRank: u.usNewsRanking || null,
+  qsRank: u.qsRanking || null,
+  timesRank: u.timesRanking || null,
+  
+  gmatAvg: u.gmatAverageScore || null,
+  acceptRate: u.acceptanceRate || null,
+  tuitionFee: u.tuitionFees ? `${u.tuitionFees.toLocaleString()}` : null,
+  
+  pros: u.whyChooseHighlights || [],
+  cons: [],
+  isAdded: u.savedByUsers?.length > 0 || false,
+  savedByUsers: u.savedByUsers || [],
+}));
 
     // Build pagination metadata
     const pagination = {
