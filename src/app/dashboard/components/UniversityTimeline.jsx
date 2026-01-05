@@ -960,36 +960,153 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           {/* Stats Cards - Enhanced */}
           {(metadata || selectedUniversity) && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {/* Deadline Card */}
-              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
-                metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 30 ? 'border-rose-200 bg-rose-50/50' : 'border-gray-200'
-              }`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`p-2.5 rounded-xl ${
-                    metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14 ? 'bg-rose-100' : 'bg-amber-100'
-                  }`}>
-                    <Timer className={`w-5 h-5 ${
-                      metadata?.daysUntilDeadline && metadata.daysUntilDeadline <= 14 ? 'text-[#BE123C]' : 'text-[#D97706]'
-                    }`} />
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">Deadline</span>
-                </div>
-                {metadata?.deadline ? (
-                  <>
-                    <div className="text-lg font-bold text-gray-900">
-                      {formatDate(metadata.deadline)}
-                    </div>
-                    <div className={`text-sm mt-1 font-semibold flex items-center gap-1 ${getDeadlineUrgency(metadata.daysUntilDeadline).color}`}>
-                      {metadata.daysUntilDeadline <= 14 && <AlertCircle className="w-4 h-4" />}
-                      {metadata.daysUntilDeadline > 0
-                        ? `${metadata.daysUntilDeadline} days left`
-                        : 'Deadline passed'}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-gray-400 text-sm">Check website</div>
-                )}
+{/* Deadline Card */}
+<div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md border-gray-200 relative group`}>
+  <div className="flex items-center gap-3 mb-3">
+    <div className="p-2.5 rounded-xl bg-amber-100">
+      <Timer className="w-5 h-5 text-[#D97706]" />
+    </div>
+    <span className="text-sm font-medium text-gray-500">Next Deadline</span>
+  </div>
+  
+  {(() => {
+    // Parse deadlines directly from selectedUniversity
+    const parseUniversityDeadlines = () => {
+      let rawDeadlines = [];
+
+      if (Array.isArray(selectedUniversity?.roundDeadlines) && selectedUniversity.roundDeadlines.length > 0) {
+        rawDeadlines = selectedUniversity.roundDeadlines.map(d => d.trim());
+      } 
+      else if (typeof selectedUniversity?.averageDeadlines === 'string' && selectedUniversity.averageDeadlines.trim()) {
+        const pattern = /(Round\s*\d+|Deferred):\s*([^,]+(?:,\s*\d{4})?[^R]*?)(?=\s*(?:Round\s*\d+|Deferred):|$)/gi;
+        const matches = [...selectedUniversity.averageDeadlines.matchAll(pattern)];
+        
+        if (matches.length > 0) {
+          rawDeadlines = matches.map(match => {
+            const round = match[1].trim();
+            const date = match[2].trim();
+            return `${round}: ${date}`;
+          });
+        } else {
+          rawDeadlines = selectedUniversity.averageDeadlines.split(/,(?=\s*(?:Round|Deferred))/i).map(p => p.trim()).filter(Boolean);
+        }
+      }
+
+      return rawDeadlines;
+    };
+
+    const rawDeadlines = parseUniversityDeadlines();
+    
+    if (rawDeadlines.length === 0) {
+      return <div className="text-gray-400 text-sm">No deadline set</div>;
+    }
+
+    // Parse and filter for future deadlines
+    const now = new Date();
+    const futureDeadlines = [];
+
+    rawDeadlines.forEach((deadline, idx) => {
+      // Split by colon to separate round and date
+      const colonIndex = deadline.indexOf(':');
+      let round = `Round ${idx + 1}`;
+      let dateStr = deadline;
+
+      if (colonIndex > -1) {
+        round = deadline.substring(0, colonIndex).trim();
+        dateStr = deadline.substring(colonIndex + 1).trim();
+      }
+
+      // Remove parentheses and period
+      dateStr = dateStr.replace(/[()\.]/g, '').trim();
+
+      // Parse the date
+      const parsedDate = new Date(dateStr);
+      
+      // Only add if it's a valid future date
+      if (!isNaN(parsedDate.getTime()) && parsedDate > now) {
+        futureDeadlines.push({
+          date: parsedDate,
+          dateString: dateStr,
+          round: round
+        });
+      }
+    });
+
+    // Sort by date
+    futureDeadlines.sort((a, b) => a.date - b.date);
+
+    if (futureDeadlines.length === 0) {
+      return <div className="text-gray-400 text-sm">All deadlines passed</div>;
+    }
+
+    // Get the nearest deadline
+    const nextDeadline = futureDeadlines[0];
+    const daysUntil = Math.ceil((nextDeadline.date - now) / (1000 * 60 * 60 * 24));
+    
+    return (
+      <>
+        <div className="text-xs text-gray-500 mb-1">{nextDeadline.round}</div>
+        <div className="text-lg font-bold text-gray-900">
+          {nextDeadline.date.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          })}
+        </div>
+        <div className={`text-sm mt-1 font-semibold flex items-center gap-1 ${
+          daysUntil <= 14 ? 'text-rose-600' : daysUntil <= 30 ? 'text-amber-600' : 'text-gray-600'
+        }`}>
+          {daysUntil <= 14 && daysUntil > 0 && <AlertCircle className="w-4 h-4" />}
+          {daysUntil > 0 ? `${daysUntil} days left` : daysUntil === 0 ? 'Today!' : `${Math.abs(daysUntil)} days ago`}
+        </div>
+        {futureDeadlines.length > 1 && (
+          <>
+            <div className="text-xs text-gray-500 mt-2">
+              +{futureDeadlines.length - 1} more round{futureDeadlines.length > 2 ? 's' : ''}
+            </div>
+          </>
+        )}
+
+        {/* Hover Tooltip for All Deadlines */}
+        {futureDeadlines.length > 0 && (
+          <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#D97706] p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                <span className="text-sm font-bold text-gray-900">All Deadlines</span>
+                <span className="text-xs font-semibold text-[#D97706] bg-amber-100 px-2 py-1 rounded-full">
+                  {futureDeadlines.length} round{futureDeadlines.length > 1 ? 's' : ''}
+                </span>
               </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {futureDeadlines.map((deadline, idx) => {
+                  const daysUntilThis = Math.ceil((deadline.date - now) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={idx} className="text-xs bg-gray-50 p-3 rounded-lg border border-gray-200 hover:bg-amber-50 transition-colors">
+                      <div className="font-medium text-gray-700 mb-1">{deadline.round}</div>
+                      <div className="text-gray-600 mb-1">
+                        {deadline.date.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </div>
+                      <div className={`text-xs font-medium ${
+                        daysUntilThis <= 14 ? 'text-rose-600' : 
+                        daysUntilThis <= 30 ? 'text-amber-600' : 'text-gray-500'
+                      }`}>
+                        {daysUntilThis} days away
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  })()}
+</div>
 
               {/* Essays Card - Color coded by completion */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
