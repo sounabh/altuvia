@@ -960,13 +960,13 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           {/* Stats Cards - Enhanced */}
           {(metadata || selectedUniversity) && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-{/* Deadline Card */}
+{/* Deadline Card - FIXED */}
 <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md border-gray-200 relative group`}>
   <div className="flex items-center gap-3 mb-3">
     <div className="p-2.5 rounded-xl bg-amber-100">
       <Timer className="w-5 h-5 text-[#D97706]" />
     </div>
-    <span className="text-sm font-medium text-gray-500">Next Deadline</span>
+    <span className="text-sm font-medium text-gray-500">Deadlines</span>
   </div>
   
   {(() => {
@@ -1001,11 +1001,11 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
       return <div className="text-gray-400 text-sm">No deadline set</div>;
     }
 
-    // Parse and filter for future deadlines
+    // Parse ALL deadlines (no future filter)
     const now = new Date();
-    const futureDeadlines = [];
+    const allDeadlines = [];
 
- rawDeadlines.forEach((deadline, idx) => {
+    rawDeadlines.forEach((deadline, idx) => {
       // Split by colon to separate round and date
       const colonIndex = deadline.indexOf(':');
       let round = `Round ${idx + 1}`;
@@ -1016,13 +1016,12 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
         dateStr = deadline.substring(colonIndex + 1).trim();
       }
 
-      // Remove parentheses and period
+      // Remove parentheses, periods, and extra whitespace
       dateStr = dateStr.replace(/[()\.]/g, '').trim();
 
-      // Parse the date with better format handling
-      let parsedDate;
+      // Parse the date with comprehensive format handling
+      let parsedDate = null;
       
-      // Try multiple parsing strategies
       // Strategy 1: Direct Date constructor
       parsedDate = new Date(dateStr);
       
@@ -1034,7 +1033,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
       
       // Strategy 3: Handle formats like "January 15, 2025" or "Jan 15, 2025"
       if (isNaN(parsedDate.getTime())) {
-        const datePattern = /([A-Za-z]+)\s+(\d+),?\s+(\d{4})?/;
+        const datePattern = /([A-Za-z]+)\s+(\d+),?\s*(\d{4})?/;
         const match = dateStr.match(datePattern);
         if (match) {
           const [, month, day, year = new Date().getFullYear()] = match;
@@ -1042,89 +1041,217 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
         }
       }
 
-      // Validate: Only add if it's a valid future date
-      // Set comparison to start of day to include today's deadlines
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
-      if (!isNaN(parsedDate.getTime()) && parsedDate >= todayStart) {
-        futureDeadlines.push({
+      // Strategy 4: Handle "Month Year" format (no day) - e.g., "January 2025" or "Jan 2025"
+      if (isNaN(parsedDate.getTime())) {
+        const monthYearPattern = /^([A-Za-z]+)\s*,?\s*(\d{4})$/;
+        const match = dateStr.match(monthYearPattern);
+        if (match) {
+          const [, month, year] = match;
+          // Default to 1st of the month
+          parsedDate = new Date(`${month} 1, ${year}`);
+        }
+      }
+
+      // Strategy 5: Handle "Month, Year" format with comma
+      if (isNaN(parsedDate.getTime())) {
+        const monthCommaYearPattern = /^([A-Za-z]+),\s*(\d{4})$/;
+        const match = dateStr.match(monthCommaYearPattern);
+        if (match) {
+          const [, month, year] = match;
+          parsedDate = new Date(`${month} 1, ${year}`);
+        }
+      }
+
+      // Strategy 6: Handle just month name (assume current/next year)
+      if (isNaN(parsedDate.getTime())) {
+        const monthOnlyPattern = /^([A-Za-z]+)$/;
+        const match = dateStr.match(monthOnlyPattern);
+        if (match) {
+          const [, month] = match;
+          const currentYear = new Date().getFullYear();
+          parsedDate = new Date(`${month} 1, ${currentYear}`);
+          // If the month has already passed this year, use next year
+          if (parsedDate < now) {
+            parsedDate = new Date(`${month} 1, ${currentYear + 1}`);
+          }
+        }
+      }
+
+      // Determine if we have a specific day or just month/year
+      const hasSpecificDay = /\d+/.test(dateStr) && !/^\d{4}$/.test(dateStr.match(/\d+/)?.[0] || '');
+      const isMonthYearOnly = !hasSpecificDay || /^[A-Za-z]+\s*,?\s*\d{4}$/.test(dateStr);
+
+      // Add to array regardless of whether it's past or future
+      if (parsedDate && !isNaN(parsedDate.getTime())) {
+        allDeadlines.push({
           date: parsedDate,
           dateString: dateStr,
-          round: round
+          round: round,
+          isMonthYearOnly: isMonthYearOnly
+        });
+      } else {
+        // If parsing completely fails, still add it with null date for display
+        allDeadlines.push({
+          date: null,
+          dateString: dateStr,
+          round: round,
+          isMonthYearOnly: true,
+          parseError: true
         });
       }
     });
-    // Sort by date
-    futureDeadlines.sort((a, b) => a.date - b.date);
 
-    if (futureDeadlines.length === 0) {
-      return <div className="text-gray-400 text-sm">All deadlines passed</div>;
+    // Sort by date (null dates go to the end)
+    allDeadlines.sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return a.date - b.date;
+    });
+
+    if (allDeadlines.length === 0) {
+      return <div className="text-gray-400 text-sm">No deadline set</div>;
     }
 
-    // Get the nearest deadline
-    const nextDeadline = futureDeadlines[0];
-    const daysUntil = Math.ceil((nextDeadline.date - now) / (1000 * 60 * 60 * 24));
+    // Find the next upcoming deadline (for highlight)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const nextUpcomingIndex = allDeadlines.findIndex(d => d.date && d.date >= todayStart);
+    const nextDeadline = nextUpcomingIndex >= 0 ? allDeadlines[nextUpcomingIndex] : allDeadlines[0];
+    
+    // Calculate days until next deadline
+    const getDaysUntil = (date) => {
+      if (!date) return null;
+      return Math.ceil((date - now) / (1000 * 60 * 60 * 24));
+    };
+
+    const daysUntil = getDaysUntil(nextDeadline?.date);
+    const isPast = daysUntil !== null && daysUntil < 0;
+    const isToday = daysUntil === 0;
+
+    // Format date for display
+    const formatDate = (deadline) => {
+      if (!deadline.date) return deadline.dateString; // Return original string if parse failed
+      
+      if (deadline.isMonthYearOnly) {
+        return deadline.date.toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric'
+        });
+      }
+      return deadline.date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
+
+    const formatDateShort = (deadline) => {
+      if (!deadline.date) return deadline.dateString;
+      
+      if (deadline.isMonthYearOnly) {
+        return deadline.date.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric'
+        });
+      }
+      return deadline.date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
     
     return (
       <>
-        <div className="text-xs text-gray-500 mb-1">{nextDeadline.round}</div>
-        <div className="text-lg font-bold text-gray-900">
-          {nextDeadline.date.toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-          })}
+        <div className="text-xs text-gray-500 mb-1">
+          {nextDeadline.round}
+          {isPast && <span className="ml-2 text-gray-400">(Passed)</span>}
         </div>
-        <div className={`text-sm mt-1 font-semibold flex items-center gap-1 ${
-          daysUntil <= 14 ? 'text-rose-600' : daysUntil <= 30 ? 'text-amber-600' : 'text-gray-600'
-        }`}>
-          {daysUntil <= 14 && daysUntil > 0 && <AlertCircle className="w-4 h-4" />}
-          {daysUntil > 0 ? `${daysUntil} days left` : daysUntil === 0 ? 'Today!' : `${Math.abs(daysUntil)} days ago`}
+        <div className={`text-lg font-bold ${isPast ? 'text-gray-400' : 'text-gray-900'}`}>
+          {formatDate(nextDeadline)}
         </div>
-        {futureDeadlines.length > 1 && (
-          <>
-            <div className="text-xs text-gray-500 mt-2">
-              +{futureDeadlines.length - 1} more round{futureDeadlines.length > 2 ? 's' : ''}
-            </div>
-          </>
+        {daysUntil !== null && (
+          <div className={`text-sm mt-1 font-semibold flex items-center gap-1 ${
+            isPast ? 'text-gray-400' :
+            isToday ? 'text-rose-600' :
+            daysUntil <= 14 ? 'text-rose-600' : 
+            daysUntil <= 30 ? 'text-amber-600' : 'text-gray-600'
+          }`}>
+            {!isPast && daysUntil <= 14 && daysUntil > 0 && <AlertCircle className="w-4 h-4" />}
+            {isToday ? 'Today!' : 
+             isPast ? `${Math.abs(daysUntil)} days ago` : 
+             `${daysUntil} days left`}
+          </div>
+        )}
+        {allDeadlines.length > 1 && (
+          <div className="text-xs text-gray-500 mt-2">
+            +{allDeadlines.length - 1} more round{allDeadlines.length > 2 ? 's' : ''}
+          </div>
         )}
 
         {/* Hover Tooltip for All Deadlines */}
-        {futureDeadlines.length > 0 && (
-          <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#D97706] p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                <span className="text-sm font-bold text-gray-900">All Deadlines</span>
-                <span className="text-xs font-semibold text-[#D97706] bg-amber-100 px-2 py-1 rounded-full">
-                  {futureDeadlines.length} round{futureDeadlines.length > 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {futureDeadlines.map((deadline, idx) => {
-                  const daysUntilThis = Math.ceil((deadline.date - now) / (1000 * 60 * 60 * 24));
-                  return (
-                    <div key={idx} className="text-xs bg-gray-50 p-3 rounded-lg border border-gray-200 hover:bg-amber-50 transition-colors">
-                      <div className="font-medium text-gray-700 mb-1">{deadline.round}</div>
-                      <div className="text-gray-600 mb-1">
-                        {deadline.date.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </div>
+        <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#D97706] p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+              <span className="text-sm font-bold text-gray-900">All Deadlines</span>
+              <span className="text-xs font-semibold text-[#D97706] bg-amber-100 px-2 py-1 rounded-full">
+                {allDeadlines.length} round{allDeadlines.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {allDeadlines.map((deadline, idx) => {
+                const daysUntilThis = getDaysUntil(deadline.date);
+                const isThisPast = daysUntilThis !== null && daysUntilThis < 0;
+                const isThisNext = nextUpcomingIndex === idx;
+                
+                return (
+                  <div 
+                    key={idx} 
+                    className={`text-xs p-3 rounded-lg border transition-colors ${
+                      isThisNext 
+                        ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200' 
+                        : isThisPast 
+                          ? 'bg-gray-50 border-gray-200 opacity-60' 
+                          : 'bg-gray-50 border-gray-200 hover:bg-amber-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-gray-700">{deadline.round}</span>
+                      {isThisNext && (
+                        <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">
+                          Next
+                        </span>
+                      )}
+                      {isThisPast && (
+                        <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">
+                          Passed
+                        </span>
+                      )}
+                    </div>
+                    <div className={`mb-1 ${isThisPast ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {formatDateShort(deadline)}
+                      {deadline.isMonthYearOnly && !deadline.parseError && (
+                        <span className="text-gray-400 ml-1">(Month only)</span>
+                      )}
+                    </div>
+                    {daysUntilThis !== null && (
                       <div className={`text-xs font-medium ${
+                        isThisPast ? 'text-gray-400' :
+                        daysUntilThis === 0 ? 'text-rose-600' :
                         daysUntilThis <= 14 ? 'text-rose-600' : 
                         daysUntilThis <= 30 ? 'text-amber-600' : 'text-gray-500'
                       }`}>
-                        {daysUntilThis} days away
+                        {daysUntilThis === 0 ? 'Today!' :
+                         isThisPast ? `${Math.abs(daysUntilThis)} days ago` :
+                         `${daysUntilThis} days away`}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        )}
+        </div>
       </>
     );
   })()}
