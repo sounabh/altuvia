@@ -991,21 +991,20 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
                       </Button>
                     </div>
 
-                    {/* Essay Prompt */}
-                    <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-                      <p className="text-sm text-blue-800 font-medium mb-2">
-                        Essay Prompt:
-                      </p>
-                      <p className="text-sm text-blue-700 leading-relaxed">
-                        {currentEssayData.promptText}
-                      </p>
-                      <div className="flex items-center justify-between mt-3 text-xs text-blue-600">
-                        <span>Word limit: {currentEssayData.wordLimit}</span>
-                        {currentEssayData.minWordCount && (
-                          <span>Minimum: {currentEssayData.minWordCount}</span>
-                        )}
-                      </div>
-                    </div>
+                   {/* Essay Prompt */}
+<div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+  <p className="text-sm text-blue-800 font-medium mb-2">
+    Essay Prompt:
+  </p>
+  {/* FIXED: Added classes to prevent truncation */}
+  <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap break-words overflow-visible line-clamp-none">
+    {currentEssayData.promptText}
+  </p>
+  <div className="flex items-center justify-between mt-3 text-xs text-blue-600">
+    <span>Word limit: {currentEssayData.wordLimit}</span>
+   
+  </div>
+</div>
 
                     {/* Essay Editor or Create Button */}
                     {currentEssay ? (

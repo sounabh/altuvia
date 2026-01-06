@@ -1005,7 +1005,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
     const now = new Date();
     const futureDeadlines = [];
 
-    rawDeadlines.forEach((deadline, idx) => {
+ rawDeadlines.forEach((deadline, idx) => {
       // Split by colon to separate round and date
       const colonIndex = deadline.indexOf(':');
       let round = `Round ${idx + 1}`;
@@ -1019,11 +1019,34 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
       // Remove parentheses and period
       dateStr = dateStr.replace(/[()\.]/g, '').trim();
 
-      // Parse the date
-      const parsedDate = new Date(dateStr);
+      // Parse the date with better format handling
+      let parsedDate;
       
-      // Only add if it's a valid future date
-      if (!isNaN(parsedDate.getTime()) && parsedDate > now) {
+      // Try multiple parsing strategies
+      // Strategy 1: Direct Date constructor
+      parsedDate = new Date(dateStr);
+      
+      // Strategy 2: If that fails, try adding explicit year if missing
+      if (isNaN(parsedDate.getTime())) {
+        const currentYear = new Date().getFullYear();
+        parsedDate = new Date(`${dateStr}, ${currentYear}`);
+      }
+      
+      // Strategy 3: Handle formats like "January 15, 2025" or "Jan 15, 2025"
+      if (isNaN(parsedDate.getTime())) {
+        const datePattern = /([A-Za-z]+)\s+(\d+),?\s+(\d{4})?/;
+        const match = dateStr.match(datePattern);
+        if (match) {
+          const [, month, day, year = new Date().getFullYear()] = match;
+          parsedDate = new Date(`${month} ${day}, ${year}`);
+        }
+      }
+
+      // Validate: Only add if it's a valid future date
+      // Set comparison to start of day to include today's deadlines
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      if (!isNaN(parsedDate.getTime()) && parsedDate >= todayStart) {
         futureDeadlines.push({
           date: parsedDate,
           dateString: dateStr,
@@ -1031,7 +1054,6 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
         });
       }
     });
-
     // Sort by date
     futureDeadlines.sort((a, b) => a.date - b.date);
 
