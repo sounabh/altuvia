@@ -1,4 +1,4 @@
-// app/api/cv/ai-assist/route.js - ENHANCED AI ASSISTANT WITH OPENROUTER
+// app/api/cv/ai-assist/route.js - ENHANCED WITH AUTO-FILL CAPABILITY
 import { NextResponse } from "next/server";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -151,12 +151,16 @@ Provide a helpful, specific, actionable response that directly addresses their q
       analysisMetrics = extractAnalysisMetrics(aiResponse, cvData);
     }
 
+    // NEW: Parse AI content for form auto-fill
+    const structuredContent = parseAIContentForForms(aiResponse, activeSection, cvData);
+
     return NextResponse.json({
       response: aiResponse,
       suggestions: suggestions,
       analysis: analysisMetrics,
       cvStats: cvStats,
       hasContentSuggestions: hasContentSuggestions,
+      structuredContent: structuredContent, // NEW: Add structured content
       timestamp: new Date().toISOString()
     });
 
@@ -168,6 +172,190 @@ Provide a helpful, specific, actionable response that directly addresses their q
       error: error.message
     }, { status: 200 });
   }
+}
+
+// NEW: Parse AI content for form auto-fill
+function parseAIContentForForms(aiResponse, activeSection, cvData) {
+  const formData = {};
+  
+  // Try to extract JSON-formatted suggestions first
+  const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      return parsed;
+    } catch (e) {
+      console.log("JSON parsing failed, using text extraction");
+    }
+  }
+
+  // Text-based extraction for different sections
+  switch (activeSection) {
+    case 'personal':
+      formData.personal = extractPersonalInfo(aiResponse);
+      break;
+    case 'education':
+      formData.education = extractEducationInfo(aiResponse, cvData);
+      break;
+    case 'experience':
+      formData.experience = extractExperienceInfo(aiResponse, cvData);
+      break;
+    case 'projects':
+      formData.projects = extractProjectsInfo(aiResponse, cvData);
+      break;
+    case 'skills':
+      formData.skills = extractSkillsInfo(aiResponse, cvData);
+      break;
+    case 'achievements':
+      formData.achievements = extractAchievementsInfo(aiResponse, cvData);
+      break;
+    case 'volunteer':
+      formData.volunteer = extractVolunteerInfo(aiResponse, cvData);
+      break;
+  }
+
+  return Object.keys(formData).length > 0 ? formData : null;
+}
+
+function extractPersonalInfo(text) {
+  const data = {};
+  
+  // Extract professional summary
+  const summaryMatch = text.match(/(?:summary|professional summary|about)[\s:]*["']?([^"'\n]{50,500})["']?/i);
+  if (summaryMatch) {
+    data.summary = summaryMatch[1].trim();
+  }
+  
+  return Object.keys(data).length > 0 ? data : null;
+}
+
+function extractEducationInfo(text, cvData) {
+  const currentEdu = cvData.education?.[0] || {};
+  const updates = [];
+  
+  // Extract GPA suggestions
+  const gpaMatch = text.match(/GPA[\s:]*(\d+\.\d+)/i);
+  
+  // Extract description/details
+  const descMatch = text.match(/(?:description|details|coursework)[\s:]*["']?([^"'\n]{30,300})["']?/i);
+  
+  if (gpaMatch || descMatch) {
+    updates.push({
+      ...currentEdu,
+      gpa: gpaMatch ? gpaMatch[1] : currentEdu.gpa,
+      description: descMatch ? descMatch[1].trim() : currentEdu.description
+    });
+  }
+  
+  return updates.length > 0 ? updates : null;
+}
+
+function extractExperienceInfo(text, cvData) {
+  const currentExp = cvData.experience?.[0] || {};
+  const updates = [];
+  
+  // Extract bullet points
+  const bullets = text.match(/[•\-\*]\s*(.+)/g);
+  if (bullets) {
+    const description = bullets
+      .map(b => b.replace(/^[•\-\*]\s*/, '').trim())
+      .filter(b => b.length > 20)
+      .join('\n• ');
+    
+    if (description) {
+      updates.push({
+        ...currentExp,
+        description: '• ' + description
+      });
+    }
+  }
+  
+  return updates.length > 0 ? updates : null;
+}
+
+function extractProjectsInfo(text, cvData) {
+  const currentProj = cvData.projects?.[0] || {};
+  const updates = [];
+  
+  // Extract project description
+  const descMatch = text.match(/(?:description|details)[\s:]*["']?([^"'\n]{30,300})["']?/i);
+  
+  // Extract achievements
+  const achMatch = text.match(/(?:achievement|result|impact)[\s:]*["']?([^"'\n]{30,200})["']?/i);
+  
+  if (descMatch || achMatch) {
+    updates.push({
+      ...currentProj,
+      description: descMatch ? descMatch[1].trim() : currentProj.description,
+      achievements: achMatch ? achMatch[1].trim() : currentProj.achievements
+    });
+  }
+  
+  return updates.length > 0 ? updates : null;
+}
+
+function extractSkillsInfo(text, cvData) {
+  const updates = [];
+  
+  // Extract skill lists
+  const skillMatches = text.match(/(?:skills?|technologies?)[\s:]*([^.\n]+)/gi);
+  
+  if (skillMatches) {
+    skillMatches.forEach(match => {
+      const skills = match
+        .replace(/(?:skills?|technologies?)[\s:]*/i, '')
+        .split(/,|;|\|/)
+        .map(s => s.trim())
+        .filter(s => s.length > 1 && s.length < 30);
+      
+      if (skills.length > 0 && cvData.skills?.[0]) {
+        updates.push({
+          ...cvData.skills[0],
+          skills: [...new Set([...(cvData.skills[0].skills || []), ...skills])]
+        });
+      }
+    });
+  }
+  
+  return updates.length > 0 ? updates : null;
+}
+
+function extractAchievementsInfo(text, cvData) {
+  const currentAch = cvData.achievements?.[0] || {};
+  const updates = [];
+  
+  // Extract achievement description
+  const descMatch = text.match(/(?:description|details|impact)[\s:]*["']?([^"'\n]{30,300})["']?/i);
+  
+  if (descMatch) {
+    updates.push({
+      ...currentAch,
+      description: descMatch[1].trim()
+    });
+  }
+  
+  return updates.length > 0 ? updates : null;
+}
+
+function extractVolunteerInfo(text, cvData) {
+  const currentVol = cvData.volunteer?.[0] || {};
+  const updates = [];
+  
+  // Extract description
+  const descMatch = text.match(/(?:description|activities|responsibilities)[\s:]*["']?([^"'\n]{30,300})["']?/i);
+  
+  // Extract impact
+  const impactMatch = text.match(/(?:impact|achievement|result)[\s:]*["']?([^"'\n]{30,200})["']?/i);
+  
+  if (descMatch || impactMatch) {
+    updates.push({
+      ...currentVol,
+      description: descMatch ? descMatch[1].trim() : currentVol.description,
+      impact: impactMatch ? impactMatch[1].trim() : currentVol.impact
+    });
+  }
+  
+  return updates.length > 0 ? updates : null;
 }
 
 function buildDetailedCVContext(cvData, activeSection) {

@@ -1,4 +1,4 @@
-// components/AIAssistant.jsx - PRODUCTION READY VERSION
+// components/AIAssistant.jsx - PRODUCTION READY VERSION WITH AUTO-FILL
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -128,18 +128,18 @@ What would you like help with today?`,
 
       const data = await response.json();
 
-      // Add AI response to chat
+      // Add AI response to chat (MODIFIED: use structuredContent)
       setChatHistory(prev => [...prev, {
         role: 'assistant',
         content: data.response,
         suggestions: data.suggestions,
-        sectionUpdates: data.sectionUpdates,
+        sectionUpdates: data.structuredContent, // CHANGED: from data.sectionUpdates
         timestamp: new Date()
       }]);
 
       // Handle section updates if provided
-      if (data.sectionUpdates && data.applyUpdates) {
-        handleApplySuggestion(data.sectionUpdates);
+      if (data.structuredContent && data.applyUpdates) {
+        handleApplySuggestion(data.structuredContent);
       }
 
     } catch (error) {
@@ -156,12 +156,49 @@ What would you like help with today?`,
     }
   };
 
-  const handleApplySuggestion = (sectionUpdates) => {
+  // MODIFIED: Enhanced apply suggestion handler
+  const handleApplySuggestion = (contentData) => {
     try {
-      Object.entries(sectionUpdates).forEach(([section, data]) => {
-        updateCVData(section, data);
+      if (!contentData) {
+        toast.error('No suggestions to apply');
+        return;
+      }
+
+      let applied = false;
+
+      // Apply structured content based on section
+      Object.entries(contentData).forEach(([section, data]) => {
+        if (data && section !== 'timestamp') {
+          if (Array.isArray(data)) {
+            // For array-based sections (education, experience, etc.)
+            const currentData = cvData[section] || [];
+            
+            // Update first item or create new one
+            if (currentData.length > 0) {
+              const updatedData = currentData.map((item, idx) => {
+                if (idx === 0 && data[0]) {
+                  // Merge AI suggestions with existing data
+                  return { ...item, ...data[0] };
+                }
+                return item;
+              });
+              updateCVData(section, updatedData);
+              applied = true;
+            }
+          } else {
+            // For object-based sections (personal)
+            const currentData = cvData[section] || {};
+            updateCVData(section, { ...currentData, ...data });
+            applied = true;
+          }
+        }
       });
-      toast.success('AI suggestions applied successfully!');
+
+      if (applied) {
+        toast.success('AI suggestions applied successfully!');
+      } else {
+        toast.info('No changes to apply');
+      }
     } catch (error) {
       console.error('Error applying suggestions:', error);
       toast.error('Failed to apply suggestions');

@@ -50,9 +50,9 @@ export const VersionSaveDialog = ({ isOpen, onClose, onSave, currentVersionName 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-2">
             <Save className="w-6 h-6 text-blue-600" />
             <h3 className="text-xl font-semibold text-gray-900">Save CV Version</h3>
@@ -65,11 +65,11 @@ export const VersionSaveDialog = ({ isOpen, onClose, onSave, currentVersionName 
           </button>
         </div>
         
-        {/* Body */}
-        <div className="p-6 space-y-5">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Version Name Input */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-700">
               Version Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -82,7 +82,7 @@ export const VersionSaveDialog = ({ isOpen, onClose, onSave, currentVersionName 
             />
             
             {/* Quick Suggestions */}
-            <div className="mt-3">
+            <div>
               <p className="text-xs font-medium text-gray-600 mb-2">Quick suggestions:</p>
               <div className="flex flex-wrap gap-2">
                 {suggestions.slice(0, 5).map((suggestion, index) => (
@@ -107,7 +107,7 @@ export const VersionSaveDialog = ({ isOpen, onClose, onSave, currentVersionName 
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What changes did you make in this version? e.g., Updated skills section, tailored for tech companies..."
-              rows={4}
+              rows={3}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none resize-none"
             />
             <p className="mt-1 text-xs text-gray-500">
@@ -147,7 +147,7 @@ export const VersionSaveDialog = ({ isOpen, onClose, onSave, currentVersionName 
         </div>
         
         {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+        <div className="flex-shrink-0 flex items-center justify-end space-x-3 px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
           <button
             onClick={handleClose}
             className="px-5 py-2.5 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors font-medium"

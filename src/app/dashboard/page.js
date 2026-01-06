@@ -21,6 +21,9 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // ✅ NEW: Timeline cache state lifted to parent
+  const [timelineCache, setTimelineCache] = useState({});
 
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -485,6 +488,8 @@ const Index = () => {
             universities={universities} 
             stats={stats} 
             userProfile={userProfile}
+            timelineCache={timelineCache}
+            setTimelineCache={setTimelineCache}
           />
         )}
       </div>

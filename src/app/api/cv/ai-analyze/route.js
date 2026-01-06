@@ -1,9 +1,9 @@
-// app/api/cv/ai-analyze/route.js - ENHANCED DETAILED ANALYSIS WITH OPENROUTER
+// app/api/cv/ai-analyze/route.js - ENHANCED WITH STRUCTURED IMPROVEMENTS
 import { NextResponse } from "next/server";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const MODEL = "google/gemini-2.5-flash-lite"; // or "google/gemini-flash-1.5"
+const MODEL = "google/gemini-2.5-flash-lite";
 
 async function callOpenRouter(messages, maxTokens = 3000, temperature = 0.6) {
   try {
@@ -67,6 +67,9 @@ export async function POST(request) {
     // Calculate ATS score
     const atsAnalysis = await analyzeATS(cvText);
 
+    // NEW: Generate structured improvements
+    const structuredContent = generateStructuredImprovements(sectionAnalyses, cvData);
+
     return NextResponse.json({
       overallAnalysis: overallAnalysis,
       sectionAnalyses: sectionAnalyses,
@@ -76,6 +79,7 @@ export async function POST(request) {
       improvements: overallAnalysis.improvements,
       recommendations: overallAnalysis.recommendations,
       criticalIssues: overallAnalysis.criticalIssues,
+      structuredContent: structuredContent, // NEW
       timestamp: new Date().toISOString()
     });
 
@@ -89,6 +93,35 @@ export async function POST(request) {
       { status: 500 }
     );
   }
+}
+
+// NEW: Generate structured improvements from analysis
+function generateStructuredImprovements(sectionAnalyses, cvData) {
+  const improvements = {};
+  
+  Object.entries(sectionAnalyses).forEach(([section, analysis]) => {
+    if (analysis.suggestions && analysis.suggestions.length > 0) {
+      // Convert suggestions to structured form data
+      const suggestion = analysis.suggestions[0];
+      
+      if (section === 'personal' && typeof suggestion === 'string') {
+        improvements.personal = { summary: suggestion };
+      } else if (section === 'experience' && typeof suggestion === 'string') {
+        improvements.experience = [{ description: suggestion }];
+      } else if (section === 'education' && typeof suggestion === 'string') {
+        improvements.education = [{ description: suggestion }];
+      } else if (section === 'projects' && typeof suggestion === 'string') {
+        improvements.projects = [{ description: suggestion }];
+      } else if (section === 'achievements' && typeof suggestion === 'string') {
+        improvements.achievements = [{ description: suggestion }];
+      } else if (section === 'volunteer' && typeof suggestion === 'string') {
+        improvements.volunteer = [{ description: suggestion }];
+      }
+      // Add more section mappings as needed
+    }
+  });
+  
+  return Object.keys(improvements).length > 0 ? improvements : null;
 }
 
 async function analyzeAllSections(cvData, targetRole, targetCompany) {

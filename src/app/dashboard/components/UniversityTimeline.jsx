@@ -81,7 +81,13 @@ const isValidTaskId = (id) => {
   return id && typeof id === 'string' && id.length >= 20;
 };
 
-const UniversityTimeline = ({ universities, stats, userProfile }) => {
+const UniversityTimeline = ({ 
+  universities, 
+  stats, 
+  userProfile,
+  timelineCache,      // ✅ NEW: Receive cache from parent
+  setTimelineCache    // ✅ NEW: Receive setter from parent
+}) => {
   const [selectedUniversity, setSelectedUniversity] = useState(null);
   const [timeline, setTimeline] = useState(null);
   const [metadata, setMetadata] = useState(null);
@@ -96,6 +102,19 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
   const [invalidTasksCount, setInvalidTasksCount] = useState(0);
   const [hoveredEventCard, setHoveredEventCard] = useState(null);
   const { data: session } = useSession();
+
+  // ✅ NEW: Load timeline from cache when university changes
+  useEffect(() => {
+    if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
+      const cached = timelineCache[selectedUniversity.id];
+      console.log('📦 Loading timeline from cache for:', selectedUniversity.universityName);
+      setTimeline(cached.timeline);
+      setMetadata(cached.metadata);
+      setExpandedPhases(cached.expandedPhases || {});
+      setExpandedTasks(cached.expandedTasks || {});
+      setInvalidTasksCount(cached.invalidTasksCount || 0);
+    }
+  }, [selectedUniversity?.id, timelineCache]);
 
   // ✅ Helper function to get essay counts - Prioritizes fresh metadata from API
   const getEssayCounts = useCallback(() => {
@@ -431,6 +450,20 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
           essaysCompleted: data.metadata?.essaysCompleted,
           eventsCompleted: data.metadata?.calendarEventsCompleted
         });
+        
+        // ✅ NEW: Save to parent cache
+        setTimelineCache(prev => ({
+          ...prev,
+          [university.id]: {
+            timeline: data.timeline,
+            metadata: data.metadata || null,
+            expandedPhases: initialExpanded,
+            expandedTasks: {},
+            invalidTasksCount: invalidTasks.length,
+            cachedAt: new Date().toISOString()
+          }
+        }));
+        console.log('💾 Timeline cached in parent for:', university.universityName);
       } else {
         throw new Error(data.error || 'Failed to generate timeline');
       }
@@ -447,21 +480,51 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
       setLoadingTimelines(prev => ({ ...prev, [university.id]: false }));
       setAbortController(null);
     }
-  }, [session, userProfile]);
+  }, [session, userProfile, setTimelineCache]);
 
   const togglePhase = (phaseIndex) => {
-    setExpandedPhases(prev => ({
-      ...prev,
-      [phaseIndex]: !prev[phaseIndex]
-    }));
+    setExpandedPhases(prev => {
+      const newExpanded = {
+        ...prev,
+        [phaseIndex]: !prev[phaseIndex]
+      };
+      
+      // ✅ NEW: Update parent cache
+      if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
+        setTimelineCache(prevCache => ({
+          ...prevCache,
+          [selectedUniversity.id]: {
+            ...prevCache[selectedUniversity.id],
+            expandedPhases: newExpanded
+          }
+        }));
+      }
+      
+      return newExpanded;
+    });
   };
 
   const toggleTask = (phaseIndex, taskIndex) => {
     const key = `${phaseIndex}-${taskIndex}`;
-    setExpandedTasks(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    setExpandedTasks(prev => {
+      const newExpanded = {
+        ...prev,
+        [key]: !prev[key]
+      };
+      
+      // ✅ NEW: Update parent cache
+      if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
+        setTimelineCache(prevCache => ({
+          ...prevCache,
+          [selectedUniversity.id]: {
+            ...prevCache[selectedUniversity.id],
+            expandedTasks: newExpanded
+          }
+        }));
+      }
+      
+      return newExpanded;
+    });
   };
 
   // ✅ CRITICAL FIX: Updated toggleTaskComplete function to use timeline state directly
@@ -561,6 +624,22 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
           overallProgress: data.newProgress
         }));
       }
+      
+      // ✅ NEW: Update parent cache with latest state
+      if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
+        setTimelineCache(prev => ({
+          ...prev,
+          [selectedUniversity.id]: {
+            ...prev[selectedUniversity.id],
+            timeline: timeline,
+            metadata: metadata,
+            expandedPhases: expandedPhases,
+            expandedTasks: expandedTasks,
+            cachedAt: new Date().toISOString()
+          }
+        }));
+        console.log('💾 Parent cache updated after task completion');
+      }
 
     } catch (error) {
       console.error('❌ Failed to save task completion:', error);
@@ -597,16 +676,32 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
     }
 
     setSelectedUniversity(university);
-    setTimeline(null);
-    setMetadata(null);
-    setExpandedTasks({});
-    setExpandedPhases({});
-    setError(null);
-    setInvalidTasksCount(0);
+    
+    // ✅ NEW: Check if timeline exists in parent cache
+    if (timelineCache[university.id]) {
+      console.log('📦 Loading from parent cache, skipping state reset');
+      // Timeline will be loaded by the useEffect hook
+    } else {
+      // Only reset if no cache exists
+      setTimeline(null);
+      setMetadata(null);
+      setExpandedTasks({});
+      setExpandedPhases({});
+      setError(null);
+      setInvalidTasksCount(0);
+    }
   };
 
   const handleRegenerate = () => {
     if (selectedUniversity) {
+      // ✅ NEW: Clear parent cache for this university
+      setTimelineCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[selectedUniversity.id];
+        return newCache;
+      });
+      console.log('🗑️ Parent cache cleared for regeneration');
+      
       generateTimeline(selectedUniversity, true);
     }
   };
@@ -782,12 +877,7 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
           </div>
           {timeline && (
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setDebugMode(!debugMode)}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-xs"
-              >
-                {debugMode ? 'Hide Debug' : 'Debug'}
-              </button>
+             
               <button
                 onClick={handleRegenerate}
                 disabled={generatingTimeline}
@@ -801,23 +891,7 @@ const UniversityTimeline = ({ universities, stats, userProfile }) => {
         </div>
       </div>
 
-      {/* Debug Panel */}
-      {debugMode && metadata && (
-        <div className="bg-slate-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-auto">
-          <div className="font-bold text-white mb-2">📊 Data Sync Debug Info:</div>
-          <pre className="whitespace-pre-wrap">
-            {`Essays: ${essayCounts.completed}/${essayCounts.total} (${essayCounts.rate}%)
-Tasks in UI: ${taskStats.completed}/${taskStats.total}
-Invalid Task IDs: ${invalidTasksCount}
-Calendar: ${calendarStats.completed}/${calendarStats.total}
-Tests Needed: ${testStatus.needed.join(', ') || 'None'}
-Tests Complete: ${testStatus.completed.map(t => t.display).join(', ') || 'None'}
-From Database: ${metadata.fromDatabase ? 'Yes' : 'No (Fresh Generate)'}
-Tasks Synced: ${metadata.tasksSynced || 0}
-Timeline ID: ${metadata.timelineId || 'N/A'}`}
-          </pre>
-        </div>
-      )}
+   
 
       {/* University Selector */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -832,6 +906,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
             const isSelected = selectedUniversity?.id === uni.id;
             const isLoading = loadingTimelines[uni.id];
             const progress = calculateUniversityProgress(uni);
+            const hasCache = timelineCache[uni.id];
 
             return (
               <button
@@ -867,11 +942,14 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                       </p>
                     </div>
                   </div>
-                  {isSelected ? (
-                    <CheckCircle2 className="w-6 h-6 text-[#002147] flex-shrink-0" />
-                  ) : isLoading ? (
-                    <Loader2 className="w-6 h-6 text-gray-400 animate-spin flex-shrink-0" />
-                  ) : null}
+                  <div className="flex flex-col items-end gap-1">
+                   
+                    {isSelected ? (
+                      <CheckCircle2 className="w-6 h-6 text-[#002147] flex-shrink-0" />
+                    ) : isLoading ? (
+                      <Loader2 className="w-6 h-6 text-gray-400 animate-spin flex-shrink-0" />
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-3">
