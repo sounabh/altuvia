@@ -7,7 +7,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const GEMINI_MODEL = "google/gemini-2.0-flash-lite";
+const GEMINI_MODEL = "google/gemini-2.5-flash-lite";
 
 
 // ========================================

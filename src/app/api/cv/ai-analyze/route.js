@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const MODEL = "google/gemini-2.0-flash-exp:free"; // or "google/gemini-flash-1.5"
+const MODEL = "google/gemini-2.5-flash-lite"; // or "google/gemini-flash-1.5"
 
 async function callOpenRouter(messages, maxTokens = 3000, temperature = 0.6) {
   try {
