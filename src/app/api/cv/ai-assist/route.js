@@ -1,8 +1,48 @@
-// app/api/cv/ai-assist/route.js - ENHANCED AI ASSISTANT
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/cv/ai-assist/route.js - ENHANCED AI ASSISTANT WITH OPENROUTER
 import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const MODEL = "google/gemini-2.0-flash-exp:free";
+
+async function callOpenRouter(messages, maxTokens = 3000, temperature = 0.8) {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "CV AI Advisor",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: messages,
+        temperature: temperature,
+        top_p: 0.95,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter API error:", response.status, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling OpenRouter:", error);
+    throw error;
+  }
+}
 
 export async function POST(request) {
   try {
@@ -86,19 +126,10 @@ User's Question: ${message}
 
 Provide a helpful, specific, actionable response that directly addresses their question while referencing their actual CV data.`;
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.8,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 3000,
-      }
-    });
-
-    const result = await model.generateContent(systemPrompt);
-    const response = result.response;
-    const aiResponse = response.text();
+    const aiResponse = await callOpenRouter([
+      { role: "system", content: systemPrompt },
+      { role: "user", content: message }
+    ], 3000, 0.8);
 
     // Detect if AI is providing content suggestions
     const hasContentSuggestions = detectContentSuggestions(aiResponse);
@@ -132,7 +163,6 @@ Provide a helpful, specific, actionable response that directly addresses their q
   } catch (error) {
     console.error("AI Assist Error:", error);
     
-    // Return a helpful error message instead of failing
     return NextResponse.json({
       response: "I apologize, but I encountered a temporary issue. Please try rephrasing your question or use one of the quick action buttons above. I'm here to help with:\n\n• Analyzing your CV sections\n• Suggesting improvements\n• Writing professional content\n• Optimizing for ATS\n• Answering any CV-related questions\n\nWhat would you like help with?",
       error: error.message
@@ -336,7 +366,6 @@ function extractStructuredSuggestions(response, section, cvData) {
     hasDirectContent: false
   };
 
-  // Extract content between markers
   const contentPatterns = [
     /SUGGESTED CONTENT:(.*?)(?=\n\n|$)/is,
     /ENHANCED VERSION:(.*?)(?=\n\n|$)/is,
@@ -356,7 +385,6 @@ function extractStructuredSuggestions(response, section, cvData) {
     }
   }
 
-  // Extract bullet point suggestions
   const bulletPoints = response.match(/[•\-\*]\s*(.+)/g);
   if (bulletPoints && bulletPoints.length > 0) {
     bulletPoints.forEach(bp => {
@@ -374,7 +402,6 @@ function extractStructuredSuggestions(response, section, cvData) {
 }
 
 function extractAnalysisMetrics(response, cvData) {
-  // Extract scores if mentioned
   const scorePattern = /(\d+)(?:\/100|%|\s*out of 100)/gi;
   const scores = [];
   let match;
@@ -387,7 +414,6 @@ function extractAnalysisMetrics(response, cvData) {
     ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : null;
 
-  // Count strengths and improvements mentioned
   const strengthsCount = (response.match(/strength|good|excellent|well-written|effective/gi) || []).length;
   const improvementsCount = (response.match(/improve|enhance|consider|missing|add|need/gi) || []).length;
 

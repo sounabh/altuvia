@@ -1,8 +1,48 @@
-// app/api/cv/ai-chat/route.js - ENHANCED AI CHATBOT WITH CONTEXT & AUTO-APPLY
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/cv/ai-chat/route.js - ENHANCED AI CHATBOT WITH OPENROUTER
 import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const MODEL = "google/gemini-2.0-flash-exp:free";
+
+async function callOpenRouter(messages, maxTokens = 4000, temperature = 0.9) {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "CV AI Assistant Chat",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: messages,
+        temperature: temperature,
+        top_p: 0.95,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter API error:", response.status, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling OpenRouter:", error);
+    throw error;
+  }
+}
 
 export async function POST(request) {
   try {
@@ -98,46 +138,6 @@ RESPONSE GUIDELINES:
    - Include examples when helpful
    - Suggest related improvements
 
-EXAMPLE INTERACTIONS:
-
-User: "How do I make my resume stand out?"
-You: "Great question! Based on your ${activeSection} section, here are specific ways to make YOUR resume stand out:
-
-1. **Quantify Your Achievements**: I see you worked at [company]. Instead of saying 'improved process', say 'Improved process efficiency by 30%, saving 15 hours/week'
-
-2. **Use Power Verbs**: Start bullets with Led, Developed, Implemented, Achieved...
-
-3. **Tailor to Jobs**: [specific advice based on their experience]
-
-Want me to rewrite any specific section to demonstrate?"
-
-User: "Write me a professional summary"
-You: "I'll create a tailored professional summary based on your experience:
-
-✍️ **SUGGESTED CONTENT** (ready to copy):
----
-[Generate actual summary based on their data]
----
-
-💡 **Why This Works**:
-• Highlights your key strengths in [field]
-• Includes quantifiable achievements
-• Uses industry keywords for ATS
-• Perfect length (50-70 words)
-
-Want me to adjust the tone or focus?"
-
-User: "Is React a good skill to have?"
-You: "Yes! React is highly valuable, especially for [relate to their field if relevant]. It's in demand because:
-
-• Used by top companies (Facebook, Netflix, Airbnb)
-• Growing job market - [stat if available]
-• Pairs well with Node.js for full-stack roles
-
-I see you have [list their current skills]. Adding React would complement your [specific skill] nicely. Want me to suggest how to showcase it in your Projects section?"
-
----
-
 CRITICAL RULES:
 ✓ NEVER say "I can't help with that" - always find a way to be helpful
 ✓ ALWAYS reference their actual CV data when relevant
@@ -149,19 +149,10 @@ CRITICAL RULES:
 
 Now respond to the user's message naturally and helpfully, taking into account their entire CV context and conversation history.`;
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.9,
-        topP: 0.95,
-        topK: 64,
-        maxOutputTokens: 4000,
-      }
-    });
-
-    const result = await model.generateContent(systemPrompt);
-    const response = result.response;
-    const aiResponse = response.text();
+    const aiResponse = await callOpenRouter([
+      { role: "system", content: systemPrompt },
+      { role: "user", content: message }
+    ], 4000, 0.9);
 
     // Detect if AI provided content that can be auto-applied
     const autoApplyContent = extractAutoApplyContent(aiResponse, activeSection, cvData);
@@ -368,7 +359,6 @@ function analyzeCVCompleteness(cvData) {
 }
 
 function extractAutoApplyContent(response, section, cvData) {
-  // Look for marked content sections that can be auto-applied
   const contentMarkers = [
     /✍️\s*\*\*SUGGESTED CONTENT\*\*.*?---\s*([\s\S]*?)\s*---/i,
     /SUGGESTED CONTENT:.*?\n([\s\S]*?)(?=\n\n💡|$)/i,
@@ -381,7 +371,6 @@ function extractAutoApplyContent(response, section, cvData) {
     if (match && match[1]) {
       const content = match[1].trim();
       
-      // Try to structure the content based on section
       return {
         section: section,
         content: content,
@@ -391,12 +380,10 @@ function extractAutoApplyContent(response, section, cvData) {
     }
   }
 
-  // Check if response contains bullet points that could be applied
   const bulletMatches = response.match(/[•\-]\s*(.+)/g);
   if (bulletMatches && bulletMatches.length >= 3) {
     const bullets = bulletMatches.map(b => b.replace(/^[•\-]\s*/, '').trim());
     
-    // Check if these look like CV content (not explanations)
     const looksLikeContent = bullets.some(b => 
       b.length > 30 && 
       !b.toLowerCase().includes('why') && 
@@ -437,17 +424,14 @@ function detectContentType(content, section) {
 }
 
 function detectAnalysis(response, cvData) {
-  // Check if response contains analysis elements
   const hasScoring = /\d+\/100|score.*?\d+%/i.test(response);
   const hasStrengths = /strength|good|excellent|well/i.test(response);
   const hasImprovements = /improve|enhance|consider|missing|add/i.test(response);
   
   if (hasScoring || (hasStrengths && hasImprovements)) {
-    // Extract scores if present
     const scoreMatch = response.match(/(\d+)(?:\/100|%)/);
     const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
     
-    // Extract strengths
     const strengths = [];
     const strengthSection = response.match(/strength[s]?:?\n([\s\S]*?)(?=\n\n|improve|$)/i);
     if (strengthSection) {
@@ -457,7 +441,6 @@ function detectAnalysis(response, cvData) {
       }
     }
     
-    // Extract improvements
     const improvements = [];
     const improvementSection = response.match(/improve[ments]*:?\n([\s\S]*?)(?=\n\n|$)/i);
     if (improvementSection) {

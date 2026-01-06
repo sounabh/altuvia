@@ -1,8 +1,48 @@
-// app/api/cv/ai-enhance-section/route.js - Section-Specific Enhancement
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/cv/ai-enhance-section/route.js - Section Enhancement WITH OPENROUTER
 import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const MODEL = "google/gemini-2.0-flash-exp:free";
+
+async function callOpenRouter(messages, maxTokens = 2048, temperature = 0.7) {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "CV Section Enhancer",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: messages,
+        temperature: temperature,
+        top_p: 0.9,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter API error:", response.status, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling OpenRouter:", error);
+    throw error;
+  }
+}
 
 export async function POST(request) {
   try {
@@ -29,18 +69,9 @@ export async function POST(request) {
       targetCompany
     );
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.9,
-        maxOutputTokens: 2048,
-      }
-    });
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const enhancedContent = response.text();
+    const enhancedContent = await callOpenRouter([
+      { role: "user", content: prompt }
+    ], 2048, 0.7);
 
     // Parse the enhanced content into structured format
     const structured = parseEnhancedSection(enhancedContent, section);
@@ -309,13 +340,11 @@ Return as properly structured JSON with an improvements field.`;
 
 function parseEnhancedSection(content, section) {
   try {
-    // Try to parse as JSON first
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
 
-    // If not JSON, try to extract structured data
     return {
       content: content,
       parsed: false

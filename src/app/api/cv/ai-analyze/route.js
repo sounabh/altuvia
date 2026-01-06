@@ -1,8 +1,48 @@
-// app/api/cv/ai-analyze/route.js - ENHANCED DETAILED ANALYSIS
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/cv/ai-analyze/route.js - ENHANCED DETAILED ANALYSIS WITH OPENROUTER
 import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const MODEL = "google/gemini-2.0-flash-exp:free"; // or "google/gemini-flash-1.5"
+
+async function callOpenRouter(messages, maxTokens = 3000, temperature = 0.6) {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "CV Analysis System",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: messages,
+        temperature: temperature,
+        top_p: 0.9,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter API error:", response.status, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling OpenRouter:", error);
+    throw error;
+  }
+}
 
 export async function POST(request) {
   try {
@@ -52,15 +92,6 @@ export async function POST(request) {
 }
 
 async function analyzeAllSections(cvData, targetRole, targetCompany) {
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash-exp",
-    generationConfig: {
-      temperature: 0.6,
-      topP: 0.9,
-      maxOutputTokens: 3000,
-    }
-  });
-
   const sections = ['personal', 'education', 'experience', 'projects', 'skills', 'achievements', 'volunteer'];
   const analyses = {};
 
@@ -81,8 +112,10 @@ async function analyzeAllSections(cvData, targetRole, targetCompany) {
     const prompt = createSectionAnalysisPrompt(section, cvData[section], targetRole, targetCompany);
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
+      const response = await callOpenRouter([
+        { role: "user", content: prompt }
+      ], 3000, 0.6);
+      
       analyses[section] = parseSectionAnalysis(response, section);
     } catch (error) {
       console.error(`Error analyzing ${section}:`, error);
@@ -168,14 +201,6 @@ function parseSectionAnalysis(response, section) {
 }
 
 async function getOverallAnalysis(cvText, sectionAnalyses, targetRole, targetCompany) {
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash-exp",
-    generationConfig: {
-      temperature: 0.5,
-      maxOutputTokens: 2500,
-    }
-  });
-
   const sectionSummary = Object.values(sectionAnalyses)
     .map(s => `${s.name}: ${s.score}/100 - ${s.feedback}`)
     .join('\n');
@@ -204,8 +229,10 @@ Provide analysis in this JSON format:
 BE STRICT: If the CV is weak, reflect that. Don't inflate scores. Average generic CVs should score 50-65, good CVs 70-80, excellent 85+.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    const response = await callOpenRouter([
+      { role: "user", content: prompt }
+    ], 2500, 0.5);
+    
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -235,14 +262,6 @@ BE STRICT: If the CV is weak, reflect that. Don't inflate scores. Average generi
 }
 
 async function analyzeATS(cvText) {
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash-exp",
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 1500,
-    }
-  });
-
   const atsPrompt = `Analyze this CV for ATS (Applicant Tracking System) compatibility:
 
 ${cvText}
@@ -257,8 +276,10 @@ Provide JSON:
 }`;
 
   try {
-    const result = await model.generateContent(atsPrompt);
-    const response = result.response.text();
+    const response = await callOpenRouter([
+      { role: "user", content: atsPrompt }
+    ], 1500, 0.3);
+    
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);

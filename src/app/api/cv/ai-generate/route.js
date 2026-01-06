@@ -1,8 +1,48 @@
-// app/api/cv/ai-generate/route.js - AI Content Generation
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/cv/ai-generate/route.js - AI Content Generation WITH OPENROUTER
 import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const MODEL = "google/gemini-2.0-flash-exp:free";
+
+async function callOpenRouter(messages, maxTokens = 1500, temperature = 0.8) {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "CV Content Generator",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: messages,
+        temperature: temperature,
+        top_p: 0.95,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter API error:", response.status, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling OpenRouter:", error);
+    throw error;
+  }
+}
 
 export async function POST(request) {
   try {
@@ -44,19 +84,9 @@ export async function POST(request) {
         prompt = createGeneralPrompt(section, context, existingContent, generationType);
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.8,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 1500,
-      }
-    });
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const generatedContent = response.text();
+    const generatedContent = await callOpenRouter([
+      { role: "user", content: prompt }
+    ], 1500, 0.8);
 
     // Parse and structure the response
     const structured = structureGeneratedContent(generatedContent, section, generationType);
@@ -284,7 +314,6 @@ Provide ONLY the ${type === 'enhance' ? 'enhanced' : 'new'} content.`;
 }
 
 function structureGeneratedContent(content, section, type) {
-  // Structure the content based on section type
   const structured = {
     raw: content,
     formatted: content

@@ -1,10 +1,70 @@
-// src/app/api/essay/[universityName]/route.js - FIXED VERSION
+// src/app/api/essay/[universityName]/route.js - OPENROUTER VERSION
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+// ============================================================
+// OPENROUTER CONFIGURATION - REPLACED GOOGLE GENERATIVE AI
+// ============================================================
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const GEMINI_MODEL = "google/gemini-2.5-flash-lite"; // Flash Lite model
+
+// ============================================================
+// OPENROUTER HELPER FUNCTION
+// ============================================================
+async function callGeminiViaOpenRouter(prompt, maxTokens = 4096) {
+  try {
+    console.log(`🔌 Calling OpenRouter with Gemini model: ${GEMINI_MODEL}`);
+    
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "University Essay Analysis System",
+      },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        top_p: 0.8,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ OpenRouter API error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again in a moment.");
+      } else if (response.status === 401) {
+        throw new Error("Invalid API key. Please check your OpenRouter configuration.");
+      } else {
+        throw new Error(`OpenRouter API error: ${response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+
+    if (!data.choices?.[0]?.message) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    return {
+      text: data.choices[0].message.content,
+      finishReason: data.choices[0].finish_reason,
+      usage: data.usage,
+      model: data.model,
+    };
+  } catch (error) {
+    console.error("❌ Error calling OpenRouter:", error);
+    throw error;
+  }
+}
 
 export async function GET(request, { params }) {
   try {
@@ -1098,8 +1158,11 @@ async function performAIAnalysis(data) {
     );
   }
 
-  if (!process.env.GOOGLE_GEMINI_API_KEY) {
-    console.error("GOOGLE_GEMINI_API_KEY not configured");
+  // ============================================================
+  // UPDATED: CHECK OPENROUTER API KEY INSTEAD OF GOOGLE GEMINI
+  // ============================================================
+  if (!OPENROUTER_API_KEY) {
+    console.error("OPENROUTER_API_KEY not configured");
     const storedAnalysis = await getStoredAnalysis(essayId, versionId);
     if (storedAnalysis) {
       return NextResponse.json({
@@ -1155,44 +1218,6 @@ async function performAIAnalysis(data) {
         cached: true,
         processingTime: Date.now() - startTime,
       });
-    }
-
-    // Initialize Gemini with the latest model - UPGRADED TO FLASH 2.0
-    let model;
-    try {
-      // Using Gemini 2.0 Flash for better analysis quality
-      model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.8,
-          topK: 40,
-          maxOutputTokens: 4096,
-        },
-      });
-    } catch (initError) {
-      console.error(
-        "Failed to initialize Gemini 2.0, falling back to Pro:",
-        initError
-      );
-      try {
-        model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-      } catch (fallbackError) {
-        console.error("Failed to initialize Gemini:", fallbackError);
-        const storedAnalysis = await getStoredAnalysis(essayId, versionId);
-        if (storedAnalysis) {
-          return NextResponse.json({
-            success: true,
-            analysis: storedAnalysis,
-            cached: true,
-            message: "Using stored analysis - AI initialization failed",
-          });
-        }
-        return NextResponse.json(
-          { error: "AI service initialization failed" },
-          { status: 500 }
-        );
-      }
     }
 
     // Calculate essay metrics for context
@@ -1328,9 +1353,12 @@ CRITICAL INSTRUCTIONS:
 
     let result;
     try {
-      result = await model.generateContent(analysisPrompt);
+      // ============================================================
+      // UPDATED: CALL OPENROUTER INSTEAD OF GOOGLE GEMINI DIRECTLY
+      // ============================================================
+      result = await callGeminiViaOpenRouter(analysisPrompt, 4096);
     } catch (apiError) {
-      console.error("Gemini API error:", apiError);
+      console.error("OpenRouter API error:", apiError);
       const storedAnalysis = await getStoredAnalysis(essayId, versionId);
       if (storedAnalysis) {
         return NextResponse.json({
@@ -1365,7 +1393,7 @@ CRITICAL INSTRUCTIONS:
     }
 
     const processingTime = Date.now() - startTime;
-    const responseText = result.response.text();
+    const responseText = result.text; // Changed from result.response.text()
 
     let analysisData;
     try {
@@ -1408,7 +1436,7 @@ CRITICAL INSTRUCTIONS:
       versionId,
       analysisData,
       processingTime,
-      "gemini-2.0-flash-exp" // Updated model name
+      "gemini-via-openrouter" // Updated provider name
     );
 
     return NextResponse.json({
@@ -1881,9 +1909,12 @@ async function saveAnalysisToDatabase(
             ["critical", "warning"].includes(s.type)
           )
         ),
+        // ============================================================
+        // UPDATED: MODIFIED MODEL NAME TO INDICATE OPENROUTER USAGE
+        // ============================================================
         aiProvider: provider,
         modelUsed:
-          provider === "gemini" ? "gemini-1.5-flash" : "local-analysis",
+          provider === "gemini" ? "gemini-2.5-flash-lite (via OpenRouter)" : "local-analysis",
         promptVersion: "3.0",
         status: errorMessage ? "failed" : "completed",
         processingTime,

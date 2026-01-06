@@ -3,29 +3,24 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "../auth/[...nextauth]/route";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
+
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const GEMINI_MODEL = "google/gemini-2.0-flash-lite";
+
 
 // ========================================
 // AI COLOR FETCHER
 // ========================================
 async function fetchSchoolColorFromAI(universityName) {
   try {
-    if (!process.env.GOOGLE_GEMINI_API_KEY) {
-      console.warn("Gemini API key not configured");
+    if (!OPENROUTER_API_KEY) {
+      console.warn("OpenRouter API key not configured");
       return null;
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-lite",
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 200,
-      },
-    });
-
-   const prompt = `You are a university branding expert. Return ONLY the primary brand color hex code for ${universityName}.
+    const prompt = `You are a university branding expert. Return ONLY the primary brand color hex code for ${universityName}.
 
 Rules:
 - Return ONLY the hex code in format #RRGGBB
@@ -36,8 +31,37 @@ Rules:
 University: ${universityName}
 Hex Code:`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim();
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "University Calendar Color System",
+      },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        top_p: 0.8,
+        max_tokens: 200,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ OpenRouter API error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from AI service");
+    }
+
+    const responseText = data.choices[0].message.content.trim();
     
     console.log(`AI Response for ${universityName}:`, responseText);
     
@@ -55,7 +79,6 @@ Hex Code:`;
     return null;
   }
 }
-
 // ========================================
 // GET ENDPOINT - Fetch Calendar Events
 // ========================================
