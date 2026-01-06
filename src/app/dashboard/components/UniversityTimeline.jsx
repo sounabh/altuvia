@@ -568,13 +568,30 @@ const UniversityTimeline = ({
     setSavingTasks(prev => ({ ...prev, [taskKey]: true }));
 
     // ✅ CRITICAL: Update timeline state immediately for UI (single source of truth)
-    setTimeline(prevTimeline => {
-      const newTimeline = JSON.parse(JSON.stringify(prevTimeline));
-      const targetTask = newTimeline.phases[phaseIndex].tasks[taskIndex];
-      targetTask.completed = newCompletedState;
-      targetTask.status = newCompletedState ? 'completed' : 'pending';
-      return newTimeline;
-    });
+ // ✅ CRITICAL: Update timeline state immediately for UI (single source of truth)
+setTimeline(prevTimeline => {
+  const newTimeline = JSON.parse(JSON.stringify(prevTimeline));
+  const targetTask = newTimeline.phases[phaseIndex].tasks[taskIndex];
+  targetTask.completed = newCompletedState;
+  targetTask.status = newCompletedState ? 'completed' : 'pending';
+  
+  // ✅ FIX: Update parent cache with the NEW timeline immediately
+  if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
+    setTimelineCache(prev => ({
+      ...prev,
+      [selectedUniversity.id]: {
+        ...prev[selectedUniversity.id],
+        timeline: newTimeline, // ✅ Use newTimeline instead of stale timeline
+        metadata: metadata,
+        expandedPhases: expandedPhases,
+        expandedTasks: expandedTasks,
+        cachedAt: new Date().toISOString()
+      }
+    }));
+  }
+  
+  return newTimeline;
+});
 
     try {
       const userId = session?.user?.id || session?.userId || session?.user?.sub;
@@ -625,22 +642,7 @@ const UniversityTimeline = ({
         }));
       }
       
-      // ✅ NEW: Update parent cache with latest state
-      if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
-        setTimelineCache(prev => ({
-          ...prev,
-          [selectedUniversity.id]: {
-            ...prev[selectedUniversity.id],
-            timeline: timeline,
-            metadata: metadata,
-            expandedPhases: expandedPhases,
-            expandedTasks: expandedTasks,
-            cachedAt: new Date().toISOString()
-          }
-        }));
-        console.log('💾 Parent cache updated after task completion');
-      }
-
+    
     } catch (error) {
       console.error('❌ Failed to save task completion:', error);
 
