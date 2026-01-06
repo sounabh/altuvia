@@ -16,38 +16,72 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Format deadlines using the same logic as UniversityOverview
+  // FIXED: Improved deadline parsing logic
   const getFormattedDeadlines = () => {
-    let rawDeadlines = [];
+    let formattedDeadlines = [];
 
+    // Case 1: roundDeadlines is already an array
     if (Array.isArray(university?.roundDeadlines) && university.roundDeadlines.length > 0) {
-      rawDeadlines = university.roundDeadlines.map(d => d.trim());
-    } else if (typeof university?.averageDeadlines === 'string' && university.averageDeadlines.trim()) {
-      const pattern = /(Round\s*\d+|Deferred):\s*([^,]+(?:,\s*\d{4})?[^R]*?)(?=\s*(?:Round\s*\d+|Deferred):|$)/gi;
-      const matches = [...university.averageDeadlines.matchAll(pattern)];
+      formattedDeadlines = university.roundDeadlines.map((d, idx) => {
+        const trimmed = d.trim();
+        // Match patterns like "Round 1: September 2025" or "Round1: September 2025"
+        const match = trimmed.match(/^(Round\s*\d+|Deferred)\s*:\s*(.+)$/i);
+        if (match) {
+          return {
+            round: match[1].replace(/\s+/g, ' ').trim(), // Normalize "Round1" to "Round 1"
+            date: match[2].trim()
+          };
+        }
+        // If no round label, assign one
+        return { round: `Round ${idx + 1}`, date: trimmed };
+      });
+    } 
+    // Case 2: averageDeadlines is a string that needs parsing
+    else if (typeof university?.averageDeadlines === 'string' && university.averageDeadlines.trim()) {
+      const deadlineStr = university.averageDeadlines.trim();
       
-      if (matches.length > 0) {
-        rawDeadlines = matches.map(match => {
-          const round = match[1].trim();
-          const date = match[2].trim();
-          return `${round}: ${date}`;
-        });
-      } else {
-        rawDeadlines = university.averageDeadlines.split(/,(?=\s*(?:Round|Deferred))/i).map(p => p.trim()).filter(Boolean);
-      }
+      // Use lookahead to split at each "Round X:" or "Deferred:" while keeping the delimiter
+      const parts = deadlineStr.split(/(?=(?:Round\s*\d+|Deferred)\s*:)/gi).filter(Boolean);
+      
+      parts.forEach((part, idx) => {
+        const trimmedPart = part.trim()
+          .replace(/,\s*$/, '')  // Remove trailing comma
+          .replace(/^\s*,/, ''); // Remove leading comma
+        
+        // Match the round pattern
+        const match = trimmedPart.match(/^(Round\s*\d+|Deferred)\s*:\s*(.+)$/i);
+        
+        if (match) {
+          const roundLabel = match[1].replace(/round\s*/i, 'Round ').trim(); // Normalize to "Round X"
+          const dateValue = match[2]
+            .trim()
+            .replace(/,\s*$/, '')  // Remove trailing comma
+            .replace(/\s+/g, ' '); // Normalize whitespace
+          
+          if (roundLabel && dateValue) {
+            formattedDeadlines.push({ 
+              round: roundLabel, 
+              date: dateValue 
+            });
+          }
+        } else if (trimmedPart && !trimmedPart.match(/^\s*$/)) {
+          // Fallback for entries without round label
+          formattedDeadlines.push({ 
+            round: `Round ${idx + 1}`, 
+            date: trimmedPart.replace(/,\s*$/, '').trim() 
+          });
+        }
+      });
     }
 
-    if (rawDeadlines.length === 0) return null;
-
-    return rawDeadlines.map((deadline, idx) => {
-      const colonIndex = deadline.indexOf(':');
-      if (colonIndex > -1) {
-        const round = deadline.substring(0, colonIndex).trim();
-        const date = deadline.substring(colonIndex + 1).trim();
-        return { round, date };
-      }
-      return { round: `Round ${idx + 1}`, date: deadline };
+    // Sort rounds by number (Round 1, Round 2, etc.)
+    formattedDeadlines.sort((a, b) => {
+      const aNum = parseInt(a.round.match(/\d+/)?.[0] || '999');
+      const bNum = parseInt(b.round.match(/\d+/)?.[0] || '999');
+      return aNum - bNum;
     });
+
+    return formattedDeadlines.length > 0 ? formattedDeadlines : null;
   };
 
   const formattedDeadlines = getFormattedDeadlines();
@@ -209,7 +243,7 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
         {/* Card Content Section */}
         <div className="p-5 flex-grow flex flex-col bg-gray-50">
           <div className="space-y-4">
-            {/* Deadline Section - Cleaner Inline Design */}
+            {/* Deadline Section - FIXED: Consistent Format */}
             {formattedDeadlines && formattedDeadlines.length > 0 && (
               <div className="bg-[#002147] rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -226,14 +260,18 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
                   )}
                 </div>
                 
-                {/* Show first deadline or all based on state */}
-                <div className="space-y-2">
+                {/* FIXED: Each round on its own line with consistent formatting */}
+                <div className="space-y-3">
                   {(showAllDeadlines ? formattedDeadlines : formattedDeadlines.slice(0, 1)).map((deadline, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 bg-[#3598FE] rounded-full flex-shrink-0 mt-1.5"></span>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs text-white font-medium block">{deadline.round}</span>
-                        <span className="text-xs text-blue-200 block truncate">{deadline.date}</span>
+                    <div key={index} className="flex items-start gap-3">
+                      <span className="w-2 h-2 bg-[#3598FE] rounded-full flex-shrink-0 mt-1.5"></span>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-white font-semibold">
+                          {deadline.round}
+                        </span>
+                        <span className="text-sm text-blue-200">
+                          {deadline.date}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -247,12 +285,12 @@ export const UniversityCard = ({ university, onRemove, onUpdate }) => {
                       e.stopPropagation();
                       setShowAllDeadlines(!showAllDeadlines);
                     }}
-                    className="mt-3 w-full text-xs text-blue-300 hover:text-white transition-colors flex items-center justify-center gap-1 py-1"
+                    className="mt-3 w-full text-xs text-blue-300 hover:text-white transition-colors flex items-center justify-center gap-1 py-1 border-t border-blue-800 pt-3"
                   >
                     {showAllDeadlines ? (
-                      <>Show Less</>
+                      <>Show Less ▲</>
                     ) : (
-                      <>Show All {formattedDeadlines.length} Rounds</>
+                      <>Show All {formattedDeadlines.length} Rounds ▼</>
                     )}
                   </button>
                 )}
