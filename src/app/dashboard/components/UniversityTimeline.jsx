@@ -960,7 +960,10 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           {/* Stats Cards - Enhanced */}
           {(metadata || selectedUniversity) && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+
+              
 {/* Deadline Card - FIXED */}
+{/* Deadline Card - PROPERLY FIXED */}
 <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md border-gray-200 relative group`}>
   <div className="flex items-center gap-3 mb-3">
     <div className="p-2.5 rounded-xl bg-amber-100">
@@ -970,137 +973,197 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
   </div>
   
   {(() => {
-    // Parse deadlines directly from selectedUniversity
-    const parseUniversityDeadlines = () => {
-      let rawDeadlines = [];
-
-      if (Array.isArray(selectedUniversity?.roundDeadlines) && selectedUniversity.roundDeadlines.length > 0) {
-        rawDeadlines = selectedUniversity.roundDeadlines.map(d => d.trim());
-      } 
-      else if (typeof selectedUniversity?.averageDeadlines === 'string' && selectedUniversity.averageDeadlines.trim()) {
-        const pattern = /(Round\s*\d+|Deferred):\s*([^,]+(?:,\s*\d{4})?[^R]*?)(?=\s*(?:Round\s*\d+|Deferred):|$)/gi;
-        const matches = [...selectedUniversity.averageDeadlines.matchAll(pattern)];
-        
-        if (matches.length > 0) {
-          rawDeadlines = matches.map(match => {
-            const round = match[1].trim();
-            const date = match[2].trim();
-            return `${round}: ${date}`;
-          });
-        } else {
-          rawDeadlines = selectedUniversity.averageDeadlines.split(/,(?=\s*(?:Round|Deferred))/i).map(p => p.trim()).filter(Boolean);
-        }
-      }
-
-      return rawDeadlines;
-    };
-
-    const rawDeadlines = parseUniversityDeadlines();
+    // ============================================
+    // PROPERLY FIXED DEADLINE PARSER
+    // ============================================
     
-    if (rawDeadlines.length === 0) {
+    const parseAllDeadlines = () => {
+      const deadlines = [];
+      
+      // Get the raw string
+      let deadlineString = '';
+      
+      if (Array.isArray(selectedUniversity?.roundDeadlines) && selectedUniversity.roundDeadlines.length > 0) {
+        deadlineString = selectedUniversity.roundDeadlines.join('; ');
+      } else if (typeof selectedUniversity?.averageDeadlines === 'string') {
+        deadlineString = selectedUniversity.averageDeadlines.trim();
+      }
+      
+      if (!deadlineString) return deadlines;
+      
+      console.log('Original deadline string:', deadlineString);
+      
+      // ============================================
+      // STEP 1: Split by "Round" keyword using lookahead
+      // This splits BEFORE each "Round" but keeps "Round" in the result
+      // ============================================
+      const segments = deadlineString
+        .split(/(?=Round\s*\d+)/gi)
+        .map(s => s.trim())
+        .filter(Boolean);
+      
+      console.log('Segments after split:', segments);
+      
+      // ============================================
+      // STEP 2: Parse each segment
+      // ============================================
+      segments.forEach((segment, idx) => {
+        // Clean up trailing punctuation
+        segment = segment.replace(/[,;|]+$/, '').trim();
+        
+        // Extract round name and date
+        // Pattern: "Round 1 : (September 3, 2025)" or "Round 1: September 3, 2025"
+        const colonIndex = segment.indexOf(':');
+        
+        let roundName = `Round ${idx + 1}`;
+        let dateStr = segment;
+        
+        if (colonIndex !== -1) {
+          roundName = segment.substring(0, colonIndex).trim();
+          dateStr = segment.substring(colonIndex + 1).trim();
+        }
+        
+        // Clean up date string - remove parentheses, periods, extra spaces
+        dateStr = dateStr
+          .replace(/[()]/g, '')  // Remove parentheses
+          .replace(/\./g, '')     // Remove periods
+          .replace(/\s+/g, ' ')   // Normalize spaces
+          .trim();
+        
+        console.log(`Segment ${idx}: Round="${roundName}", DateStr="${dateStr}"`);
+        
+        // ============================================
+        // STEP 3: Parse the date
+        // ============================================
+        const parseDate = (str) => {
+          if (!str) return { date: null, isMonthYearOnly: false };
+          
+          const months = {
+            'january': 0, 'jan': 0,
+            'february': 1, 'feb': 1,
+            'march': 2, 'mar': 2,
+            'april': 3, 'apr': 3,
+            'may': 4,
+            'june': 5, 'jun': 5,
+            'july': 6, 'jul': 6,
+            'august': 7, 'aug': 7,
+            'september': 8, 'sep': 8, 'sept': 8,
+            'october': 9, 'oct': 9,
+            'november': 10, 'nov': 10,
+            'december': 11, 'dec': 11
+          };
+          
+          let match;
+          
+          // Format: "September 3, 2025" or "September 3 2025"
+          match = str.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})$/i);
+          if (match) {
+            const monthNum = months[match[1].toLowerCase()];
+            if (monthNum !== undefined) {
+              return {
+                date: new Date(parseInt(match[3]), monthNum, parseInt(match[2])),
+                isMonthYearOnly: false
+              };
+            }
+          }
+          
+          // Format: "3 September, 2025" or "3 September 2025"
+          match = str.match(/^(\d{1,2})\s+([A-Za-z]+),?\s*(\d{4})$/i);
+          if (match) {
+            const monthNum = months[match[2].toLowerCase()];
+            if (monthNum !== undefined) {
+              return {
+                date: new Date(parseInt(match[3]), monthNum, parseInt(match[1])),
+                isMonthYearOnly: false
+              };
+            }
+          }
+          
+          // Format: "September 2025" (month year only)
+          match = str.match(/^([A-Za-z]+)\s+(\d{4})$/i);
+          if (match) {
+            const monthNum = months[match[1].toLowerCase()];
+            if (monthNum !== undefined) {
+              return {
+                date: new Date(parseInt(match[2]), monthNum, 1),
+                isMonthYearOnly: true
+              };
+            }
+          }
+          
+          // Format: "September 3" (no year - use current/next year)
+          match = str.match(/^([A-Za-z]+)\s+(\d{1,2})$/i);
+          if (match) {
+            const monthNum = months[match[1].toLowerCase()];
+            if (monthNum !== undefined) {
+              const now = new Date();
+              let year = now.getFullYear();
+              const testDate = new Date(year, monthNum, parseInt(match[2]));
+              if (testDate < now) {
+                year++;
+              }
+              return {
+                date: new Date(year, monthNum, parseInt(match[2])),
+                isMonthYearOnly: false
+              };
+            }
+          }
+          
+          // Format: "3 September" (no year)
+          match = str.match(/^(\d{1,2})\s+([A-Za-z]+)$/i);
+          if (match) {
+            const monthNum = months[match[2].toLowerCase()];
+            if (monthNum !== undefined) {
+              const now = new Date();
+              let year = now.getFullYear();
+              const testDate = new Date(year, monthNum, parseInt(match[1]));
+              if (testDate < now) {
+                year++;
+              }
+              return {
+                date: new Date(year, monthNum, parseInt(match[1])),
+                isMonthYearOnly: false
+              };
+            }
+          }
+          
+          // Fallback: try native Date parsing
+          const fallback = new Date(str);
+          if (!isNaN(fallback.getTime())) {
+            return { date: fallback, isMonthYearOnly: false };
+          }
+          
+          return { date: null, isMonthYearOnly: false };
+        };
+        
+        const { date, isMonthYearOnly } = parseDate(dateStr);
+        
+        console.log(`Parsed date for ${roundName}:`, date);
+        
+        deadlines.push({
+          round: roundName,
+          date: date,
+          dateString: dateStr,
+          isMonthYearOnly: isMonthYearOnly,
+          parseError: date === null
+        });
+      });
+      
+      return deadlines;
+    };
+    
+    // ============================================
+    // MAIN RENDER LOGIC
+    // ============================================
+    
+    const allDeadlines = parseAllDeadlines();
+    
+    console.log('Final deadlines:', allDeadlines);
+    
+    if (allDeadlines.length === 0) {
       return <div className="text-gray-400 text-sm">No deadline set</div>;
     }
-
-    // Parse ALL deadlines (no future filter)
-    const now = new Date();
-    const allDeadlines = [];
-
-    rawDeadlines.forEach((deadline, idx) => {
-      // Split by colon to separate round and date
-      const colonIndex = deadline.indexOf(':');
-      let round = `Round ${idx + 1}`;
-      let dateStr = deadline;
-
-      if (colonIndex > -1) {
-        round = deadline.substring(0, colonIndex).trim();
-        dateStr = deadline.substring(colonIndex + 1).trim();
-      }
-
-      // Remove parentheses, periods, and extra whitespace
-      dateStr = dateStr.replace(/[()\.]/g, '').trim();
-
-      // Parse the date with comprehensive format handling
-      let parsedDate = null;
-      
-      // Strategy 1: Direct Date constructor
-      parsedDate = new Date(dateStr);
-      
-      // Strategy 2: If that fails, try adding explicit year if missing
-      if (isNaN(parsedDate.getTime())) {
-        const currentYear = new Date().getFullYear();
-        parsedDate = new Date(`${dateStr}, ${currentYear}`);
-      }
-      
-      // Strategy 3: Handle formats like "January 15, 2025" or "Jan 15, 2025"
-      if (isNaN(parsedDate.getTime())) {
-        const datePattern = /([A-Za-z]+)\s+(\d+),?\s*(\d{4})?/;
-        const match = dateStr.match(datePattern);
-        if (match) {
-          const [, month, day, year = new Date().getFullYear()] = match;
-          parsedDate = new Date(`${month} ${day}, ${year}`);
-        }
-      }
-
-      // Strategy 4: Handle "Month Year" format (no day) - e.g., "January 2025" or "Jan 2025"
-      if (isNaN(parsedDate.getTime())) {
-        const monthYearPattern = /^([A-Za-z]+)\s*,?\s*(\d{4})$/;
-        const match = dateStr.match(monthYearPattern);
-        if (match) {
-          const [, month, year] = match;
-          // Default to 1st of the month
-          parsedDate = new Date(`${month} 1, ${year}`);
-        }
-      }
-
-      // Strategy 5: Handle "Month, Year" format with comma
-      if (isNaN(parsedDate.getTime())) {
-        const monthCommaYearPattern = /^([A-Za-z]+),\s*(\d{4})$/;
-        const match = dateStr.match(monthCommaYearPattern);
-        if (match) {
-          const [, month, year] = match;
-          parsedDate = new Date(`${month} 1, ${year}`);
-        }
-      }
-
-      // Strategy 6: Handle just month name (assume current/next year)
-      if (isNaN(parsedDate.getTime())) {
-        const monthOnlyPattern = /^([A-Za-z]+)$/;
-        const match = dateStr.match(monthOnlyPattern);
-        if (match) {
-          const [, month] = match;
-          const currentYear = new Date().getFullYear();
-          parsedDate = new Date(`${month} 1, ${currentYear}`);
-          // If the month has already passed this year, use next year
-          if (parsedDate < now) {
-            parsedDate = new Date(`${month} 1, ${currentYear + 1}`);
-          }
-        }
-      }
-
-      // Determine if we have a specific day or just month/year
-      const hasSpecificDay = /\d+/.test(dateStr) && !/^\d{4}$/.test(dateStr.match(/\d+/)?.[0] || '');
-      const isMonthYearOnly = !hasSpecificDay || /^[A-Za-z]+\s*,?\s*\d{4}$/.test(dateStr);
-
-      // Add to array regardless of whether it's past or future
-      if (parsedDate && !isNaN(parsedDate.getTime())) {
-        allDeadlines.push({
-          date: parsedDate,
-          dateString: dateStr,
-          round: round,
-          isMonthYearOnly: isMonthYearOnly
-        });
-      } else {
-        // If parsing completely fails, still add it with null date for display
-        allDeadlines.push({
-          date: null,
-          dateString: dateStr,
-          round: round,
-          isMonthYearOnly: true,
-          parseError: true
-        });
-      }
-    });
-
+    
     // Sort by date (null dates go to the end)
     allDeadlines.sort((a, b) => {
       if (!a.date && !b.date) return 0;
@@ -1108,58 +1171,43 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
       if (!b.date) return -1;
       return a.date - b.date;
     });
-
-    if (allDeadlines.length === 0) {
-      return <div className="text-gray-400 text-sm">No deadline set</div>;
-    }
-
-    // Find the next upcoming deadline (for highlight)
+    
+    const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Find next upcoming deadline
     const nextUpcomingIndex = allDeadlines.findIndex(d => d.date && d.date >= todayStart);
     const nextDeadline = nextUpcomingIndex >= 0 ? allDeadlines[nextUpcomingIndex] : allDeadlines[0];
     
-    // Calculate days until next deadline
+    // Helper functions
     const getDaysUntil = (date) => {
       if (!date) return null;
       return Math.ceil((date - now) / (1000 * 60 * 60 * 24));
     };
-
+    
+    const formatDate = (deadline) => {
+      if (!deadline.date) return deadline.dateString || 'Date TBD';
+      
+      const options = deadline.isMonthYearOnly 
+        ? { month: 'long', year: 'numeric' }
+        : { month: 'long', day: 'numeric', year: 'numeric' };
+      
+      return deadline.date.toLocaleDateString('en-US', options);
+    };
+    
+    const formatDateShort = (deadline) => {
+      if (!deadline.date) return deadline.dateString || 'TBD';
+      
+      const options = deadline.isMonthYearOnly 
+        ? { month: 'short', year: 'numeric' }
+        : { month: 'short', day: 'numeric', year: 'numeric' };
+      
+      return deadline.date.toLocaleDateString('en-US', options);
+    };
+    
     const daysUntil = getDaysUntil(nextDeadline?.date);
     const isPast = daysUntil !== null && daysUntil < 0;
     const isToday = daysUntil === 0;
-
-    // Format date for display
-    const formatDate = (deadline) => {
-      if (!deadline.date) return deadline.dateString; // Return original string if parse failed
-      
-      if (deadline.isMonthYearOnly) {
-        return deadline.date.toLocaleDateString('en-US', {
-          month: 'long',
-          year: 'numeric'
-        });
-      }
-      return deadline.date.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    };
-
-    const formatDateShort = (deadline) => {
-      if (!deadline.date) return deadline.dateString;
-      
-      if (deadline.isMonthYearOnly) {
-        return deadline.date.toLocaleDateString('en-US', {
-          month: 'short',
-          year: 'numeric'
-        });
-      }
-      return deadline.date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    };
     
     return (
       <>
@@ -1189,7 +1237,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
           </div>
         )}
 
-        {/* Hover Tooltip for All Deadlines */}
+        {/* Hover Tooltip */}
         <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#D97706] p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
           <div className="space-y-2">
             <div className="flex items-center justify-between pb-2 border-b border-gray-200">
@@ -1230,7 +1278,7 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
                     </div>
                     <div className={`mb-1 ${isThisPast ? 'text-gray-400' : 'text-gray-600'}`}>
                       {formatDateShort(deadline)}
-                      {deadline.isMonthYearOnly && !deadline.parseError && (
+                      {deadline.isMonthYearOnly && (
                         <span className="text-gray-400 ml-1">(Month only)</span>
                       )}
                     </div>
@@ -1256,7 +1304,6 @@ Timeline ID: ${metadata.timelineId || 'N/A'}`}
     );
   })()}
 </div>
-
               {/* Essays Card - Color coded by completion */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
                 essayCounts.rate === 100
