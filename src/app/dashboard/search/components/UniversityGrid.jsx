@@ -1,9 +1,13 @@
 "use client";
 
+// React and hooks imports
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+
+// Component and icon imports
 import UniversityCard from './UniversityCard';
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+
 
 // Pagination Component
 const Pagination = ({ 
@@ -48,40 +52,34 @@ const Pagination = ({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-200">
-      
-      {/* Results counter */}
-      <div className="text-sm text-gray-600 order-2 sm:order-1">
-        Showing <span className="font-semibold text-[#002147]">{startItem}</span> to{' '}
-        <span className="font-semibold text-[#002147]">{endItem}</span> of{' '}
-        <span className="font-semibold text-[#002147]">{totalItems}</span> universities
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-12 pt-6 border-t border-gray-200/50">
+      <div className="text-sm text-gray-500 font-medium order-2 sm:order-1">
+        Showing <span className="text-[#002147] font-bold">{startItem}</span> - <span className="text-[#002147] font-bold">{endItem}</span> of <span className="text-[#002147] font-bold">{totalItems}</span>
       </div>
 
-      {/* Pagination controls */}
       <div className="flex items-center gap-2 order-1 sm:order-2">
-        
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-[#002147] hover:bg-[#3598FE] hover:text-white hover:border-[#3598FE] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+          className="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-[#3598FE] disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600 transition-all duration-200 shadow-sm"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-4 h-4" />
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-2">
           {visiblePages.map((page, index) => (
             <React.Fragment key={index}>
               {page === '...' ? (
-                <div className="flex items-center justify-center w-10 h-10 text-gray-400">
-                  <MoreHorizontal className="w-5 h-5" />
+                <div className="flex items-center justify-center w-8 h-8 text-gray-300">
+                  <MoreHorizontal className="w-4 h-4" />
                 </div>
               ) : (
                 <button
                   onClick={() => onPageChange(page)}
-                  className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  className={`flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold transition-all duration-200 ${
                     currentPage === page
-                      ? 'bg-[#002147] text-white hover:bg-[#3598FE]'
-                      : 'border border-gray-200 bg-white text-[#002147] hover:bg-[#3598FE] hover:text-white hover:border-[#3598FE]'
+                      ? 'bg-[#002147] text-white shadow-md scale-105'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-[#3598FE] shadow-sm'
                   }`}
                 >
                   {page}
@@ -94,16 +92,16 @@ const Pagination = ({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-[#002147] hover:bg-[#3598FE] hover:text-white hover:border-[#3598FE] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300"
+          className="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-[#3598FE] disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600 transition-all duration-200 shadow-sm"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>
   );
 };
 
-// Main University Grid Component
+
 const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   const { data: session, status } = useSession();
 
@@ -117,11 +115,15 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
 
   const abortControllerRef = useRef(null);
   const cacheRef = useRef(new Map());
+  const lastFetchTimeRef = useRef(0);
+  const isVisibleRef = useRef(true);
 
+  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedGmat, selectedRanking]);
 
+  // Memoized search parameters for API call
   const searchParams = useMemo(() => {
     if (status === "loading") return null;
 
@@ -136,13 +138,17 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     });
   }, [searchQuery, selectedGmat, selectedRanking, session, status, currentPage, itemsPerPage]);
 
+  // Data fetching function
   const fetchData = useCallback(async (paramsString, forceRefresh = false) => {
     if (!paramsString) return;
 
+    const now = Date.now();
     const cached = cacheRef.current.get(paramsString);
-    const cacheValidTime = 300000;
+    // Reduced cache time to 30 seconds for faster updates
+    const cacheValidTime = 30000;
 
-    if (!forceRefresh && cached && Date.now() - cached.timestamp < cacheValidTime) {
+    // Return cached data if valid and not forcing refresh
+    if (!forceRefresh && cached && now - cached.timestamp < cacheValidTime) {
       setUniversities(cached.data.universities);
       setTotalPages(cached.data.totalPages);
       setTotalItems(cached.data.totalItems);
@@ -150,6 +156,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       return;
     }
 
+    // Abort previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -171,7 +178,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
       });
 
       const headers = {
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'no-cache',
         'Content-Type': 'application/json',
       };
 
@@ -198,12 +205,15 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
         setUniversities(responseData.universities);
         setTotalPages(responseData.totalPages);
         setTotalItems(responseData.totalItems);
+        lastFetchTimeRef.current = now;
 
+        // Update cache
         cacheRef.current.set(paramsString, {
           data: responseData,
-          timestamp: Date.now()
+          timestamp: now
         });
 
+        // Limit cache size
         if (cacheRef.current.size > 20) {
           const firstKey = cacheRef.current.keys().next().value;
           cacheRef.current.delete(firstKey);
@@ -227,6 +237,41 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   }, [session, itemsPerPage]);
 
+  // ✅ NEW: Handle visibility change - refresh when user returns to tab/page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isVisibleRef.current) {
+        // User returned to the page - clear cache and refetch
+        console.log('Page became visible - refreshing data');
+        cacheRef.current.clear();
+        if (searchParams) {
+          fetchData(searchParams, true);
+        }
+      }
+      isVisibleRef.current = document.visibilityState === 'visible';
+    };
+
+    const handleFocus = () => {
+      // Also refresh on window focus (catches more cases)
+      const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+      // If more than 2 seconds since last fetch, refresh
+      if (timeSinceLastFetch > 2000 && searchParams) {
+        console.log('Window focused - refreshing data');
+        cacheRef.current.clear();
+        fetchData(searchParams, true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [searchParams, fetchData]);
+
+  // Effect to fetch data when parameters change
   useEffect(() => {
     if (status === "loading") {
       setLoading(true);
@@ -240,6 +285,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   }, [searchParams, fetchData, status, searchQuery]);
 
+  // Cleanup effect
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -248,6 +294,27 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     };
   }, []);
 
+  // ✅ NEW: Update local state when toggle happens
+  const handleToggleSuccess = useCallback((universityId, newState) => {
+    setUniversities(prev => prev.map(u => 
+      u.id === universityId 
+        ? { ...u, isAdded: newState }
+        : u
+    ));
+    
+    // Also update cache
+    cacheRef.current.forEach((value, key) => {
+      const updatedUniversities = value.data.universities.map(u =>
+        u.id === universityId ? { ...u, isAdded: newState } : u
+      );
+      cacheRef.current.set(key, {
+        ...value,
+        data: { ...value.data, universities: updatedUniversities }
+      });
+    });
+  }, []);
+
+  // Manual refresh function
   const handleRefresh = useCallback(() => {
     cacheRef.current.clear();
     if (searchParams) {
@@ -255,27 +322,31 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
     }
   }, [searchParams, fetchData]);
 
+  // Page change handler
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const gridElement = document.getElementById('university-grid');
+    if (gridElement) {
+      gridElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, []);
 
-  // Loading Skeleton
+  // Loading skeleton
   const LoadingSkeleton = useMemo(() => (
-    <div className="w-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+    <div id="university-grid">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {Array.from({ length: itemsPerPage }, (_, i) => (
-          <div 
-            key={i} 
-            className="bg-white border border-gray-200 overflow-hidden animate-pulse rounded-lg flex flex-col"
-            style={{ minHeight: '540px', maxHeight: '540px' }}
-          >
-            <div className="bg-gray-200 h-56 w-full flex-shrink-0" />
-            <div className="p-4 space-y-3 flex-1 flex flex-col">
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-200 rounded w-1/2" />
-              <div className="flex-1" />
-              <div className="h-10 bg-gray-200 rounded" />
+          <div key={i} className="flex flex-col gap-4 h-full animate-pulse">
+            <div className="bg-gray-200 h-60 w-full rounded-2xl" />
+            <div className="flex-grow bg-white rounded-2xl p-5 border border-gray-100 space-y-4">
+              <div className="h-6 bg-gray-200 rounded w-3/4" />
+              <div className="grid grid-cols-3 gap-2">
+                <div className="h-10 bg-gray-200 rounded-xl" />
+                <div className="h-10 bg-gray-200 rounded-xl" />
+                <div className="h-10 bg-gray-200 rounded-xl" />
+              </div>
+              <div className="h-4 bg-gray-200 rounded w-1/2" />
+              <div className="h-10 bg-gray-200 rounded-lg mt-auto" />
             </div>
           </div>
         ))}
@@ -287,7 +358,7 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
 
   if (error) {
     return (
-      <div className="w-full text-center py-16 bg-white border border-gray-200 shadow-sm rounded-lg">
+      <div className="text-center py-16 bg-white shadow-sm rounded-lg" id="university-grid">
         <h3 className="text-xl font-semibold text-[#3598FE] mb-2">Error loading universities</h3>
         <p className="text-gray-600 mb-4">{error}</p>
         <button 
@@ -301,26 +372,20 @@ const UniversityGrid = ({ searchQuery, selectedGmat, selectedRanking }) => {
   }
 
   return (
-    <div className="w-full">
-      
-      {/* University Grid - Properly aligned 3 columns with equal heights */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+    <div id="university-grid">
+      <div className="columns-1 sm:columns-2 lg:columns-3 gap-10 space-y-10 mb-8">
         {universities.length > 0 ? (
-          universities.map(university => (
-            <UniversityCard 
-              key={university.id}
-              university={university} 
-              onToggleSuccess={(newState) => {
-                setUniversities(prev => prev.map(u => 
-                  u.id === university.id 
-                    ? { ...u, savedByUsers: newState ? [{ id: session?.userId || 'current-user' }] : [] }
-                    : u
-                ));
-              }}
-            />
+          universities.map((university, index) => (
+            <div key={university.id} className="break-inside-avoid">
+              <UniversityCard 
+                university={university} 
+                index={index}
+                onToggleSuccess={handleToggleSuccess}
+              />
+            </div>
           ))
         ) : (
-          <div className="col-span-full text-center py-16 bg-white border border-gray-200 shadow-sm rounded-lg">
+          <div className="col-span-full text-center py-16 bg-white shadow-sm rounded-lg break-inside-avoid">
             <h3 className="text-xl font-semibold text-[#002147] mb-2">No universities found</h3>
             <p className="text-gray-600">Try adjusting your search or filter criteria</p>
           </div>

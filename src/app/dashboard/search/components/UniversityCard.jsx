@@ -2,21 +2,57 @@
 
 import React, { useState, useEffect, useCallback, memo } from "react";
 import { useSession } from "next-auth/react";
-import { MapPin, Heart, GraduationCap, DollarSign, TrendingUp, Award } from "lucide-react";
+import { MapPin, Heart, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
-const UniversityCard = memo(({ university }) => {
+const UniversityCard = memo(({ university, index = 0, onToggleSuccess }) => {
   const [isAdded, setIsAdded] = useState(false);
   const { data: session, status } = useSession();
 
-  const universityUrl = university.slug
+  const universityUrl = university?.slug
     ? `/dashboard/university/${university.slug}`
-    : `/dashboard/university/${university.id}`;
+    : `/dashboard/university/${university?.id}`;
 
+  // Sync saved state from university data
   useEffect(() => {
     if (!university) return;
     setIsAdded(Boolean(university.isAdded));
   }, [university?.isAdded, university?.id]);
+
+  // ✅ Format rank with proper fallback handling
+  const formatRank = (rank) => {
+    // Handle null, undefined, empty string
+    if (rank === null || rank === undefined || rank === '' || rank === 'N/A') {
+      return null;
+    }
+    
+    // Convert to string and clean up
+    const rankStr = String(rank).trim();
+    
+    // If it's empty after trim, return null
+    if (!rankStr) return null;
+    
+    // If it already starts with #, return as is
+    if (rankStr.startsWith('#')) {
+      return rankStr;
+    }
+    
+    // If it's a number or can be parsed as one
+    const rankNum = parseInt(rankStr.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(rankNum) && rankNum > 0) {
+      return `#${rankNum}`;
+    }
+    
+    // If it's a text rank like "Top 10", "Tier 1", etc.
+    if (rankStr.length > 0) {
+      return rankStr;
+    }
+    
+    return null;
+  };
+
+  const displayRank = formatRank(university?.rank);
 
   const toggleHeart = useCallback(async (e) => {
     e.stopPropagation();
@@ -28,6 +64,7 @@ const UniversityCard = memo(({ university }) => {
     }
 
     const token = session?.token;
+
     if (!token) {
       toast.error("Authentication expired, please login again");
       return;
@@ -35,22 +72,38 @@ const UniversityCard = memo(({ university }) => {
 
     const previousState = isAdded;
     const newState = !isAdded;
+
+    // Optimistic update
     setIsAdded(newState);
+
+    // Notify parent to update its state & cache
+    if (onToggleSuccess) {
+      onToggleSuccess(university?.id, newState);
+    }
 
     if (newState) {
       toast.success("University added to dashboard", {
-        style: { background: '#3598FE', color: 'white', border: 'none' },
+        style: {
+          background: '#3598FE',
+          color: 'white',
+          border: 'none',
+        },
         duration: 2000,
       });
     } else {
       toast("University removed from dashboard", {
-        style: { background: '#002147', color: 'white', border: 'none' },
+        style: {
+          background: '#002147',
+          color: 'white',
+          border: 'none',
+        },
         duration: 2000,
       });
     }
 
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
       const response = await fetch(`${API_BASE_URL}/api/university/toggleSaved`, {
         method: "POST",
         headers: {
@@ -61,180 +114,158 @@ const UniversityCard = memo(({ university }) => {
       });
 
       if (!response.ok) {
+        // Revert on failure
         setIsAdded(previousState);
-        toast.error(`Failed to ${newState ? 'save' : 'remove'} university.`);
+        if (onToggleSuccess) {
+          onToggleSuccess(university?.id, previousState);
+        }
+        toast.error(`Failed to ${newState ? 'save' : 'remove'} university. Please try again.`);
       }
+
     } catch (error) {
+      // Revert on error
       setIsAdded(previousState);
-      toast.error("Network error. Please try again.");
+      if (onToggleSuccess) {
+        onToggleSuccess(university?.id, previousState);
+      }
+      toast.error("Network error. Please check your connection and try again.");
     }
-  }, [isAdded, university?.id, session, status]);
-
-  // Function to get ranking display with source - checks all available rankings
-  const getRankingDisplay = () => {
-    // Priority order: FT Global > US News > QS > Times > FT Regional
-    if (university?.ftGlobalRank && university.ftGlobalRank !== 'N/A') {
-      return {
-        rank: university.ftGlobalRank,
-        source: 'FT Global'
-      };
-    }
-    if (university?.usNewsRank && university.usNewsRank !== 'N/A') {
-      return {
-        rank: university.usNewsRank,
-        source: 'US News'
-      };
-    }
-    if (university?.qsRank && university.qsRank !== 'N/A') {
-      return {
-        rank: university.qsRank,
-        source: 'QS'
-      };
-    }
-    if (university?.timesRank && university.timesRank !== 'N/A') {
-      return {
-        rank: university.timesRank,
-        source: 'Times'
-      };
-    }
-    if (university?.ftRegionalRank && university.ftRegionalRank !== 'N/A') {
-      return {
-        rank: university.ftRegionalRank,
-        source: 'FT Regional'
-      };
-    }
-    return null;
-  };
-
-  const rankingInfo = getRankingDisplay();
+  }, [isAdded, university?.id, session, status, onToggleSuccess]);
 
   if (!university) return null;
 
+  const variations = [
+    { border: "border-blue-100", bg: "bg-blue-50/30" },
+    { border: "border-purple-100", bg: "bg-purple-50/30" },
+    { border: "border-emerald-100", bg: "bg-emerald-50/30" },
+    { border: "border-rose-100", bg: "bg-rose-50/30" },
+  ];
+  const style = variations[index % variations.length];
+
   return (
     <div 
-      className="group relative bg-white border border-gray-200 transition-all duration-300 overflow-hidden cursor-pointer flex flex-col font-sans hover:shadow-lg rounded-lg"
+      className="group relative flex flex-col w-full cursor-pointer break-inside-avoid"
       onClick={() => window.location.href = universityUrl}
-      style={{ 
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        minHeight: '540px',
-        maxHeight: '540px'
-      }}
     >
-      
-      {/* Image Header - Fixed height */}
-      <div className="relative h-56 flex-shrink-0 overflow-hidden">
-        <img
-          src={university?.image}
-          alt={university?.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
+      {/* Image Block */}
+      <div className="relative h-52 w-full mb-3 rounded-2xl overflow-hidden shadow-sm group-hover:shadow-md transition-all duration-300">
+        <Image
+          src={university?.image || '/placeholder-university.jpg'}
+          alt={university?.name || "University Image"}
+          fill
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          quality={80}
         />
+        <div className="absolute inset-0 bg-black/10 transition-opacity group-hover:opacity-0" />
         
-        <div className="absolute inset-0 bg-gradient-to-t from-[#002147]/90 via-[#002147]/40 to-transparent" />
-        
-        {/* Top Action Bar */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-start justify-between z-20">
-          <button
-            onClick={toggleHeart}
-            className={`px-3 py-1.5 rounded-md backdrop-blur-sm transition-all duration-200 text-xs font-medium ${
-              isAdded
-                ? "bg-[#3598FE] text-white"
-                : "bg-white/95 text-[#002147] hover:bg-white"
-            }`}
-          >
-            {isAdded ? "Added" : "Add"}
-          </button>
-
-          {rankingInfo && (
-            <div className="bg-white/95 backdrop-blur-sm px-3.5 py-2 rounded-lg flex items-center gap-2 shadow-md">
-              <Award className="w-4 h-4 text-[#3598FE] flex-shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-[#002147] leading-none">#{rankingInfo.rank}</span>
-                <span className="text-[10px] text-gray-600 font-medium mt-0.5">{rankingInfo.source}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* University Info Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
-          <h3 className="text-white font-semibold text-base mb-1.5 leading-tight line-clamp-2">
-            {university?.name}
-          </h3>
-          <div className="flex items-center text-white/90 text-sm">
-            <MapPin className="w-4 h-4 mr-1.5 flex-shrink-0" />
-            <span className="truncate">{university?.location}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Section - Flexible with proper spacing */}
-      <div className="flex-1 p-4 flex flex-col bg-gray-50" style={{ minHeight: '284px' }}>
-        
-        {/* Stats Row - Dynamic metrics based on availability */}
-        {(() => {
-          const stats = [];
-          
-          if (university?.gmatAvg && university.gmatAvg !== 'N/A') {
-            stats.push(
-              <div key="gmat" className="text-center p-2 bg-white border border-gray-200 rounded hover:border-[#3598FE] transition-colors">
-                <TrendingUp className="w-4 h-4 text-[#3598FE] mx-auto mb-1" />
-                <div className="text-[10px] text-gray-500 mb-0.5">GMAT</div>
-                <div className="text-sm font-bold text-[#002147]">{university.gmatAvg}</div>
-              </div>
-            );
-          }
-
-          if (university?.acceptRate && university.acceptRate !== 'N/A') {
-            stats.push(
-              <div key="accept" className="text-center p-2 bg-white border border-gray-200 rounded hover:border-[#3598FE] transition-colors">
-                <GraduationCap className="w-4 h-4 text-[#3598FE] mx-auto mb-1" />
-                <div className="text-[10px] text-gray-500 mb-0.5">Accept</div>
-                <div className="text-sm font-bold text-[#002147]">{university.acceptRate}%</div>
-              </div>
-            );
-          }
-
-          if (university?.tuitionFee && university.tuitionFee !== 'N/A') {
-            stats.push(
-              <div key="tuition" className="text-center p-2 bg-white border border-gray-200 rounded hover:border-[#3598FE] transition-colors">
-                <DollarSign className="w-4 h-4 text-[#3598FE] mx-auto mb-1" />
-                <div className="text-[10px] text-gray-500 mb-0.5">Tuition</div>
-                <div className="text-[10px] font-semibold text-[#002147] leading-tight">{university.tuitionFee}</div>
-              </div>
-            );
-          }
-
-          const gridCols = stats.length === 1 ? 'grid-cols-1' : stats.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
-
-          return stats.length > 0 ? (
-            <div className={`grid ${gridCols} gap-2 mb-3 flex-shrink-0`}>
-              {stats}
-            </div>
-          ) : null;
-        })()}
-
-        {/* Advantages List - Scrollable */}
-        {university?.pros && university.pros.length > 0 && (
-          <div className="flex-1 mb-3 overflow-hidden flex flex-col">
-            <div className="text-xs font-semibold text-[#002147] uppercase tracking-wide mb-2 flex-shrink-0">Key Advantages</div>
-            <div className="overflow-y-auto flex-1 pr-1" style={{ maxHeight: '120px' }}>
-              <ul className="space-y-1.5">
-                {university.pros.map((advantage, index) => (
-                  <li key={index} className="flex items-start text-xs text-gray-700 leading-relaxed">
-                    <span className="inline-block w-1.5 h-1.5 bg-[#3598FE] rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
-                    <span>{advantage}</span>
-                  </li>
-                ))}
-              </ul>
+        {/* ✅ Rank Badge - Only show if rank exists */}
+        {displayRank && (
+          <div className="absolute top-3 left-3">
+            <div className="px-2.5 py-1 bg-white/95 backdrop-blur-md rounded-lg text-[10px] font-bold tracking-wide uppercase text-[#002147] shadow-sm flex items-center gap-1">
+              <span className="text-amber-500">🏆</span>
+              <span>Rank {displayRank}</span>
             </div>
           </div>
         )}
 
-        {/* CTA Button - Always visible at bottom */}
-        <button className="w-full bg-[#002147] hover:bg-[#3598FE] text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-all duration-700 ease-in-out transform hover:rounded-3xl flex-shrink-0 mt-auto">
-          View Details →
+        {/* Add Button */}
+        <button
+          onClick={toggleHeart}
+          className={`absolute top-3 right-3 px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition-all duration-300 shadow-sm backdrop-blur-md flex items-center gap-1.5 ${
+            isAdded
+              ? "bg-white text-[#E11D48] shadow-md transform scale-105"
+              : "bg-black/30 text-white border border-white/20 hover:bg-white hover:text-[#E11D48]"
+          }`}
+        >
+          {isAdded ? (
+            <>
+              <Heart className="w-3 h-3 fill-current" />
+              <span>Added</span>
+            </>
+          ) : (
+            <span>+ Add</span>
+          )}
         </button>
+
+        {/* Location Tag */}
+        {university?.location && (
+          <div className="absolute bottom-3 left-3">
+            <div className="flex items-center text-white text-xs font-semibold drop-shadow-md">
+              <MapPin className="w-3.5 h-3.5 mr-1" />
+              {university.location}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Content Block */}
+      <div className={`flex flex-col ${style.bg} rounded-2xl p-3 border ${style.border} shadow-sm transition-all duration-300 group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden`}>
+        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50/50 to-transparent rounded-bl-[4rem] -z-10" />
+        
+        {/* Header */}
+        <h3 className="text-[#002147] font-bold text-[16px] leading-tight mb-2 group-hover:text-[#3598FE] transition-colors">
+          {university?.name}
+        </h3>
+
+        {/* Stats Grid */}
+        <div className="flex items-center justify-between py-2.5 px-3 bg-gray-50/80 rounded-xl border border-gray-100 mb-4">
+          <div className="text-center flex-1">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <span className="text-sm">🎓</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GMAT</span>
+            </div>
+            <span className="block text-[13px] font-bold text-[#002147]">
+              {university?.gmatAvg || '-'}
+            </span>
+          </div>
+          <div className="w-px h-8 bg-gray-200" />
+          <div className="text-center flex-1">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <span className="text-sm">💰</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tuition</span>
+            </div>
+            <span className="block text-[13px] font-bold text-[#002147] whitespace-nowrap">
+              {university?.tuitionFee 
+                ? `$${parseInt(university.tuitionFee.toString().replace(/,/g, '')).toLocaleString()}` 
+                : '-'}
+            </span>
+          </div>
+          <div className="w-px h-8 bg-gray-200" />
+          <div className="text-center flex-1">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <span className="text-sm">⚡</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Accept</span>
+            </div>
+            <span className="block text-[13px] font-bold text-[#002147]">
+              {university?.acceptRate ? `${university.acceptRate}%` : '-'}
+            </span>
+          </div>
+        </div>
+
+        {/* Advantages */}
+        {university?.pros && university.pros.length > 0 && (
+          <div className="space-y-1 mb-2">
+            {university.pros.slice(0, 2).map((pro, idx) => (
+              <div key={idx} className="flex items-start gap-2 p-1.5 rounded-lg hover:bg-white/60 transition-colors duration-200">
+                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3598FE] flex-shrink-0" />
+                <p className="text-[12.5px] text-gray-600 font-medium leading-relaxed">
+                  {pro}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* View Sign/Action */}
+        <div className="mt-2 flex items-center justify-end">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[#3598FE] group/btn transition-all">
+            View Details
+            <div className="w-6 h-6 rounded-full bg-[#3598FE]/10 flex items-center justify-center group-hover/btn:bg-[#3598FE] group-hover/btn:scale-110 transition-all duration-300">
+              <TrendingUp className="w-3.5 h-3.5 text-[#3598FE] group-hover/btn:text-white transition-colors" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

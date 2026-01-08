@@ -56,7 +56,7 @@ const FilterDropdown = memo(({ value, onChange, options }) => (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="appearance-none bg-white border border-gray-200 px-4 py-3 pr-10 text-gray-700 font-medium hover:border-gray-300 focus:outline-none focus:border-gray-400 transition-all duration-200 cursor-pointer shadow-sm"
+      className="appearance-none bg-white border border-gray-200 px-4 py-2.5 pr-10 text-gray-700 text-sm font-medium hover:border-gray-300 focus:outline-none focus:border-[#3598FE] focus:ring-1 focus:ring-[#3598FE] transition-all duration-200 cursor-pointer shadow-sm rounded-lg"
     >
       {/* Dynamically Render Options */}
       {options.map((option) => (
@@ -96,7 +96,7 @@ const FilterSection = memo(({
 }) => {
   return (
     // Filter Container with Responsive Layout
-    <div className="flex flex-wrap gap-4 justify-center">
+    <div className="flex flex-wrap gap-4">
       {/* GMAT Score Filter Dropdown */}
       <FilterDropdown
         value={selectedGmat}
