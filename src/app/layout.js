@@ -38,13 +38,7 @@ export const metadata = {
       }
     ]
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Admissions Made Effortless | Your Education Journey",
-    description: "Centralize all your MBA & college applications",
-    images: ["/twitter-image.jpg"], // Create this image
-    creator: "@yourhandle" // Your Twitter handle
-  },
+  
   robots: {
     index: true,
     follow: true,
@@ -56,11 +50,7 @@ export const metadata = {
       'max-snippet': -1,
     },
   },
-  verification: {
-    google: "your-google-verification-code", // Add after creating Google Search Console
-    // yandex: "your-yandex-verification-code",
-    // bing: "your-bing-verification-code",
-  }
+  
 };
 
 export default function RootLayout({ children }) {

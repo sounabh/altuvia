@@ -635,7 +635,7 @@ const loadCVData = async (cvId, email) => {
 
   return (
     <CVDataContext.Provider value={{ cvData, updateCVData }}>
-      <div className="min-h-screen bg-cvLightBg">
+      <div className="min-h-screen bg-cvLightBg mb-10">
         <Header
           onPreviewToggle={() => setIsPreviewMode(!isPreviewMode)}
           isPreviewMode={isPreviewMode}

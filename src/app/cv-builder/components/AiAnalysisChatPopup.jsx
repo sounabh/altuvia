@@ -1,7 +1,8 @@
+// app/components/AIAnalysisChatPopup.jsx - COMPLETE FIXED VERSION
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Loader2, Copy, Check, Sparkles, Download, CheckCircle } from 'lucide-react';
+import { X, Send, Loader2, Copy, Check, Sparkles, CheckCircle } from 'lucide-react';
 import { useCVData } from '../page';
 import { toast } from 'sonner';
 
@@ -78,7 +79,6 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
 
   const checkFilledSections = () => {
     const filled = [];
-    
     if (cvData.personal && (cvData.personal.fullName || cvData.personal.email || cvData.personal.summary)) {
       filled.push('Personal Info');
     }
@@ -100,7 +100,6 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
     if (cvData.volunteer && cvData.volunteer.some(v => v.organization)) {
       filled.push('Volunteer');
     }
-    
     return filled;
   };
 
@@ -111,36 +110,12 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
   };
 
   const quickActions = [
-    { 
-      label: 'Write Professional Summary', 
-      prompt: 'Write me a compelling professional summary based on my background',
-      icon: '✍️' 
-    },
-    { 
-      label: 'Analyze My CV', 
-      prompt: 'Analyze my entire CV and give me detailed feedback on all sections',
-      icon: '📊' 
-    },
-    { 
-      label: 'Improve Current Section', 
-      prompt: `Analyze my ${activeSection} section and suggest specific improvements`,
-      icon: '🔧' 
-    },
-    { 
-      label: 'Generate Bullet Points', 
-      prompt: `Generate professional bullet points for my ${activeSection} section`,
-      icon: '📝' 
-    },
-    { 
-      label: 'ATS Optimization Tips', 
-      prompt: 'How can I optimize my CV for Applicant Tracking Systems?',
-      icon: '🎯' 
-    },
-    { 
-      label: 'Career Advice', 
-      prompt: 'Give me advice on how to improve my career prospects',
-      icon: '💡' 
-    }
+    { label: 'Write Professional Summary', prompt: 'Write me a compelling professional summary based on my background', icon: '✍️' },
+    { label: 'Analyze My CV', prompt: 'Analyze my entire CV and give me detailed feedback on all sections', icon: '📊' },
+    { label: 'Improve Current Section', prompt: `Analyze my ${activeSection} section and suggest specific improvements`, icon: '🔧' },
+    { label: 'Generate Bullet Points', prompt: `Generate professional bullet points for my ${activeSection} section`, icon: '📝' },
+    { label: 'ATS Optimization Tips', prompt: 'How can I optimize my CV for Applicant Tracking Systems?', icon: '🎯' },
+    { label: 'Career Advice', prompt: 'Give me advice on how to improve my career prospects', icon: '💡' }
   ];
 
   const handleQuickAction = (prompt) => {
@@ -154,7 +129,7 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
       role: msg.role,
       content: msg.content,
       timestamp: new Date(),
-      autoApplyContent: msg.autoApplyContent || null,
+      structuredContent: msg.structuredContent || null,
       analysis: msg.analysis || null
     }]);
   };
@@ -166,15 +141,11 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
     const userMessage = input.trim();
     setInput('');
 
-    addMessage({
-      role: 'user',
-      content: userMessage
-    });
-
+    addMessage({ role: 'user', content: userMessage });
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/cv/ai-chat', {
+      const response = await fetch('/api/cv/ai-assist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,10 +160,12 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
 
       const data = await response.json();
       
+      console.log('AI Response received:', data);
+      
       addMessage({
         role: 'assistant',
         content: data.response,
-        autoApplyContent: data.autoApplyContent,
+        structuredContent: data.structuredContent,
         analysis: data.analysis
       });
 
@@ -207,54 +180,84 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
     }
   };
 
-  const handleApplyContent = (autoApplyContent) => {
+  const handleApplyContent = (structuredContent) => {
     try {
-      const { section, content, type } = autoApplyContent;
-      
-      if (type === 'summary' && section === 'personal') {
-        const updatedPersonal = {
-          ...cvData.personal,
-          summary: content
-        };
-        updateCVData('personal', updatedPersonal);
-        toast.success('Professional summary applied! Check the Personal Info section.');
-      } 
-      else if (type === 'bullets' || type === 'description') {
-        if (section === 'experience' && cvData.experience.length > 0) {
-          const updatedExperience = [...cvData.experience];
-          updatedExperience[0] = {
-            ...updatedExperience[0],
-            description: content
-          };
-          updateCVData('experience', updatedExperience);
-          toast.success('Content applied to your Experience section!');
-        } 
-        else if (section === 'projects' && cvData.projects.length > 0) {
-          const updatedProjects = [...cvData.projects];
-          updatedProjects[0] = {
-            ...updatedProjects[0],
-            description: content
-          };
-          updateCVData('projects', updatedProjects);
-          toast.success('Content applied to your Projects section!');
-        }
-        else {
-          toast.info('Content generated! Copy and paste it into your CV.');
-        }
+      if (!structuredContent || !structuredContent.section || !structuredContent.data) {
+        toast.error('No content to apply');
+        return;
       }
-      else if (type === 'skills_list' && section === 'skills') {
-        const skillsArray = content.split(',').map(s => s.trim());
-        const updatedSkills = [{
-          id: Date.now().toString(),
-          name: 'AI Suggested Skills',
-          skills: skillsArray
-        }];
-        updateCVData('skills', updatedSkills);
-        toast.success('Skills applied! Check the Skills section.');
+
+      const { section, data } = structuredContent;
+      let applied = false;
+
+      console.log('Applying content for section:', section, data);
+
+      // Handle different section types
+      switch (section) {
+        case 'personal':
+          if (data.personal) {
+            updateCVData('personal', { ...cvData.personal, ...data.personal });
+            applied = true;
+            toast.success('Professional summary applied! Check the Personal Info section.');
+          }
+          break;
+
+        case 'experience':
+          if (data.experience && Array.isArray(data.experience)) {
+            updateCVData('experience', data.experience);
+            applied = true;
+            toast.success('Experience details applied! Check the Experience section.');
+          }
+          break;
+
+        case 'education':
+          if (data.education && Array.isArray(data.education)) {
+            updateCVData('education', data.education);
+            applied = true;
+            toast.success('Education details applied! Check the Education section.');
+          }
+          break;
+
+        case 'projects':
+          if (data.projects && Array.isArray(data.projects)) {
+            updateCVData('projects', data.projects);
+            applied = true;
+            toast.success('Project details applied! Check the Projects section.');
+          }
+          break;
+
+        case 'skills':
+          if (data.skills && Array.isArray(data.skills)) {
+            updateCVData('skills', data.skills);
+            applied = true;
+            toast.success('Skills applied! Check the Skills section.');
+          }
+          break;
+
+        case 'achievements':
+          if (data.achievements && Array.isArray(data.achievements)) {
+            updateCVData('achievements', data.achievements);
+            applied = true;
+            toast.success('Achievement details applied! Check the Achievements section.');
+          }
+          break;
+
+        case 'volunteer':
+          if (data.volunteer && Array.isArray(data.volunteer)) {
+            updateCVData('volunteer', data.volunteer);
+            applied = true;
+            toast.success('Volunteer details applied! Check the Volunteer section.');
+          }
+          break;
+
+        default:
+          console.warn('Unknown section:', section);
       }
-      else {
-        toast.info('Content is ready! Copy it from the chat and paste into your CV.');
+
+      if (!applied) {
+        toast.info('Content ready to copy! Click the copy button to use it manually.');
       }
+
     } catch (error) {
       console.error('Error applying content:', error);
       toast.error('Failed to apply content. Please copy and paste manually.');
@@ -262,13 +265,7 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
   };
 
   const copyToClipboard = (text, id) => {
-    // Remove markdown formatting for clean copy
-    const cleanText = text
-      .replace(/\*\*/g, '')
-      .replace(/✍️|💡|📊|🔧|📝|🎯|✓|❌|⚠️/g, '')
-      .replace(/---/g, '')
-      .trim();
-    
+    const cleanText = text.replace(/\*\*/g, '').replace(/✍️|💡|📊|🔧|📝|🎯|✓|❌|⚠️/g, '').replace(/---/g, '').trim();
     navigator.clipboard.writeText(cleanText);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -283,80 +280,91 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-b from-slate-50 to-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden border border-slate-200">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white flex items-center justify-between">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Sparkles className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl bg-[#002147] flex items-center justify-center shadow-lg shadow-[#002147]/20">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">AI CV Assistant</h2>
-              <p className="text-sm text-blue-100">Ask me anything about your CV</p>
+              <h2 className="text-lg font-bold text-[#002147]">AI CV Assistant</h2>
+              <p className="text-[11px] text-slate-500">Ask me anything about your CV</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition">
-            <X className="w-6 h-6" />
+          <button 
+            onClick={onClose} 
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
-          
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-3xl ${
+              <div className={`max-w-[75%] ${
                 msg.role === 'user' 
-                  ? 'bg-blue-600 text-white rounded-lg rounded-tr-none' 
-                  : 'bg-white text-gray-800 rounded-lg rounded-tl-none border border-gray-200 shadow-sm'
-              } p-4`}>
-                <div className="prose prose-sm max-w-none whitespace-pre-wrap break-words">
+                  ? 'bg-[#002147] text-white rounded-2xl rounded-br-md shadow-lg shadow-[#002147]/20' 
+                  : 'bg-white text-slate-700 rounded-2xl rounded-bl-md border border-slate-100 shadow-sm'
+              } px-4 py-3`}>
+                
+                {msg.role === 'assistant' && (
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                    <div className="w-5 h-5 rounded-md bg-[#3598FE]/10 flex items-center justify-center">
+                      <Sparkles className="w-3 h-3 text-[#3598FE]" />
+                    </div>
+                    <span className="text-[11px] font-semibold text-[#002147]">AI Assistant</span>
+                  </div>
+                )}
+
+                <div className="text-[13px] leading-relaxed">
                   {msg.content.split('\n').map((line, i) => {
-                    // Format bold text
                     if (line.includes('**')) {
                       const parts = line.split('**');
                       return (
-                        <div key={i} className={`${msg.role === 'user' ? '' : 'font-semibold text-blue-700'} mb-1`}>
-                          {parts.map((part, idx) => (
-                            idx % 2 === 0 ? part : <strong key={idx}>{part}</strong>
-                          ))}
+                        <div key={i} className={`${msg.role === 'user' ? '' : 'font-semibold text-[#002147]'} mb-1`}>
+                          {parts.map((part, idx) => (idx % 2 === 0 ? part : <strong key={idx}>{part}</strong>))}
                         </div>
                       );
                     }
-                    // Format bullet points
                     if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
-                      return (
-                        <div key={i} className="ml-2 mb-1">{line}</div>
-                      );
+                      return <div key={i} className="ml-3 mb-1 flex items-start gap-2"><span className="text-[#3598FE]">•</span>{line.replace(/^[•-]\s*/, '')}</div>;
                     }
                     return <div key={i} className="mb-1">{line || <br />}</div>;
                   })}
                 </div>
                 
-                {/* Auto-Apply Button */}
-                {msg.autoApplyContent && msg.role === 'assistant' && (
-                  <div className="mt-4 pt-3 border-t border-gray-200 flex gap-2">
+                {/* Apply to CV Button */}
+                {msg.structuredContent && msg.role === 'assistant' && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2">
                     <button
-                      onClick={() => handleApplyContent(msg.autoApplyContent)}
-                      className="flex items-center gap-2 text-sm bg-green-50 text-green-700 px-4 py-2 rounded-lg hover:bg-green-100 transition font-medium"
+                      onClick={() => handleApplyContent(msg.structuredContent)}
+                      className="flex items-center gap-1.5 text-[12px] bg-[#002147] text-white px-3 py-1.5 rounded-lg hover:bg-[#003167] transition font-medium shadow-sm"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-3.5 h-3.5" />
                       Apply to CV
                     </button>
                     <button
-                      onClick={() => copyToClipboard(msg.autoApplyContent.content, msg.id + '-apply')}
-                      className="flex items-center gap-2 text-sm bg-blue-50 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100 transition"
+                      onClick={() => {
+                        const contentToCopy = typeof msg.structuredContent.data === 'string' 
+                          ? msg.structuredContent.data 
+                          : JSON.stringify(msg.structuredContent.data, null, 2);
+                        copyToClipboard(contentToCopy, msg.id + '-apply');
+                      }}
+                      className="flex items-center gap-1.5 text-[12px] bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-[#3598FE]/10 hover:text-[#3598FE] transition"
                     >
                       {copiedId === msg.id + '-apply' ? (
                         <>
-                          <Check className="w-4 h-4" />
+                          <Check className="w-3.5 h-3.5" />
                           Copied!
                         </>
                       ) : (
                         <>
-                          <Copy className="w-4 h-4" />
+                          <Copy className="w-3.5 h-3.5" />
                           Copy
                         </>
                       )}
@@ -365,29 +373,19 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
                 )}
 
                 {/* Regular Copy Button */}
-                {!msg.autoApplyContent && msg.role === 'assistant' && msg.content.length > 100 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
+                {!msg.structuredContent && msg.role === 'assistant' && msg.content.length > 100 && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => copyToClipboard(msg.content, msg.id)}
-                      className="flex items-center gap-2 text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded hover:bg-blue-100 transition"
+                      className="flex items-center gap-1.5 text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md hover:bg-[#3598FE]/10 hover:text-[#3598FE] transition"
                     >
-                      {copiedId === msg.id ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          Copy Response
-                        </>
-                      )}
+                      {copiedId === msg.id ? <><Check className="w-3 h-3" />Copied!</> : <><Copy className="w-3 h-3" />Copy Response</>}
                     </button>
                   </div>
                 )}
 
-                <div className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                  {msg.timestamp.toLocaleTimeString()}
+                <div className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-white/60' : 'text-slate-400'}`}>
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             </div>
@@ -395,25 +393,25 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                  <span className="text-sm text-gray-600">AI is thinking...</span>
+              <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#3598FE]" />
+                  <span className="text-[12px] text-slate-500">AI is thinking...</span>
                 </div>
               </div>
             </div>
           )}
 
           {messages.length === 1 && !isLoading && (
-            <div className="grid grid-cols-2 gap-3 mt-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
               {quickActions.map((action, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleQuickAction(action.prompt)}
-                  className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:shadow-md transition text-left"
+                  className="p-3 bg-white border border-slate-100 rounded-xl hover:border-[#3598FE] hover:shadow-md transition-all text-left group"
                 >
-                  <div className="text-2xl mb-2">{action.icon}</div>
-                  <div className="font-semibold text-blue-900 text-sm">{action.label}</div>
+                  <div className="text-xl mb-1.5">{action.icon}</div>
+                  <div className="text-[12px] font-semibold text-[#002147] group-hover:text-[#3598FE] transition-colors">{action.label}</div>
                 </button>
               ))}
             </div>
@@ -423,36 +421,29 @@ export default function AIAnalysisChatPopup({ onClose, cvData, activeSection }) 
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-gray-200 p-4 bg-white">
+        <div className="border-t border-slate-100 p-4 bg-white">
           <form onSubmit={handleSendMessage} className="flex gap-3">
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Ask me anything... (Shift+Enter for new line, Enter to send)"
+              placeholder="Ask me anything... (Enter to send, Shift+Enter for new line)"
               disabled={isLoading}
               rows={2}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 resize-none"
+              className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-[#002147] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3598FE]/20 focus:border-[#3598FE] transition-all resize-none disabled:bg-slate-100"
             />
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 self-end"
+              className="px-5 py-2.5 bg-[#002147] text-white rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 self-end shadow-lg shadow-[#002147]/20 hover:bg-[#003167]"
             >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </form>
-          <div className="text-xs text-gray-500 mt-2 flex items-center justify-between">
-            <span>Currently editing: <strong>{activeSection}</strong> section</span>
-            <span className="flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              Powered by Gemini AI
-            </span>
+          <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400">
+            <span>Editing: <strong className="text-[#002147]">{activeSection}</strong></span>
+            <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-[#3598FE]" />Powered by Gemini AI</span>
           </div>
         </div>
       </div>

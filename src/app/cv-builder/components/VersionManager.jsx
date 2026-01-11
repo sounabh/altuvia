@@ -1,15 +1,12 @@
-// components/VersionManager.jsx - OPTIMISTIC UPDATES WITH CACHING
+// components/VersionManager.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { X, GitBranch, Eye, Download, Copy, Calendar, Trash2, Loader2, FileText, Star, FolderOpen, RefreshCw } from 'lucide-react';
+import { X, GitBranch, Eye, Download, Copy, Calendar, Trash2, Loader2, FileText, Star, FolderOpen, RefreshCw, Clock, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Cache for versions data
 const versionsCache = new Map();
 
-// Export function to clear cache (can be called from parent component)
 export const clearVersionsCache = (userEmail) => {
   if (userEmail) {
     versionsCache.delete(`versions_${userEmail}`);
@@ -21,6 +18,7 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [groupedVersions, setGroupedVersions] = useState({});
+  const [expandedGroups, setExpandedGroups] = useState({});
   const hasFetchedRef = useRef(false);
   const cacheKey = `versions_${userEmail}`;
 
@@ -30,8 +28,6 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
     } else {
       setLoading(false);
     }
-    
-    // Reset fetch ref when component mounts
     return () => {
       hasFetchedRef.current = false;
     };
@@ -54,18 +50,13 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
 
   const loadAllVersions = async (forceRefresh = false) => {
     try {
-      // Check cache first for instant display
       if (!forceRefresh && versionsCache.has(cacheKey)) {
         const cachedData = versionsCache.get(cacheKey);
         const cacheAge = Date.now() - cachedData.timestamp;
-        
-        // Use cache if less than 30 seconds old
         if (cacheAge < 30000) {
           setVersions(cachedData.versions);
           setGroupedVersions(cachedData.grouped);
           setLoading(false);
-          
-          // Fetch in background to update cache after first render
           if (!hasFetchedRef.current) {
             hasFetchedRef.current = true;
             setTimeout(() => fetchVersionsInBackground(), 100);
@@ -74,7 +65,6 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
         }
       }
 
-      // First load or force refresh
       if (forceRefresh) {
         setRefreshing(true);
       } else {
@@ -86,12 +76,8 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       
       if (data.success) {
         const grouped = groupVersions(data.versions);
-        
-        // Update state
         setVersions(data.versions);
         setGroupedVersions(grouped);
-        
-        // Update cache
         versionsCache.set(cacheKey, {
           versions: data.versions,
           grouped: grouped,
@@ -116,19 +102,15 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       
       if (data.success) {
         const grouped = groupVersions(data.versions);
-        
-        // Check if data changed
         const currentVersionIds = versions.map(v => v.id).sort().join(',');
         const newVersionIds = data.versions.map(v => v.id).sort().join(',');
         
         if (currentVersionIds !== newVersionIds) {
-          // Silently update cache and state
           versionsCache.set(cacheKey, {
             versions: data.versions,
             grouped: grouped,
             timestamp: Date.now()
           });
-          
           setVersions(data.versions);
           setGroupedVersions(grouped);
         }
@@ -140,7 +122,6 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
 
   const handleDuplicate = async (version) => {
     try {
-      // Optimistic update - add duplicate immediately
       const optimisticDuplicate = {
         ...version,
         id: `temp_${Date.now()}`,
@@ -150,7 +131,6 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
         isOptimistic: true
       };
 
-      // Update UI immediately
       setVersions(prev => [optimisticDuplicate, ...prev]);
       setGroupedVersions(prev => {
         const key = version.cvSlug;
@@ -174,12 +154,10 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       const data = await response.json();
       
       if (data.success) {
-        // Replace optimistic version with real data
         versionsCache.delete(cacheKey);
         await loadAllVersions(true);
-        toast.success('Version duplicated successfully!');
+        toast.success('Version duplicated!');
       } else {
-        // Rollback on failure
         setVersions(prev => prev.filter(v => v.id !== optimisticDuplicate.id));
         setGroupedVersions(prev => {
           const key = version.cvSlug;
@@ -200,59 +178,41 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
   };
 
   const handleDelete = async (versionId) => {
-    if (!confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Delete this version? This cannot be undone.')) return;
 
     try {
-      // Store for rollback
       const versionToDelete = versions.find(v => v.id === versionId);
       
-      // Optimistic update - remove immediately
       setVersions(prev => prev.filter(v => v.id !== versionId));
       setGroupedVersions(prev => {
         const key = versionToDelete.cvSlug;
         const newVersions = prev[key].versions.filter(v => v.id !== versionId);
-        
-        // If no versions left in this CV group, remove the group
         if (newVersions.length === 0) {
           const { [key]: removed, ...rest } = prev;
           return rest;
         }
-        
         return {
           ...prev,
-          [key]: {
-            ...prev[key],
-            versions: newVersions
-          }
+          [key]: { ...prev[key], versions: newVersions }
         };
       });
 
-      toast.info('Deleting version...');
+      toast.info('Deleting...');
       
-      const response = await fetch(`/api/cv/versions/${versionId}`, {
-        method: 'DELETE'
-      });
-
+      const response = await fetch(`/api/cv/versions/${versionId}`, { method: 'DELETE' });
       const data = await response.json();
       
       if (data.success) {
-        // Update cache
         versionsCache.delete(cacheKey);
-        toast.success('Version deleted successfully!');
+        toast.success('Version deleted!');
       } else {
-        // Rollback on failure
-        setVersions(prev => [...prev, versionToDelete].sort((a, b) => 
-          new Date(b.createdAt) - new Date(a.createdAt)
-        ));
         await loadAllVersions(true);
-        toast.error('Failed to delete version');
+        toast.error('Failed to delete');
       }
     } catch (error) {
       console.error('Failed to delete version:', error);
       await loadAllVersions(true);
-      toast.error('Failed to delete version');
+      toast.error('Failed to delete');
     }
   };
 
@@ -261,9 +221,7 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       toast.info('Generating PDF...');
       const response = await fetch(`/api/cv/export-pdf?versionId=${version.id}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
+      if (!response.ok) throw new Error('Failed to generate PDF');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -275,185 +233,180 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      toast.success('PDF exported successfully!');
+      toast.success('PDF exported!');
     } catch (error) {
       console.error('Failed to export version:', error);
       toast.error('Failed to export PDF');
     }
   };
 
-  const handleLoadVersion = (version) => {
-    onLoadVersion(version);
+  const toggleGroup = (slug) => {
+    setExpandedGroups(prev => ({ ...prev, [slug]: !prev[slug] }));
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-cvBorder">
-          <div className="flex items-center space-x-2">
-            <GitBranch className="w-6 h-6 text-cvAccent" />
-            <h2 className="text-xl font-bold cv-heading">All My CV Versions</h2>
-            {versions.length > 0 && (
-              <Badge className="bg-blue-100 text-blue-800 ml-2">
-                {versions.length} total
-              </Badge>
-            )}
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-b from-slate-50 to-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden border border-slate-200">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#002147] flex items-center justify-center shadow-lg shadow-[#002147]/20">
+              <GitBranch className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-[#002147]">My CV Versions</h2>
+              <p className="text-xs text-slate-500">{versions.length} versions saved</p>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+          <div className="flex items-center gap-2">
+            <button 
               onClick={() => loadAllVersions(true)}
               disabled={refreshing}
-              title="Refresh versions"
-              className="hover:bg-gray-100"
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-[#002147]"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            </button>
+            <button 
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-[#002147]"
+            >
               <X className="w-5 h-5" />
-            </Button>
+            </button>
           </div>
         </div>
 
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="w-8 h-8 animate-spin text-cvAccent" />
+            <div className="flex flex-col items-center justify-center h-48 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-[#3598FE]" />
+              <p className="text-sm text-slate-500">Loading versions...</p>
             </div>
           ) : !userEmail ? (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">Please log in to view versions</p>
+            <div className="flex flex-col items-center justify-center h-48 gap-3">
+              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-sm text-slate-500">Please log in to view versions</p>
             </div>
           ) : versions.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 mb-2">No versions saved yet</p>
-              <p className="text-sm text-gray-400">Create CVs and save versions to see them here!</p>
+            <div className="flex flex-col items-center justify-center h-48 gap-3">
+              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-sm font-medium text-slate-600">No versions saved yet</p>
+              <p className="text-xs text-slate-400">Create and save CV versions to see them here</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {Object.entries(groupedVersions).map(([cvSlug, cvGroup]) => (
-                <div key={cvSlug} className="space-y-3">
-                  <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
-                    <FolderOpen className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold cv-heading text-blue-900">
-                      {cvGroup.cvTitle}
-                    </h3>
-                    <Badge variant="outline" className="text-xs">
-                      {cvGroup.versions.length} version{cvGroup.versions.length !== 1 ? 's' : ''}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-2 pl-7">
-                    {cvGroup.versions.map((version) => (
-                      <Card 
-                        key={version.id} 
-                        className={`border border-cvBorder hover:border-cvAccent transition-colors ${
-                          version.isOptimistic ? 'opacity-60 animate-pulse' : ''
-                        }`}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <h4 className="font-semibold cv-heading text-base">{version.versionLabel}</h4>
+            <div className="space-y-3">
+              {Object.entries(groupedVersions).map(([cvSlug, cvGroup]) => {
+                const isExpanded = expandedGroups[cvSlug] !== false;
+                
+                return (
+                  <div key={cvSlug} className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                    {/* Group Header */}
+                    <button
+                      onClick={() => toggleGroup(cvSlug)}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#3598FE]/10 flex items-center justify-center">
+                        <FolderOpen className="w-4 h-4 text-[#3598FE]" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <h3 className="text-sm font-semibold text-[#002147]">{cvGroup.cvTitle}</h3>
+                        <p className="text-[11px] text-slate-400">{cvGroup.versions.length} version{cvGroup.versions.length !== 1 ? 's' : ''}</p>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                    </button>
+                    
+                    {/* Version List */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100">
+                        {cvGroup.versions.map((version) => (
+                          <div 
+                            key={version.id}
+                            className={`flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${
+                              version.isOptimistic ? 'opacity-50' : ''
+                            }`}
+                          >
+                            {/* Version Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[13px] font-medium text-[#002147] truncate">
+                                  {version.versionLabel}
+                                </span>
                                 {version.isOptimistic && (
-                                  <Badge className="bg-gray-100 text-gray-600 border-gray-300">
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    Saving...
-                                  </Badge>
+                                  <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
                                 )}
                                 {version.isBookmarked && (
-                                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                                    <Star className="w-3 h-3 mr-1 fill-yellow-600" />
-                                    Bookmarked
-                                  </Badge>
+                                  <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                                 )}
                                 {version.isCurrentCV && (
-                                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                                    Current CV
-                                  </Badge>
+                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded">
+                                    Current
+                                  </span>
                                 )}
-                                <Badge className="bg-blue-100 text-blue-800">
+                                <span className="px-1.5 py-0.5 bg-[#3598FE]/10 text-[#3598FE] text-[10px] font-medium rounded">
                                   v{version.versionNumber}
-                                </Badge>
+                                </span>
                               </div>
-                              
+                              <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {new Date(version.createdAt).toLocaleDateString('en-US', {
+                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </span>
+                                <span>{version.templateId}</span>
+                              </div>
                               {version.changeDescription && (
-                                <p className="text-sm text-gray-600 mb-2">{version.changeDescription}</p>
+                                <p className="text-[11px] text-slate-500 mt-1 truncate">{version.changeDescription}</p>
                               )}
-                              
-                              <div className="flex items-center space-x-4 text-sm cv-body text-gray-500">
-                                <div className="flex items-center space-x-1">
-                                  <Calendar className="w-4 h-4" />
-                                  <span>{new Date(version.createdAt).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}</span>
-                                </div>
-                                <span>•</span>
-                                <span>{version.templateId} template</span>
-                              </div>
                             </div>
-                            
-                            <div className="flex items-center space-x-2 ml-4">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleLoadVersion(version)}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => onLoadVersion(version)}
                                 disabled={version.isOptimistic}
-                                className="border-cvAccent text-cvAccent hover:bg-cvAccent hover:text-white disabled:opacity-50"
-                                title="Load this version"
+                                className="p-1.5 rounded-lg bg-[#002147] text-white hover:bg-[#003167] transition-colors disabled:opacity-50"
+                                title="Load"
                               >
-                                <Eye className="w-4 h-4 mr-1" />
-                                Load
-                              </Button>
-                              
-                              <Button
-                                variant="outline"
-                                size="sm"
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => handleDuplicate(version)}
                                 disabled={version.isOptimistic}
-                                className="border-green-500 text-green-600 hover:bg-green-500 hover:text-white disabled:opacity-50"
-                                title="Duplicate version"
+                                className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-[#3598FE] hover:text-white transition-colors disabled:opacity-50"
+                                title="Duplicate"
                               >
-                                <Copy className="w-4 h-4" />
-                              </Button>
-                              
-                              <Button
-                                variant="outline"
-                                size="sm"
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => handleExportVersion(version)}
                                 disabled={version.isOptimistic}
-                                className="border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white disabled:opacity-50"
-                                title="Export as PDF"
+                                className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-purple-500 hover:text-white transition-colors disabled:opacity-50"
+                                title="Export PDF"
                               >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              
-                              <Button
-                                variant="outline"
-                                size="sm"
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => handleDelete(version.id)}
                                 disabled={version.isOptimistic}
-                                className="border-red-500 text-red-600 hover:bg-red-500 hover:text-white disabled:opacity-50"
-                                title="Delete version"
+                                className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+                                title="Delete"
                               >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

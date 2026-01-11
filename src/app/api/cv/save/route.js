@@ -167,7 +167,7 @@ export async function POST(request) {
       isNewCV = true;
 
       // ========================================
-      // FIX: Handle duplicate slug gracefully
+      // Handle duplicate slug gracefully
       // ========================================
       let cvSlug = cvNumber || `cv-${Date.now()}`;
       let slugAttempt = 0;
@@ -260,7 +260,12 @@ export async function POST(request) {
           skills: {
             create: cvData.skills?.map((skillGroup, index) => ({
               categoryName: skillGroup.name || "",
-              skills: skillGroup.skills || [],
+              // ✅ FIX: Extract skill names from objects
+              skills: Array.isArray(skillGroup.skills) 
+                ? skillGroup.skills.map(skill => 
+                    typeof skill === 'string' ? skill : skill.name
+                  ).filter(Boolean)
+                : [],
               displayOrder: index,
             })) || [],
           },
@@ -444,7 +449,12 @@ export async function POST(request) {
         data: cvData.skills.map((skillGroup, index) => ({
           cvId,
           categoryName: skillGroup.name || "",
-          skills: skillGroup.skills || [],
+          // ✅ FIX: Extract skill names from objects
+          skills: Array.isArray(skillGroup.skills)
+            ? skillGroup.skills.map(skill => 
+                typeof skill === 'string' ? skill : skill.name
+              ).filter(Boolean)
+            : [],
           displayOrder: index,
         })),
       });

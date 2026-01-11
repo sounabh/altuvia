@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, Palette } from "lucide-react";
+import { Eye, Palette, Mail, Phone, MapPin, Linkedin, Globe } from "lucide-react";
 
 const Label = ({ children, className }) => (
   <span className={className}>{children}</span>
@@ -16,6 +16,45 @@ const THEME_COLORS = [
   { name: "Slate", value: "#475569", light: "#e2e8f0" },
   { name: "Black", value: "#000000", light: "#f3f4f6" },
 ];
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+// Extract skill name from various formats (string or object)
+const getSkillName = (skill) => {
+  if (!skill) return '';
+  if (typeof skill === 'string') return skill.trim();
+  if (typeof skill === 'object' && skill !== null) {
+    // Handle various object structures
+    return skill.name || skill.value || skill.skill || skill.label || skill.title || '';
+  }
+  return String(skill);
+};
+
+// Clean HTML tags and entities from text
+const stripHtmlTags = (text) => {
+  if (!text) return '';
+  if (typeof text !== 'string') return String(text);
+  return text
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
+    .replace(/&amp;/g, '&')  // Replace &amp; with &
+    .replace(/&lt;/g, '<')   // Replace &lt; with <
+    .replace(/&gt;/g, '>')   // Replace &gt; with >
+    .replace(/&quot;/g, '"') // Replace &quot; with "
+    .replace(/&#39;/g, "'")  // Replace &#39; with '
+    .trim();
+};
+
+// Get skills list as array of strings
+const getSkillsList = (category) => {
+  if (!category || !category.skills) return [];
+  if (!Array.isArray(category.skills)) return [];
+  return category.skills
+    .map(skill => getSkillName(skill))
+    .filter(name => name.length > 0);
+};
 
 export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#1e40af", onThemeColorChange }) => {
   console.log("PreviewPanel - cvData received:", cvData);
@@ -34,36 +73,14 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     if (!description) return null;
     
     if (Array.isArray(description)) {
-      return (
-        <ul className="list-disc list-inside space-y-1 mt-2">
-          {description.map((item, index) => (
-            <li key={index} className="text-sm text-gray-700 leading-relaxed">{item}</li>
-          ))}
-        </ul>
-      );
+      return description.map(item => stripHtmlTags(item)).filter(Boolean);
     }
     
     if (typeof description === 'string') {
-      const lines = description.split('\n').filter(line => line.trim());
-      const hasBullets = lines.some(line => line.trim().startsWith('•') || line.trim().startsWith('-'));
-      
-      if (hasBullets) {
-        return (
-          <ul className="list-disc list-inside space-y-1 mt-2">
-            {lines.map((line, index) => (
-              <li key={index} className="text-sm text-gray-700 leading-relaxed">
-                {line.replace(/^[•\-]\s*/, '')}
-              </li>
-            ))}
-          </ul>
-        );
-      }
-      
-      return (
-        <div className="text-sm text-gray-700 whitespace-pre-line mt-2 leading-relaxed">
-          {description}
-        </div>
-      );
+      // First strip HTML tags, then split by newlines
+      const cleanedDesc = stripHtmlTags(description);
+      const lines = cleanedDesc.split('\n').filter(line => line.trim());
+      return lines.map(line => line.replace(/^[•\-]\s*/, '').trim()).filter(Boolean);
     }
     
     return null;
@@ -79,113 +96,91 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     volunteer: Array.isArray(cvData.volunteer) ? cvData.volunteer : [],
   };
 
-  console.log("PreviewPanel - safeData:", safeData);
-
-  // Strict validation: item has data only if at least one field has meaningful content
   const hasMeaningfulValue = (value) => {
     if (value === null || value === undefined) return false;
-    
     if (Array.isArray(value)) {
       return value.length > 0 && value.some(item => hasMeaningfulValue(item));
     }
-    
-    const stringValue = value.toString().trim();
+    const stringValue = String(value).trim();
     if (stringValue === "") return false;
-    
-    // Check for placeholder text or minimal content
     const minimalPatterns = [
-      /^[.\-\s]*$/, // Only dots, dashes, or whitespace
-      /^n\/a$/i, // n/a or N/A
+      /^[.\-\s]*$/,
+      /^n\/a$/i,
       /^not specified$/i,
-      /^enter /i, // Enter something
-      /^your /i, // Your something
-      /^add /i, // Add something
-      /^\[.*\]$/, // [Something in brackets]
-      /^\(.*\)$/, // (Something in parentheses)
+      /^enter /i,
+      /^your /i,
+      /^add /i,
+      /^\[.*\]$/,
+      /^\(.*\)$/,
+      /^\[object Object\]$/i,
     ];
-    
-    // If value matches any minimal pattern, consider it empty
     if (minimalPatterns.some(pattern => pattern.test(stringValue))) {
       return false;
     }
-    
     return true;
   };
 
   const hasData = (section) => {
-    if (!section || !Array.isArray(section)) {
-      console.log(`hasData: section is invalid`, section);
-      return false;
-    }
-    
-    const result = section.some((item, index) => {
-      if (!item || typeof item !== 'object') {
-        console.log(`hasData: item ${index} is invalid`, item);
-        return false;
-      }
-      
-      // Skip the 'id' field when checking for meaningful content
+    if (!section || !Array.isArray(section)) return false;
+    return section.some((item) => {
+      if (!item || typeof item !== 'object') return false;
       const filteredItem = { ...item };
-      delete filteredItem.id; // Remove id field from consideration
-      
-      const hasMeaningfulContent = Object.values(filteredItem).some(value => {
-        const hasValue = hasMeaningfulValue(value);
-        if (hasValue) {
-          console.log(`hasData: item ${index} has meaningful value:`, value);
-        }
-        return hasValue;
-      });
-      
-      console.log(`hasData: item ${index} has meaningful content (excluding id): ${hasMeaningfulContent}`, filteredItem);
-      return hasMeaningfulContent;
+      delete filteredItem.id;
+      return Object.values(filteredItem).some(value => hasMeaningfulValue(value));
     });
-    
-    console.log(`hasData for ${section.length} items: ${result}`);
-    return result;
   };
 
   const hasSectionData = (sectionName) => {
     const section = safeData[sectionName];
-    console.log(`hasSectionData called for ${sectionName}:`, section);
-    
     if (sectionName === 'personal') {
-      // Check personal section - exclude fullName from validation
       const { fullName, ...otherPersonalData } = section;
       const hasOtherData = Object.values(otherPersonalData).some(value => hasMeaningfulValue(value));
-      console.log(`hasSectionData personal: fullName="${fullName}", hasOtherData=${hasOtherData}`);
       return hasMeaningfulValue(fullName) || hasOtherData;
     }
-    
-    const result = hasData(section);
-    console.log(`hasSectionData for ${sectionName}: ${result}`);
-    return result;
+    if (sectionName === 'skills') {
+      // Special check for skills - ensure at least one category has actual skills
+      return section.some(category => {
+        const skillsList = getSkillsList(category);
+        return category.name || skillsList.length > 0;
+      });
+    }
+    return hasData(section);
   };
 
   const hasContactInfo = () => {
-    const { fullName, ...contactFields } = safeData.personal;
-    const result = Object.values(contactFields).some(value => hasMeaningfulValue(value));
-    console.log("hasContactInfo:", result, contactFields);
-    return result;
+    const { fullName, summary, ...contactFields } = safeData.personal;
+    return Object.values(contactFields).some(value => hasMeaningfulValue(value));
   };
 
   const hasSummary = () => {
-    const result = hasMeaningfulValue(safeData.personal?.summary);
-    console.log("hasSummary:", result, safeData.personal?.summary);
-    return result;
+    return hasMeaningfulValue(safeData.personal?.summary);
   };
 
   const currentTheme = THEME_COLORS.find(t => t.value === themeColor) || THEME_COLORS[0];
 
   const renderTemplate = () => {
+    const commonProps = {
+      data: safeData,
+      formatDate,
+      hasSectionData,
+      hasData,
+      renderDescription,
+      themeColor: currentTheme,
+      hasContactInfo,
+      hasSummary,
+      getSkillsList,
+      stripHtmlTags,
+    };
+
     switch (selectedTemplate) {
       case "modern":
-        return <ModernPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
+        return <ModernPreview {...commonProps} />;
       case "classic":
-        return <ClassicPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
+        return <ClassicPreview {...commonProps} />;
       case "minimal":
-        return <MinimalPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
+        return <MinimalPreview {...commonProps} />;
       default:
-        return <ModernPreview data={safeData} formatDate={formatDate} hasSectionData={hasSectionData} hasData={hasData} renderDescription={renderDescription} themeColor={currentTheme} hasContactInfo={hasContactInfo} hasSummary={hasSummary} />;
+        return <ModernPreview {...commonProps} />;
     }
   };
 
@@ -244,631 +239,878 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
   );
 };
 
-const ModernPreview = ({ data, formatDate, hasSectionData, hasData, renderDescription, themeColor, hasContactInfo, hasSummary }) => {
-  console.log("ModernPreview rendering with data:", data);
-  
-  return (
-  <div className="p-8 text-sm antialiased" style={{ fontFamily: 'Calibri, Arial, sans-serif' }}>
-    <div className="mb-8">
-      <h1 className="text-4xl font-bold mb-2 tracking-tight" style={{ color: themeColor.value, fontFamily: 'Georgia, serif' }}>
-        {data.personal?.fullName || "Your Name"}
-      </h1>
+// ============================================
+// MODERN TEMPLATE - Clean with accent colors
+// ============================================
+const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
+  const BulletList = ({ items }) => {
+    const parsedItems = renderDescription(items);
+    if (!parsedItems || parsedItems.length === 0) return null;
     
-      {hasContactInfo() && (
-        <div className="flex flex-wrap gap-4 text-sm text-gray-700">
-          {data.personal?.email && <span className="flex items-center gap-1">✉ {data.personal.email}</span>}
-          {data.personal?.phone && <span className="flex items-center gap-1">📞 {data.personal.phone}</span>}
-          {data.personal?.location && <span className="flex items-center gap-1">📍 {data.personal.location}</span>}
-          {data.personal?.linkedin && <span className="flex items-center gap-1">💼 {data.personal.linkedin}</span>}
-          {data.personal?.website && <span className="flex items-center gap-1">🌐 {data.personal.website}</span>}
-        </div>
+    return (
+      <ul className="space-y-1.5 mt-2">
+        {parsedItems.map((item, idx) => (
+          <li key={idx} className="flex items-start gap-3 text-sm text-slate-700">
+            <span 
+              className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" 
+              style={{ backgroundColor: themeColor.value }}
+            />
+            <span className="leading-relaxed">{item}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  return (
+    <div className="p-10 font-sans antialiased bg-white">
+      {/* Header */}
+      <header className="mb-6">
+        <h1 
+          className="text-4xl font-bold tracking-tight mb-1"
+          style={{ color: themeColor.value }}
+        >
+          {data.personal?.fullName || "Your Name"}
+        </h1>
+        
+        {hasContactInfo() && (
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600 mt-4">
+            {data.personal?.email && (
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: themeColor.light }}
+                >
+                  <Mail className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
+                </div>
+                <span>{data.personal.email}</span>
+              </div>
+            )}
+            {data.personal?.phone && (
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: themeColor.light }}
+                >
+                  <Phone className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
+                </div>
+                <span>{data.personal.phone}</span>
+              </div>
+            )}
+            {data.personal?.location && (
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: themeColor.light }}
+                >
+                  <MapPin className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
+                </div>
+                <span>{data.personal.location}</span>
+              </div>
+            )}
+            {data.personal?.linkedin && (
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: themeColor.light }}
+                >
+                  <Linkedin className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
+                </div>
+                <span>{data.personal.linkedin}</span>
+              </div>
+            )}
+            {data.personal?.website && (
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: themeColor.light }}
+                >
+                  <Globe className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
+                </div>
+                <span>{data.personal.website}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </header>
+
+      {/* Accent Line */}
+      <div 
+        className="h-1 w-full rounded-full mb-6"
+        style={{ 
+          background: `linear-gradient(to right, ${themeColor.value}, ${themeColor.value}88, ${themeColor.value}44)` 
+        }}
+      />
+
+      {/* Professional Summary */}
+      {hasSummary() && (
+        <section className="mb-6">
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Professional Summary
+          </h2>
+          <p className="text-sm text-slate-700 leading-relaxed pl-4 border-l-2 border-slate-100">
+            {stripHtmlTags(data.personal.summary)}
+          </p>
+        </section>
+      )}
+
+      {/* Education */}
+      {hasSectionData('education') && (
+        <section className="mb-6">
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Education
+          </h2>
+          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
+            {data.education.map((edu, i) => (
+              (edu.institution || edu.degree || edu.field) && (
+                <div key={i}>
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-semibold text-slate-900">
+                      {edu.degree}{edu.field && ` in ${edu.field}`}
+                    </h3>
+                    {(edu.startDate || edu.endDate) && (
+                      <span 
+                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
+                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
+                      >
+                        {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  {edu.institution && (
+                    <p className="text-sm text-slate-600 mb-1">{edu.institution}</p>
+                  )}
+                  {edu.gpa && (
+                    <p className="text-sm text-slate-500">GPA: {edu.gpa}</p>
+                  )}
+                  {edu.description && (
+                    <p className="text-xs text-slate-600 mt-2">{stripHtmlTags(edu.description)}</p>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Experience */}
+      {hasSectionData('experience') && (
+        <section className="mb-6">
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Experience
+          </h2>
+          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
+            {data.experience.map((exp, i) => (
+              (exp.company || exp.position) && (
+                <div key={i}>
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-semibold text-slate-900">{exp.position}</h3>
+                    {(exp.startDate || exp.endDate) && (
+                      <span 
+                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
+                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
+                      >
+                        {formatDate(exp.startDate)} - {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600 mb-2">
+                    {exp.company}{exp.location && ` • ${exp.location}`}
+                  </p>
+                  {exp.description && <BulletList items={exp.description} />}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Projects */}
+      {hasSectionData('projects') && (
+        <section className="mb-6">
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Projects
+          </h2>
+          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
+            {data.projects.map((proj, i) => (
+              proj.name && (
+                <div key={i}>
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-semibold text-slate-900">{proj.name}</h3>
+                    {(proj.startDate || proj.endDate) && (
+                      <span 
+                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
+                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
+                      >
+                        {proj.startDate ? formatDate(proj.startDate) : ''} 
+                        {proj.endDate ? ` - ${formatDate(proj.endDate)}` : ''}
+                      </span>
+                    )}
+                  </div>
+                  {proj.technologies && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {proj.technologies.split(',').map((tech, idx) => (
+                        <span 
+                          key={idx} 
+                          className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded"
+                        >
+                          {tech.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {proj.description && <BulletList items={proj.description} />}
+                  {(proj.githubUrl || proj.liveUrl) && (
+                    <div className="flex gap-4 mt-2 text-xs" style={{ color: themeColor.value }}>
+                      {proj.githubUrl && <span>GitHub: {proj.githubUrl}</span>}
+                      {proj.liveUrl && <span>Live: {proj.liveUrl}</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Skills - FIXED */}
+      {hasSectionData('skills') && (
+        <section className="mb-6">
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Technical Skills
+          </h2>
+          <div className="grid grid-cols-2 gap-3 pl-4 border-l-2 border-slate-100">
+            {data.skills.map((category, i) => {
+              const skillsList = getSkillsList(category);
+              return (category.name || skillsList.length > 0) ? (
+                <div key={i} className="bg-slate-50 rounded-lg p-3">
+                  {category.name && (
+                    <h4 className="font-semibold text-slate-800 text-sm mb-1">
+                      {stripHtmlTags(category.name)}
+                    </h4>
+                  )}
+                  {skillsList.length > 0 && (
+                    <p className="text-slate-600 text-xs leading-relaxed">
+                      {skillsList.join(", ")}
+                    </p>
+                  )}
+                </div>
+              ) : null;
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Achievements - FIXED */}
+      {hasSectionData('achievements') && (
+        <section className="mb-6">
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Achievements
+          </h2>
+          <div className="pl-4 border-l-2 border-slate-100 space-y-3">
+            {data.achievements.map((ach, i) => (
+              ach.title && (
+                <div key={i}>
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-semibold text-slate-900">{stripHtmlTags(ach.title)}</h3>
+                    {ach.date && (
+                      <span className="text-xs text-slate-500 ml-4">{ach.date}</span>
+                    )}
+                  </div>
+                  {ach.organization && (
+                    <p className="text-sm text-slate-600">{stripHtmlTags(ach.organization)}</p>
+                  )}
+                  {ach.description && (
+                    <p className="text-sm text-slate-600 mt-1">{stripHtmlTags(ach.description)}</p>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Volunteer */}
+      {hasSectionData('volunteer') && (
+        <section>
+          <h2 
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: themeColor.value }}
+          >
+            <span 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: themeColor.value }}
+            />
+            Volunteer Experience
+          </h2>
+          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
+            {data.volunteer.map((vol, i) => (
+              (vol.organization || vol.role) && (
+                <div key={i}>
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-semibold text-slate-900">{vol.role}</h3>
+                    {(vol.startDate || vol.endDate) && (
+                      <span 
+                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
+                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
+                      >
+                        {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600 mb-2">
+                    {vol.organization}{vol.location && ` • ${vol.location}`}
+                  </p>
+                  {vol.description && <BulletList items={vol.description} />}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
       )}
     </div>
-
-    {hasSummary() && (
-      <div className="mb-8">
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          PROFESSIONAL SUMMARY
-        </h2>
-        <p className="text-sm text-gray-800 leading-relaxed">{data.personal.summary}</p>
-      </div>
-    )}
-
-    {hasSectionData('education') && (
-      <div className="mb-8">
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          EDUCATION
-        </h2>
-        {data.education.map((edu, i) => (
-          (edu.institution || edu.degree || edu.field) && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900">
-                  {edu.degree || "Degree"} in {edu.field || "Field"}
-                </h3>
-                {(edu.startDate || edu.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                  </span>
-                )}
-              </div>
-              {edu.institution && <p className="text-sm text-gray-800 mb-1 font-semibold">{edu.institution}</p>}
-              {edu.gpa && <p className="text-sm text-gray-700">GPA: {edu.gpa}</p>}
-              {edu.description && <p className="text-sm text-gray-700 mt-1">{edu.description}</p>}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('experience') && (
-      <div className="mb-8">
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          PROFESSIONAL EXPERIENCE
-        </h2>
-        {data.experience.map((exp, i) => (
-          (exp.company || exp.position) && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-start mb-1">
-                {exp.position && <h3 className="font-bold text-gray-900">{exp.position}</h3>}
-                {(exp.startDate || exp.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {formatDate(exp.startDate)} -{" "}
-                    {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                  </span>
-                )}
-              </div>
-              {exp.company && (
-                <p className="text-sm text-gray-800 mb-2 font-semibold">
-                  {exp.company}
-                  {exp.location && ` • ${exp.location}`}
-                </p>
-              )}
-              {exp.description && renderDescription(exp.description)}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('projects') && (
-      <div className="mb-8">
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          PROJECTS
-        </h2>
-        {data.projects.map((proj, i) => (
-          proj.name && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900">{proj.name}</h3>
-                {(proj.startDate || proj.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {proj.startDate ? formatDate(proj.startDate) : ''} 
-                    {proj.endDate ? ` - ${formatDate(proj.endDate)}` : ''}
-                  </span>
-                )}
-              </div>
-              {proj.technologies && (
-                <p className="text-sm text-gray-700 mb-1">{proj.technologies}</p>
-              )}
-              {proj.description && renderDescription(proj.description)}
-              {(proj.githubUrl || proj.liveUrl) && (
-                <div className="flex gap-4 mt-2 text-sm" style={{ color: themeColor.value }}>
-                  {proj.githubUrl && <span>GitHub: {proj.githubUrl}</span>}
-                  {proj.liveUrl && <span>Live: {proj.liveUrl}</span>}
-                </div>
-              )}
-              {proj.achievements && (
-                <div className="mt-2">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">Achievements:</p>
-                  {renderDescription(proj.achievements)}
-                </div>
-              )}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('skills') && (
-      <div className="mb-8">
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          SKILLS
-        </h2>
-        <div className="grid grid-cols-2 gap-4">
-          {data.skills.map((category, i) => {
-            const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            return (category.name || skillsList.length > 0) ? (
-              <div key={i}>
-                {category.name && <h4 className="font-bold text-gray-900 mb-1">{category.name}</h4>}
-                {skillsList.length > 0 && (
-                  <p className="text-sm text-gray-700 leading-relaxed">{skillsList.join(", ")}</p>
-                )}
-              </div>
-            ) : null;
-          })}
-        </div>
-      </div>
-    )}
-
-    {hasSectionData('achievements') && (
-      <div className="mb-8">
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          ACHIEVEMENTS
-        </h2>
-        {data.achievements.map((ach, i) => (
-          ach.title && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-gray-900">{ach.title}</h3>
-                {ach.date && <span className="text-sm text-gray-600 whitespace-nowrap ml-4">{ach.date}</span>}
-              </div>
-              {ach.organization && (
-                <p className="text-sm text-gray-800 mb-1 font-semibold">{ach.organization}</p>
-              )}
-              {ach.type && <p className="text-sm text-gray-700 mb-2 italic">{ach.type}</p>}
-              {ach.description && renderDescription(ach.description)}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('volunteer') && (
-      <div>
-        <h2 
-          className="text-xl font-bold mb-3 pb-2 border-b-2" 
-          style={{ borderColor: themeColor.value, color: themeColor.value }}
-        >
-          VOLUNTEER EXPERIENCE
-        </h2>
-        {data.volunteer.map((vol, i) => (
-          (vol.organization || vol.role) && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-start mb-1">
-                {vol.role && <h3 className="font-bold text-gray-900">{vol.role}</h3>}
-                {(vol.startDate || vol.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
-                  </span>
-                )}
-              </div>
-              {vol.organization && (
-                <p className="text-sm text-gray-800 mb-2 font-semibold">
-                  {vol.organization}
-                  {vol.location && ` • ${vol.location}`}
-                </p>
-              )}
-              {vol.description && renderDescription(vol.description)}
-              {vol.impact && (
-                <p className="text-sm text-gray-700 italic mt-2">{vol.impact}</p>
-              )}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-  </div>
   );
 };
 
-const ClassicPreview = ({ data, formatDate, hasSectionData, hasData, renderDescription, themeColor, hasContactInfo, hasSummary }) => {
-  console.log("ClassicPreview rendering with data:", data);
-  
+// ============================================
+// CLASSIC TEMPLATE - Traditional formal style
+// ============================================
+const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
+  const BulletList = ({ items }) => {
+    const parsedItems = renderDescription(items);
+    if (!parsedItems || parsedItems.length === 0) return null;
+    
+    return (
+      <ul className="mt-2 ml-4 space-y-1">
+        {parsedItems.map((item, idx) => (
+          <li 
+            key={idx} 
+            className="relative pl-4 text-sm text-gray-700 leading-relaxed before:content-['•'] before:absolute before:left-0 before:text-gray-400"
+          >
+            {item}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   return (
-  <div className="p-8 text-sm antialiased" style={{ fontFamily: 'Times New Roman, serif' }}>
-    <div className="text-center mb-8 border-b-2 pb-4" style={{ borderColor: themeColor.value }}>
-      <h1 className="text-3xl font-bold mb-2 tracking-wide" style={{ color: themeColor.value }}>
-        {data.personal?.fullName || "Your Name"}
-      </h1>
-      {hasContactInfo() && (
-        <div className="text-sm space-y-1 text-gray-800">
-          {data.personal?.email && <p>{data.personal.email}</p>}
-          {data.personal?.phone && <p>{data.personal.phone}</p>}
-          {data.personal?.location && <p>{data.personal.location}</p>}
-          {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
-          {data.personal?.website && <p>{data.personal.website}</p>}
-        </div>
+    <div className="p-10 font-serif antialiased bg-white text-gray-900">
+      {/* Header */}
+      <header className="text-center mb-8 pb-5 border-b-2" style={{ borderColor: themeColor.value }}>
+        <h1 
+          className="text-3xl font-bold tracking-wide mb-2"
+          style={{ color: themeColor.value }}
+        >
+          {(data.personal?.fullName || "Your Name").toUpperCase()}
+        </h1>
+        
+        {hasContactInfo() && (
+          <div className="text-sm text-gray-600 space-y-0.5">
+            <p>
+              {[data.personal?.email, data.personal?.phone].filter(Boolean).join("  •  ")}
+            </p>
+            <p>
+              {[data.personal?.location, data.personal?.linkedin, data.personal?.website].filter(Boolean).join("  •  ")}
+            </p>
+          </div>
+        )}
+      </header>
+
+      {/* Professional Summary */}
+      {hasSummary() && (
+        <section className="mb-6">
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Professional Summary
+          </h2>
+          <p className="text-sm leading-relaxed text-justify text-gray-700">
+            {stripHtmlTags(data.personal.summary)}
+          </p>
+        </section>
       )}
-    </div>
 
-    {hasSummary() && (
-      <div className="mb-6">
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Professional Summary
-        </h2>
-        <p className="text-sm leading-relaxed text-justify text-gray-800">
-          {data.personal.summary}
-        </p>
-      </div>
-    )}
-
-    {hasSectionData('education') && (
-      <div className="mb-6">
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Education
-        </h2>
-        {data.education.map((edu, i) => (
-          (edu.institution || edu.degree || edu.field) && (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between mb-1">
-                <strong className="text-gray-900">
-                  {edu.degree || "Degree"} in {edu.field || "Field"}
-                </strong>
-                {(edu.startDate || edu.endDate) && (
-                  <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                    {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                  </span>
-                )}
-              </div>
-              {edu.institution && <em className="text-gray-800 block mb-1">{edu.institution}</em>}
-              {edu.gpa && (
-                <p className="text-sm text-gray-800">
-                  <strong>GPA:</strong> {edu.gpa}
-                </p>
-              )}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('experience') && (
-      <div className="mb-6">
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Professional Experience
-        </h2>
-        {data.experience.map((exp, i) => (
-          (exp.company || exp.position) && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between mb-1">
-                {exp.position && <strong className="text-gray-900">{exp.position}</strong>}
-                {(exp.startDate || exp.endDate) && (
-                  <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                    {formatDate(exp.startDate)} -{" "}
-                    {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                  </span>
-                )}
-              </div>
-              {exp.company && (
-                <em className="text-gray-800 block mb-2">
-                  {exp.company}
-                  {exp.location && ` • ${exp.location}`}
-                </em>
-              )}
-              {exp.description && renderDescription(exp.description)}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('projects') && (
-      <div className="mb-6">
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Projects
-        </h2>
-        {data.projects.map((proj, i) => (
-          proj.name && (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between mb-1">
-                <strong className="text-gray-900">{proj.name}</strong>
-                {(proj.startDate || proj.endDate) && (
-                  <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                    {proj.startDate ? formatDate(proj.startDate) : ''} 
-                    {proj.endDate ? ` - ${formatDate(proj.endDate)}` : ''}
-                  </span>
-                )}
-              </div>
-              {proj.technologies && (
-                <p className="text-sm text-gray-800 mt-1 italic">
-                  Technologies: {proj.technologies}
-                </p>
-              )}
-              {proj.description && renderDescription(proj.description)}
-              {(proj.githubUrl || proj.liveUrl) && (
-                <div className="mt-2 text-sm space-y-1" style={{ color: themeColor.value }}>
-                  {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
-                  {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
-                </div>
-              )}
-              {proj.achievements && (
-                <div className="mt-2">
-                  <strong className="text-sm text-gray-900">Key Achievements:</strong>
-                  {renderDescription(proj.achievements)}
-                </div>
-              )}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('skills') && (
-      <div className="mb-6">
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Technical Skills
-        </h2>
-        <div className="text-sm space-y-2">
-          {data.skills.map((category, i) => {
-            const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            return (category.name || skillsList.length > 0) ? (
-              <div key={i}>
-                {category.name && <strong className="text-gray-900">{category.name}:</strong>}
-                {skillsList.length > 0 && (
-                  <span className="text-gray-800"> {skillsList.join(", ")}</span>
-                )}
-              </div>
-            ) : null;
-          })}
-        </div>
-      </div>
-    )}
-
-    {hasSectionData('achievements') && (
-      <div className="mb-6">
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Achievements
-        </h2>
-        <div className="text-sm space-y-3">
-          {data.achievements.map((ach, i) => (
-            ach.title && (
-              <div key={i}>
-                <div className="flex justify-between">
-                  <strong className="text-gray-900">{ach.title}</strong>
-                  {ach.date && <span className="text-sm text-gray-800 whitespace-nowrap ml-4">{ach.date}</span>}
-                </div>
-                {ach.organization && (
-                  <p className="text-sm text-gray-800">{ach.organization}</p>
-                )}
-                {ach.type && <p className="text-sm text-gray-800 italic">{ach.type}</p>}
-                {ach.description && renderDescription(ach.description)}
-              </div>
-            )
-          ))}
-        </div>
-      </div>
-    )}
-
-    {hasSectionData('volunteer') && (
-      <div>
-        <h2 className="text-lg font-bold uppercase tracking-wider border-b pb-1 mb-3" style={{ borderColor: themeColor.value, color: themeColor.value }}>
-          Volunteer
-        </h2>
-        <div className="text-sm space-y-3">
-          {data.volunteer.map((vol, i) => (
-            (vol.organization || vol.role) && (
-              <div key={i}>
-                <div className="flex justify-between">
+      {/* Education */}
+      {hasSectionData('education') && (
+        <section className="mb-6">
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Education
+          </h2>
+          {data.education.map((edu, i) => (
+            (edu.institution || edu.degree || edu.field) && (
+              <div key={i} className="mb-3">
+                <div className="flex justify-between items-start mb-1">
                   <strong className="text-gray-900">
-                    {vol.role || "Volunteer"}
+                    {edu.degree}{edu.field && `, ${edu.field}`}
                   </strong>
-                  {(vol.startDate || vol.endDate) && (
-                    <span className="text-sm text-gray-800 whitespace-nowrap ml-4">
-                      {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
+                  {(edu.startDate || edu.endDate) && (
+                    <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                      {formatDate(edu.startDate)} – {formatDate(edu.endDate)}
                     </span>
                   )}
                 </div>
-                {vol.organization && <p className="text-sm text-gray-800">{vol.organization}</p>}
-                {vol.description && renderDescription(vol.description)}
-                {vol.impact && (
-                  <p className="text-sm text-gray-800 italic">{vol.impact}</p>
+                {edu.institution && (
+                  <p className="text-sm italic text-gray-600 mb-1">{edu.institution}</p>
+                )}
+                {edu.gpa && (
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">GPA:</span> {edu.gpa}
+                  </p>
+                )}
+                {edu.description && (
+                  <p className="text-sm text-gray-700 mt-1">{stripHtmlTags(edu.description)}</p>
                 )}
               </div>
             )
           ))}
-        </div>
-      </div>
-    )}
-  </div>
+        </section>
+      )}
+
+      {/* Experience */}
+      {hasSectionData('experience') && (
+        <section className="mb-6">
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Professional Experience
+          </h2>
+          {data.experience.map((exp, i) => (
+            (exp.company || exp.position) && (
+              <div key={i} className="mb-4">
+                <div className="flex justify-between items-start mb-1">
+                  <strong className="text-gray-900">{exp.position}</strong>
+                  {(exp.startDate || exp.endDate) && (
+                    <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                      {formatDate(exp.startDate)} – {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm italic text-gray-600 mb-2">
+                  {exp.company}{exp.location && `, ${exp.location}`}
+                </p>
+                {exp.description && <BulletList items={exp.description} />}
+              </div>
+            )
+          ))}
+        </section>
+      )}
+
+      {/* Projects */}
+      {hasSectionData('projects') && (
+        <section className="mb-6">
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Technical Projects
+          </h2>
+          {data.projects.map((proj, i) => (
+            proj.name && (
+              <div key={i} className="mb-4">
+                <div className="flex justify-between items-start mb-1">
+                  <strong className="text-gray-900">{proj.name}</strong>
+                  {(proj.startDate || proj.endDate) && (
+                    <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                      {proj.startDate ? formatDate(proj.startDate) : ''} 
+                      {proj.endDate ? ` – ${formatDate(proj.endDate)}` : ''}
+                    </span>
+                  )}
+                </div>
+                {proj.technologies && (
+                  <p className="text-sm italic text-gray-600 mb-2">
+                    Technologies: {proj.technologies}
+                  </p>
+                )}
+                {proj.description && <BulletList items={proj.description} />}
+                {(proj.githubUrl || proj.liveUrl) && (
+                  <div className="mt-2 text-sm space-y-0.5" style={{ color: themeColor.value }}>
+                    {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
+                    {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
+                  </div>
+                )}
+              </div>
+            )
+          ))}
+        </section>
+      )}
+
+      {/* Skills - FIXED */}
+      {hasSectionData('skills') && (
+        <section className="mb-6">
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Technical Skills
+          </h2>
+          <div className="text-sm text-gray-700 space-y-2">
+            {data.skills.map((category, i) => {
+              const skillsList = getSkillsList(category);
+              return (category.name || skillsList.length > 0) ? (
+                <p key={i}>
+                  <span className="font-semibold text-gray-900">
+                    {stripHtmlTags(category.name)}:
+                  </span>{" "}
+                  {skillsList.join(", ")}
+                </p>
+              ) : null;
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Achievements - FIXED */}
+      {hasSectionData('achievements') && (
+        <section className="mb-6">
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Achievements
+          </h2>
+          <div className="space-y-3">
+            {data.achievements.map((ach, i) => (
+              ach.title && (
+                <div key={i}>
+                  <div className="flex justify-between items-start">
+                    <strong className="text-gray-900">{stripHtmlTags(ach.title)}</strong>
+                    {ach.date && (
+                      <span className="text-sm text-gray-600 ml-4">{ach.date}</span>
+                    )}
+                  </div>
+                  {ach.organization && (
+                    <p className="text-sm text-gray-600">{stripHtmlTags(ach.organization)}</p>
+                  )}
+                  {ach.description && (
+                    <p className="text-sm text-gray-700 mt-1">{stripHtmlTags(ach.description)}</p>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Volunteer */}
+      {hasSectionData('volunteer') && (
+        <section>
+          <h2 
+            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
+            style={{ borderColor: themeColor.value, color: themeColor.value }}
+          >
+            Volunteer Experience
+          </h2>
+          <div className="space-y-4">
+            {data.volunteer.map((vol, i) => (
+              (vol.organization || vol.role) && (
+                <div key={i}>
+                  <div className="flex justify-between items-start mb-1">
+                    <strong className="text-gray-900">{vol.role}</strong>
+                    {(vol.startDate || vol.endDate) && (
+                      <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                        {formatDate(vol.startDate)} – {formatDate(vol.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm italic text-gray-600 mb-2">
+                    {vol.organization}{vol.location && `, ${vol.location}`}
+                  </p>
+                  {vol.description && <BulletList items={vol.description} />}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
   );
 };
 
-const MinimalPreview = ({ data, formatDate, hasSectionData, hasData, renderDescription, themeColor, hasContactInfo, hasSummary }) => {
-  console.log("MinimalPreview rendering with data:", data);
-  
+// ============================================
+// MINIMAL TEMPLATE - Ultra clean, lots of whitespace
+// ============================================
+const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
+  const BulletList = ({ items }) => {
+    const parsedItems = renderDescription(items);
+    if (!parsedItems || parsedItems.length === 0) return null;
+    
+    return (
+      <ul className="mt-3 space-y-2">
+        {parsedItems.map((item, idx) => (
+          <li key={idx} className="flex items-start gap-4 text-sm text-gray-600">
+            <span className="text-gray-300 mt-0.5">—</span>
+            <span className="leading-relaxed">{item}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   return (
-  <div className="p-8 text-sm antialiased" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-    <div className="mb-8">
-      <h1 className="text-4xl font-normal mb-2 tracking-tight" style={{ color: themeColor.value }}>
-        {data.personal?.fullName || "Your Name"}
-      </h1>
-     
-      {hasContactInfo() && (
-        <div className="text-sm text-gray-600 space-y-1">
-          {data.personal?.email && <p>{data.personal.email}</p>}
-          {data.personal?.phone && <p>{data.personal.phone}</p>}
-          {data.personal?.location && <p>{data.personal.location}</p>}
-          {data.personal?.linkedin && <p>{data.personal.linkedin}</p>}
-          {data.personal?.website && <p>{data.personal.website}</p>}
-        </div>
+    <div className="p-12 font-sans antialiased bg-white" style={{ fontWeight: 300 }}>
+      {/* Header */}
+      <header className="mb-10">
+        <h1 
+          className="text-5xl font-extralight tracking-tight mb-2"
+          style={{ color: themeColor.value }}
+        >
+          {data.personal?.fullName || "Your Name"}
+        </h1>
+        
+        {hasContactInfo() && (
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 mt-4">
+            {data.personal?.email && <span>{data.personal.email}</span>}
+            {data.personal?.email && data.personal?.phone && <span className="text-gray-300">|</span>}
+            {data.personal?.phone && <span>{data.personal.phone}</span>}
+            {data.personal?.phone && data.personal?.location && <span className="text-gray-300">|</span>}
+            {data.personal?.location && <span>{data.personal.location}</span>}
+            {data.personal?.location && data.personal?.linkedin && <span className="text-gray-300">|</span>}
+            {data.personal?.linkedin && <span>{data.personal.linkedin}</span>}
+            {data.personal?.linkedin && data.personal?.website && <span className="text-gray-300">|</span>}
+            {data.personal?.website && <span>{data.personal.website}</span>}
+          </div>
+        )}
+      </header>
+
+      {/* Thin Divider */}
+      <div className="w-16 h-px mb-10" style={{ backgroundColor: themeColor.value }} />
+
+      {/* Summary */}
+      {hasSummary() && (
+        <section className="mb-10">
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Summary
+          </h2>
+          <p className="text-sm text-gray-600 leading-loose max-w-2xl">
+            {stripHtmlTags(data.personal.summary)}
+          </p>
+        </section>
       )}
-    </div>
 
-    {hasSummary() && (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Summary</h2>
-        <p className="text-sm text-gray-800 leading-relaxed">{data.personal.summary}</p>
-      </div>
-    )}
-
-    {hasSectionData('education') && (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Education</h2>
-        {data.education.map((edu, i) => (
-          (edu.institution || edu.degree || edu.field) && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-baseline mb-1">
-                <h3 className="font-semibold text-gray-900">
-                  {edu.degree || "Degree"} in {edu.field || "Field"}
-                </h3>
-                {(edu.startDate || edu.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
-                  </span>
-                )}
-              </div>
-              {edu.institution && <p className="text-sm text-gray-700">{edu.institution}</p>}
-              {edu.gpa && <p className="text-sm text-gray-600">GPA: {edu.gpa}</p>}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('experience') && (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Experience</h2>
-        {data.experience.map((exp, i) => (
-          (exp.company || exp.position) && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-baseline mb-1">
-                {exp.position && <h3 className="font-semibold text-gray-900">{exp.position}</h3>}
-                {(exp.startDate || exp.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {formatDate(exp.startDate)} —{" "}
-                    {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                  </span>
-                )}
-              </div>
-              {exp.company && <p className="text-sm text-gray-700 mb-2">{exp.company}</p>}
-              {exp.description && renderDescription(exp.description)}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('projects') && (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Projects</h2>
-        {data.projects.map((proj, i) => (
-          proj.name && (
-            <div key={i} className="mb-4">
-              <div className="flex justify-between items-baseline mb-1">
-                <h3 className="font-semibold text-gray-900">{proj.name}</h3>
-                {(proj.startDate || proj.endDate) && (
-                  <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                    {proj.startDate ? formatDate(proj.startDate) : ''} 
-                    {proj.endDate ? ` — ${formatDate(proj.endDate)}` : ''}
-                  </span>
-                )}
-              </div>
-              {proj.technologies && (
-                <p className="text-sm text-gray-700 mt-1 italic">{proj.technologies}</p>
-              )}
-              {proj.description && renderDescription(proj.description)}
-              {(proj.githubUrl || proj.liveUrl) && (
-                <div className="mt-2 text-sm space-y-1" style={{ color: themeColor.value }}>
-                  {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
-                  {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
-                </div>
-              )}
-              {proj.achievements && (
-                <div className="mt-2">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">Achievements:</p>
-                  {renderDescription(proj.achievements)}
-                </div>
-              )}
-            </div>
-          )
-        ))}
-      </div>
-    )}
-
-    {hasSectionData('skills') && (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Skills</h2>
-        <div className="space-y-2 text-sm">
-          {data.skills.map((category, i) => {
-            const skillsList = Array.isArray(category.skills) ? category.skills : [];
-            return (category.name || skillsList.length > 0) ? (
-              <div key={i}>
-                {category.name && (
-                  <span className="font-semibold text-gray-900">
-                    {category.name}:
-                  </span>
-                )}
-                {skillsList.length > 0 && (
-                  <span className="text-gray-700"> {skillsList.join(", ")}</span>
-                )}
-              </div>
-            ) : null;
-          })}
-        </div>
-      </div>
-    )}
-
-    {hasSectionData('achievements') && (
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Achievements</h2>
-        <div className="space-y-3 text-sm">
-          {data.achievements.map((ach, i) => (
-            ach.title && (
-              <div key={i}>
-                <div className="flex justify-between">
-                  <span className="font-semibold text-gray-900">{ach.title}</span>
-                  {ach.date && <span className="text-gray-600 whitespace-nowrap ml-4">{ach.date}</span>}
-                </div>
-                {ach.organization && (
-                  <p className="text-gray-700">{ach.organization}</p>
-                )}
-                {ach.type && <p className="text-gray-700 italic">{ach.type}</p>}
-                {ach.description && renderDescription(ach.description)}
-              </div>
-            )
-          ))}
-        </div>
-      </div>
-    )}
-
-    {hasSectionData('volunteer') && (
-      <div>
-        <h2 className="text-lg font-semibold mb-3 tracking-wide" style={{ color: themeColor.value }}>Volunteer</h2>
-        <div className="space-y-3 text-sm">
-          {data.volunteer.map((vol, i) => (
-            (vol.organization || vol.role) && (
-              <div key={i}>
-                <div className="flex justify-between">
-                  <span className="font-semibold text-gray-900">
-                    {vol.role || "Volunteer"}
-                  </span>
-                  {(vol.startDate || vol.endDate) && (
-                    <span className="text-gray-600 whitespace-nowrap ml-4">
-                      {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
-                    </span>
+      {/* Education */}
+      {hasSectionData('education') && (
+        <section className="mb-10">
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Education
+          </h2>
+          <div className="space-y-4">
+            {data.education.map((edu, i) => (
+              (edu.institution || edu.degree || edu.field) && (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-normal text-gray-900">
+                      {edu.degree}{edu.field && `, ${edu.field}`}
+                    </h3>
+                    {(edu.startDate || edu.endDate) && (
+                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
+                        {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  {edu.institution && (
+                    <p className="text-sm text-gray-500">{edu.institution}</p>
+                  )}
+                  {edu.gpa && (
+                    <p className="text-sm text-gray-400 mt-1">GPA: {edu.gpa}</p>
                   )}
                 </div>
-                {vol.organization && <p className="text-gray-700">{vol.organization}</p>}
-                {vol.description && renderDescription(vol.description)}
-                {vol.impact && (
-                  <p className="text-gray-700 italic">{vol.impact}</p>
-                )}
-              </div>
-            )
-          ))}
-        </div>
-      </div>
-    )}
-  </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Experience */}
+      {hasSectionData('experience') && (
+        <section className="mb-10">
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Experience
+          </h2>
+          <div className="space-y-6">
+            {data.experience.map((exp, i) => (
+              (exp.company || exp.position) && (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-normal text-gray-900">{exp.position}</h3>
+                    {(exp.startDate || exp.endDate) && (
+                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
+                        {formatDate(exp.startDate)} — {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 mb-1">{exp.company}</p>
+                  {exp.description && <BulletList items={exp.description} />}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Projects */}
+      {hasSectionData('projects') && (
+        <section className="mb-10">
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Projects
+          </h2>
+          <div className="space-y-6">
+            {data.projects.map((proj, i) => (
+              proj.name && (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-normal text-gray-900">{proj.name}</h3>
+                    {(proj.startDate || proj.endDate) && (
+                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
+                        {proj.startDate ? formatDate(proj.startDate) : ''} 
+                        {proj.endDate ? ` — ${formatDate(proj.endDate)}` : ''}
+                      </span>
+                    )}
+                  </div>
+                  {proj.technologies && (
+                    <p className="text-sm text-gray-400 mb-1">{proj.technologies}</p>
+                  )}
+                  {proj.description && <BulletList items={proj.description} />}
+                  {(proj.githubUrl || proj.liveUrl) && (
+                    <div className="mt-3 text-sm space-y-1" style={{ color: themeColor.value }}>
+                      {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
+                      {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
+                    </div>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Skills - FIXED */}
+      {hasSectionData('skills') && (
+        <section className="mb-10">
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Skills
+          </h2>
+          <div className="space-y-3 text-sm">
+            {data.skills.map((category, i) => {
+              const skillsList = getSkillsList(category);
+              return (category.name || skillsList.length > 0) ? (
+                <div key={i} className="flex">
+                  <span className="w-28 text-gray-400 flex-shrink-0">
+                    {stripHtmlTags(category.name)}
+                  </span>
+                  <span className="text-gray-600">{skillsList.join(", ")}</span>
+                </div>
+              ) : null;
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Achievements - FIXED */}
+      {hasSectionData('achievements') && (
+        <section className="mb-10">
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Achievements
+          </h2>
+          <div className="space-y-4">
+            {data.achievements.map((ach, i) => (
+              ach.title && (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline">
+                    <h3 className="text-base font-normal text-gray-900">
+                      {stripHtmlTags(ach.title)}
+                    </h3>
+                    {ach.date && (
+                      <span className="text-sm text-gray-400 ml-4">{ach.date}</span>
+                    )}
+                  </div>
+                  {ach.organization && (
+                    <p className="text-sm text-gray-500">{stripHtmlTags(ach.organization)}</p>
+                  )}
+                  {ach.description && (
+                    <p className="text-sm text-gray-600 mt-1">{stripHtmlTags(ach.description)}</p>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Volunteer */}
+      {hasSectionData('volunteer') && (
+        <section>
+          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
+            Volunteer
+          </h2>
+          <div className="space-y-6">
+            {data.volunteer.map((vol, i) => (
+              (vol.organization || vol.role) && (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-normal text-gray-900">{vol.role}</h3>
+                    {(vol.startDate || vol.endDate) && (
+                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
+                        {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">{vol.organization}</p>
+                  {vol.description && <BulletList items={vol.description} />}
+                </div>
+              )
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
   );
 };
 

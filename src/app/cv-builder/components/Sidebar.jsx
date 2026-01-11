@@ -5,10 +5,10 @@ import {
   User,
   GraduationCap,
   Briefcase,
-  FolderOpen,
+  Code,
   Award,
   Heart,
-  Code,
+  Sparkles,
 } from "lucide-react";
 
 const sections = [
@@ -22,13 +22,8 @@ const sections = [
 
 export const Sidebar = ({ activeSection, onSectionChange }) => {
   return (
-    <div className="w-64 bg-white text-black border-r border-cvBorder p-4 flex flex-col">
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold cv-heading mb-2">CV Sections</h2>
-        <p className="text-sm cv-body">Click to edit each section</p>
-      </div>
-
-      <nav className="space-y-2 flex-1">
+    <div className="w-64 bg-gradient-to-b from-slate-50 to-white border-r border-slate-100 p-4 flex flex-col">
+      <nav className="space-y-1 flex-1">
         {sections.map((section) => {
           const Icon = section.icon;
           const isActive = activeSection === section.id;
@@ -37,41 +32,54 @@ export const Sidebar = ({ activeSection, onSectionChange }) => {
             <button
               key={section.id}
               onClick={() => onSectionChange(section.id)}
-              className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-left transition-all duration-200 ${
+              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                 isActive
-                  ? "bg-[#002147] text-white shadow-md"
-                  : "hover:bg-cvLightBg text-cvBody hover:text-cvHeading"
+                  ? "bg-[#002147] text-white shadow-lg shadow-[#002147]/20"
+                  : "hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#002147]"
               }`}
             >
-              <Icon
-                className={`w-5 h-5 flex-shrink-0 ${
-                  isActive ? "text-white" : "text-cvAccent"
+              <div
+                className={`p-1.5 rounded-md transition-all duration-200 ${
+                  isActive
+                    ? "bg-white/20"
+                    : "bg-[#3598FE]/10 group-hover:bg-[#3598FE]/15"
                 }`}
-              />
-              <span className="font-medium truncate">{section.label}</span>
+              >
+                <Icon
+                  className={`w-4 h-4 ${
+                    isActive ? "text-white" : "text-[#3598FE]"
+                  }`}
+                />
+              </div>
+              <span className="text-sm font-medium">{section.label}</span>
             </button>
           );
         })}
       </nav>
 
-      <div className="mt-8 p-4 bg-cvLightBg rounded-lg border border-cvBorder relative overflow-hidden">
-        {/* Coming Soon Ribbon */}
-        <div className="absolute top-1 -right-8 bg-[#002147] text-white text-xs px-8 py-1 transform rotate-45">
+      <div className="mt-6 p-3 bg-gradient-to-br from-[#002147]/5 to-[#3598FE]/5 rounded-xl relative overflow-hidden">
+        <span className="absolute top-2 right-2 bg-gradient-to-r from-[#3598FE] to-[#002147] text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
           Soon
+        </span>
+
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-3.5 h-3.5 text-[#3598FE]" />
+          <span className="text-xs font-semibold text-[#002147]">
+            Quick Actions
+          </span>
         </div>
-        
-        <h3 className="font-semibold cv-heading text-sm mb-3">Quick Actions</h3>
-        <div className="space-y-2">
-          <button 
+
+        <div className="space-y-1.5">
+          <button
             disabled
-            className="w-full text-left text-sm text-gray-400 cursor-not-allowed transition-colors duration-200"
+            className="w-full text-left text-xs text-slate-400 cursor-not-allowed py-1.5 px-2 rounded-md bg-white/50"
           >
             Import from LinkedIn
           </button>
-          
-          <button 
+
+          <button
             disabled
-            className="w-full text-left text-sm text-gray-400 cursor-not-allowed transition-colors duration-200"
+            className="w-full text-left text-xs text-slate-400 cursor-not-allowed py-1.5 px-2 rounded-md bg-white/50"
           >
             Auto-fill from Profile
           </button>

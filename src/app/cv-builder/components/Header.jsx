@@ -1,4 +1,5 @@
-// components/Header.jsx - PREMIUM MODERN DESIGN
+"use client";
+
 import React, { useState } from "react";
 import {
   Eye,
@@ -9,31 +10,25 @@ import {
   Plus,
   Loader2,
   TrendingUp,
+  FileText,
 } from "lucide-react";
 
 export const Header = ({
   onPreviewToggle,
   isPreviewMode,
-  onAIToggle,
   onVersionToggle,
   onSave,
   onNewCV,
   onExportPDF,
   cvNumber,
-  cvData,
-  selectedTemplate,
   isSaving,
-  isAnalyzing,
   atsScore,
   onOpenAIChat,
-  cvId
+  cvId,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isAIHovered, setIsAIHovered] = useState(false);
 
-  /**
-   * Handle PDF export with loading state
-   */
   const handleExportPDF = async () => {
     try {
       setIsExporting(true);
@@ -46,130 +41,128 @@ export const Header = ({
   };
 
   return (
-    <header className="h-20 bg-white border-b border-gray-200 px-8 flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">CV Builder</h1>
-          <span className="px-2.5 hidden py-0.5 bg-blue-50 border border-blue-200 text-[#002147] rounded-md text-sm font-semibold font-mono">
-            #{cvNumber}
+    <header className="bg-white border-b border-gray-100 px-5 py-5 flex items-center justify-between">
+      {/* Left Section */}
+      <div className="flex items-center gap-5">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
+            <FileText className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-base font-bold text-[#002147]">
+            CV Builder
           </span>
         </div>
 
-        {/* ATS Score Display */}
+        {/* ATS Score */}
         {atsScore !== null && atsScore !== undefined && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-md">
-            <TrendingUp className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-medium text-gray-700">ATS</span>
-            <span
-              className={`text-sm font-bold ${
-                atsScore >= 85
-                  ? "text-green-600"
-                  : atsScore >= 70
-                  ? "text-yellow-600"
-                  : "text-red-600"
-              }`}
-            >
-              {atsScore}%
-            </span>
-          </div>
+          <>
+            <div className="w-px h-5 bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <TrendingUp
+                className={`w-4 h-4 ${
+                  atsScore >= 85
+                    ? "text-emerald-500"
+                    : atsScore >= 70
+                    ? "text-amber-500"
+                    : "text-rose-500"
+                }`}
+              />
+              <span className="text-sm text-gray-500">ATS</span>
+              <span
+                className={`text-sm font-bold ${
+                  atsScore >= 85
+                    ? "text-emerald-600"
+                    : atsScore >= 70
+                    ? "text-amber-600"
+                    : "text-rose-600"
+                }`}
+              >
+                {atsScore}%
+              </span>
+            </div>
+          </>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* AI Assistant Button - Large Round Icon Only */}
+      {/* Right Section */}
+      <div className="flex items-center gap-1.5">
+        {/* AI Button */}
         <button
           onClick={onOpenAIChat}
           onMouseEnter={() => setIsAIHovered(true)}
           onMouseLeave={() => setIsAIHovered(false)}
           disabled={isSaving}
-          className="relative w-11 h-11 rounded-full bg-gradient-to-br from-[#002147] to-[#003d7a] hover:from-[#003d7a] hover:to-[#002147] flex items-center justify-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:scale-105"
+          className="relative p-2 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
           title="AI Assistant"
         >
           <Bot
-            className={`w-5 h-5 text-white transition-transform duration-300 ${
-              isAIHovered ? "rotate-12 scale-110" : ""
+            className={`w-[18px] h-[18px] text-[#002147] transition-transform ${
+              isAIHovered ? "scale-110" : ""
             }`}
           />
-          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full animate-pulse border-2 border-white"></div>
+          <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full" />
         </button>
 
-        {/* Version Manager Button */}
         <button
           onClick={onVersionToggle}
           disabled={isSaving}
-          className="px-4 py-2 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 hover:border-gray-400"
-          title="Manage CV versions"
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors disabled:opacity-50"
+          title="Versions"
         >
-          <GitBranch className="w-4 h-4" />
-          <span>Versions</span>
+          <GitBranch className="w-[18px] h-[18px]" />
         </button>
 
-        {/* Preview Toggle Button */}
         <button
           onClick={onPreviewToggle}
           disabled={isSaving}
-          className={`px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
             isPreviewMode
-              ? "bg-[#002147] hover:bg-[#003d7a] text-white"
-              : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 hover:border-gray-400"
+              ? "bg-[#002147] text-white"
+              : "hover:bg-gray-100 text-gray-600"
           }`}
-          title={isPreviewMode ? "Hide preview" : "Show preview"}
+          title="Preview"
         >
-          <Eye className="w-4 h-4" />
-          <span>Preview</span>
+          <Eye className="w-[18px] h-[18px]" />
         </button>
 
-        <div className="w-px h-6 bg-gray-300" />
+        <div className="w-px h-5 bg-gray-200 mx-1" />
 
-        {/* Save Button */}
+        {/* Primary Actions */}
         <button
           onClick={onSave}
           disabled={isSaving}
-          className="px-4 py-2 rounded-md bg-[#002147] hover:bg-[#003d7a] text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Save current CV"
+          className="h-8 px-3 rounded-lg bg-[#002147] hover:bg-[#0a3161] text-white text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
         >
           {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Saving</span>
-            </>
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <>
-              <Save className="w-4 h-4" />
-              <span>Save</span>
-            </>
+            <Save className="w-4 h-4" />
           )}
+          <span>Save</span>
         </button>
 
-        {/* Export PDF Button */}
         <button
           onClick={handleExportPDF}
           disabled={isSaving || isExporting || !cvId}
-          title={!cvId ? "Save CV first to export" : "Export CV as PDF"}
-          className="px-4 py-2 rounded-md bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 hover:border-gray-400"
+          title={!cvId ? "Save first" : "Export PDF"}
+          className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
         >
           {isExporting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Exporting</span>
-            </>
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <>
-              <Download className="w-4 h-4" />
-              <span>Export PDF</span>
-            </>
+            <Download className="w-4 h-4" />
           )}
+          <span>Export</span>
         </button>
 
-        {/* New CV Button */}
         <button
           onClick={onNewCV}
           disabled={isSaving}
-          className="px-4 py-2 rounded-md bg-green-600 hover:bg-green-700 text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Create new CV"
+          className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
-          <span>New CV</span>
+          <span>New</span>
         </button>
       </div>
     </header>

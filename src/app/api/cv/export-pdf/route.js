@@ -122,6 +122,124 @@ export async function GET(request) {
   }
 }
 
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+// Strip HTML tags and entities from text
+const stripHtmlTags = (text) => {
+  if (!text) return '';
+  if (typeof text !== 'string') return String(text);
+  return text
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Check if a value is meaningful (not empty or placeholder)
+const hasMeaningfulValue = (value) => {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) {
+    return value.length > 0 && value.some(item => hasMeaningfulValue(item));
+  }
+  if (typeof value === 'object') {
+    const filteredObj = { ...value };
+    delete filteredObj.id;
+    return Object.values(filteredObj).some(v => hasMeaningfulValue(v));
+  }
+  const stringValue = stripHtmlTags(String(value));
+  if (stringValue === "") return false;
+  const minimalPatterns = [
+    /^[.\-\s]*$/,
+    /^n\/a$/i,
+    /^not specified$/i,
+    /^enter /i,
+    /^your /i,
+    /^add /i,
+    /^\[.*\]$/,
+    /^\(.*\)$/,
+    /^\[object Object\]$/i,
+  ];
+  return !minimalPatterns.some(pattern => pattern.test(stringValue));
+};
+
+// Get skill name from various formats
+const getSkillName = (skill) => {
+  if (!skill) return '';
+  if (typeof skill === 'string') return stripHtmlTags(skill);
+  if (typeof skill === 'object' && skill !== null) {
+    return stripHtmlTags(skill.name || skill.value || skill.skill || skill.label || skill.title || '');
+  }
+  return stripHtmlTags(String(skill));
+};
+
+// Get skills list as array of strings
+const getSkillsList = (category) => {
+  if (!category || !category.skills) return [];
+  if (!Array.isArray(category.skills)) return [];
+  return category.skills
+    .map(skill => getSkillName(skill))
+    .filter(name => name.length > 0);
+};
+
+// Check if education section has valid data
+const hasEducationData = (education) => {
+  if (!Array.isArray(education)) return false;
+  return education.some(edu => {
+    const hasInstitution = hasMeaningfulValue(edu.institution);
+    const hasDegree = hasMeaningfulValue(edu.degree);
+    const hasField = hasMeaningfulValue(edu.field);
+    return hasInstitution || hasDegree || hasField;
+  });
+};
+
+// Check if experience section has valid data
+const hasExperienceData = (experience) => {
+  if (!Array.isArray(experience)) return false;
+  return experience.some(exp => {
+    const hasCompany = hasMeaningfulValue(exp.company);
+    const hasPosition = hasMeaningfulValue(exp.position);
+    return hasCompany || hasPosition;
+  });
+};
+
+// Check if projects section has valid data
+const hasProjectsData = (projects) => {
+  if (!Array.isArray(projects)) return false;
+  return projects.some(proj => hasMeaningfulValue(proj.name));
+};
+
+// Check if skills section has valid data
+const hasSkillsData = (skills) => {
+  if (!Array.isArray(skills)) return false;
+  return skills.some(category => {
+    const skillsList = getSkillsList(category);
+    return hasMeaningfulValue(category.name) || skillsList.length > 0;
+  });
+};
+
+// Check if achievements section has valid data
+const hasAchievementsData = (achievements) => {
+  if (!Array.isArray(achievements)) return false;
+  return achievements.some(ach => hasMeaningfulValue(ach.title));
+};
+
+// Check if volunteer section has valid data
+const hasVolunteerData = (volunteer) => {
+  if (!Array.isArray(volunteer)) return false;
+  return volunteer.some(vol => {
+    const hasOrg = hasMeaningfulValue(vol.organization);
+    const hasRole = hasMeaningfulValue(vol.role);
+    return hasOrg || hasRole;
+  });
+};
+
 async function generatePDF(cvData, templateId, themeColor) {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
 
@@ -142,52 +260,104 @@ async function generatePDF(cvData, templateId, themeColor) {
       r: parseInt(result[1], 16) / 255,
       g: parseInt(result[2], 16) / 255,
       b: parseInt(result[3], 16) / 255,
-    } : { r: 0.12, g: 0.13, b: 0.28 };
+    } : { r: 0.12, g: 0.25, b: 0.69 };
+  };
+
+  // Generate lighter version of theme color
+  const getLightColor = (hex) => {
+    const themeRgb = hexToRgb(hex);
+    return rgb(
+      Math.min(1, themeRgb.r * 0.15 + 0.85),
+      Math.min(1, themeRgb.g * 0.15 + 0.85),
+      Math.min(1, themeRgb.b * 0.15 + 0.85)
+    );
   };
 
   const themeRgb = hexToRgb(themeColor);
   const primaryColor = rgb(themeRgb.r, themeRgb.g, themeRgb.b);
+  const lightColor = getLightColor(themeColor);
 
   // Format date helper
   const formatDate = (date) => {
     if (!date) return "";
-    const [year, month] = date.split("-");
+    const parts = date.split("-");
+    if (parts.length < 2) return date;
+    const [year, month] = parts;
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${monthNames[parseInt(month) - 1]} ${year}`;
+    const monthIndex = parseInt(month) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return date;
+    return `${monthNames[monthIndex]} ${year}`;
+  };
+
+  // Parse description into bullet points
+  const parseDescription = (description) => {
+    if (!description) return [];
+    
+    // First strip HTML tags
+    let cleanDesc = stripHtmlTags(description);
+    
+    if (Array.isArray(description)) {
+      return description.map(item => stripHtmlTags(item)).filter(Boolean);
+    }
+    
+    if (typeof cleanDesc === 'string') {
+      return cleanDesc.split('\n')
+        .filter(line => line.trim())
+        .map(line => line.replace(/^[•\-]\s*/, '').trim())
+        .filter(line => line);
+    }
+    return [];
+  };
+
+  const fonts = {
+    helvetica,
+    helveticaBold,
+    helveticaOblique,
+    timesRoman,
+    timesRomanBold,
+    timesRomanItalic,
+    primaryColor,
+    lightColor,
+    formatDate,
+    parseDescription,
+    rgb,
+    stripHtmlTags,
+    getSkillsList,
   };
 
   // Choose template
   switch (templateId) {
     case 'classic':
-      return generateClassicTemplate(pdfDoc, cvData, {
-        timesRoman, timesRomanBold, timesRomanItalic,
-        primaryColor, formatDate
-      });
+      return generateClassicTemplate(pdfDoc, cvData, fonts);
     case 'minimal':
-      return generateMinimalTemplate(pdfDoc, cvData, {
-        helvetica, helveticaBold, helveticaOblique,
-        primaryColor, formatDate
-      });
+      return generateMinimalTemplate(pdfDoc, cvData, fonts);
     case 'modern':
     default:
-      return generateModernTemplate(pdfDoc, cvData, {
-        helvetica, helveticaBold, helveticaOblique,
-        primaryColor, formatDate
-      });
+      return generateModernTemplate(pdfDoc, cvData, fonts);
   }
 }
 
-// ==================== MODERN TEMPLATE ====================
+// ============================================
+// MODERN TEMPLATE - Clean Layout
+// ============================================
 async function generateModernTemplate(pdfDoc, cvData, fonts) {
-  const { rgb } = await import('pdf-lib');
-  const { helvetica, helveticaBold, helveticaOblique, primaryColor, formatDate } = fonts;
+  const { helvetica, helveticaBold, primaryColor, lightColor, formatDate, parseDescription, rgb, stripHtmlTags, getSkillsList } = fonts;
+  
   const pageWidth = 612;
   const pageHeight = 792;
-  const margin = 48;
+  const margin = 50;
   const contentWidth = pageWidth - (2 * margin);
   
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
+
+  // Colors
+  const slate900 = rgb(0.06, 0.09, 0.13);
+  const slate700 = rgb(0.20, 0.25, 0.33);
+  const slate600 = rgb(0.28, 0.33, 0.42);
+  const slate500 = rgb(0.39, 0.45, 0.55);
+  const slate100 = rgb(0.95, 0.96, 0.98);
+  const slate50 = rgb(0.97, 0.98, 0.99);
 
   const addNewPage = () => {
     page = pdfDoc.addPage([pageWidth, pageHeight]);
@@ -195,985 +365,775 @@ async function generateModernTemplate(pdfDoc, cvData, fonts) {
   };
 
   const checkSpace = (required) => {
-    if (y - required < margin + 20) {
+    if (y - required < margin + 30) {
       addNewPage();
     }
   };
 
-  const drawText = (text, x, yPos, size, font, color = rgb(0, 0, 0), maxWidth = null) => {
-    if (!text) return yPos;
-    const actualMaxWidth = maxWidth || contentWidth;
-    const words = text.toString().split(' ');
-    let line = '';
-    let lineY = yPos;
+  // Text wrapping helper - improved
+  const wrapText = (text, font, size, maxWidth) => {
+    if (!text) return [];
+    const cleanText = stripHtmlTags(text.toString());
+    const words = cleanText.split(' ').filter(w => w);
+    const lines = [];
+    let currentLine = '';
 
-    for (let word of words) {
-      const testLine = line + (line ? ' ' : '') + word;
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
       const testWidth = font.widthOfTextAtSize(testLine, size);
       
-      if (testWidth > actualMaxWidth && line) {
-        page.drawText(line, { x, y: lineY, size, font, color });
-        line = word;
-        lineY -= size + 3;
-        checkSpace(size + 3);
+      if (testWidth > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
       } else {
-        line = testLine;
+        currentLine = testLine;
       }
     }
-    
-    if (line) {
-      page.drawText(line, { x, y: lineY, size, font, color });
-      return lineY - size - 3;
-    }
-    return lineY;
+    if (currentLine) lines.push(currentLine);
+    return lines;
   };
 
-  const drawBulletList = (text, x, yPos, size, font) => {
-    if (!text) return yPos;
-    const lines = text.split('\n').filter(line => line.trim());
+  // Draw wrapped text and return new Y position
+  const drawWrappedText = (text, x, yPos, size, font, color, maxWidth, lineHeight = 1.4) => {
+    const lines = wrapText(text, font, size, maxWidth);
     let currentY = yPos;
-
-    lines.forEach(line => {
-      checkSpace(size + 6);
-      const cleanLine = line.replace(/^[•\-]\s*/, '').trim();
-      if (cleanLine) {
-        page.drawText('•', { x, y: currentY, size, font: helvetica, color: primaryColor });
-        currentY = drawText(cleanLine, x + 12, currentY, size, font, rgb(0.25, 0.25, 0.25), contentWidth - 12);
-        currentY -= 2;
-      }
-    });
+    
+    for (const line of lines) {
+      checkSpace(size * lineHeight);
+      page.drawText(line, { x, y: currentY, size, font, color });
+      currentY -= size * lineHeight;
+    }
     return currentY;
   };
 
-  const drawLine = (x1, y1, x2, y2, color, thickness = 1) => {
-    page.drawLine({
-      start: { x: x1, y: y1 },
-      end: { x: x2, y: y2 },
-      thickness,
-      color,
+  // Draw section header with dot
+  const drawSectionHeader = (title, yPos) => {
+    checkSpace(30);
+    
+    // Small dot
+    page.drawCircle({
+      x: margin + 4,
+      y: yPos - 3,
+      size: 3,
+      color: primaryColor,
+    });
+    
+    // Section title
+    page.drawText(title.toUpperCase(), {
+      x: margin + 14,
+      y: yPos - 6,
+      size: 9,
+      font: helveticaBold,
+      color: primaryColor,
+    });
+    
+    return yPos - 24;
+  };
+
+  // Draw bullet list - improved spacing
+  const drawBulletList = (items, x, yPos) => {
+    let currentY = yPos;
+    
+    items.forEach((item) => {
+      if (!item) return;
+      const cleanItem = stripHtmlTags(item);
+      if (!cleanItem) return;
+      
+      checkSpace(20);
+      
+      // Small colored dot
+      page.drawCircle({
+        x: x + 3,
+        y: currentY - 3,
+        size: 2,
+        color: primaryColor,
+      });
+      
+      // Text with proper wrapping
+      const lines = wrapText(cleanItem, helvetica, 9, contentWidth - 25);
+      lines.forEach((line, idx) => {
+        checkSpace(13);
+        page.drawText(line, {
+          x: x + 12,
+          y: currentY - (idx * 13),
+          size: 9,
+          font: helvetica,
+          color: slate700,
+        });
+      });
+      currentY -= (lines.length * 13) + 4;
+    });
+    
+    return currentY;
+  };
+
+  // Draw date badge
+  const drawDateBadge = (dateText, xRight, yPos) => {
+    if (!dateText) return;
+    const textWidth = helvetica.widthOfTextAtSize(dateText, 8);
+    const badgeWidth = textWidth + 16;
+    const badgeX = xRight - badgeWidth;
+    
+    // Badge background
+    page.drawRectangle({
+      x: badgeX,
+      y: yPos - 10,
+      width: badgeWidth,
+      height: 16,
+      color: lightColor,
+    });
+    
+    // Badge text
+    page.drawText(dateText, {
+      x: badgeX + 8,
+      y: yPos - 5,
+      size: 8,
+      font: helvetica,
+      color: primaryColor,
     });
   };
 
   // ==================== HEADER ====================
-  checkSpace(70);
-  page.drawText(cvData.personal?.fullName || 'Your Name', {
+  checkSpace(100);
+  
+  // Name
+  const fullName = stripHtmlTags(cvData.personal?.fullName) || 'Your Name';
+  page.drawText(fullName, {
     x: margin,
     y: y,
-    size: 26,
+    size: 28,
     font: helveticaBold,
     color: primaryColor,
   });
-  y -= 32;
+  y -= 38;
 
-  // Contact Information
-  const contactItems = [];
-  if (cvData.personal?.email) contactItems.push(cvData.personal.email);
-  if (cvData.personal?.phone) contactItems.push(cvData.personal.phone);
-  if (cvData.personal?.location) contactItems.push(cvData.personal.location);
+  // Contact info - simple clean layout without problematic icons
+  const contacts = [];
+  if (hasMeaningfulValue(cvData.personal?.email)) contacts.push(stripHtmlTags(cvData.personal.email));
+  if (hasMeaningfulValue(cvData.personal?.phone)) contacts.push(stripHtmlTags(cvData.personal.phone));
+  if (hasMeaningfulValue(cvData.personal?.location)) contacts.push(stripHtmlTags(cvData.personal.location));
+  if (hasMeaningfulValue(cvData.personal?.linkedin)) contacts.push(stripHtmlTags(cvData.personal.linkedin));
+  if (hasMeaningfulValue(cvData.personal?.website)) contacts.push(stripHtmlTags(cvData.personal.website));
 
-  if (contactItems.length > 0) {
-    page.drawText(contactItems.join(' • '), {
-      x: margin,
-      y: y,
-      size: 9,
-      font: helvetica,
-      color: rgb(0.35, 0.35, 0.35),
+  if (contacts.length > 0) {
+    // Display contacts in a clean row format with separators
+    const contactText = contacts.join('  •  ');
+    const contactLines = wrapText(contactText, helvetica, 9, contentWidth);
+    
+    contactLines.forEach((line) => {
+      page.drawText(line, {
+        x: margin,
+        y: y,
+        size: 9,
+        font: helvetica,
+        color: slate600,
+      });
+      y -= 14;
     });
-    y -= 13;
-  }
-
-  if (cvData.personal?.linkedin) {
-    page.drawText(cvData.personal.linkedin, {
-      x: margin,
-      y: y,
-      size: 9,
-      font: helvetica,
-      color: primaryColor,
-    });
-    y -= 18;
-  } else {
     y -= 6;
   }
 
-  // ==================== PROFESSIONAL SUMMARY ====================
-  if (cvData.personal?.summary) {
-    checkSpace(55);
-    page.drawText('PROFESSIONAL SUMMARY', {
-      x: margin,
+  // Gradient accent line
+  const gradientSteps = 20;
+  const lineWidth = contentWidth / gradientSteps;
+  for (let i = 0; i < gradientSteps; i++) {
+    const opacity = 1 - (i * 0.04);
+    page.drawRectangle({
+      x: margin + (i * lineWidth),
       y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
+      width: lineWidth + 1,
+      height: 3,
+      color: rgb(
+        primaryColor.red * opacity + (1 - opacity),
+        primaryColor.green * opacity + (1 - opacity),
+        primaryColor.blue * opacity + (1 - opacity)
+      ),
     });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
-    y = drawText(cvData.personal.summary, margin, y, 9.5, helvetica, rgb(0.2, 0.2, 0.2), contentWidth);
-    y -= 16;
+  }
+  y -= 24;
+
+  // ==================== PROFESSIONAL SUMMARY ====================
+  if (hasMeaningfulValue(cvData.personal?.summary)) {
+    y = drawSectionHeader('Professional Summary', y);
+    
+    const summaryStartY = y + 5;
+    const cleanSummary = stripHtmlTags(cvData.personal.summary);
+    y = drawWrappedText(cleanSummary, margin + 12, y, 9.5, helvetica, slate700, contentWidth - 16);
+    
+    // Draw left border line
+    page.drawLine({
+      start: { x: margin + 4, y: summaryStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
+    });
+    
+    y -= 20;
   }
 
   // ==================== EDUCATION ====================
-  const hasEducation = cvData.education?.some(edu => edu.institution || edu.degree);
-  if (hasEducation) {
-    checkSpace(55);
-    page.drawText('EDUCATION', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
-
-    cvData.education.forEach((edu, idx) => {
-      if (edu.institution || edu.degree) {
-        checkSpace(45);
+  if (hasEducationData(cvData.education)) {
+    y = drawSectionHeader('Education', y);
+    
+    const sectionStartY = y + 5;
+    
+    cvData.education.forEach((edu) => {
+      const hasInstitution = hasMeaningfulValue(edu.institution);
+      const hasDegree = hasMeaningfulValue(edu.degree);
+      const hasField = hasMeaningfulValue(edu.field);
+      
+      if (hasInstitution || hasDegree || hasField) {
+        checkSpace(55);
+        
+        // Calculate date width first
+        let dateWidth = 0;
+        let dateText = '';
+        if (edu.startDate || edu.endDate) {
+          dateText = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 8) + 24;
+        }
         
         // Degree and Field
-        const degreeText = edu.degree && edu.field 
-          ? `${edu.degree} in ${edu.field}`
-          : edu.degree || edu.field || 'Degree';
+        let degreeText = '';
+        if (hasDegree && hasField) {
+          degreeText = `${stripHtmlTags(edu.degree)} in ${stripHtmlTags(edu.field)}`;
+        } else if (hasDegree) {
+          degreeText = stripHtmlTags(edu.degree);
+        } else if (hasField) {
+          degreeText = stripHtmlTags(edu.field);
+        }
         
-        page.drawText(degreeText, {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: helveticaBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
+        if (degreeText) {
+          const maxDegreeWidth = contentWidth - dateWidth - 16;
+          const degreeLines = wrapText(degreeText, helveticaBold, 10.5, maxDegreeWidth);
+          
+          degreeLines.forEach((line, lineIdx) => {
+            page.drawText(line, {
+              x: margin + 12,
+              y: y - (lineIdx * 14),
+              size: 10.5,
+              font: helveticaBold,
+              color: slate900,
+            });
+          });
+          
+          if (degreeLines.length > 1) {
+            y -= (degreeLines.length - 1) * 14;
+          }
+        }
 
-        // Dates (right aligned)
-        if (edu.startDate || edu.endDate) {
-          const dateText = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
+        // Date badge
+        if (dateText) {
+          drawDateBadge(dateText, pageWidth - margin, y + 4);
+        }
+        y -= 16;
+
+        // Institution
+        if (hasInstitution) {
+          page.drawText(stripHtmlTags(edu.institution), {
+            x: margin + 12,
             y: y,
             size: 9,
             font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
+            color: slate600,
           });
-        }
-        y -= 13;
-
-        // Institution
-        if (edu.institution) {
-          page.drawText(edu.institution, {
-            x: margin,
-            y: y,
-            size: 9.5,
-            font: helveticaBold,
-            color: rgb(0.25, 0.25, 0.25),
-          });
-          y -= 12;
+          y -= 14;
         }
 
         // GPA
-        if (edu.gpa) {
-          page.drawText(`GPA: ${edu.gpa}`, {
-            x: margin,
+        if (hasMeaningfulValue(edu.gpa)) {
+          page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, {
+            x: margin + 12,
             y: y,
             size: 9,
             font: helvetica,
-            color: rgb(0.35, 0.35, 0.35),
+            color: slate500,
           });
-          y -= 11;
+          y -= 14;
         }
 
         // Description
-        if (edu.description) {
-          y = drawText(edu.description, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
+        if (hasMeaningfulValue(edu.description)) {
+          y = drawWrappedText(stripHtmlTags(edu.description), margin + 12, y, 8.5, helvetica, slate600, contentWidth - 20);
         }
 
-        y -= idx < cvData.education.length - 1 ? 10 : 6;
+        y -= 10;
       }
+    });
+
+    // Left border
+    page.drawLine({
+      start: { x: margin + 4, y: sectionStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
     });
 
     y -= 10;
   }
 
-  // ==================== PROFESSIONAL EXPERIENCE ====================
-  const hasExperience = cvData.experience?.some(exp => exp.company || exp.position);
-  if (hasExperience) {
-    checkSpace(55);
-    page.drawText('PROFESSIONAL EXPERIENCE', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
-
-    cvData.experience.forEach((exp, idx) => {
-      if (exp.company || exp.position) {
-        checkSpace(45);
+  // ==================== EXPERIENCE ====================
+  if (hasExperienceData(cvData.experience)) {
+    y = drawSectionHeader('Experience', y);
+    
+    const sectionStartY = y + 5;
+    
+    cvData.experience.forEach((exp) => {
+      const hasCompany = hasMeaningfulValue(exp.company);
+      const hasPosition = hasMeaningfulValue(exp.position);
+      
+      if (hasCompany || hasPosition) {
+        checkSpace(60);
+        
+        // Calculate date width first
+        let dateWidth = 0;
+        let dateText = '';
+        if (exp.startDate || exp.endDate || exp.isCurrentRole) {
+          dateText = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}`;
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 8) + 24;
+        }
         
         // Position
-        if (exp.position) {
-          page.drawText(exp.position, {
-            x: margin,
-            y: y,
-            size: 10.5,
-            font: helveticaBold,
-            color: rgb(0.1, 0.1, 0.1),
+        if (hasPosition) {
+          const maxPositionWidth = contentWidth - dateWidth - 16;
+          const positionLines = wrapText(stripHtmlTags(exp.position), helveticaBold, 10.5, maxPositionWidth);
+          
+          positionLines.forEach((line, lineIdx) => {
+            page.drawText(line, {
+              x: margin + 12,
+              y: y - (lineIdx * 14),
+              size: 10.5,
+              font: helveticaBold,
+              color: slate900,
+            });
           });
+          
+          if (positionLines.length > 1) {
+            y -= (positionLines.length - 1) * 14;
+          }
         }
 
-        // Dates (right aligned)
-        if (exp.startDate || exp.endDate || exp.isCurrentRole) {
-          const dateText = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}`;
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
+        // Date badge
+        if (dateText) {
+          drawDateBadge(dateText, pageWidth - margin, y + 4);
+        }
+        y -= 16;
+
+        // Company and Location
+        if (hasCompany) {
+          let companyText = stripHtmlTags(exp.company);
+          if (hasMeaningfulValue(exp.location)) {
+            companyText += ` • ${stripHtmlTags(exp.location)}`;
+          }
+          page.drawText(companyText, {
+            x: margin + 12,
             y: y,
             size: 9,
             font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
+            color: slate600,
           });
-        }
-        y -= 13;
-
-        // Company and Location
-        if (exp.company) {
-          const companyText = exp.location ? `${exp.company} • ${exp.location}` : exp.company;
-          page.drawText(companyText, {
-            x: margin,
-            y: y,
-            size: 9.5,
-            font: helveticaBold,
-            color: rgb(0.25, 0.25, 0.25),
-          });
-          y -= 13;
+          y -= 16;
         }
 
-        // Description with bullets
-        if (exp.description) {
-          y = drawBulletList(exp.description, margin, y, 9, helvetica);
-          y -= 4;
+        // Description bullets
+        if (hasMeaningfulValue(exp.description)) {
+          const items = parseDescription(exp.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin + 8, y);
+          }
         }
 
-        y -= idx < cvData.experience.length - 1 ? 10 : 6;
+        y -= 10;
       }
+    });
+
+    // Left border
+    page.drawLine({
+      start: { x: margin + 4, y: sectionStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
     });
 
     y -= 10;
   }
 
   // ==================== PROJECTS ====================
-  const hasProjects = cvData.projects?.some(proj => proj.name);
-  if (hasProjects) {
-    checkSpace(55);
-    page.drawText('PROJECTS', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
-
-    cvData.projects.forEach((proj, idx) => {
-      if (proj.name) {
-        checkSpace(45);
+  if (hasProjectsData(cvData.projects)) {
+    y = drawSectionHeader('Projects', y);
+    
+    const sectionStartY = y + 5;
+    
+    cvData.projects.forEach((proj) => {
+      if (hasMeaningfulValue(proj.name)) {
+        checkSpace(60);
+        
+        // Calculate date width first
+        let dateWidth = 0;
+        let dateText = '';
+        if (proj.startDate || proj.endDate) {
+          if (proj.startDate && proj.endDate) {
+            dateText = `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`;
+          } else {
+            dateText = formatDate(proj.startDate) || formatDate(proj.endDate);
+          }
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 8) + 24;
+        }
         
         // Project Name
-        page.drawText(proj.name, {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: helveticaBold,
-          color: rgb(0.1, 0.1, 0.1),
+        const maxNameWidth = contentWidth - dateWidth - 16;
+        const nameLines = wrapText(stripHtmlTags(proj.name), helveticaBold, 10.5, maxNameWidth);
+        
+        nameLines.forEach((line, lineIdx) => {
+          page.drawText(line, {
+            x: margin + 12,
+            y: y - (lineIdx * 14),
+            size: 10.5,
+            font: helveticaBold,
+            color: slate900,
+          });
         });
-
-        // Dates (right aligned)
-        if (proj.startDate || proj.endDate) {
-          const dateText = proj.startDate && proj.endDate
-            ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
-            : formatDate(proj.startDate) || formatDate(proj.endDate);
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
-          });
-        }
-        y -= 13;
-
-        // Technologies
-        if (proj.technologies) {
-          page.drawText(`Technologies: ${proj.technologies}`, {
-            x: margin,
-            y: y,
-            size: 9,
-            font: helveticaOblique,
-            color: rgb(0.35, 0.35, 0.35),
-          });
-          y -= 11;
+        
+        if (nameLines.length > 1) {
+          y -= (nameLines.length - 1) * 14;
         }
 
-        // Description
-        if (proj.description) {
-          y = drawBulletList(proj.description, margin, y, 9, helvetica);
-          y -= 4;
+        // Date badge
+        if (dateText) {
+          drawDateBadge(dateText, pageWidth - margin, y + 4);
+        }
+        y -= 16;
+
+        // Technology tags
+        if (hasMeaningfulValue(proj.technologies)) {
+          let tagX = margin + 12;
+          let tagY = y;
+          const tags = stripHtmlTags(proj.technologies).split(',').map(t => t.trim()).filter(t => t);
+          
+          tags.forEach((tag) => {
+            const tagWidth = helvetica.widthOfTextAtSize(tag, 8) + 10;
+            
+            if (tagX + tagWidth > pageWidth - margin - 10) {
+              tagX = margin + 12;
+              tagY -= 16;
+            }
+            
+            // Tag background
+            page.drawRectangle({
+              x: tagX,
+              y: tagY - 8,
+              width: tagWidth,
+              height: 14,
+              color: slate100,
+            });
+            
+            // Tag text
+            page.drawText(tag, {
+              x: tagX + 5,
+              y: tagY - 4,
+              size: 8,
+              font: helvetica,
+              color: slate600,
+            });
+            
+            tagX += tagWidth + 6;
+          });
+          y = tagY - 18;
+        }
+
+        // Description bullets
+        if (hasMeaningfulValue(proj.description)) {
+          const items = parseDescription(proj.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin + 8, y);
+          }
         }
 
         // URLs
-        if (proj.githubUrl) {
-          page.drawText(`GitHub: ${proj.githubUrl}`, {
-            x: margin,
+        if (hasMeaningfulValue(proj.githubUrl)) {
+          checkSpace(15);
+          page.drawText(`GitHub: ${stripHtmlTags(proj.githubUrl)}`, {
+            x: margin + 12,
             y: y,
-            size: 8.5,
+            size: 8,
             font: helvetica,
             color: primaryColor,
           });
-          y -= 10;
+          y -= 13;
         }
 
-        if (proj.liveUrl) {
-          page.drawText(`Live: ${proj.liveUrl}`, {
-            x: margin,
+        if (hasMeaningfulValue(proj.liveUrl)) {
+          checkSpace(15);
+          page.drawText(`Live: ${stripHtmlTags(proj.liveUrl)}`, {
+            x: margin + 12,
             y: y,
-            size: 8.5,
+            size: 8,
             font: helvetica,
             color: primaryColor,
           });
-          y -= 10;
+          y -= 13;
         }
 
-        // Achievements
-        if (proj.achievements) {
-          page.drawText('Key Achievements:', {
-            x: margin,
-            y: y,
-            size: 9,
-            font: helveticaBold,
-            color: rgb(0.2, 0.2, 0.2),
-          });
-          y -= 11;
-          y = drawBulletList(proj.achievements, margin, y, 9, helvetica);
-          y -= 4;
-        }
-
-        y -= idx < cvData.projects.length - 1 ? 10 : 6;
+        y -= 10;
       }
+    });
+
+    // Left border
+    page.drawLine({
+      start: { x: margin + 4, y: sectionStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
     });
 
     y -= 10;
   }
 
-  // ==================== SKILLS ====================
-  const hasSkills = cvData.skills?.some(s => s.skills?.length > 0);
-  if (hasSkills) {
-    checkSpace(55);
-    page.drawText('SKILLS', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
+  // ==================== SKILLS (Grid Layout) ====================
+  if (hasSkillsData(cvData.skills)) {
+    y = drawSectionHeader('Technical Skills', y);
+    
+    const sectionStartY = y + 5;
+    const colWidth = (contentWidth - 30) / 2;
+    let col = 0;
+    let rowY = y;
 
-    cvData.skills.forEach((category, idx) => {
-      if (category.skills?.length > 0) {
-        checkSpace(20);
-        const categoryName = category.name || category.categoryName || 'Skills';
-        const skillsText = `${categoryName}: ${category.skills.join(', ')}`;
-        y = drawText(skillsText, margin, y, 9, helvetica, rgb(0.25, 0.25, 0.25), contentWidth);
-        y -= idx < cvData.skills.length - 1 ? 6 : 4;
+    cvData.skills.forEach((category) => {
+      const skillsList = getSkillsList(category);
+      const hasName = hasMeaningfulValue(category.name);
+      
+      if (hasName || skillsList.length > 0) {
+        checkSpace(50);
+        
+        const xPos = margin + 12 + (col * (colWidth + 12));
+        
+        // Skill card background
+        page.drawRectangle({
+          x: xPos,
+          y: rowY - 32,
+          width: colWidth,
+          height: 38,
+          color: slate50,
+        });
+        
+        // Category name
+        if (hasName) {
+          page.drawText(stripHtmlTags(category.name), {
+            x: xPos + 8,
+            y: rowY - 12,
+            size: 9,
+            font: helveticaBold,
+            color: slate900,
+          });
+        }
+        
+        // Skills list
+        if (skillsList.length > 0) {
+          const skillsText = skillsList.join(', ');
+          const lines = wrapText(skillsText, helvetica, 8, colWidth - 16);
+          lines.slice(0, 2).forEach((line, lineIdx) => {
+            page.drawText(line, {
+              x: xPos + 8,
+              y: rowY - 24 - (lineIdx * 11),
+              size: 8,
+              font: helvetica,
+              color: slate600,
+            });
+          });
+        }
+        
+        col++;
+        if (col >= 2) {
+          col = 0;
+          rowY -= 48;
+        }
       }
+    });
+
+    y = col > 0 ? rowY - 48 : rowY;
+
+    // Left border
+    page.drawLine({
+      start: { x: margin + 4, y: sectionStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
     });
 
     y -= 10;
   }
 
   // ==================== ACHIEVEMENTS ====================
-  const hasAchievements = cvData.achievements?.some(ach => ach.title);
-  if (hasAchievements) {
-    checkSpace(55);
-    page.drawText('ACHIEVEMENTS', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
-
-    cvData.achievements.forEach((ach, idx) => {
-      if (ach.title) {
-        checkSpace(35);
+  if (hasAchievementsData(cvData.achievements)) {
+    y = drawSectionHeader('Achievements', y);
+    
+    const sectionStartY = y + 5;
+    
+    cvData.achievements.forEach((ach) => {
+      if (hasMeaningfulValue(ach.title)) {
+        checkSpace(40);
+        
+        // Calculate date width
+        let dateWidth = 0;
+        if (hasMeaningfulValue(ach.date)) {
+          dateWidth = helvetica.widthOfTextAtSize(stripHtmlTags(ach.date), 8) + 10;
+        }
         
         // Title
-        page.drawText(ach.title, {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: helveticaBold,
-          color: rgb(0.1, 0.1, 0.1),
+        const maxTitleWidth = contentWidth - dateWidth - 20;
+        const titleLines = wrapText(stripHtmlTags(ach.title), helveticaBold, 10.5, maxTitleWidth);
+        
+        titleLines.forEach((line, lineIdx) => {
+          page.drawText(line, {
+            x: margin + 12,
+            y: y - (lineIdx * 14),
+            size: 10.5,
+            font: helveticaBold,
+            color: slate900,
+          });
         });
+        
+        if (titleLines.length > 1) {
+          y -= (titleLines.length - 1) * 14;
+        }
 
-        // Date (right aligned)
-        if (ach.date) {
-          const dateWidth = helvetica.widthOfTextAtSize(ach.date, 9);
-          page.drawText(ach.date, {
-            x: pageWidth - margin - dateWidth,
+        // Date
+        if (hasMeaningfulValue(ach.date)) {
+          page.drawText(stripHtmlTags(ach.date), {
+            x: pageWidth - margin - dateWidth + 5,
             y: y,
-            size: 9,
+            size: 8,
             font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
+            color: slate500,
           });
         }
-        y -= 13;
+        y -= 14;
 
-        // Organization and Type
-        if (ach.organization) {
-          const orgText = ach.type ? `${ach.organization} • ${ach.type}` : ach.organization;
-          page.drawText(orgText, {
-            x: margin,
+        // Organization
+        if (hasMeaningfulValue(ach.organization)) {
+          page.drawText(stripHtmlTags(ach.organization), {
+            x: margin + 12,
             y: y,
             size: 9,
             font: helvetica,
-            color: rgb(0.35, 0.35, 0.35),
+            color: slate600,
           });
-          y -= 11;
+          y -= 14;
         }
 
         // Description
-        if (ach.description) {
-          y = drawText(ach.description, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
+        if (hasMeaningfulValue(ach.description)) {
+          y = drawWrappedText(stripHtmlTags(ach.description), margin + 12, y, 9, helvetica, slate600, contentWidth - 20);
         }
 
-        y -= idx < cvData.achievements.length - 1 ? 10 : 6;
+        y -= 10;
       }
+    });
+
+    // Left border
+    page.drawLine({
+      start: { x: margin + 4, y: sectionStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
     });
 
     y -= 10;
   }
 
-  // ==================== VOLUNTEER EXPERIENCE ====================
-  const hasVolunteer = cvData.volunteer?.some(vol => vol.organization || vol.role);
-  if (hasVolunteer) {
-    checkSpace(55);
-    page.drawText('VOLUNTEER EXPERIENCE', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1.5);
-    y -= 13;
-
-    cvData.volunteer.forEach((vol, idx) => {
-      if (vol.organization || vol.role) {
-        checkSpace(40);
+  // ==================== VOLUNTEER ====================
+  if (hasVolunteerData(cvData.volunteer)) {
+    y = drawSectionHeader('Volunteer Experience', y);
+    
+    const sectionStartY = y + 5;
+    
+    cvData.volunteer.forEach((vol) => {
+      const hasOrg = hasMeaningfulValue(vol.organization);
+      const hasRole = hasMeaningfulValue(vol.role);
+      
+      if (hasOrg || hasRole) {
+        checkSpace(55);
+        
+        // Calculate date width
+        let dateWidth = 0;
+        let dateText = '';
+        if (vol.startDate || vol.endDate) {
+          dateText = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 8) + 24;
+        }
         
         // Role
-        if (vol.role) {
-          page.drawText(vol.role, {
-            x: margin,
-            y: y,
-            size: 10.5,
-            font: helveticaBold,
-            color: rgb(0.1, 0.1, 0.1),
+        if (hasRole) {
+          const maxRoleWidth = contentWidth - dateWidth - 16;
+          const roleLines = wrapText(stripHtmlTags(vol.role), helveticaBold, 10.5, maxRoleWidth);
+          
+          roleLines.forEach((line, lineIdx) => {
+            page.drawText(line, {
+              x: margin + 12,
+              y: y - (lineIdx * 14),
+              size: 10.5,
+              font: helveticaBold,
+              color: slate900,
+            });
           });
+          
+          if (roleLines.length > 1) {
+            y -= (roleLines.length - 1) * 14;
+          }
         }
 
-        // Dates (right aligned)
-        if (vol.startDate || vol.endDate) {
-          const dateText = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
+        // Date badge
+        if (dateText) {
+          drawDateBadge(dateText, pageWidth - margin, y + 4);
+        }
+        y -= 16;
+
+        // Organization
+        if (hasOrg) {
+          let orgText = stripHtmlTags(vol.organization);
+          if (hasMeaningfulValue(vol.location)) {
+            orgText += ` • ${stripHtmlTags(vol.location)}`;
+          }
+          page.drawText(orgText, {
+            x: margin + 12,
             y: y,
             size: 9,
             font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
+            color: slate600,
           });
-        }
-        y -= 13;
-
-        // Organization and Location
-        if (vol.organization) {
-          const orgText = vol.location ? `${vol.organization} • ${vol.location}` : vol.organization;
-          page.drawText(orgText, {
-            x: margin,
-            y: y,
-            size: 9.5,
-            font: helveticaBold,
-            color: rgb(0.25, 0.25, 0.25),
-          });
-          y -= 13;
+          y -= 16;
         }
 
         // Description
-        if (vol.description) {
-          y = drawBulletList(vol.description, margin, y, 9, helvetica);
-          y -= 4;
+        if (hasMeaningfulValue(vol.description)) {
+          const items = parseDescription(vol.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin + 8, y);
+          }
         }
 
-        // Impact
-        if (vol.impact) {
-          page.drawText(`Impact: ${vol.impact}`, {
-            x: margin,
-            y: y,
-            size: 9,
-            font: helveticaOblique,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-          y -= 11;
-        }
-
-        y -= idx < cvData.volunteer.length - 1 ? 10 : 6;
+        y -= 10;
       }
     });
-  }
 
-  return await pdfDoc.save();
-}
-
-// ==================== CLASSIC TEMPLATE ====================
-async function generateClassicTemplate(pdfDoc, cvData, fonts) {
-  const { rgb } = await import('pdf-lib');
-  const { timesRoman, timesRomanBold, timesRomanItalic, primaryColor, formatDate } = fonts;
-  const pageWidth = 612;
-  const pageHeight = 792;
-  const margin = 50;
-  const contentWidth = pageWidth - (2 * margin);
-  
-  let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin;
-
-  const addNewPage = () => {
-    page = pdfDoc.addPage([pageWidth, pageHeight]);
-    y = pageHeight - margin;
-  };
-
-  const checkSpace = (required) => {
-    if (y - required < margin + 20) {
-      addNewPage();
-    }
-  };
-
-  const drawText = (text, x, yPos, size, font, color = rgb(0, 0, 0), maxWidth = null) => {
-    if (!text) return yPos;
-    const actualMaxWidth = maxWidth || contentWidth;
-    const words = text.toString().split(' ');
-    let line = '';
-    let lineY = yPos;
-
-    for (let word of words) {
-      const testLine = line + (line ? ' ' : '') + word;
-      const testWidth = font.widthOfTextAtSize(testLine, size);
-      
-      if (testWidth > actualMaxWidth && line) {
-        page.drawText(line, { x, y: lineY, size, font, color });
-        line = word;
-        lineY -= size + 3;
-        checkSpace(size + 3);
-      } else {
-        line = testLine;
-      }
-    }
-    
-    if (line) {
-      page.drawText(line, { x, y: lineY, size, font, color });
-      return lineY - size - 3;
-    }
-    return lineY;
-  };
-
-  const drawCenteredText = (text, yPos, size, font, color = rgb(0, 0, 0)) => {
-    const textWidth = font.widthOfTextAtSize(text, size);
-    const x = margin + (contentWidth - textWidth) / 2;
-    page.drawText(text, { x, y: yPos, size, font, color });
-    return yPos - size - 3;
-  };
-
-  const drawLine = (x1, y1, x2, y2, color, thickness = 1) => {
+    // Left border
     page.drawLine({
-      start: { x: x1, y: y1 },
-      end: { x: x2, y: y2 },
-      thickness,
-      color,
-    });
-  };
-
-  // ==================== HEADER (CENTERED) ====================
-  checkSpace(90);
-  y = drawCenteredText(cvData.personal?.fullName || 'Your Name', y, 22, timesRomanBold, primaryColor);
-  y -= 8;
-
-  // Contact - Centered
-  const contactItems = [
-    cvData.personal?.email,
-    cvData.personal?.phone,
-    cvData.personal?.location,
-  ].filter(Boolean);
-
-  contactItems.forEach(item => {
-    y = drawCenteredText(item, y, 10, timesRoman, rgb(0.2, 0.2, 0.2));
-    y -= 2;
-  });
-
-  if (cvData.personal?.linkedin) {
-    y = drawCenteredText(cvData.personal.linkedin, y, 10, timesRoman, primaryColor);
-    y -= 4;
-  }
-
-  drawLine(margin, y, pageWidth - margin, y, primaryColor, 2);
-  y -= 18;
-
-  // ==================== SECTIONS ====================
-  // Professional Summary
-  if (cvData.personal?.summary) {
-    checkSpace(50);
-    y = drawCenteredText('Professional Summary', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-    y = drawText(cvData.personal.summary, margin, y, 10, timesRoman, rgb(0.2, 0.2, 0.2), contentWidth);
-    y -= 16;
-  }
-
-  // Education
-  const hasEducation = cvData.education?.some(edu => edu.institution || edu.degree);
-  if (hasEducation) {
-    checkSpace(50);
-    y = drawCenteredText('Education', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-
-    cvData.education.forEach((edu, idx) => {
-      if (edu.institution || edu.degree) {
-        checkSpace(40);
-        
-        // Degree
-        const degreeText = edu.degree && edu.field 
-          ? `${edu.degree} in ${edu.field}`
-          : edu.degree || edu.field || 'Degree';
-        
-        page.drawText(degreeText, {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: timesRomanBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-
-        // Dates (right aligned)
-        if (edu.startDate || edu.endDate) {
-          const dateText = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
-          const dateWidth = timesRoman.widthOfTextAtSize(dateText, 10);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 10,
-            font: timesRoman,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-        }
-        y -= 13;
-
-        // Institution
-        if (edu.institution) {
-          y = drawText(edu.institution, margin, y, 10, timesRomanItalic, rgb(0.2, 0.2, 0.2), contentWidth);
-          y -= 2;
-        }
-
-        // GPA
-        if (edu.gpa) {
-          page.drawText(`GPA: ${edu.gpa}`, {
-            x: margin,
-            y: y,
-            size: 10,
-            font: timesRoman,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-          y -= 12;
-        }
-
-        // Description
-        if (edu.description) {
-          y = drawText(edu.description, margin, y, 10, timesRoman, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        y -= idx < cvData.education.length - 1 ? 10 : 6;
-      }
-    });
-
-    y -= 12;
-  }
-
-  // Experience
-  const hasExperience = cvData.experience?.some(exp => exp.company || exp.position);
-  if (hasExperience) {
-    checkSpace(50);
-    y = drawCenteredText('Professional Experience', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-
-    cvData.experience.forEach((exp, idx) => {
-      if (exp.company || exp.position) {
-        checkSpace(40);
-        
-        // Position
-        page.drawText(exp.position || 'Position', {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: timesRomanBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-
-        // Dates (right aligned)
-        if (exp.startDate || exp.endDate || exp.isCurrentRole) {
-          const dateText = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}`;
-          const dateWidth = timesRoman.widthOfTextAtSize(dateText, 10);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 10,
-            font: timesRoman,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-        }
-        y -= 13;
-
-        // Company
-        if (exp.company) {
-          const companyText = exp.location ? `${exp.company} • ${exp.location}` : exp.company;
-          y = drawText(companyText, margin, y, 10, timesRomanItalic, rgb(0.2, 0.2, 0.2), contentWidth);
-          y -= 2;
-        }
-
-        // Description
-        if (exp.description) {
-          const lines = exp.description.split('\n').filter(line => line.trim());
-          lines.forEach(line => {
-            checkSpace(15);
-            const cleanLine = line.replace(/^[•\-]\s*/, '').trim();
-            if (cleanLine) {
-              y = drawText(`• ${cleanLine}`, margin, y, 10, timesRoman, rgb(0.3, 0.3, 0.3), contentWidth);
-              y -= 2;
-            }
-          });
-          y -= 4;
-        }
-
-        y -= idx < cvData.experience.length - 1 ? 10 : 6;
-      }
-    });
-
-    y -= 12;
-  }
-
-  // Projects
-  const hasProjects = cvData.projects?.some(proj => proj.name);
-  if (hasProjects) {
-    checkSpace(50);
-    y = drawCenteredText('Projects', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-
-    cvData.projects.forEach((proj, idx) => {
-      if (proj.name) {
-        checkSpace(40);
-        
-        page.drawText(proj.name, {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: timesRomanBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-        y -= 13;
-
-        if (proj.technologies) {
-          y = drawText(`Technologies: ${proj.technologies}`, margin, y, 10, timesRomanItalic, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 2;
-        }
-
-        if (proj.description) {
-          y = drawText(proj.description, margin, y, 10, timesRoman, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        if (proj.githubUrl || proj.liveUrl) {
-          if (proj.githubUrl) {
-            y = drawText(`GitHub: ${proj.githubUrl}`, margin, y, 9, timesRoman, primaryColor, contentWidth);
-            y -= 2;
-          }
-          if (proj.liveUrl) {
-            y = drawText(`Live: ${proj.liveUrl}`, margin, y, 9, timesRoman, primaryColor, contentWidth);
-            y -= 2;
-          }
-          y -= 4;
-        }
-
-        y -= idx < cvData.projects.length - 1 ? 10 : 6;
-      }
-    });
-
-    y -= 12;
-  }
-
-  // Skills
-  const hasSkills = cvData.skills?.some(s => s.skills?.length > 0);
-  if (hasSkills) {
-    checkSpace(50);
-    y = drawCenteredText('Technical Skills', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-
-    cvData.skills.forEach((category, idx) => {
-      if (category.skills?.length > 0) {
-        checkSpace(20);
-        const categoryName = category.name || category.categoryName || 'Skills';
-        const skillsText = `${categoryName}: ${category.skills.join(', ')}`;
-        y = drawText(skillsText, margin, y, 10, timesRoman, rgb(0.2, 0.2, 0.2), contentWidth);
-        y -= idx < cvData.skills.length - 1 ? 6 : 4;
-      }
-    });
-
-    y -= 12;
-  }
-
-  // Achievements
-  const hasAchievements = cvData.achievements?.some(ach => ach.title);
-  if (hasAchievements) {
-    checkSpace(50);
-    y = drawCenteredText('Achievements', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-
-    cvData.achievements.forEach((ach, idx) => {
-      if (ach.title) {
-        checkSpace(35);
-        
-        page.drawText(ach.title, {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: timesRomanBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-
-        if (ach.date) {
-          const dateWidth = timesRoman.widthOfTextAtSize(ach.date, 10);
-          page.drawText(ach.date, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 10,
-            font: timesRoman,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-        }
-        y -= 13;
-
-        if (ach.organization) {
-          const orgText = ach.type ? `${ach.organization} • ${ach.type}` : ach.organization;
-          y = drawText(orgText, margin, y, 10, timesRoman, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 2;
-        }
-
-        if (ach.description) {
-          y = drawText(ach.description, margin, y, 10, timesRoman, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        y -= idx < cvData.achievements.length - 1 ? 10 : 6;
-      }
-    });
-
-    y -= 12;
-  }
-
-  // Volunteer
-  const hasVolunteer = cvData.volunteer?.some(vol => vol.organization || vol.role);
-  if (hasVolunteer) {
-    checkSpace(50);
-    y = drawCenteredText('Volunteer Experience', y, 12, timesRomanBold, primaryColor);
-    y -= 4;
-    drawLine(margin, y, pageWidth - margin, y, primaryColor, 1);
-    y -= 12;
-
-    cvData.volunteer.forEach((vol, idx) => {
-      if (vol.organization || vol.role) {
-        checkSpace(35);
-        
-        page.drawText(vol.role || 'Volunteer', {
-          x: margin,
-          y: y,
-          size: 10.5,
-          font: timesRomanBold,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-
-        if (vol.startDate || vol.endDate) {
-          const dateText = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
-          const dateWidth = timesRoman.widthOfTextAtSize(dateText, 10);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 10,
-            font: timesRoman,
-            color: rgb(0.3, 0.3, 0.3),
-          });
-        }
-        y -= 13;
-
-        if (vol.organization) {
-          const orgText = vol.location ? `${vol.organization} • ${vol.location}` : vol.organization;
-          y = drawText(orgText, margin, y, 10, timesRomanItalic, rgb(0.2, 0.2, 0.2), contentWidth);
-          y -= 2;
-        }
-
-        if (vol.description) {
-          y = drawText(vol.description, margin, y, 10, timesRoman, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        if (vol.impact) {
-          y = drawText(`Impact: ${vol.impact}`, margin, y, 10, timesRomanItalic, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        y -= idx < cvData.volunteer.length - 1 ? 10 : 6;
-      }
+      start: { x: margin + 4, y: sectionStartY },
+      end: { x: margin + 4, y: y + 10 },
+      thickness: 2,
+      color: slate100,
     });
   }
 
   return await pdfDoc.save();
 }
 
-// ==================== MINIMAL TEMPLATE ====================
-async function generateMinimalTemplate(pdfDoc, cvData, fonts) {
-  const { rgb } = await import('pdf-lib');
-  const { helvetica, helveticaBold, helveticaOblique, primaryColor, formatDate } = fonts;
+// ============================================
+// CLASSIC TEMPLATE
+// ============================================
+async function generateClassicTemplate(pdfDoc, cvData, fonts) {
+  const { timesRoman, timesRomanBold, timesRomanItalic, primaryColor, formatDate, parseDescription, rgb, stripHtmlTags, getSkillsList } = fonts;
+  
   const pageWidth = 612;
   const pageHeight = 792;
   const margin = 50;
@@ -1182,417 +1142,891 @@ async function generateMinimalTemplate(pdfDoc, cvData, fonts) {
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
+  // Colors
+  const gray900 = rgb(0.07, 0.07, 0.07);
+  const gray700 = rgb(0.25, 0.25, 0.25);
+  const gray600 = rgb(0.35, 0.35, 0.35);
+  const gray400 = rgb(0.55, 0.55, 0.55);
+
   const addNewPage = () => {
     page = pdfDoc.addPage([pageWidth, pageHeight]);
     y = pageHeight - margin;
   };
 
   const checkSpace = (required) => {
-    if (y - required < margin + 20) {
+    if (y - required < margin + 30) {
       addNewPage();
     }
   };
 
-  const drawText = (text, x, yPos, size, font, color = rgb(0, 0, 0), maxWidth = null) => {
-    if (!text) return yPos;
-    const actualMaxWidth = maxWidth || contentWidth;
-    const words = text.toString().split(' ');
-    let line = '';
-    let lineY = yPos;
+  // Text wrapping helper
+  const wrapText = (text, font, size, maxWidth) => {
+    if (!text) return [];
+    const cleanText = stripHtmlTags(text.toString());
+    const words = cleanText.split(' ').filter(w => w);
+    const lines = [];
+    let currentLine = '';
 
-    for (let word of words) {
-      const testLine = line + (line ? ' ' : '') + word;
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
       const testWidth = font.widthOfTextAtSize(testLine, size);
       
-      if (testWidth > actualMaxWidth && line) {
-        page.drawText(line, { x, y: lineY, size, font, color });
-        line = word;
-        lineY -= size + 3;
-        checkSpace(size + 3);
+      if (testWidth > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
       } else {
-        line = testLine;
+        currentLine = testLine;
       }
     }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  };
+
+  // Draw wrapped text
+  const drawWrappedText = (text, x, yPos, size, font, color, maxWidth) => {
+    const lines = wrapText(text, font, size, maxWidth);
+    let currentY = yPos;
     
-    if (line) {
-      page.drawText(line, { x, y: lineY, size, font, color });
-      return lineY - size - 3;
+    for (const line of lines) {
+      checkSpace(size + 5);
+      page.drawText(line, { x, y: currentY, size, font, color });
+      currentY -= size + 5;
     }
-    return lineY;
+    return currentY;
+  };
+
+  // Draw centered text
+  const drawCenteredText = (text, yPos, size, font, color) => {
+    const cleanText = stripHtmlTags(text);
+    const textWidth = font.widthOfTextAtSize(cleanText, size);
+    const x = margin + (contentWidth - textWidth) / 2;
+    page.drawText(cleanText, { x, y: yPos, size, font, color });
+    return yPos - size - 6;
+  };
+
+  // Draw section header
+  const drawSectionHeader = (title, yPos) => {
+    checkSpace(30);
+    
+    page.drawText(title.toUpperCase(), {
+      x: margin,
+      y: yPos,
+      size: 11,
+      font: timesRomanBold,
+      color: primaryColor,
+    });
+    
+    page.drawLine({
+      start: { x: margin, y: yPos - 8 },
+      end: { x: pageWidth - margin, y: yPos - 8 },
+      thickness: 1,
+      color: primaryColor,
+    });
+    
+    return yPos - 26;
+  };
+
+  // Draw bullet list
+  const drawBulletList = (items, x, yPos) => {
+    let currentY = yPos;
+    
+    items.forEach((item) => {
+      if (!item) return;
+      const cleanItem = stripHtmlTags(item);
+      if (!cleanItem) return;
+      
+      checkSpace(16);
+      
+      const lines = wrapText(cleanItem, timesRoman, 10, contentWidth - 20);
+      lines.forEach((line, idx) => {
+        if (idx === 0) {
+          page.drawText('•', { x, y: currentY, size: 10, font: timesRoman, color: gray400 });
+        }
+        page.drawText(line, { x: x + 12, y: currentY, size: 10, font: timesRoman, color: gray700 });
+        currentY -= 14;
+      });
+      currentY -= 2;
+    });
+    
+    return currentY;
   };
 
   // ==================== HEADER ====================
-  checkSpace(70);
-  page.drawText(cvData.personal?.fullName || 'Your Name', {
-    x: margin,
-    y: y,
-    size: 24,
-    font: helvetica,
+  checkSpace(100);
+  
+  const name = (stripHtmlTags(cvData.personal?.fullName) || 'Your Name').toUpperCase();
+  y = drawCenteredText(name, y, 22, timesRomanBold, primaryColor);
+  y -= 4;
+
+  // Contact lines
+  const contacts1 = [];
+  const contacts2 = [];
+  
+  if (hasMeaningfulValue(cvData.personal?.email)) contacts1.push(stripHtmlTags(cvData.personal.email));
+  if (hasMeaningfulValue(cvData.personal?.phone)) contacts1.push(stripHtmlTags(cvData.personal.phone));
+  if (hasMeaningfulValue(cvData.personal?.location)) contacts2.push(stripHtmlTags(cvData.personal.location));
+  if (hasMeaningfulValue(cvData.personal?.linkedin)) contacts2.push(stripHtmlTags(cvData.personal.linkedin));
+  if (hasMeaningfulValue(cvData.personal?.website)) contacts2.push(stripHtmlTags(cvData.personal.website));
+
+  if (contacts1.length > 0) {
+    y = drawCenteredText(contacts1.join('  •  '), y, 10, timesRoman, gray600);
+  }
+  if (contacts2.length > 0) {
+    y = drawCenteredText(contacts2.join('  •  '), y, 10, timesRoman, gray600);
+  }
+
+  page.drawLine({
+    start: { x: margin, y: y - 5 },
+    end: { x: pageWidth - margin, y: y - 5 },
+    thickness: 2,
     color: primaryColor,
   });
   y -= 28;
 
-  // Contact Information
-  const contactItems = [
-    cvData.personal?.email,
-    cvData.personal?.phone,
-    cvData.personal?.location,
-  ].filter(Boolean);
-
-  contactItems.forEach(item => {
-    page.drawText(item, {
-      x: margin,
-      y: y,
-      size: 9,
-      font: helvetica,
-      color: rgb(0.4, 0.4, 0.4),
-    });
-    y -= 12;
-  });
-
-  if (cvData.personal?.linkedin) {
-    page.drawText(cvData.personal.linkedin, {
-      x: margin,
-      y: y,
-      size: 9,
-      font: helvetica,
-      color: primaryColor,
-    });
-    y -= 16;
-  } else {
-    y -= 4;
-  }
-
-  // ==================== SUMMARY ====================
-  if (cvData.personal?.summary) {
-    checkSpace(50);
-    page.drawText('Summary', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-    y = drawText(cvData.personal.summary, margin, y, 9.5, helvetica, rgb(0.2, 0.2, 0.2), contentWidth);
-    y -= 16;
+  // ==================== PROFESSIONAL SUMMARY ====================
+  if (hasMeaningfulValue(cvData.personal?.summary)) {
+    y = drawSectionHeader('Professional Summary', y);
+    y = drawWrappedText(stripHtmlTags(cvData.personal.summary), margin, y, 10, timesRoman, gray700, contentWidth);
+    y -= 18;
   }
 
   // ==================== EDUCATION ====================
-  const hasEducation = cvData.education?.some(edu => edu.institution || edu.degree);
-  if (hasEducation) {
-    checkSpace(50);
-    page.drawText('Education', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-
-    cvData.education.forEach((edu, idx) => {
-      if (edu.institution || edu.degree) {
-        checkSpace(40);
+  if (hasEducationData(cvData.education)) {
+    y = drawSectionHeader('Education', y);
+    
+    cvData.education.forEach((edu) => {
+      const hasInstitution = hasMeaningfulValue(edu.institution);
+      const hasDegree = hasMeaningfulValue(edu.degree);
+      const hasField = hasMeaningfulValue(edu.field);
+      
+      if (hasInstitution || hasDegree || hasField) {
+        checkSpace(50);
         
-        const degreeText = edu.degree && edu.field 
-          ? `${edu.degree} in ${edu.field}`
-          : edu.degree || edu.field || 'Degree';
+        let degreeText = '';
+        if (hasDegree && hasField) {
+          degreeText = `${stripHtmlTags(edu.degree)}, ${stripHtmlTags(edu.field)}`;
+        } else if (hasDegree) {
+          degreeText = stripHtmlTags(edu.degree);
+        } else if (hasField) {
+          degreeText = stripHtmlTags(edu.field);
+        }
         
-        page.drawText(degreeText, {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helveticaBold,
-          color: rgb(0.15, 0.15, 0.15),
-        });
-
+        // Calculate available width for degree text
+        let dateText = '';
+        let dateWidth = 0;
         if (edu.startDate || edu.endDate) {
-          const dateText = `${formatDate(edu.startDate)} — ${formatDate(edu.endDate)}`;
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
-          });
+          dateText = `${formatDate(edu.startDate)} – ${formatDate(edu.endDate)}`;
+          dateWidth = timesRoman.widthOfTextAtSize(dateText, 10) + 15;
         }
+        
+        if (degreeText) {
+          const maxDegreeWidth = contentWidth - dateWidth - 10;
+          const degreeLines = wrapText(degreeText, timesRomanBold, 10.5, maxDegreeWidth);
+          
+          degreeLines.forEach((line, idx) => {
+            page.drawText(line, { x: margin, y: y - (idx * 14), size: 10.5, font: timesRomanBold, color: gray900 });
+          });
+          
+          if (degreeLines.length > 1) y -= (degreeLines.length - 1) * 14;
+          
+          if (dateText) {
+            page.drawText(dateText, {
+              x: pageWidth - margin - dateWidth + 10,
+              y: y,
+              size: 10,
+              font: timesRoman,
+              color: gray600,
+            });
+          }
+        }
+        y -= 16;
+
+        if (hasInstitution) {
+          page.drawText(stripHtmlTags(edu.institution), { x: margin, y: y, size: 10, font: timesRomanItalic, color: gray600 });
+          y -= 14;
+        }
+
+        if (hasMeaningfulValue(edu.gpa)) {
+          page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, { x: margin, y: y, size: 10, font: timesRoman, color: gray700 });
+          y -= 14;
+        }
+
+        if (hasMeaningfulValue(edu.description)) {
+          y = drawWrappedText(stripHtmlTags(edu.description), margin, y, 10, timesRoman, gray700, contentWidth);
+        }
+
         y -= 12;
-
-        if (edu.institution) {
-          y = drawText(edu.institution, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 2;
-        }
-
-        if (edu.gpa) {
-          page.drawText(`GPA: ${edu.gpa}`, {
-            x: margin,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
-          });
-          y -= 10;
-        }
-
-        y -= idx < cvData.education.length - 1 ? 8 : 4;
       }
     });
-
-    y -= 12;
+    y -= 8;
   }
 
   // ==================== EXPERIENCE ====================
-  const hasExperience = cvData.experience?.some(exp => exp.company || exp.position);
-  if (hasExperience) {
-    checkSpace(50);
-    page.drawText('Experience', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-
-    cvData.experience.forEach((exp, idx) => {
-      if (exp.company || exp.position) {
-        checkSpace(40);
+  if (hasExperienceData(cvData.experience)) {
+    y = drawSectionHeader('Professional Experience', y);
+    
+    cvData.experience.forEach((exp) => {
+      const hasCompany = hasMeaningfulValue(exp.company);
+      const hasPosition = hasMeaningfulValue(exp.position);
+      
+      if (hasCompany || hasPosition) {
+        checkSpace(55);
         
-        page.drawText(exp.position || 'Position', {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helveticaBold,
-          color: rgb(0.15, 0.15, 0.15),
-        });
-
+        let dateText = '';
+        let dateWidth = 0;
         if (exp.startDate || exp.endDate || exp.isCurrentRole) {
-          const dateText = `${formatDate(exp.startDate)} — ${exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}`;
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
-          });
+          dateText = `${formatDate(exp.startDate)} – ${exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}`;
+          dateWidth = timesRoman.widthOfTextAtSize(dateText, 10) + 15;
         }
+        
+        if (hasPosition) {
+          const maxPosWidth = contentWidth - dateWidth - 10;
+          const posLines = wrapText(stripHtmlTags(exp.position), timesRomanBold, 10.5, maxPosWidth);
+          
+          posLines.forEach((line, idx) => {
+            page.drawText(line, { x: margin, y: y - (idx * 14), size: 10.5, font: timesRomanBold, color: gray900 });
+          });
+          
+          if (posLines.length > 1) y -= (posLines.length - 1) * 14;
+          
+          if (dateText) {
+            page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 10, font: timesRoman, color: gray600 });
+          }
+        }
+        y -= 16;
+
+        if (hasCompany) {
+          let companyText = stripHtmlTags(exp.company);
+          if (hasMeaningfulValue(exp.location)) {
+            companyText += `, ${stripHtmlTags(exp.location)}`;
+          }
+          page.drawText(companyText, { x: margin, y: y, size: 10, font: timesRomanItalic, color: gray600 });
+          y -= 16;
+        }
+
+        if (hasMeaningfulValue(exp.description)) {
+          const items = parseDescription(exp.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin, y);
+          }
+        }
+
         y -= 12;
-
-        if (exp.company) {
-          y = drawText(exp.company, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        if (exp.description) {
-          const lines = exp.description.split('\n').filter(line => line.trim());
-          lines.forEach(line => {
-            checkSpace(12);
-            const cleanLine = line.replace(/^[•\-]\s*/, '').trim();
-            if (cleanLine) {
-              y = drawText(`• ${cleanLine}`, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-              y -= 2;
-            }
-          });
-        }
-
-        y -= idx < cvData.experience.length - 1 ? 8 : 4;
       }
     });
-
-    y -= 12;
+    y -= 8;
   }
 
   // ==================== PROJECTS ====================
-  const hasProjects = cvData.projects?.some(proj => proj.name);
-  if (hasProjects) {
-    checkSpace(50);
-    page.drawText('Projects', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-
-    cvData.projects.forEach((proj, idx) => {
-      if (proj.name) {
-        checkSpace(40);
+  if (hasProjectsData(cvData.projects)) {
+    y = drawSectionHeader('Technical Projects', y);
+    
+    cvData.projects.forEach((proj) => {
+      if (hasMeaningfulValue(proj.name)) {
+        checkSpace(50);
         
-        page.drawText(proj.name, {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helveticaBold,
-          color: rgb(0.15, 0.15, 0.15),
+        let dateText = '';
+        let dateWidth = 0;
+        if (proj.startDate || proj.endDate) {
+          if (proj.startDate && proj.endDate) {
+            dateText = `${formatDate(proj.startDate)} – ${formatDate(proj.endDate)}`;
+          } else {
+            dateText = formatDate(proj.startDate) || formatDate(proj.endDate);
+          }
+          dateWidth = timesRoman.widthOfTextAtSize(dateText, 10) + 15;
+        }
+        
+        const maxNameWidth = contentWidth - dateWidth - 10;
+        const nameLines = wrapText(stripHtmlTags(proj.name), timesRomanBold, 10.5, maxNameWidth);
+        
+        nameLines.forEach((line, idx) => {
+          page.drawText(line, { x: margin, y: y - (idx * 14), size: 10.5, font: timesRomanBold, color: gray900 });
         });
+        
+        if (nameLines.length > 1) y -= (nameLines.length - 1) * 14;
+        
+        if (dateText) {
+          page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 10, font: timesRoman, color: gray600 });
+        }
+        y -= 16;
+
+        if (hasMeaningfulValue(proj.technologies)) {
+          page.drawText(`Technologies: ${stripHtmlTags(proj.technologies)}`, { x: margin, y: y, size: 10, font: timesRomanItalic, color: gray600 });
+          y -= 16;
+        }
+
+        if (hasMeaningfulValue(proj.description)) {
+          const items = parseDescription(proj.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin, y);
+          }
+        }
+
+        if (hasMeaningfulValue(proj.githubUrl)) {
+          page.drawText(`GitHub: ${stripHtmlTags(proj.githubUrl)}`, { x: margin, y: y, size: 9, font: timesRoman, color: primaryColor });
+          y -= 13;
+        }
+
+        if (hasMeaningfulValue(proj.liveUrl)) {
+          page.drawText(`Live: ${stripHtmlTags(proj.liveUrl)}`, { x: margin, y: y, size: 9, font: timesRoman, color: primaryColor });
+          y -= 13;
+        }
+
         y -= 12;
-
-        if (proj.technologies) {
-          y = drawText(proj.technologies, margin, y, 9, helveticaOblique, rgb(0.35, 0.35, 0.35), contentWidth);
-          y -= 4;
-        }
-
-        if (proj.description) {
-          y = drawText(proj.description, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        if (proj.githubUrl || proj.liveUrl) {
-          if (proj.githubUrl) {
-            y = drawText(`GitHub: ${proj.githubUrl}`, margin, y, 8.5, helvetica, primaryColor, contentWidth);
-            y -= 2;
-          }
-          if (proj.liveUrl) {
-            y = drawText(`Live: ${proj.liveUrl}`, margin, y, 8.5, helvetica, primaryColor, contentWidth);
-            y -= 2;
-          }
-        }
-
-        y -= idx < cvData.projects.length - 1 ? 8 : 4;
       }
     });
-
-    y -= 12;
+    y -= 8;
   }
 
   // ==================== SKILLS ====================
-  const hasSkills = cvData.skills?.some(s => s.skills?.length > 0);
-  if (hasSkills) {
-    checkSpace(50);
-    page.drawText('Skills', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-
-    cvData.skills.forEach((category, idx) => {
-      if (category.skills?.length > 0) {
-        checkSpace(18);
-        const categoryName = category.name || category.categoryName || 'Skills';
-        const skillsText = `${categoryName}: ${category.skills.join(', ')}`;
-        y = drawText(skillsText, margin, y, 9, helvetica, rgb(0.25, 0.25, 0.25), contentWidth);
-        y -= idx < cvData.skills.length - 1 ? 4 : 2;
+  if (hasSkillsData(cvData.skills)) {
+    y = drawSectionHeader('Technical Skills', y);
+    
+    cvData.skills.forEach((category) => {
+      const skillsList = getSkillsList(category);
+      const hasName = hasMeaningfulValue(category.name);
+      
+      if (hasName || skillsList.length > 0) {
+        checkSpace(20);
+        
+        const categoryName = stripHtmlTags(category.name) || 'Skills';
+        const skillsText = skillsList.join(', ');
+        
+        page.drawText(`${categoryName}:`, { x: margin, y: y, size: 10, font: timesRomanBold, color: gray900 });
+        
+        const labelWidth = timesRomanBold.widthOfTextAtSize(`${categoryName}: `, 10);
+        y = drawWrappedText(skillsText, margin + labelWidth, y, 10, timesRoman, gray700, contentWidth - labelWidth);
+        y -= 6;
       }
     });
-
-    y -= 12;
+    y -= 14;
   }
 
   // ==================== ACHIEVEMENTS ====================
-  const hasAchievements = cvData.achievements?.some(ach => ach.title);
-  if (hasAchievements) {
-    checkSpace(50);
-    page.drawText('Achievements', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-
-    cvData.achievements.forEach((ach, idx) => {
-      if (ach.title) {
-        checkSpace(30);
+  if (hasAchievementsData(cvData.achievements)) {
+    y = drawSectionHeader('Achievements', y);
+    
+    cvData.achievements.forEach((ach) => {
+      if (hasMeaningfulValue(ach.title)) {
+        checkSpace(40);
         
-        page.drawText(ach.title, {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helveticaBold,
-          color: rgb(0.15, 0.15, 0.15),
+        let dateWidth = 0;
+        if (hasMeaningfulValue(ach.date)) {
+          dateWidth = timesRoman.widthOfTextAtSize(stripHtmlTags(ach.date), 10) + 15;
+        }
+        
+        const maxTitleWidth = contentWidth - dateWidth - 10;
+        const titleLines = wrapText(stripHtmlTags(ach.title), timesRomanBold, 10.5, maxTitleWidth);
+        
+        titleLines.forEach((line, idx) => {
+          page.drawText(line, { x: margin, y: y - (idx * 14), size: 10.5, font: timesRomanBold, color: gray900 });
         });
-
-        if (ach.date) {
-          const dateWidth = helvetica.widthOfTextAtSize(ach.date, 9);
-          page.drawText(ach.date, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
-          });
+        
+        if (titleLines.length > 1) y -= (titleLines.length - 1) * 14;
+        
+        if (hasMeaningfulValue(ach.date)) {
+          page.drawText(stripHtmlTags(ach.date), { x: pageWidth - margin - dateWidth + 10, y: y, size: 10, font: timesRoman, color: gray600 });
         }
+        y -= 16;
+
+        if (hasMeaningfulValue(ach.organization)) {
+          page.drawText(stripHtmlTags(ach.organization), { x: margin, y: y, size: 10, font: timesRoman, color: gray600 });
+          y -= 14;
+        }
+
+        if (hasMeaningfulValue(ach.description)) {
+          y = drawWrappedText(stripHtmlTags(ach.description), margin, y, 10, timesRoman, gray700, contentWidth);
+        }
+
         y -= 12;
-
-        if (ach.organization) {
-          y = drawText(ach.organization, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 2;
-        }
-
-        if (ach.description) {
-          y = drawText(ach.description, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
-        }
-
-        y -= idx < cvData.achievements.length - 1 ? 8 : 4;
       }
     });
-
-    y -= 12;
+    y -= 8;
   }
 
   // ==================== VOLUNTEER ====================
-  const hasVolunteer = cvData.volunteer?.some(vol => vol.organization || vol.role);
-  if (hasVolunteer) {
-    checkSpace(50);
-    page.drawText('Volunteer', {
-      x: margin,
-      y: y,
-      size: 11,
-      font: helveticaBold,
-      color: primaryColor,
-    });
-    y -= 14;
-
-    cvData.volunteer.forEach((vol, idx) => {
-      if (vol.organization || vol.role) {
-        checkSpace(35);
+  if (hasVolunteerData(cvData.volunteer)) {
+    y = drawSectionHeader('Volunteer Experience', y);
+    
+    cvData.volunteer.forEach((vol) => {
+      const hasOrg = hasMeaningfulValue(vol.organization);
+      const hasRole = hasMeaningfulValue(vol.role);
+      
+      if (hasOrg || hasRole) {
+        checkSpace(45);
         
-        page.drawText(vol.role || 'Volunteer', {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helveticaBold,
-          color: rgb(0.15, 0.15, 0.15),
-        });
-
+        let dateText = '';
+        let dateWidth = 0;
         if (vol.startDate || vol.endDate) {
-          const dateText = `${formatDate(vol.startDate)} — ${formatDate(vol.endDate)}`;
-          const dateWidth = helvetica.widthOfTextAtSize(dateText, 9);
-          page.drawText(dateText, {
-            x: pageWidth - margin - dateWidth,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4),
+          dateText = `${formatDate(vol.startDate)} – ${formatDate(vol.endDate)}`;
+          dateWidth = timesRoman.widthOfTextAtSize(dateText, 10) + 15;
+        }
+        
+        if (hasRole) {
+          const maxRoleWidth = contentWidth - dateWidth - 10;
+          const roleLines = wrapText(stripHtmlTags(vol.role), timesRomanBold, 10.5, maxRoleWidth);
+          
+          roleLines.forEach((line, idx) => {
+            page.drawText(line, { x: margin, y: y - (idx * 14), size: 10.5, font: timesRomanBold, color: gray900 });
           });
+          
+          if (roleLines.length > 1) y -= (roleLines.length - 1) * 14;
+          
+          if (dateText) {
+            page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 10, font: timesRoman, color: gray600 });
+          }
         }
+        y -= 16;
+
+        if (hasOrg) {
+          let orgText = stripHtmlTags(vol.organization);
+          if (hasMeaningfulValue(vol.location)) {
+            orgText += `, ${stripHtmlTags(vol.location)}`;
+          }
+          page.drawText(orgText, { x: margin, y: y, size: 10, font: timesRomanItalic, color: gray600 });
+          y -= 16;
+        }
+
+        if (hasMeaningfulValue(vol.description)) {
+          const items = parseDescription(vol.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin, y);
+          }
+        }
+
         y -= 12;
+      }
+    });
+  }
 
-        if (vol.organization) {
-          y = drawText(vol.organization, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
+  return await pdfDoc.save();
+}
+
+// ============================================
+// MINIMAL TEMPLATE
+// ============================================
+async function generateMinimalTemplate(pdfDoc, cvData, fonts) {
+  const { helvetica, helveticaBold, helveticaOblique, primaryColor, formatDate, parseDescription, rgb, stripHtmlTags, getSkillsList } = fonts;
+  
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const margin = 55;
+  const contentWidth = pageWidth - (2 * margin);
+  
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin - 10;
+
+  const gray900 = rgb(0.07, 0.07, 0.07);
+  const gray600 = rgb(0.35, 0.35, 0.35);
+  const gray500 = rgb(0.45, 0.45, 0.45);
+  const gray400 = rgb(0.55, 0.55, 0.55);
+  const gray300 = rgb(0.70, 0.70, 0.70);
+
+  const addNewPage = () => {
+    page = pdfDoc.addPage([pageWidth, pageHeight]);
+    y = pageHeight - margin;
+  };
+
+  const checkSpace = (required) => {
+    if (y - required < margin + 30) {
+      addNewPage();
+    }
+  };
+
+  const wrapText = (text, font, size, maxWidth) => {
+    if (!text) return [];
+    const cleanText = stripHtmlTags(text.toString());
+    const words = cleanText.split(' ').filter(w => w);
+    const lines = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const testWidth = font.widthOfTextAtSize(testLine, size);
+      
+      if (testWidth > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  };
+
+  const drawWrappedText = (text, x, yPos, size, font, color, maxWidth) => {
+    const lines = wrapText(text, font, size, maxWidth);
+    let currentY = yPos;
+    
+    for (const line of lines) {
+      checkSpace(size + 6);
+      page.drawText(line, { x, y: currentY, size, font, color });
+      currentY -= size + 6;
+    }
+    return currentY;
+  };
+
+  const drawSectionHeader = (title, yPos) => {
+    checkSpace(30);
+    const spacedTitle = title.toUpperCase().split('').join(' ');
+    page.drawText(spacedTitle, { x: margin, y: yPos, size: 8, font: helvetica, color: gray400 });
+    return yPos - 24;
+  };
+
+  const drawBulletList = (items, x, yPos) => {
+    let currentY = yPos;
+    
+    items.forEach((item) => {
+      if (!item) return;
+      const cleanItem = stripHtmlTags(item);
+      if (!cleanItem) return;
+      
+      checkSpace(18);
+      
+      page.drawText('—', { x, y: currentY, size: 9, font: helvetica, color: gray300 });
+      
+      const lines = wrapText(cleanItem, helvetica, 9, contentWidth - 24);
+      lines.forEach((line, idx) => {
+        page.drawText(line, { x: x + 18, y: currentY - (idx * 14), size: 9, font: helvetica, color: gray600 });
+      });
+      currentY -= lines.length * 14 + 6;
+    });
+    
+    return currentY;
+  };
+
+  // ==================== HEADER ====================
+  checkSpace(90);
+  
+  page.drawText(stripHtmlTags(cvData.personal?.fullName) || 'Your Name', {
+    x: margin,
+    y: y,
+    size: 32,
+    font: helvetica,
+    color: primaryColor,
+  });
+  y -= 44;
+
+  // Contact info
+  const contacts = [];
+  if (hasMeaningfulValue(cvData.personal?.email)) contacts.push(stripHtmlTags(cvData.personal.email));
+  if (hasMeaningfulValue(cvData.personal?.phone)) contacts.push(stripHtmlTags(cvData.personal.phone));
+  if (hasMeaningfulValue(cvData.personal?.location)) contacts.push(stripHtmlTags(cvData.personal.location));
+  if (hasMeaningfulValue(cvData.personal?.linkedin)) contacts.push(stripHtmlTags(cvData.personal.linkedin));
+  if (hasMeaningfulValue(cvData.personal?.website)) contacts.push(stripHtmlTags(cvData.personal.website));
+
+  if (contacts.length > 0) {
+    const contactText = contacts.join('  |  ');
+    const lines = wrapText(contactText, helvetica, 9, contentWidth);
+    lines.forEach((line) => {
+      page.drawText(line, { x: margin, y: y, size: 9, font: helvetica, color: gray500 });
+      y -= 15;
+    });
+  }
+  y -= 6;
+
+  page.drawLine({
+    start: { x: margin, y: y },
+    end: { x: margin + 50, y: y },
+    thickness: 1,
+    color: primaryColor,
+  });
+  y -= 30;
+
+  // ==================== SUMMARY ====================
+  if (hasMeaningfulValue(cvData.personal?.summary)) {
+    y = drawSectionHeader('Summary', y);
+    y = drawWrappedText(stripHtmlTags(cvData.personal.summary), margin, y, 9.5, helvetica, gray600, contentWidth);
+    y -= 26;
+  }
+
+  // ==================== EDUCATION ====================
+  if (hasEducationData(cvData.education)) {
+    y = drawSectionHeader('Education', y);
+    
+    cvData.education.forEach((edu) => {
+      const hasInstitution = hasMeaningfulValue(edu.institution);
+      const hasDegree = hasMeaningfulValue(edu.degree);
+      const hasField = hasMeaningfulValue(edu.field);
+      
+      if (hasInstitution || hasDegree || hasField) {
+        checkSpace(50);
+        
+        let degreeText = '';
+        if (hasDegree && hasField) {
+          degreeText = `${stripHtmlTags(edu.degree)}, ${stripHtmlTags(edu.field)}`;
+        } else if (hasDegree) {
+          degreeText = stripHtmlTags(edu.degree);
+        } else if (hasField) {
+          degreeText = stripHtmlTags(edu.field);
+        }
+        
+        let dateText = '';
+        let dateWidth = 0;
+        if (edu.startDate || edu.endDate) {
+          dateText = `${formatDate(edu.startDate)} — ${formatDate(edu.endDate)}`;
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 9) + 15;
+        }
+        
+        if (degreeText) {
+          const maxDegreeWidth = contentWidth - dateWidth - 10;
+          const degreeLines = wrapText(degreeText, helvetica, 11, maxDegreeWidth);
+          
+          degreeLines.forEach((line, idx) => {
+            page.drawText(line, { x: margin, y: y - (idx * 15), size: 11, font: helvetica, color: gray900 });
+          });
+          
+          if (degreeLines.length > 1) y -= (degreeLines.length - 1) * 15;
+          
+          if (dateText) {
+            page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 9, font: helvetica, color: gray400 });
+          }
+        }
+        y -= 17;
+
+        if (hasInstitution) {
+          page.drawText(stripHtmlTags(edu.institution), { x: margin, y: y, size: 9, font: helvetica, color: gray500 });
+          y -= 14;
         }
 
-        if (vol.description) {
-          y = drawText(vol.description, margin, y, 9, helvetica, rgb(0.3, 0.3, 0.3), contentWidth);
-          y -= 4;
+        if (hasMeaningfulValue(edu.gpa)) {
+          page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, { x: margin, y: y, size: 9, font: helvetica, color: gray400 });
+          y -= 14;
         }
 
-        if (vol.impact) {
-          y = drawText(`Impact: ${vol.impact}`, margin, y, 9, helveticaOblique, rgb(0.35, 0.35, 0.35), contentWidth);
-          y -= 4;
+        y -= 14;
+      }
+    });
+    y -= 10;
+  }
+
+  // ==================== EXPERIENCE ====================
+  if (hasExperienceData(cvData.experience)) {
+    y = drawSectionHeader('Experience', y);
+    
+    cvData.experience.forEach((exp) => {
+      const hasCompany = hasMeaningfulValue(exp.company);
+      const hasPosition = hasMeaningfulValue(exp.position);
+      
+      if (hasCompany || hasPosition) {
+        checkSpace(55);
+        
+        let dateText = '';
+        let dateWidth = 0;
+        if (exp.startDate || exp.endDate || exp.isCurrentRole) {
+          dateText = `${formatDate(exp.startDate)} — ${exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}`;
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 9) + 15;
+        }
+        
+        if (hasPosition) {
+          const maxPosWidth = contentWidth - dateWidth - 10;
+          const posLines = wrapText(stripHtmlTags(exp.position), helvetica, 11, maxPosWidth);
+          
+          posLines.forEach((line, idx) => {
+            page.drawText(line, { x: margin, y: y - (idx * 15), size: 11, font: helvetica, color: gray900 });
+          });
+          
+          if (posLines.length > 1) y -= (posLines.length - 1) * 15;
+          
+          if (dateText) {
+            page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 9, font: helvetica, color: gray400 });
+          }
+        }
+        y -= 17;
+
+        if (hasCompany) {
+          page.drawText(stripHtmlTags(exp.company), { x: margin, y: y, size: 9, font: helvetica, color: gray500 });
+          y -= 18;
         }
 
-        y -= idx < cvData.volunteer.length - 1 ? 8 : 4;
+        if (hasMeaningfulValue(exp.description)) {
+          const items = parseDescription(exp.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin, y);
+          }
+        }
+
+        y -= 14;
+      }
+    });
+    y -= 10;
+  }
+
+  // ==================== PROJECTS ====================
+  if (hasProjectsData(cvData.projects)) {
+    y = drawSectionHeader('Projects', y);
+    
+    cvData.projects.forEach((proj) => {
+      if (hasMeaningfulValue(proj.name)) {
+        checkSpace(50);
+        
+        let dateText = '';
+        let dateWidth = 0;
+        if (proj.startDate || proj.endDate) {
+          if (proj.startDate && proj.endDate) {
+            dateText = `${formatDate(proj.startDate)} — ${formatDate(proj.endDate)}`;
+          } else {
+            dateText = formatDate(proj.startDate) || formatDate(proj.endDate);
+          }
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 9) + 15;
+        }
+        
+        const maxNameWidth = contentWidth - dateWidth - 10;
+        const nameLines = wrapText(stripHtmlTags(proj.name), helvetica, 11, maxNameWidth);
+        
+        nameLines.forEach((line, idx) => {
+          page.drawText(line, { x: margin, y: y - (idx * 15), size: 11, font: helvetica, color: gray900 });
+        });
+        
+        if (nameLines.length > 1) y -= (nameLines.length - 1) * 15;
+        
+        if (dateText) {
+          page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 9, font: helvetica, color: gray400 });
+        }
+        y -= 17;
+
+        if (hasMeaningfulValue(proj.technologies)) {
+          page.drawText(stripHtmlTags(proj.technologies), { x: margin, y: y, size: 9, font: helveticaOblique, color: gray400 });
+          y -= 16;
+        }
+
+        if (hasMeaningfulValue(proj.description)) {
+          const items = parseDescription(proj.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin, y);
+          }
+        }
+
+        if (hasMeaningfulValue(proj.githubUrl)) {
+          page.drawText(`GitHub: ${stripHtmlTags(proj.githubUrl)}`, { x: margin, y: y, size: 8.5, font: helvetica, color: primaryColor });
+          y -= 13;
+        }
+
+        if (hasMeaningfulValue(proj.liveUrl)) {
+          page.drawText(`Live: ${stripHtmlTags(proj.liveUrl)}`, { x: margin, y: y, size: 8.5, font: helvetica, color: primaryColor });
+          y -= 13;
+        }
+
+        y -= 14;
+      }
+    });
+    y -= 10;
+  }
+
+  // ==================== SKILLS ====================
+  if (hasSkillsData(cvData.skills)) {
+    y = drawSectionHeader('Skills', y);
+    
+    cvData.skills.forEach((category) => {
+      const skillsList = getSkillsList(category);
+      const hasName = hasMeaningfulValue(category.name);
+      
+      if (hasName || skillsList.length > 0) {
+        checkSpace(20);
+        
+        const categoryName = stripHtmlTags(category.name) || 'Skills';
+        const labelWidth = 95;
+        
+        page.drawText(categoryName, { x: margin, y: y, size: 9, font: helvetica, color: gray400 });
+        
+        const skillsText = skillsList.join(', ');
+        y = drawWrappedText(skillsText, margin + labelWidth, y, 9, helvetica, gray600, contentWidth - labelWidth);
+        y -= 6;
+      }
+    });
+    y -= 18;
+  }
+
+  // ==================== ACHIEVEMENTS ====================
+  if (hasAchievementsData(cvData.achievements)) {
+    y = drawSectionHeader('Achievements', y);
+    
+    cvData.achievements.forEach((ach) => {
+      if (hasMeaningfulValue(ach.title)) {
+        checkSpace(40);
+        
+        let dateWidth = 0;
+        if (hasMeaningfulValue(ach.date)) {
+          dateWidth = helvetica.widthOfTextAtSize(stripHtmlTags(ach.date), 9) + 15;
+        }
+        
+        const maxTitleWidth = contentWidth - dateWidth - 10;
+        const titleLines = wrapText(stripHtmlTags(ach.title), helvetica, 11, maxTitleWidth);
+        
+        titleLines.forEach((line, idx) => {
+          page.drawText(line, { x: margin, y: y - (idx * 15), size: 11, font: helvetica, color: gray900 });
+        });
+        
+        if (titleLines.length > 1) y -= (titleLines.length - 1) * 15;
+        
+        if (hasMeaningfulValue(ach.date)) {
+          page.drawText(stripHtmlTags(ach.date), { x: pageWidth - margin - dateWidth + 10, y: y, size: 9, font: helvetica, color: gray400 });
+        }
+        y -= 17;
+
+        if (hasMeaningfulValue(ach.organization)) {
+          page.drawText(stripHtmlTags(ach.organization), { x: margin, y: y, size: 9, font: helvetica, color: gray500 });
+          y -= 14;
+        }
+
+        if (hasMeaningfulValue(ach.description)) {
+          y = drawWrappedText(stripHtmlTags(ach.description), margin, y, 9, helvetica, gray600, contentWidth);
+        }
+
+        y -= 14;
+      }
+    });
+    y -= 10;
+  }
+
+  // ==================== VOLUNTEER ====================
+  if (hasVolunteerData(cvData.volunteer)) {
+    y = drawSectionHeader('Volunteer', y);
+    
+    cvData.volunteer.forEach((vol) => {
+      const hasOrg = hasMeaningfulValue(vol.organization);
+      const hasRole = hasMeaningfulValue(vol.role);
+      
+      if (hasOrg || hasRole) {
+        checkSpace(50);
+        
+        let dateText = '';
+        let dateWidth = 0;
+        if (vol.startDate || vol.endDate) {
+          dateText = `${formatDate(vol.startDate)} — ${formatDate(vol.endDate)}`;
+          dateWidth = helvetica.widthOfTextAtSize(dateText, 9) + 15;
+        }
+        
+        if (hasRole) {
+          const maxRoleWidth = contentWidth - dateWidth - 10;
+          const roleLines = wrapText(stripHtmlTags(vol.role), helvetica, 11, maxRoleWidth);
+          
+          roleLines.forEach((line, idx) => {
+            page.drawText(line, { x: margin, y: y - (idx * 15), size: 11, font: helvetica, color: gray900 });
+          });
+          
+          if (roleLines.length > 1) y -= (roleLines.length - 1) * 15;
+          
+          if (dateText) {
+            page.drawText(dateText, { x: pageWidth - margin - dateWidth + 10, y: y, size: 9, font: helvetica, color: gray400 });
+          }
+        }
+        y -= 17;
+
+        if (hasOrg) {
+          page.drawText(stripHtmlTags(vol.organization), { x: margin, y: y, size: 9, font: helvetica, color: gray500 });
+          y -= 16;
+        }
+
+        if (hasMeaningfulValue(vol.description)) {
+          const items = parseDescription(vol.description);
+          if (items.length > 0) {
+            y = drawBulletList(items, margin, y);
+          }
+        }
+
+        y -= 14;
       }
     });
   }
