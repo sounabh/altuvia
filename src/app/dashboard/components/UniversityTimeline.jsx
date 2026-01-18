@@ -568,30 +568,29 @@ const UniversityTimeline = ({
     setSavingTasks(prev => ({ ...prev, [taskKey]: true }));
 
     // ✅ CRITICAL: Update timeline state immediately for UI (single source of truth)
- // ✅ CRITICAL: Update timeline state immediately for UI (single source of truth)
-setTimeline(prevTimeline => {
-  const newTimeline = JSON.parse(JSON.stringify(prevTimeline));
-  const targetTask = newTimeline.phases[phaseIndex].tasks[taskIndex];
-  targetTask.completed = newCompletedState;
-  targetTask.status = newCompletedState ? 'completed' : 'pending';
-  
-  // ✅ FIX: Update parent cache with the NEW timeline immediately
-  if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
-    setTimelineCache(prev => ({
-      ...prev,
-      [selectedUniversity.id]: {
-        ...prev[selectedUniversity.id],
-        timeline: newTimeline, // ✅ Use newTimeline instead of stale timeline
-        metadata: metadata,
-        expandedPhases: expandedPhases,
-        expandedTasks: expandedTasks,
-        cachedAt: new Date().toISOString()
+    setTimeline(prevTimeline => {
+      const newTimeline = JSON.parse(JSON.stringify(prevTimeline));
+      const targetTask = newTimeline.phases[phaseIndex].tasks[taskIndex];
+      targetTask.completed = newCompletedState;
+      targetTask.status = newCompletedState ? 'completed' : 'pending';
+      
+      // ✅ FIX: Update parent cache with the NEW timeline immediately
+      if (selectedUniversity?.id && timelineCache[selectedUniversity.id]) {
+        setTimelineCache(prev => ({
+          ...prev,
+          [selectedUniversity.id]: {
+            ...prev[selectedUniversity.id],
+            timeline: newTimeline, // ✅ Use newTimeline instead of stale timeline
+            metadata: metadata,
+            expandedPhases: expandedPhases,
+            expandedTasks: expandedTasks,
+            cachedAt: new Date().toISOString()
+          }
+        }));
       }
-    }));
-  }
-  
-  return newTimeline;
-});
+      
+      return newTimeline;
+    });
 
     try {
       const userId = session?.user?.id || session?.userId || session?.user?.sub;
@@ -893,83 +892,93 @@ setTimeline(prevTimeline => {
         </div>
       </div>
 
-   
-
-      {/* University Selector */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <label className="text-lg font-bold text-gray-900">Select University</label>
-          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-            {universities.length} {universities.length === 1 ? 'university' : 'universities'} saved
+      {/* ✅ UPDATED: University Selector - Stats Overview Style */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-900">Select University</h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full font-medium">
+            {universities.length} saved
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {universities.map((uni) => {
             const isSelected = selectedUniversity?.id === uni.id;
-            const isLoading = loadingTimelines[uni.id];
             const progress = calculateUniversityProgress(uni);
-            const hasCache = timelineCache[uni.id];
 
             return (
               <button
                 key={uni.id}
                 onClick={() => handleUniversityChange(uni)}
                 disabled={generatingTimeline}
-                className={`p-5 rounded-xl border-2 transition-all text-left hover:shadow-lg disabled:opacity-50 group ${
+                className={`relative group overflow-hidden rounded-2xl border transition-all duration-300 disabled:opacity-50 text-left ${
                   isSelected
-                    ? 'border-[#002147] bg-[#EFF6FF] shadow-lg ring-2 ring-[#002147]/20'
-                    : 'border-gray-200 hover:border-[#002147] bg-white'
+                    ? 'border-[#002147] bg-white/60 shadow-lg backdrop-blur-xl'
+                    : 'border-white/60 bg-white/40 shadow-sm hover:shadow-lg backdrop-blur-xl'
                 }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {uni.images?.[0]?.imageUrl ? (
-                      <img
-                        src={uni.images[0].imageUrl}
-                        alt={uni.images[0].imageAltText || uni.universityName}
-                        className="w-12 h-12 rounded-xl object-cover border border-gray-200"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-gray-500" />
+                {/* Gradient Overlay on Hover */}
+                <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br from-[#3598FE] to-[#002147]`} />
+                
+                <div className="p-5 flex flex-col h-full justify-between relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    {/* University Logo/Icon */}
+                    <div className={`p-2.5 rounded-xl group-hover:scale-110 transition-transform duration-300 ${
+                      isSelected ? 'bg-blue-100' : 'bg-gray-100'
+                    }`}>
+                      {uni.images?.[0]?.imageUrl ? (
+                        <img
+                          src={uni.images[0].imageUrl}
+                          alt={uni.images[0].imageAltText || uni.universityName}
+                          className="w-5 h-5 rounded object-cover"
+                        />
+                      ) : (
+                        <Building2 className={`w-5 h-5 ${isSelected ? 'text-[#002147]' : 'text-gray-500'}`} />
+                      )}
+                    </div>
+                    
+                    {isSelected && (
+                      <div className="flex items-center gap-1 text-[10px] font-bold bg-[#002147] text-white px-2 py-1 rounded-full">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Selected</span>
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 line-clamp-1 group-hover:text-[#002147] transition-colors">
-                        {uni.universityName || uni.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3" />
-                        {uni.location}
-                      </p>
+                  </div>
+                  
+                  <div>
+                    <div className={`text-3xl font-bold mb-1 ${
+                      isSelected 
+                        ? 'bg-gradient-to-br from-[#3598FE] to-[#002147] bg-clip-text text-transparent'
+                        : 'text-gray-900'
+                    }`}>
+                      {progress}%
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                   
-                    {isSelected ? (
-                      <CheckCircle2 className="w-6 h-6 text-[#002147] flex-shrink-0" />
-                    ) : isLoading ? (
-                      <Loader2 className="w-6 h-6 text-gray-400 animate-spin flex-shrink-0" />
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 flex items-center gap-1">
-                      <FileText className="w-3 h-3" />
-                      Essays: {uni.completedEssays || 0}/{uni.totalEssays || 0}
-                    </span>
-                    <span className="font-semibold text-gray-700">{progress}%</span>
-                  </div>
-                  <div className="relative">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className={`h-2.5 rounded-full transition-all duration-500 ${
-                          isSelected ? 'bg-[#002147]' : 'bg-gray-400'
-                        }`}
-                        style={{ width: `${progress}%` }}
-                      />
+                    <div className={`text-sm font-semibold tracking-tight mb-1 ${
+                      isSelected ? 'text-[#002147]' : 'text-gray-900'
+                    }`}>
+                      {uni.universityName || uni.name}
+                    </div>
+                    <div className="text-xs text-gray-500 font-medium flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {uni.location}
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="mt-3">
+                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full relative transition-all duration-500 ${
+                            isSelected 
+                              ? 'bg-gradient-to-r from-[#3598FE] to-[#002147]'
+                              : 'bg-gray-400'
+                          }`}
+                          style={{ width: `${progress}%` }}
+                        >
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -978,17 +987,20 @@ setTimeline(prevTimeline => {
           })}
         </div>
 
-        {/* ✅ FIX 5: Add "Generate Timeline" button AFTER university selector */}
+        {/* ✅ Generate Timeline Button */}
         {selectedUniversity && !timeline && !generatingTimeline && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => generateTimeline(selectedUniversity)}
-              disabled={generatingTimeline}
-              className="px-8 py-4 bg-[#002147] text-white rounded-xl hover:bg-[#001122] transition-all font-semibold inline-flex items-center gap-3 shadow-lg"
-            >
-              <Sparkles className="w-5 h-5" />
-              Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
-            </button>
+          <div className="relative overflow-hidden rounded-2xl bg-[#002147] p-1 shadow-lg">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
+            <div className="relative bg-[#002147] rounded-xl p-4">
+              <button
+                onClick={() => generateTimeline(selectedUniversity)}
+                disabled={generatingTimeline}
+                className="w-full px-6 py-3 bg-gradient-to-r from-[#3598FE] to-[#002147] text-white rounded-lg hover:opacity-90 transition-all font-semibold inline-flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Sparkles className="w-5 h-5" />
+                Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1040,350 +1052,348 @@ setTimeline(prevTimeline => {
           {/* Stats Cards - Enhanced */}
           {(metadata || selectedUniversity) && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-
-              
-{/* Deadline Card - FIXED */}
-{/* Deadline Card - PROPERLY FIXED */}
-<div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md border-gray-200 relative group`}>
-  <div className="flex items-center gap-3 mb-3">
-    <div className="p-2.5 rounded-xl bg-amber-100">
-      <Timer className="w-5 h-5 text-[#D97706]" />
-    </div>
-    <span className="text-sm font-medium text-gray-500">Deadlines</span>
-  </div>
-  
-  {(() => {
-    // ============================================
-    // PROPERLY FIXED DEADLINE PARSER
-    // ============================================
-    
-    const parseAllDeadlines = () => {
-      const deadlines = [];
-      
-      // Get the raw string
-      let deadlineString = '';
-      
-      if (Array.isArray(selectedUniversity?.roundDeadlines) && selectedUniversity.roundDeadlines.length > 0) {
-        deadlineString = selectedUniversity.roundDeadlines.join('; ');
-      } else if (typeof selectedUniversity?.averageDeadlines === 'string') {
-        deadlineString = selectedUniversity.averageDeadlines.trim();
-      }
-      
-      if (!deadlineString) return deadlines;
-      
-      console.log('Original deadline string:', deadlineString);
-      
-      // ============================================
-      // STEP 1: Split by "Round" keyword using lookahead
-      // This splits BEFORE each "Round" but keeps "Round" in the result
-      // ============================================
-      const segments = deadlineString
-        .split(/(?=Round\s*\d+)/gi)
-        .map(s => s.trim())
-        .filter(Boolean);
-      
-      console.log('Segments after split:', segments);
-      
-      // ============================================
-      // STEP 2: Parse each segment
-      // ============================================
-      segments.forEach((segment, idx) => {
-        // Clean up trailing punctuation
-        segment = segment.replace(/[,;|]+$/, '').trim();
-        
-        // Extract round name and date
-        // Pattern: "Round 1 : (September 3, 2025)" or "Round 1: September 3, 2025"
-        const colonIndex = segment.indexOf(':');
-        
-        let roundName = `Round ${idx + 1}`;
-        let dateStr = segment;
-        
-        if (colonIndex !== -1) {
-          roundName = segment.substring(0, colonIndex).trim();
-          dateStr = segment.substring(colonIndex + 1).trim();
-        }
-        
-        // Clean up date string - remove parentheses, periods, extra spaces
-        dateStr = dateStr
-          .replace(/[()]/g, '')  // Remove parentheses
-          .replace(/\./g, '')     // Remove periods
-          .replace(/\s+/g, ' ')   // Normalize spaces
-          .trim();
-        
-        console.log(`Segment ${idx}: Round="${roundName}", DateStr="${dateStr}"`);
-        
-        // ============================================
-        // STEP 3: Parse the date
-        // ============================================
-        const parseDate = (str) => {
-          if (!str) return { date: null, isMonthYearOnly: false };
-          
-          const months = {
-            'january': 0, 'jan': 0,
-            'february': 1, 'feb': 1,
-            'march': 2, 'mar': 2,
-            'april': 3, 'apr': 3,
-            'may': 4,
-            'june': 5, 'jun': 5,
-            'july': 6, 'jul': 6,
-            'august': 7, 'aug': 7,
-            'september': 8, 'sep': 8, 'sept': 8,
-            'october': 9, 'oct': 9,
-            'november': 10, 'nov': 10,
-            'december': 11, 'dec': 11
-          };
-          
-          let match;
-          
-          // Format: "September 3, 2025" or "September 3 2025"
-          match = str.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})$/i);
-          if (match) {
-            const monthNum = months[match[1].toLowerCase()];
-            if (monthNum !== undefined) {
-              return {
-                date: new Date(parseInt(match[3]), monthNum, parseInt(match[2])),
-                isMonthYearOnly: false
-              };
-            }
-          }
-          
-          // Format: "3 September, 2025" or "3 September 2025"
-          match = str.match(/^(\d{1,2})\s+([A-Za-z]+),?\s*(\d{4})$/i);
-          if (match) {
-            const monthNum = months[match[2].toLowerCase()];
-            if (monthNum !== undefined) {
-              return {
-                date: new Date(parseInt(match[3]), monthNum, parseInt(match[1])),
-                isMonthYearOnly: false
-              };
-            }
-          }
-          
-          // Format: "September 2025" (month year only)
-          match = str.match(/^([A-Za-z]+)\s+(\d{4})$/i);
-          if (match) {
-            const monthNum = months[match[1].toLowerCase()];
-            if (monthNum !== undefined) {
-              return {
-                date: new Date(parseInt(match[2]), monthNum, 1),
-                isMonthYearOnly: true
-              };
-            }
-          }
-          
-          // Format: "September 3" (no year - use current/next year)
-          match = str.match(/^([A-Za-z]+)\s+(\d{1,2})$/i);
-          if (match) {
-            const monthNum = months[match[1].toLowerCase()];
-            if (monthNum !== undefined) {
-              const now = new Date();
-              let year = now.getFullYear();
-              const testDate = new Date(year, monthNum, parseInt(match[2]));
-              if (testDate < now) {
-                year++;
-              }
-              return {
-                date: new Date(year, monthNum, parseInt(match[2])),
-                isMonthYearOnly: false
-              };
-            }
-          }
-          
-          // Format: "3 September" (no year)
-          match = str.match(/^(\d{1,2})\s+([A-Za-z]+)$/i);
-          if (match) {
-            const monthNum = months[match[2].toLowerCase()];
-            if (monthNum !== undefined) {
-              const now = new Date();
-              let year = now.getFullYear();
-              const testDate = new Date(year, monthNum, parseInt(match[1]));
-              if (testDate < now) {
-                year++;
-              }
-              return {
-                date: new Date(year, monthNum, parseInt(match[1])),
-                isMonthYearOnly: false
-              };
-            }
-          }
-          
-          // Fallback: try native Date parsing
-          const fallback = new Date(str);
-          if (!isNaN(fallback.getTime())) {
-            return { date: fallback, isMonthYearOnly: false };
-          }
-          
-          return { date: null, isMonthYearOnly: false };
-        };
-        
-        const { date, isMonthYearOnly } = parseDate(dateStr);
-        
-        console.log(`Parsed date for ${roundName}:`, date);
-        
-        deadlines.push({
-          round: roundName,
-          date: date,
-          dateString: dateStr,
-          isMonthYearOnly: isMonthYearOnly,
-          parseError: date === null
-        });
-      });
-      
-      return deadlines;
-    };
-    
-    // ============================================
-    // MAIN RENDER LOGIC
-    // ============================================
-    
-    const allDeadlines = parseAllDeadlines();
-    
-    console.log('Final deadlines:', allDeadlines);
-    
-    if (allDeadlines.length === 0) {
-      return <div className="text-gray-400 text-sm">No deadline set</div>;
-    }
-    
-    // Sort by date (null dates go to the end)
-    allDeadlines.sort((a, b) => {
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return a.date - b.date;
-    });
-    
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    // Find next upcoming deadline
-    const nextUpcomingIndex = allDeadlines.findIndex(d => d.date && d.date >= todayStart);
-    const nextDeadline = nextUpcomingIndex >= 0 ? allDeadlines[nextUpcomingIndex] : allDeadlines[0];
-    
-    // Helper functions
-    const getDaysUntil = (date) => {
-      if (!date) return null;
-      return Math.ceil((date - now) / (1000 * 60 * 60 * 24));
-    };
-    
-    const formatDate = (deadline) => {
-      if (!deadline.date) return deadline.dateString || 'Date TBD';
-      
-      const options = deadline.isMonthYearOnly 
-        ? { month: 'long', year: 'numeric' }
-        : { month: 'long', day: 'numeric', year: 'numeric' };
-      
-      return deadline.date.toLocaleDateString('en-US', options);
-    };
-    
-    const formatDateShort = (deadline) => {
-      if (!deadline.date) return deadline.dateString || 'TBD';
-      
-      const options = deadline.isMonthYearOnly 
-        ? { month: 'short', year: 'numeric' }
-        : { month: 'short', day: 'numeric', year: 'numeric' };
-      
-      return deadline.date.toLocaleDateString('en-US', options);
-    };
-    
-    const daysUntil = getDaysUntil(nextDeadline?.date);
-    const isPast = daysUntil !== null && daysUntil < 0;
-    const isToday = daysUntil === 0;
-    
-    return (
-      <>
-        <div className="text-xs text-gray-500 mb-1">
-          {nextDeadline.round}
-          {isPast && <span className="ml-2 text-gray-400">(Passed)</span>}
-        </div>
-        <div className={`text-lg font-bold ${isPast ? 'text-gray-400' : 'text-gray-900'}`}>
-          {formatDate(nextDeadline)}
-        </div>
-        {daysUntil !== null && (
-          <div className={`text-sm mt-1 font-semibold flex items-center gap-1 ${
-            isPast ? 'text-gray-400' :
-            isToday ? 'text-rose-600' :
-            daysUntil <= 14 ? 'text-rose-600' : 
-            daysUntil <= 30 ? 'text-amber-600' : 'text-gray-600'
-          }`}>
-            {!isPast && daysUntil <= 14 && daysUntil > 0 && <AlertCircle className="w-4 h-4" />}
-            {isToday ? 'Today!' : 
-             isPast ? `${Math.abs(daysUntil)} days ago` : 
-             `${daysUntil} days left`}
-          </div>
-        )}
-        {allDeadlines.length > 1 && (
-          <div className="text-xs text-gray-500 mt-2">
-            +{allDeadlines.length - 1} more round{allDeadlines.length > 2 ? 's' : ''}
-          </div>
-        )}
-
-        {/* Hover Tooltip */}
-        <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#D97706] p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-              <span className="text-sm font-bold text-gray-900">All Deadlines</span>
-              <span className="text-xs font-semibold text-[#D97706] bg-amber-100 px-2 py-1 rounded-full">
-                {allDeadlines.length} round{allDeadlines.length > 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {allDeadlines.map((deadline, idx) => {
-                const daysUntilThis = getDaysUntil(deadline.date);
-                const isThisPast = daysUntilThis !== null && daysUntilThis < 0;
-                const isThisNext = nextUpcomingIndex === idx;
-                
-                return (
-                  <div 
-                    key={idx} 
-                    className={`text-xs p-3 rounded-lg border transition-colors ${
-                      isThisNext 
-                        ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200' 
-                        : isThisPast 
-                          ? 'bg-gray-50 border-gray-200 opacity-60' 
-                          : 'bg-gray-50 border-gray-200 hover:bg-amber-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-gray-700">{deadline.round}</span>
-                      {isThisNext && (
-                        <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">
-                          Next
-                        </span>
-                      )}
-                      {isThisPast && (
-                        <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">
-                          Passed
-                        </span>
-                      )}
-                    </div>
-                    <div className={`mb-1 ${isThisPast ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {formatDateShort(deadline)}
-                      {deadline.isMonthYearOnly && (
-                        <span className="text-gray-400 ml-1">(Month only)</span>
-                      )}
-                    </div>
-                    {daysUntilThis !== null && (
-                      <div className={`text-xs font-medium ${
-                        isThisPast ? 'text-gray-400' :
-                        daysUntilThis === 0 ? 'text-rose-600' :
-                        daysUntilThis <= 14 ? 'text-rose-600' : 
-                        daysUntilThis <= 30 ? 'text-amber-600' : 'text-gray-500'
-                      }`}>
-                        {daysUntilThis === 0 ? 'Today!' :
-                         isThisPast ? `${Math.abs(daysUntilThis)} days ago` :
-                         `${daysUntilThis} days away`}
-                      </div>
-                    )}
+              {/* Deadline Card - PROPERLY FIXED */}
+              <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md border-gray-200 relative group`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 rounded-xl bg-amber-100">
+                    <Timer className="w-5 h-5 text-[#D97706]" />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  })()}
-</div>
+                  <span className="text-sm font-medium text-gray-500">Deadlines</span>
+                </div>
+                
+                {(() => {
+                  // ============================================
+                  // PROPERLY FIXED DEADLINE PARSER
+                  // ============================================
+                  
+                  const parseAllDeadlines = () => {
+                    const deadlines = [];
+                    
+                    // Get the raw string
+                    let deadlineString = '';
+                    
+                    if (Array.isArray(selectedUniversity?.roundDeadlines) && selectedUniversity.roundDeadlines.length > 0) {
+                      deadlineString = selectedUniversity.roundDeadlines.join('; ');
+                    } else if (typeof selectedUniversity?.averageDeadlines === 'string') {
+                      deadlineString = selectedUniversity.averageDeadlines.trim();
+                    }
+                    
+                    if (!deadlineString) return deadlines;
+                    
+                    console.log('Original deadline string:', deadlineString);
+                    
+                    // ============================================
+                    // STEP 1: Split by "Round" keyword using lookahead
+                    // This splits BEFORE each "Round" but keeps "Round" in the result
+                    // ============================================
+                    const segments = deadlineString
+                      .split(/(?=Round\s*\d+)/gi)
+                      .map(s => s.trim())
+                      .filter(Boolean);
+                    
+                    console.log('Segments after split:', segments);
+                    
+                    // ============================================
+                    // STEP 2: Parse each segment
+                    // ============================================
+                    segments.forEach((segment, idx) => {
+                      // Clean up trailing punctuation
+                      segment = segment.replace(/[,;|]+$/, '').trim();
+                      
+                      // Extract round name and date
+                      // Pattern: "Round 1 : (September 3, 2025)" or "Round 1: September 3, 2025"
+                      const colonIndex = segment.indexOf(':');
+                      
+                      let roundName = `Round ${idx + 1}`;
+                      let dateStr = segment;
+                      
+                      if (colonIndex !== -1) {
+                        roundName = segment.substring(0, colonIndex).trim();
+                        dateStr = segment.substring(colonIndex + 1).trim();
+                      }
+                      
+                      // Clean up date string - remove parentheses, periods, extra spaces
+                      dateStr = dateStr
+                        .replace(/[()]/g, '')  // Remove parentheses
+                        .replace(/\./g, '')     // Remove periods
+                        .replace(/\s+/g, ' ')   // Normalize spaces
+                        .trim();
+                      
+                      console.log(`Segment ${idx}: Round="${roundName}", DateStr="${dateStr}"`);
+                      
+                      // ============================================
+                      // STEP 3: Parse the date
+                      // ============================================
+                      const parseDate = (str) => {
+                        if (!str) return { date: null, isMonthYearOnly: false };
+                        
+                        const months = {
+                          'january': 0, 'jan': 0,
+                          'february': 1, 'feb': 1,
+                          'march': 2, 'mar': 2,
+                          'april': 3, 'apr': 3,
+                          'may': 4,
+                          'june': 5, 'jun': 5,
+                          'july': 6, 'jul': 6,
+                          'august': 7, 'aug': 7,
+                          'september': 8, 'sep': 8, 'sept': 8,
+                          'october': 9, 'oct': 9,
+                          'november': 10, 'nov': 10,
+                          'december': 11, 'dec': 11
+                        };
+                        
+                        let match;
+                        
+                        // Format: "September 3, 2025" or "September 3 2025"
+                        match = str.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})$/i);
+                        if (match) {
+                          const monthNum = months[match[1].toLowerCase()];
+                          if (monthNum !== undefined) {
+                            return {
+                              date: new Date(parseInt(match[3]), monthNum, parseInt(match[2])),
+                              isMonthYearOnly: false
+                            };
+                          }
+                        }
+                        
+                        // Format: "3 September, 2025" or "3 September 2025"
+                        match = str.match(/^(\d{1,2})\s+([A-Za-z]+),?\s*(\d{4})$/i);
+                        if (match) {
+                          const monthNum = months[match[2].toLowerCase()];
+                          if (monthNum !== undefined) {
+                            return {
+                              date: new Date(parseInt(match[3]), monthNum, parseInt(match[1])),
+                              isMonthYearOnly: false
+                            };
+                          }
+                        }
+                        
+                        // Format: "September 2025" (month year only)
+                        match = str.match(/^([A-Za-z]+)\s+(\d{4})$/i);
+                        if (match) {
+                          const monthNum = months[match[1].toLowerCase()];
+                          if (monthNum !== undefined) {
+                            return {
+                              date: new Date(parseInt(match[2]), monthNum, 1),
+                              isMonthYearOnly: true
+                            };
+                          }
+                        }
+                        
+                        // Format: "September 3" (no year - use current/next year)
+                        match = str.match(/^([A-Za-z]+)\s+(\d{1,2})$/i);
+                        if (match) {
+                          const monthNum = months[match[1].toLowerCase()];
+                          if (monthNum !== undefined) {
+                            const now = new Date();
+                            let year = now.getFullYear();
+                            const testDate = new Date(year, monthNum, parseInt(match[2]));
+                            if (testDate < now) {
+                              year++;
+                            }
+                            return {
+                              date: new Date(year, monthNum, parseInt(match[2])),
+                              isMonthYearOnly: false
+                            };
+                          }
+                        }
+                        
+                        // Format: "3 September" (no year)
+                        match = str.match(/^(\d{1,2})\s+([A-Za-z]+)$/i);
+                        if (match) {
+                          const monthNum = months[match[2].toLowerCase()];
+                          if (monthNum !== undefined) {
+                            const now = new Date();
+                            let year = now.getFullYear();
+                            const testDate = new Date(year, monthNum, parseInt(match[1]));
+                            if (testDate < now) {
+                              year++;
+                            }
+                            return {
+                              date: new Date(year, monthNum, parseInt(match[1])),
+                              isMonthYearOnly: false
+                            };
+                          }
+                        }
+                        
+                        // Fallback: try native Date parsing
+                        const fallback = new Date(str);
+                        if (!isNaN(fallback.getTime())) {
+                          return { date: fallback, isMonthYearOnly: false };
+                        }
+                        
+                        return { date: null, isMonthYearOnly: false };
+                      };
+                      
+                      const { date, isMonthYearOnly } = parseDate(dateStr);
+                      
+                      console.log(`Parsed date for ${roundName}:`, date);
+                      
+                      deadlines.push({
+                        round: roundName,
+                        date: date,
+                        dateString: dateStr,
+                        isMonthYearOnly: isMonthYearOnly,
+                        parseError: date === null
+                      });
+                    });
+                    
+                    return deadlines;
+                  };
+                  
+                  // ============================================
+                  // MAIN RENDER LOGIC
+                  // ============================================
+                  
+                  const allDeadlines = parseAllDeadlines();
+                  
+                  console.log('Final deadlines:', allDeadlines);
+                  
+                  if (allDeadlines.length === 0) {
+                    return <div className="text-gray-400 text-sm">No deadline set</div>;
+                  }
+                  
+                  // Sort by date (null dates go to the end)
+                  allDeadlines.sort((a, b) => {
+                    if (!a.date && !b.date) return 0;
+                    if (!a.date) return 1;
+                    if (!b.date) return -1;
+                    return a.date - b.date;
+                  });
+                  
+                  const now = new Date();
+                  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  
+                  // Find next upcoming deadline
+                  const nextUpcomingIndex = allDeadlines.findIndex(d => d.date && d.date >= todayStart);
+                  const nextDeadline = nextUpcomingIndex >= 0 ? allDeadlines[nextUpcomingIndex] : allDeadlines[0];
+                  
+                  // Helper functions
+                  const getDaysUntil = (date) => {
+                    if (!date) return null;
+                    return Math.ceil((date - now) / (1000 * 60 * 60 * 24));
+                  };
+                  
+                  const formatDate = (deadline) => {
+                    if (!deadline.date) return deadline.dateString || 'Date TBD';
+                    
+                    const options = deadline.isMonthYearOnly 
+                      ? { month: 'long', year: 'numeric' }
+                      : { month: 'long', day: 'numeric', year: 'numeric' };
+                    
+                    return deadline.date.toLocaleDateString('en-US', options);
+                  };
+                  
+                  const formatDateShort = (deadline) => {
+                    if (!deadline.date) return deadline.dateString || 'TBD';
+                    
+                    const options = deadline.isMonthYearOnly 
+                      ? { month: 'short', year: 'numeric' }
+                      : { month: 'short', day: 'numeric', year: 'numeric' };
+                    
+                    return deadline.date.toLocaleDateString('en-US', options);
+                  };
+                  
+                  const daysUntil = getDaysUntil(nextDeadline?.date);
+                  const isPast = daysUntil !== null && daysUntil < 0;
+                  const isToday = daysUntil === 0;
+                  
+                  return (
+                    <>
+                      <div className="text-xs text-gray-500 mb-1">
+                        {nextDeadline.round}
+                        {isPast && <span className="ml-2 text-gray-400">(Passed)</span>}
+                      </div>
+                      <div className={`text-lg font-bold ${isPast ? 'text-gray-400' : 'text-gray-900'}`}>
+                        {formatDate(nextDeadline)}
+                      </div>
+                      {daysUntil !== null && (
+                        <div className={`text-sm mt-1 font-semibold flex items-center gap-1 ${
+                          isPast ? 'text-gray-400' :
+                          isToday ? 'text-rose-600' :
+                          daysUntil <= 14 ? 'text-rose-600' : 
+                          daysUntil <= 30 ? 'text-amber-600' : 'text-gray-600'
+                        }`}>
+                          {!isPast && daysUntil <= 14 && daysUntil > 0 && <AlertCircle className="w-4 h-4" />}
+                          {isToday ? 'Today!' : 
+                          isPast ? `${Math.abs(daysUntil)} days ago` : 
+                          `${daysUntil} days left`}
+                        </div>
+                      )}
+                      {allDeadlines.length > 1 && (
+                        <div className="text-xs text-gray-500 mt-2">
+                          +{allDeadlines.length - 1} more round{allDeadlines.length > 2 ? 's' : ''}
+                        </div>
+                      )}
+
+                      {/* Hover Tooltip */}
+                      <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border-2 border-[#D97706] p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                            <span className="text-sm font-bold text-gray-900">All Deadlines</span>
+                            <span className="text-xs font-semibold text-[#D97706] bg-amber-100 px-2 py-1 rounded-full">
+                              {allDeadlines.length} round{allDeadlines.length > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {allDeadlines.map((deadline, idx) => {
+                              const daysUntilThis = getDaysUntil(deadline.date);
+                              const isThisPast = daysUntilThis !== null && daysUntilThis < 0;
+                              const isThisNext = nextUpcomingIndex === idx;
+                              
+                              return (
+                                <div 
+                                  key={idx} 
+                                  className={`text-xs p-3 rounded-lg border transition-colors ${
+                                    isThisNext 
+                                      ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200' 
+                                      : isThisPast 
+                                        ? 'bg-gray-50 border-gray-200 opacity-60' 
+                                        : 'bg-gray-50 border-gray-200 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium text-gray-700">{deadline.round}</span>
+                                    {isThisNext && (
+                                      <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">
+                                        Next
+                                      </span>
+                                    )}
+                                    {isThisPast && (
+                                      <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">
+                                        Passed
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className={`mb-1 ${isThisPast ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    {formatDateShort(deadline)}
+                                    {deadline.isMonthYearOnly && (
+                                      <span className="text-gray-400 ml-1">(Month only)</span>
+                                    )}
+                                  </div>
+                                  {daysUntilThis !== null && (
+                                    <div className={`text-xs font-medium ${
+                                      isThisPast ? 'text-gray-400' :
+                                      daysUntilThis === 0 ? 'text-rose-600' :
+                                      daysUntilThis <= 14 ? 'text-rose-600' : 
+                                      daysUntilThis <= 30 ? 'text-amber-600' : 'text-gray-500'
+                                    }`}>
+                                      {daysUntilThis === 0 ? 'Today!' :
+                                      isThisPast ? `${Math.abs(daysUntilThis)} days ago` :
+                                      `${daysUntilThis} days away`}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
               {/* Essays Card - Color coded by completion */}
               <div className={`bg-white rounded-xl shadow-sm border-2 p-5 transition-all hover:shadow-md ${
                 essayCounts.rate === 100
