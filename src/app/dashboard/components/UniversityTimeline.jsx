@@ -814,7 +814,7 @@ const UniversityTimeline = ({
   // Empty state
   if (!universities || universities.length === 0) {
     return (
-      <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-200">
+      <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
         <div className="w-20 h-20 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-6">
           <Calendar className="w-10 h-10 text-[#002147]" />
         </div>
@@ -860,34 +860,29 @@ const UniversityTimeline = ({
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-[#002147] rounded-2xl p-8 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyek0zNiAyNnYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
-        
-        <div className="relative flex items-start justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-              <Sparkles className="w-8 h-8 text-yellow-300" />
+      {/* ✅ UPDATED: Header Section - Clean Minimalist Design */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-100 rounded-xl">
+              <Sparkles className="w-5 h-5 text-[#002147]" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">AI Application Timeline</h1>
-              <p className="text-blue-200 text-lg">
-                Your personalized step-by-step guide from research to submission
+              <h1 className="text-lg font-bold text-gray-900">AI Application Timeline</h1>
+              <p className="text-sm text-gray-600">
+                Personalized step-by-step guide
               </p>
             </div>
           </div>
           {timeline && (
-            <div className="flex items-center gap-3">
-             
-              <button
-                onClick={handleRegenerate}
-                disabled={generatingTimeline}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white/20 hover:bg-white/30 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                <RefreshCw className={`w-4 h-4 ${generatingTimeline ? 'animate-spin' : ''}`} />
-                Regenerate
-              </button>
-            </div>
+            <button
+              onClick={handleRegenerate}
+              disabled={generatingTimeline}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-gray-700"
+            >
+              <RefreshCw className={`w-4 h-4 ${generatingTimeline ? 'animate-spin' : ''}`} />
+              Regenerate
+            </button>
           )}
         </div>
       </div>
@@ -895,13 +890,13 @@ const UniversityTimeline = ({
       {/* ✅ UPDATED: University Selector - Stats Overview Style */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">Select University</h3>
-          <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full font-medium">
+          <h3 className="text-sm font-semibold text-gray-900">Select University</h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
             {universities.length} saved
           </span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {universities.map((uni) => {
             const isSelected = selectedUniversity?.id === uni.id;
             const progress = calculateUniversityProgress(uni);
@@ -911,19 +906,16 @@ const UniversityTimeline = ({
                 key={uni.id}
                 onClick={() => handleUniversityChange(uni)}
                 disabled={generatingTimeline}
-                className={`relative group overflow-hidden rounded-2xl border transition-all duration-300 disabled:opacity-50 text-left ${
+                className={`relative overflow-hidden rounded-xl border transition-all duration-300 disabled:opacity-50 text-left ${
                   isSelected
-                    ? 'border-[#002147] bg-white/60 shadow-lg backdrop-blur-xl'
-                    : 'border-white/60 bg-white/40 shadow-sm hover:shadow-lg backdrop-blur-xl'
+                    ? 'border-[#002147] bg-blue-50 shadow-md'
+                    : 'border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-[#002147]'
                 }`}
               >
-                {/* Gradient Overlay on Hover */}
-                <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br from-[#3598FE] to-[#002147]`} />
-                
-                <div className="p-5 flex flex-col h-full justify-between relative z-10">
+                <div className="p-5 flex flex-col h-full justify-between">
                   <div className="flex justify-between items-start mb-4">
                     {/* University Logo/Icon */}
-                    <div className={`p-2.5 rounded-xl group-hover:scale-110 transition-transform duration-300 ${
+                    <div className={`p-2.5 rounded-xl ${
                       isSelected ? 'bg-blue-100' : 'bg-gray-100'
                     }`}>
                       {uni.images?.[0]?.imageUrl ? (
@@ -938,24 +930,15 @@ const UniversityTimeline = ({
                     </div>
                     
                     {isSelected && (
-                      <div className="flex items-center gap-1 text-[10px] font-bold bg-[#002147] text-white px-2 py-1 rounded-full">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Selected</span>
-                      </div>
+                      <CheckCircle2 className="w-5 h-5 text-[#002147]" />
                     )}
                   </div>
                   
                   <div>
-                    <div className={`text-3xl font-bold mb-1 ${
-                      isSelected 
-                        ? 'bg-gradient-to-br from-[#3598FE] to-[#002147] bg-clip-text text-transparent'
-                        : 'text-gray-900'
-                    }`}>
+                    <div className="text-3xl font-bold text-gray-900 mb-1">
                       {progress}%
                     </div>
-                    <div className={`text-sm font-semibold tracking-tight mb-1 ${
-                      isSelected ? 'text-[#002147]' : 'text-gray-900'
-                    }`}>
+                    <div className="text-sm font-semibold text-gray-900 tracking-tight mb-1">
                       {uni.universityName || uni.name}
                     </div>
                     <div className="text-xs text-gray-500 font-medium flex items-center gap-1">
@@ -965,18 +948,16 @@ const UniversityTimeline = ({
                     
                     {/* Progress Bar */}
                     <div className="mt-3">
-                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full relative transition-all duration-500 ${
-                            isSelected 
-                              ? 'bg-gradient-to-r from-[#3598FE] to-[#002147]'
-                              : 'bg-gray-400'
-                          }`}
-                          style={{ width: `${progress}%` }}
-                        >
-                          {isSelected && (
-                            <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
-                          )}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-500 ${
+                              isSelected 
+                                ? 'bg-[#002147]'
+                                : 'bg-gray-400'
+                            }`}
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
                       </div>
                     </div>
@@ -989,25 +970,22 @@ const UniversityTimeline = ({
 
         {/* ✅ Generate Timeline Button */}
         {selectedUniversity && !timeline && !generatingTimeline && (
-          <div className="relative overflow-hidden rounded-2xl bg-[#002147] p-1 shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
-            <div className="relative bg-[#002147] rounded-xl p-4">
-              <button
-                onClick={() => generateTimeline(selectedUniversity)}
-                disabled={generatingTimeline}
-                className="w-full px-6 py-3 bg-gradient-to-r from-[#3598FE] to-[#002147] text-white rounded-lg hover:opacity-90 transition-all font-semibold inline-flex items-center justify-center gap-2 shadow-sm"
-              >
-                <Sparkles className="w-5 h-5" />
-                Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
-              </button>
-            </div>
+          <div className="flex justify-center">
+            <button
+              onClick={() => generateTimeline(selectedUniversity)}
+              disabled={generatingTimeline}
+              className="px-6 py-3 bg-[#002147] text-white rounded-lg hover:bg-[#001122] transition-all font-semibold inline-flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Sparkles className="w-4 h-4" />
+              Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
+            </button>
           </div>
         )}
       </div>
 
       {/* Timeline Content */}
       {generatingTimeline ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="relative w-24 h-24 mx-auto mb-8">
             <div className="absolute inset-0 bg-[#DBEAFE] rounded-full animate-ping opacity-50" />
             <div className="absolute inset-2 bg-[#BFDBFE] rounded-full animate-pulse" />
@@ -1036,7 +1014,7 @@ const UniversityTimeline = ({
           </div>
         </div>
       ) : error && !timeline ? (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-10 text-center">
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-10 text-center">
           <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <XCircle className="w-10 h-10 text-[#BE123C]" />
           </div>
@@ -1614,94 +1592,87 @@ const UniversityTimeline = ({
             </div>
           )}
 
-          {/* Timeline Overview - Enhanced */}
-          <div className="bg-[#002147] rounded-2xl p-8 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[#002147]/20 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#002147]/20 rounded-full blur-3xl"></div>
-
-            <div className="relative">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                <div className="text-center md:text-left">
-                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
-                    <Clock className="w-4 h-4" />
-                    Duration
-                  </div>
-                  <div className="text-3xl font-bold">{timeline.totalDuration || '4-6 months'}</div>
+          {/* ✅ UPDATED: Timeline Overview - Clean Minimalist Design */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+              <div className="text-center md:text-left">
+                <div className="text-gray-500 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <Clock className="w-4 h-4" />
+                  Duration
                 </div>
-                <div className="text-center md:text-left">
-                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
-                    <TrendingUp className="w-4 h-4" />
-                    Progress
-                  </div>
-                  <div className="text-3xl font-bold">{calculateOverallProgress()}%</div>
+                <div className="text-2xl font-bold text-gray-900">{timeline.totalDuration || '4-6 months'}</div>
+              </div>
+              <div className="text-center md:text-left">
+                <div className="text-gray-500 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <TrendingUp className="w-4 h-4" />
+                  Progress
                 </div>
-                <div className="text-center md:text-left">
-                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
-                    <Flag className="w-4 h-4" />
-                    Phases
-                  </div>
-                  <div className="text-3xl font-bold">{timeline.phases?.length || 0}</div>
+                <div className="text-2xl font-bold text-gray-900">{calculateOverallProgress()}%</div>
+              </div>
+              <div className="text-center md:text-left">
+                <div className="text-gray-500 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <Flag className="w-4 h-4" />
+                  Phases
                 </div>
-                <div className="text-center md:text-left">
-                  <div className="text-blue-200 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
-                    <ClipboardList className="w-4 h-4" />
-                    Tasks
-                  </div>
-                  <div className="text-3xl font-bold">
-                    <span className="text-emerald-400">{taskStats.completed}</span>
-                    <span className="text-blue-300">/</span>
-                    {taskStats.total}
-                  </div>
+                <div className="text-2xl font-bold text-gray-900">{timeline.phases?.length || 0}</div>
+              </div>
+              <div className="text-center md:text-left">
+                <div className="text-gray-500 text-sm mb-1 flex items-center gap-2 justify-center md:justify-start">
+                  <ClipboardList className="w-4 h-4" />
+                  Tasks
+                </div>
+                <div className="text-2xl font-bold text-gray-900">
+                  <span className="text-emerald-600">{taskStats.completed}</span>
+                  <span className="text-gray-400">/</span>
+                  {taskStats.total}
                 </div>
               </div>
-
-              {/* Enhanced Progress Bar */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-blue-200 font-medium">Overall Progress</span>
-                  <span className="text-sm font-bold text-white">{calculateOverallProgress()}%</span>
-                </div>
-                <div className="w-full bg-blue-900/50 rounded-full h-4 overflow-hidden backdrop-blur-sm">
-                  <div
-                    className="bg-[#002147] h-4 rounded-full transition-all duration-700 relative"
-                    style={{ width: `${calculateOverallProgress()}%` }}
-                  >
-                    <div className="absolute inset-0 bg-white/20"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Breakdown */}
-              {metadata && (
-                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-blue-800/50">
-                  <div className="text-center p-4 bg-white/5 rounded-xl backdrop-blur-sm">
-                    <FileText className="w-5 h-5 mx-auto mb-2 text-purple-400" />
-                    <div className="text-blue-200 text-xs mb-1">Essays</div>
-                    <div className="text-xl font-bold">{progressStats.essays}%</div>
-                  </div>
-                  <div className="text-center p-4 bg-white/5 rounded-xl backdrop-blur-sm">
-                    <Calendar className="w-5 h-5 mx-auto mb-2 text-blue-400" />
-                    <div className="text-blue-200 text-xs mb-1">Events</div>
-                    <div className="text-xl font-bold">{progressStats.events}%</div>
-                  </div>
-                  <div className="text-center p-4 bg-white/5 rounded-xl backdrop-blur-sm">
-                    <GraduationCap className="w-5 h-5 mx-auto mb-2 text-emerald-400" />
-                    <div className="text-blue-200 text-xs mb-1">Tests</div>
-                    <div className="text-xl font-bold">{progressStats.tests}%</div>
-                  </div>
-                </div>
-              )}
-
-              {timeline.overview && (
-                <p className="text-blue-100 leading-relaxed mt-6 pt-6 border-t border-blue-800/50 text-center md:text-left">
-                  {timeline.overview}
-                </p>
-              )}
             </div>
+
+            {/* Enhanced Progress Bar */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-gray-700 font-medium">Overall Progress</span>
+                <span className="text-sm font-bold text-gray-900">{calculateOverallProgress()}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-[#002147] h-3 rounded-full transition-all duration-700"
+                  style={{ width: `${calculateOverallProgress()}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Progress Breakdown */}
+            {metadata && (
+              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200">
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <FileText className="w-5 h-5 mx-auto mb-2 text-purple-600" />
+                  <div className="text-gray-500 text-xs mb-1">Essays</div>
+                  <div className="text-xl font-bold text-gray-900">{progressStats.essays}%</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <Calendar className="w-5 h-5 mx-auto mb-2 text-blue-600" />
+                  <div className="text-gray-500 text-xs mb-1">Events</div>
+                  <div className="text-xl font-bold text-gray-900">{progressStats.events}%</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-xl">
+                  <GraduationCap className="w-5 h-5 mx-auto mb-2 text-emerald-600" />
+                  <div className="text-gray-500 text-xs mb-1">Tests</div>
+                  <div className="text-xl font-bold text-gray-900">{progressStats.tests}%</div>
+                </div>
+              </div>
+            )}
+
+            {timeline.overview && (
+              <p className="text-gray-600 leading-relaxed mt-6 pt-6 border-t border-gray-200 text-center md:text-left">
+                {timeline.overview}
+              </p>
+            )}
           </div>
 
           {/* Phase Progress Overview - Color Coded */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
               <Flag className="w-5 h-5 text-[#002147]" />
               Phase Progress Overview
@@ -1720,11 +1691,11 @@ const UniversityTimeline = ({
                       setExpandedPhases(prev => ({ ...prev, [idx]: true }));
                       document.getElementById(`phase-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
-                    className={`relative p-4 rounded-xl border-2 transition-all hover:shadow-lg group ${
+                    className={`relative p-4 rounded-xl border-2 transition-all hover:shadow-md group ${
                       isCompleted
                         ? 'bg-emerald-50 border-emerald-300'
                         : isInProgress
-                          ? `${colors.bg} ${colors.border} shadow-md`
+                          ? `${colors.bg} ${colors.border} shadow-sm`
                           : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -1732,7 +1703,7 @@ const UniversityTimeline = ({
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#002147] rounded-full animate-pulse"></div>
                     )}
 
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 mx-auto transition-transform group-hover:scale-110 ${
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 mx-auto transition-transform ${
                       isCompleted
                         ? 'bg-emerald-500 text-white'
                         : isInProgress
@@ -1784,11 +1755,11 @@ const UniversityTimeline = ({
                 <div
                   key={phase.id || phaseIndex}
                   id={`phase-${phaseIndex}`}
-                  className={`bg-white rounded-2xl shadow-sm border-2 overflow-hidden transition-all ${
+                  className={`bg-white rounded-xl border-2 overflow-hidden transition-all ${
                     isCompleted
                       ? 'border-emerald-300'
                       : isInProgress
-                        ? `${colors.border} shadow-lg ring-2 ${colors.ring}/20`
+                        ? `${colors.border} shadow-md`
                         : 'border-gray-200'
                   }`}
                 >
@@ -1805,7 +1776,7 @@ const UniversityTimeline = ({
                       className="w-full p-6 flex items-center justify-between text-white"
                     >
                       <div className="flex items-center gap-5 flex-1">
-                        <div className={`relative w-16 h-16 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-sm`}>
+                        <div className={`relative w-16 h-16 rounded-2xl flex items-center justify-center bg-white/20`}>
                           {isCompleted ? (
                             <Trophy className="w-8 h-8 text-white" />
                           ) : (
@@ -2219,7 +2190,7 @@ const UniversityTimeline = ({
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="w-24 h-24 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-8">
             <Sparkles className="w-12 h-12 text-[#002147]" />
           </div>
