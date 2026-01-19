@@ -811,15 +811,15 @@ const UniversityTimeline = ({
     return phase.tasks.filter(task => task.completed === true || task.status === 'completed').length;
   };
 
-  // Empty state
+  // ✅ UPDATED: Empty state
   if (!universities || universities.length === 0) {
     return (
       <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
         <div className="w-20 h-20 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-6">
           <Calendar className="w-10 h-10 text-[#002147]" />
         </div>
-        <h3 className="text-2xl font-bold text-gray-800 mb-3">No Universities Saved</h3>
-        <p className="text-gray-500 max-w-md mx-auto mb-6">
+        <h3 className="text-2xl font-bold text-gray-900 mb-3">No Universities Saved</h3>
+        <p className="text-gray-600 max-w-md mx-auto mb-6">
           Save universities to your profile to generate personalized AI-powered application timelines
         </p>
       </div>
@@ -860,17 +860,17 @@ const UniversityTimeline = ({
         </div>
       )}
 
-      {/* ✅ UPDATED: Header Section - Clean Minimalist Design */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      {/* ✅ UPDATED: Clean Header Section */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-100 rounded-xl">
               <Sparkles className="w-5 h-5 text-[#002147]" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-900">AI Application Timeline</h1>
+              <h1 className="text-xl font-bold text-gray-900">AI Application Timeline</h1>
               <p className="text-sm text-gray-600">
-                Personalized step-by-step guide
+                Personalized step-by-step application guide
               </p>
             </div>
           </div>
@@ -887,8 +887,8 @@ const UniversityTimeline = ({
         </div>
       </div>
 
-      {/* ✅ UPDATED: University Selector - Stats Overview Style */}
-      <div className="space-y-4">
+      {/* ✅ UPDATED: University Selector - Stats Card Style */}
+      <div className="space-y-4 mb-6">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-900">Select University</h3>
           <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
@@ -896,7 +896,7 @@ const UniversityTimeline = ({
           </span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {universities.map((uni) => {
             const isSelected = selectedUniversity?.id === uni.id;
             const progress = calculateUniversityProgress(uni);
@@ -906,17 +906,17 @@ const UniversityTimeline = ({
                 key={uni.id}
                 onClick={() => handleUniversityChange(uni)}
                 disabled={generatingTimeline}
-                className={`relative overflow-hidden rounded-xl border transition-all duration-300 disabled:opacity-50 text-left ${
+                className={`relative overflow-hidden rounded-xl border-2 transition-all duration-300 disabled:opacity-50 text-left ${
                   isSelected
-                    ? 'border-[#002147] bg-blue-50 shadow-md'
-                    : 'border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-[#002147]'
+                    ? 'border-[#002147] bg-blue-50/50 shadow-md ring-2 ring-[#002147]/10'
+                    : 'border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-[#3598FE]'
                 }`}
               >
-                <div className="p-5 flex flex-col h-full justify-between">
+                <div className="p-5">
+                  {/* Top Row: Icon + Selection Indicator */}
                   <div className="flex justify-between items-start mb-4">
-                    {/* University Logo/Icon */}
-                    <div className={`p-2.5 rounded-xl ${
-                      isSelected ? 'bg-blue-100' : 'bg-gray-100'
+                    <div className={`p-2.5 rounded-xl transition-colors ${
+                      isSelected ? 'bg-[#002147]' : 'bg-gray-100'
                     }`}>
                       {uni.images?.[0]?.imageUrl ? (
                         <img
@@ -925,107 +925,155 @@ const UniversityTimeline = ({
                           className="w-5 h-5 rounded object-cover"
                         />
                       ) : (
-                        <Building2 className={`w-5 h-5 ${isSelected ? 'text-[#002147]' : 'text-gray-500'}`} />
+                        <Building2 className={`w-5 h-5 ${isSelected ? 'text-white' : 'text-gray-500'}`} />
                       )}
                     </div>
                     
                     {isSelected && (
-                      <CheckCircle2 className="w-5 h-5 text-[#002147]" />
+                      <div className="flex items-center gap-1.5 text-xs font-bold bg-[#002147] text-white px-2.5 py-1 rounded-full">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Selected
+                      </div>
                     )}
                   </div>
                   
-                  <div>
-                    <div className="text-3xl font-bold text-gray-900 mb-1">
-                      {progress}%
-                    </div>
-                    <div className="text-sm font-semibold text-gray-900 tracking-tight mb-1">
+                  {/* University Name & Location */}
+                  <div className="mb-4">
+                    <h4 className="text-base font-bold text-gray-900 mb-1 line-clamp-2 leading-tight">
                       {uni.universityName || uni.name}
-                    </div>
+                    </h4>
                     <div className="text-xs text-gray-500 font-medium flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {uni.location}
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{uni.location}</span>
                     </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="mt-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
-                          <div 
-                            className={`h-2 rounded-full transition-all duration-500 ${
-                              isSelected 
-                                ? 'bg-[#002147]'
-                                : 'bg-gray-400'
-                            }`}
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
+                  </div>
+                  
+                  {/* Progress Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-600">Progress</span>
+                      <span className={`text-lg font-bold ${
+                        isSelected ? 'text-[#002147]' : 'text-gray-900'
+                      }`}>
+                        {progress}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          isSelected 
+                            ? 'bg-gradient-to-r from-[#002147] to-[#3598FE]'
+                            : 'bg-gray-400'
+                        }`}
+                        style={{ width: `${progress}%` }}
+                      />
                     </div>
                   </div>
                 </div>
+
+                {/* Subtle gradient overlay on hover */}
+                <div className={`absolute inset-0 opacity-0 hover:opacity-5 transition-opacity duration-300 bg-gradient-to-br from-[#002147] to-[#3598FE] pointer-events-none ${
+                  isSelected ? 'opacity-5' : ''
+                }`} />
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* ✅ Generate Timeline Button */}
-        {selectedUniversity && !timeline && !generatingTimeline && (
-          <div className="flex justify-center">
+      {/* ✅ Single Generate Timeline Button - Only show when no timeline exists */}
+      {selectedUniversity && !timeline && !generatingTimeline && (
+        <div className="bg-gradient-to-br from-[#002147] to-[#001835] rounded-xl p-8 text-center mb-6 relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-[#3598FE] rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-[#60B4FF] rounded-full blur-3xl" />
+          </div>
+          
+          <div className="relative z-10">
+            <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-[#3598FE]" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-white mb-2">
+              Ready to Generate Your Timeline
+            </h3>
+            <p className="text-blue-200 text-sm mb-6 max-w-2xl mx-auto">
+              Create a personalized AI-powered timeline for{' '}
+              <span className="font-semibold text-white">
+                {selectedUniversity.universityName || selectedUniversity.name}
+              </span>
+            </p>
+            
             <button
               onClick={() => generateTimeline(selectedUniversity)}
               disabled={generatingTimeline}
-              className="px-6 py-3 bg-[#002147] text-white rounded-lg hover:bg-[#001122] transition-all font-semibold inline-flex items-center justify-center gap-2 shadow-sm"
+              className="px-8 py-3 bg-white text-[#002147] rounded-xl hover:bg-blue-50 transition-all font-bold inline-flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Sparkles className="w-4 h-4" />
-              Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
+              <Sparkles className="w-5 h-5" />
+              Generate Timeline
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Timeline Content */}
-      {generatingTimeline ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
-          <div className="relative w-24 h-24 mx-auto mb-8">
+      {/* ✅ UPDATED: Loading State */}
+      {generatingTimeline && (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center mb-6">
+          <div className="relative w-20 h-20 mx-auto mb-6">
             <div className="absolute inset-0 bg-[#DBEAFE] rounded-full animate-ping opacity-50" />
             <div className="absolute inset-2 bg-[#BFDBFE] rounded-full animate-pulse" />
-            <div className="relative w-24 h-24 bg-[#002147] rounded-full flex items-center justify-center">
-              <Loader2 className="w-12 h-12 text-white animate-spin" />
+            <div className="relative w-20 h-20 bg-[#002147] rounded-full flex items-center justify-center">
+              <Loader2 className="w-10 h-10 text-white animate-spin" />
             </div>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-3">Generating Your Timeline</h3>
+          
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Generating Your Timeline</h3>
           <p className="text-gray-600 max-w-lg mx-auto mb-6">
-            AI is analyzing <strong className="text-[#002147]">{selectedUniversity?.universityName || selectedUniversity?.name}</strong>'s
-            requirements and your profile...
+            AI is analyzing{' '}
+            <strong className="text-[#002147]">
+              {selectedUniversity?.universityName || selectedUniversity?.name}
+            </strong>
+            's requirements and your profile...
           </p>
+          
           <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
             <span className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               Analyzing
             </span>
             <span className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-[#002147]" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#002147]" />
               Creating phases
             </span>
             <span className="flex items-center gap-2">
-              <Circle className="w-5 h-5 text-gray-300" />
+              <Circle className="w-4 h-4 text-gray-300" />
               Building tasks
             </span>
           </div>
         </div>
-      ) : error && !timeline ? (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-10 text-center">
-          <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <XCircle className="w-10 h-10 text-[#BE123C]" />
+      )}
+
+      {/* ✅ UPDATED: Error State */}
+      {error && !timeline && !generatingTimeline && (
+        <div className="bg-white rounded-xl border-2 border-rose-200 p-10 text-center mb-6">
+          <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-[#BE123C]" />
           </div>
-          <h3 className="text-2xl font-bold text-rose-900 mb-3">Error Generating Timeline</h3>
-          <p className="text-rose-700 mb-8 max-w-md mx-auto">{error}</p>
-          <button onClick={handleRegenerate} className="px-8 py-3 bg-[#BE123C] text-white rounded-xl hover:bg-[#9F1239] transition-colors font-semibold inline-flex items-center gap-2">
-            <RefreshCw className="w-5 h-5" />
+          <h3 className="text-xl font-bold text-rose-900 mb-2">Error Generating Timeline</h3>
+          <p className="text-rose-700 mb-6 max-w-md mx-auto text-sm">{error}</p>
+          <button 
+            onClick={handleRegenerate} 
+            className="px-6 py-2.5 bg-[#BE123C] text-white rounded-xl hover:bg-[#9F1239] transition-colors font-semibold inline-flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
             Try Again
           </button>
         </div>
-      ) : timeline ? (
+      )}
+
+      {/* Timeline Content */}
+      {timeline && !generatingTimeline && (
         <div className="space-y-6">
           {/* Stats Cards - Enhanced */}
           {(metadata || selectedUniversity) && (
@@ -2189,7 +2237,10 @@ const UniversityTimeline = ({
             </div>
           )}
         </div>
-      ) : (
+      )}
+
+      {/* Empty state when no university selected but universities exist */}
+      {!timeline && !generatingTimeline && selectedUniversity && universities.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="w-24 h-24 bg-[#EFF6FF] rounded-full flex items-center justify-center mx-auto mb-8">
             <Sparkles className="w-12 h-12 text-[#002147]" />
@@ -2198,16 +2249,6 @@ const UniversityTimeline = ({
           <p className="text-gray-600 max-w-lg mx-auto mb-8">
             Select a university above to generate a personalized AI-powered timeline with actionable steps for your application
           </p>
-          {selectedUniversity && (
-            <button
-              onClick={() => generateTimeline(selectedUniversity)}
-              disabled={generatingTimeline}
-              className="px-8 py-4 bg-[#002147] text-white rounded-xl hover:bg-[#001122] transition-all font-semibold inline-flex items-center gap-3 disabled:opacity-50"
-            >
-              <Sparkles className="w-5 h-5" />
-              Generate Timeline for {selectedUniversity.universityName || selectedUniversity.name}
-            </button>
-          )}
         </div>
       )}
     </div>

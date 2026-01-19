@@ -28,6 +28,7 @@ const Layout = ({ children }) => {
     { id: 'calendar', label: 'Calendar', icon: Calendar, href: '/dashboard/calender', comingSoon: false },
     { id: 'essay', label: 'Essays', icon: Book, href: '/workspace/independent', comingSoon: false },
     { id: 'cv-builder', label: 'CV Builder', icon: FileText, href: '/cv-builder', comingSoon: false },
+     { id: 'settings', label: 'Settings', icon: Settings, href: '/dashboard/settings', comingSoon: false },
     { id: 'resource-hub', label: 'Resource Hub', icon: BookOpen, href: '/resources-hub', comingSoon: true },
   ];
 

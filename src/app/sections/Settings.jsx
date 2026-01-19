@@ -8,15 +8,14 @@ import {
   User, 
   Mail, 
   Lock, 
-  Camera, 
   Save, 
-  X, 
   CheckCircle2,
   AlertCircle,
   Crown,
   Calendar,
   CreditCard,
-  Loader2
+  Loader2,
+  Shield
 } from "lucide-react";
 
 const SettingsPage = () => {
@@ -24,7 +23,6 @@ const SettingsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
-  const [imagePreview, setImagePreview] = useState(null);
   const [subscription, setSubscription] = useState(null);
   
   // Form states
@@ -33,8 +31,7 @@ const SettingsPage = () => {
     email: "",
     currentPassword: "",
     newPassword: "",
-    confirmPassword: "",
-    image: null
+    confirmPassword: ""
   });
 
   const [errors, setErrors] = useState({});
@@ -47,7 +44,6 @@ const SettingsPage = () => {
         name: session.user.name || "",
         email: session.user.email || ""
       }));
-      setImagePreview(session.user.image);
     }
     fetchSubscription();
   }, [session]);
@@ -73,18 +69,6 @@ const SettingsPage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: "" }));
-    }
-  };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Image size should be less than 5MB");
-        return;
-      }
-      setFormData(prev => ({ ...prev, image: file }));
-      setImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -131,9 +115,6 @@ const SettingsPage = () => {
       const formDataToSend = new FormData();
       formDataToSend.append("name", formData.name);
       formDataToSend.append("email", formData.email);
-      if (formData.image) {
-        formDataToSend.append("image", formData.image);
-      }
 
       const response = await fetch("/api/user/profile", {
         method: "PUT",
@@ -146,19 +127,16 @@ const SettingsPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Update session with new data
         await updateSession({
           ...session,
           user: {
             ...session.user,
             name: data.user.name,
-            email: data.user.email,
-            image: data.user.image
+            email: data.user.email
           }
         });
 
         toast.success("Profile updated successfully!", { id: toastId });
-        setImagePreview(data.user.image);
       } else {
         toast.error(data.error || "Failed to update profile", { id: toastId });
       }
@@ -212,65 +190,46 @@ const SettingsPage = () => {
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
-    { id: "security", label: "Security", icon: Lock },
+    { id: "security", label: "Security", icon: Shield },
     { id: "subscription", label: "Subscription", icon: Crown }
   ];
 
-  const getPlanBadgeColor = (plan) => {
-    switch (plan?.toLowerCase()) {
-      case "premium": return "from-purple-500 to-pink-500";
-      case "pro": return "from-blue-500 to-cyan-500";
-      default: return "from-gray-400 to-gray-500";
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 90, 0],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute -top-48 -right-48 w-96 h-96 rounded-full bg-gradient-to-br from-blue-200 to-transparent opacity-30 blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, -90, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute -bottom-48 -left-48 w-96 h-96 rounded-full bg-gradient-to-tr from-indigo-200 to-transparent opacity-30 blur-3xl"
-        />
+    <div className="min-h-screen bg-blue-50/60 relative overflow-hidden">
+      {/* Background Blobs */}
+      <div className="absolute top-0 left-0 w-full h-[500px] pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-5%] w-[25rem] h-[25rem] rounded-full bg-blue-100 blur-[80px] mix-blend-multiply opacity-60 animate-blob" />
+        <div className="absolute top-[20%] right-[-5%] w-[20rem] h-[20rem] rounded-full bg-blue-100 blur-[80px] mix-blend-multiply opacity-60 animate-blob animation-delay-2000" />
       </div>
 
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-bold text-[#002147] mb-2">Settings</h1>
-          <p className="text-gray-600">Manage your account preferences</p>
-        </motion.div>
+      {/* Hero Header */}
+      <div className="relative z-10 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14 text-center">
+          <motion.h1 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-3xl md:text-5xl font-bold text-[#002147] mb-4 tracking-tight"
+          >
+            Account <span className="text-[#3598FE]">Settings.</span>
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto font-medium"
+          >
+            Manage your profile, security, and subscription preferences
+          </motion.p>
+        </div>
+      </div>
 
-        {/* Tabs */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+        {/* Tab Navigation */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="flex gap-2 mb-6 bg-white/80 backdrop-blur-sm p-2 rounded-2xl shadow-lg"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex gap-4 mb-8 border-b border-gray-200"
         >
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -278,14 +237,14 @@ const SettingsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-all duration-300 ${
+                className={`px-6 py-3 font-medium transition-colors relative flex items-center gap-2 ${
                   activeTab === tab.id
-                    ? "bg-[#002147] text-white shadow-lg"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "text-[#002147] border-b-2 border-[#002147]"
+                    : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                <Icon size={20} />
-                <span className="font-medium">{tab.label}</span>
+                <Icon size={18} />
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -295,41 +254,17 @@ const SettingsPage = () => {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-gray-100"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200 p-8"
           >
             {activeTab === "profile" && (
               <div className="space-y-6">
-                {/* Profile Image */}
-                <div className="flex flex-col items-center mb-8">
-                  <div className="relative group">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#002147] shadow-xl">
-                      {imagePreview ? (
-                        <img
-                          src={imagePreview}
-                          alt="Profile"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
-                          <User size={48} className="text-white" />
-                        </div>
-                      )}
-                    </div>
-                    <label className="absolute bottom-0 right-0 bg-[#002147] text-white p-3 rounded-full cursor-pointer shadow-lg hover:bg-[#3598FE] transition-all duration-300 group-hover:scale-110">
-                      <Camera size={20} />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  <p className="mt-3 text-sm text-gray-500">Click camera icon to change photo</p>
+                <div>
+                  <h3 className="text-xl font-semibold text-[#002147] mb-1">Profile Information</h3>
+                  <p className="text-sm text-gray-500">Update your account details</p>
                 </div>
 
                 {/* Name Field */}
@@ -338,22 +273,22 @@ const SettingsPage = () => {
                     Full Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="text"
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
-                      className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none transition-all duration-300 ${
+                      className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
                         errors.name
-                          ? "border-red-300 focus:border-red-500"
-                          : "border-gray-200 focus:border-[#002147]"
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300 focus:ring-[#002147]"
                       }`}
                       placeholder="Enter your name"
                     />
                   </div>
                   {errors.name && (
-                    <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                    <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
                       <AlertCircle size={14} />
                       {errors.name}
                     </p>
@@ -366,22 +301,22 @@ const SettingsPage = () => {
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none transition-all duration-300 ${
+                      className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
                         errors.email
-                          ? "border-red-300 focus:border-red-500"
-                          : "border-gray-200 focus:border-[#002147]"
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300 focus:ring-[#002147]"
                       }`}
                       placeholder="Enter your email"
                     />
                   </div>
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                    <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
                       <AlertCircle size={14} />
                       {errors.email}
                     </p>
@@ -390,9 +325,9 @@ const SettingsPage = () => {
 
                 {/* Provider Info */}
                 {session?.provider && session.provider !== "credentials" && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <p className="text-sm text-blue-700">
-                      <CheckCircle2 size={16} className="inline mr-2" />
+                  <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-700 flex items-center gap-2">
+                      <CheckCircle2 size={16} />
                       Connected via {session.provider.charAt(0).toUpperCase() + session.provider.slice(1)}
                     </p>
                   </div>
@@ -402,12 +337,12 @@ const SettingsPage = () => {
                 <button
                   onClick={handleSaveProfile}
                   disabled={isSaving}
-                  className="w-full bg-[#002147] text-white py-4 rounded-xl font-medium hover:bg-[#3598FE] transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  className="w-full bg-[#002147] text-white py-3 rounded-lg font-medium hover:bg-[#003366] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
-                    <Loader2 size={20} className="animate-spin" />
+                    <Loader2 size={18} className="animate-spin" />
                   ) : (
-                    <Save size={20} />
+                    <Save size={18} />
                   )}
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>
@@ -416,12 +351,15 @@ const SettingsPage = () => {
 
             {activeTab === "security" && (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-[#002147] mb-4">Change Password</h3>
+                <div>
+                  <h3 className="text-xl font-semibold text-[#002147] mb-1">Security Settings</h3>
+                  <p className="text-sm text-gray-500">Update your password to keep your account secure</p>
+                </div>
 
                 {session?.provider !== "credentials" ? (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
-                    <Lock size={48} className="mx-auto text-yellow-600 mb-3" />
-                    <p className="text-yellow-700">
+                  <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-6 text-center">
+                    <Lock size={40} className="mx-auto text-amber-600 mb-3" />
+                    <p className="text-amber-800 font-medium">
                       You're signed in with {session.provider}. Password changes are managed through your {session.provider} account.
                     </p>
                   </div>
@@ -433,22 +371,22 @@ const SettingsPage = () => {
                         Current Password
                       </label>
                       <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                           type="password"
                           name="currentPassword"
                           value={formData.currentPassword}
                           onChange={handleInputChange}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none transition-all duration-300 ${
+                          className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
                             errors.currentPassword
-                              ? "border-red-300 focus:border-red-500"
-                              : "border-gray-200 focus:border-[#002147]"
+                              ? "border-red-300 focus:ring-red-500"
+                              : "border-gray-300 focus:ring-[#002147]"
                           }`}
                           placeholder="Enter current password"
                         />
                       </div>
                       {errors.currentPassword && (
-                        <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                        <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
                           <AlertCircle size={14} />
                           {errors.currentPassword}
                         </p>
@@ -461,22 +399,22 @@ const SettingsPage = () => {
                         New Password
                       </label>
                       <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                           type="password"
                           name="newPassword"
                           value={formData.newPassword}
                           onChange={handleInputChange}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none transition-all duration-300 ${
+                          className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
                             errors.newPassword
-                              ? "border-red-300 focus:border-red-500"
-                              : "border-gray-200 focus:border-[#002147]"
+                              ? "border-red-300 focus:ring-red-500"
+                              : "border-gray-300 focus:ring-[#002147]"
                           }`}
                           placeholder="Enter new password"
                         />
                       </div>
                       {errors.newPassword && (
-                        <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                        <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
                           <AlertCircle size={14} />
                           {errors.newPassword}
                         </p>
@@ -489,22 +427,22 @@ const SettingsPage = () => {
                         Confirm New Password
                       </label>
                       <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                           type="password"
                           name="confirmPassword"
                           value={formData.confirmPassword}
                           onChange={handleInputChange}
-                          className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none transition-all duration-300 ${
+                          className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
                             errors.confirmPassword
-                              ? "border-red-300 focus:border-red-500"
-                              : "border-gray-200 focus:border-[#002147]"
+                              ? "border-red-300 focus:ring-red-500"
+                              : "border-gray-300 focus:ring-[#002147]"
                           }`}
                           placeholder="Confirm new password"
                         />
                       </div>
                       {errors.confirmPassword && (
-                        <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                        <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
                           <AlertCircle size={14} />
                           {errors.confirmPassword}
                         </p>
@@ -515,12 +453,12 @@ const SettingsPage = () => {
                     <button
                       onClick={handleChangePassword}
                       disabled={isSaving}
-                      className="w-full bg-[#002147] text-white py-4 rounded-xl font-medium hover:bg-[#3598FE] transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                      className="w-full bg-[#002147] text-white py-3 rounded-lg font-medium hover:bg-[#003366] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSaving ? (
-                        <Loader2 size={20} className="animate-spin" />
+                        <Loader2 size={18} className="animate-spin" />
                       ) : (
-                        <Lock size={20} />
+                        <Lock size={18} />
                       )}
                       {isSaving ? "Changing..." : "Change Password"}
                     </button>
@@ -531,42 +469,47 @@ const SettingsPage = () => {
 
             {activeTab === "subscription" && (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-[#002147] mb-4">Subscription Details</h3>
+                <div>
+                  <h3 className="text-xl font-semibold text-[#002147] mb-1">Subscription Plan</h3>
+                  <p className="text-sm text-gray-500">Manage your subscription and billing</p>
+                </div>
 
                 {subscription ? (
                   <div className="space-y-4">
-                    {/* Plan Badge */}
-                    <div className={`p-6 rounded-2xl bg-gradient-to-r ${getPlanBadgeColor(subscription.plan)} text-white shadow-xl`}>
+                    {/* Plan Info */}
+                    <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-6">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <Crown size={32} />
+                          <div className="p-2.5 bg-[#002147] rounded-lg">
+                            <Crown size={24} className="text-white" />
+                          </div>
                           <div>
-                            <h4 className="text-2xl font-bold capitalize">{subscription.plan} Plan</h4>
-                            <p className="text-sm opacity-90 capitalize">{subscription.status}</p>
+                            <h4 className="text-xl font-bold text-[#002147] capitalize">{subscription.plan} Plan</h4>
+                            <p className="text-sm text-gray-600 capitalize">{subscription.status}</p>
                           </div>
                         </div>
                         {subscription.status === "active" && (
-                          <CheckCircle2 size={32} />
+                          <CheckCircle2 size={28} className="text-green-600" />
                         )}
                       </div>
                     </div>
 
-                    {/* Subscription Info Cards */}
+                    {/* Subscription Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Calendar size={20} className="text-[#002147]" />
-                          <h5 className="font-medium text-gray-700">Billing Cycle</h5>
+                      <div className="bg-white border border-gray-200 rounded-lg p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calendar size={18} className="text-[#002147]" />
+                          <h5 className="font-medium text-gray-700 text-sm">Billing Cycle</h5>
                         </div>
                         <p className="text-2xl font-bold text-[#002147] capitalize">
                           {subscription.billingCycle || "N/A"}
                         </p>
                       </div>
 
-                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
-                        <div className="flex items-center gap-3 mb-2">
-                          <CreditCard size={20} className="text-[#002147]" />
-                          <h5 className="font-medium text-gray-700">Current Period</h5>
+                      <div className="bg-white border border-gray-200 rounded-lg p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CreditCard size={18} className="text-[#002147]" />
+                          <h5 className="font-medium text-gray-700 text-sm">Current Period</h5>
                         </div>
                         <p className="text-sm font-semibold text-[#002147]">
                           {subscription.currentPeriodStart
@@ -582,25 +525,27 @@ const SettingsPage = () => {
 
                     {/* Trial Info */}
                     {subscription.status === "trial" && subscription.trialEndDate && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                        <p className="text-yellow-800">
-                          <AlertCircle size={16} className="inline mr-2" />
+                      <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-4">
+                        <p className="text-amber-800 text-sm flex items-center gap-2">
+                          <AlertCircle size={16} />
                           Trial ends on {new Date(subscription.trialEndDate).toLocaleDateString()}
                         </p>
                       </div>
                     )}
 
-                    {/* Manage Subscription Button */}
-                    <button className="w-full bg-gradient-to-r from-[#002147] to-[#3598FE] text-white py-4 rounded-xl font-medium hover:shadow-xl transition-all duration-300">
+                    {/* Manage Button */}
+                    <button className="w-full bg-[#002147] text-white py-3 rounded-lg font-medium hover:bg-[#003366] transition-colors">
                       Manage Subscription
                     </button>
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Crown size={64} className="mx-auto text-gray-300 mb-4" />
+                    <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                      <Crown size={40} className="text-gray-400" />
+                    </div>
                     <h4 className="text-xl font-semibold text-gray-700 mb-2">No Active Subscription</h4>
                     <p className="text-gray-500 mb-6">Upgrade to access premium features</p>
-                    <button className="bg-gradient-to-r from-[#002147] to-[#3598FE] text-white px-8 py-3 rounded-xl font-medium hover:shadow-xl transition-all duration-300">
+                    <button className="bg-[#002147] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#003366] transition-colors">
                       View Plans
                     </button>
                   </div>
