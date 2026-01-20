@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, createContext, useContext, useEffect } from "react";
+import React, { useState, createContext, useContext, useEffect, Suspense } from "react";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { CVBuilder } from "./components/CVBuilder";
@@ -32,7 +32,8 @@ const generateUniqueCVNumber = (userId) => {
   return `cv-${userIdPart}-${timestamp}-${randomPart}`;
 };
 
-const Index = () => {
+// Separate component that uses useSearchParams
+const CVBuilderContent = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -138,7 +139,7 @@ const Index = () => {
     }
   }, [status, session]);
 
-  // NEW: Load CV based on URL parameters or localStorage
+  // Load CV based on URL parameters or localStorage
   useEffect(() => {
     const initializeCV = async () => {
       if (status !== "authenticated" || !userEmail || !userId) {
@@ -152,11 +153,13 @@ const Index = () => {
         if (urlCVId) {
           // Load CV from URL parameter
           console.log("Loading CV from URL parameter:", urlCVId);
-          await loadCVData(urlCVId, userEmail);
           setCurrentCVId(urlCVId);
           
           // Store in localStorage for future sessions
           localStorage.setItem("currentCVId", urlCVId);
+          
+          // Load CV data (this will update cvNumber internally)
+          await loadCVData(urlCVId, userEmail);
           
           // Clean URL (remove query parameter)
           router.replace('/cv-builder', { scroll: false });
@@ -747,6 +750,22 @@ const Index = () => {
         )}
       </div>
     </CVDataContext.Provider>
+  );
+};
+
+// Main component wrapped with Suspense
+const Index = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-cvLightBg flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#002147] mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading CV Builder...</p>
+        </div>
+      </div>
+    }>
+      <CVBuilderContent />
+    </Suspense>
   );
 };
 
