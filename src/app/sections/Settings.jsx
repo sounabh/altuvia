@@ -15,16 +15,12 @@ import {
   Lock as LockIcon,
   Loader2,
   Shield,
-  Sparkles,
-  Gift,
-  Zap,
-  Check,
-  Star
+  Gift
 } from "lucide-react";
 
 const SettingsPage = () => {
-  const { data: session, update: updateSession } = useSession();
-  const [isLoading, setIsLoading] = useState(false);
+  const { data: session, update: updateSession, status } = useSession();
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   
@@ -41,14 +37,44 @@ const SettingsPage = () => {
 
   // Load user data
   useEffect(() => {
-    if (session?.user) {
-      setFormData(prev => ({
-        ...prev,
-        name: session.user.name || "",
-        email: session.user.email || ""
-      }));
-    }
-  }, [session]);
+    const fetchUserProfile = async () => {
+      if (status === "loading") return;
+      
+      if (status !== "authenticated") {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/user/profile', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setFormData(prev => ({
+            ...prev,
+            name: data.user.name || "",
+            email: data.user.email || ""
+          }));
+        } else {
+          const errorData = await response.json();
+          console.error("Failed to load profile:", errorData.error);
+          toast.error(errorData.error || "Failed to load profile");
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        toast.error("Failed to load profile data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [status]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -74,19 +100,24 @@ const SettingsPage = () => {
 
   const validatePassword = () => {
     const newErrors = {};
+    
+    // Only require current password if user signed up with credentials
     if (session?.user?.provider === "credentials") {
       if (!formData.currentPassword) {
         newErrors.currentPassword = "Current password is required";
       }
     }
+    
     if (!formData.newPassword) {
       newErrors.newPassword = "New password is required";
     } else if (formData.newPassword.length < 8) {
       newErrors.newPassword = "Password must be at least 8 characters";
     }
+    
     if (formData.newPassword !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -98,21 +129,21 @@ const SettingsPage = () => {
     const toastId = toast.loading("Updating profile...");
 
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append("name", formData.name);
-      formDataToSend.append("email", formData.email);
-
-      const response = await fetch("/api/user/profile", {
+      const response = await fetch('/api/user/profile', {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${session?.token}`
+          "Content-Type": "application/json",
         },
-        body: formDataToSend
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email
+        })
       });
 
       const data = await response.json();
 
       if (response.ok) {
+        // Update the session with new user data
         await updateSession({
           ...session,
           user: {
@@ -141,11 +172,10 @@ const SettingsPage = () => {
     const toastId = toast.loading("Changing password...");
 
     try {
-      const response = await fetch("/api/user/password", {
+      const response = await fetch('/api/user/password', {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.token}`
         },
         body: JSON.stringify({
           currentPassword: formData.currentPassword,
@@ -157,6 +187,7 @@ const SettingsPage = () => {
 
       if (response.ok) {
         toast.success("Password changed successfully!", { id: toastId });
+        // Clear password fields
         setFormData(prev => ({
           ...prev,
           currentPassword: "",
@@ -180,16 +211,23 @@ const SettingsPage = () => {
     { id: "subscription", label: "Subscription", icon: Crown, free: true }
   ];
 
-  const freeFeatures = [
-    "Unlimited CV Creations",
-    "AI-Powered Analysis",
-    "Multiple Templates",
-    "PDF Export",
-    "Version History",
-    "Smart Tips & Suggestions",
-    "ATS Score Checker",
-    "Real-time Preview"
-  ];
+  if (isLoading || status === "loading") {
+    return (
+      <div className="min-h-screen bg-blue-50/60 flex items-center justify-center">
+        <Loader2 size={40} className="animate-spin text-[#002147]" />
+      </div>
+    );
+  }
+
+  if (status !== "authenticated") {
+    return (
+      <div className="min-h-screen bg-blue-50/60 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Please sign in to access settings.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-blue-50/60 relative overflow-hidden">
@@ -326,11 +364,11 @@ const SettingsPage = () => {
                 </div>
 
                 {/* Provider Info */}
-                {session?.provider && session.provider !== "credentials" && (
+                {session?.user?.provider && session.user.provider !== "credentials" && (
                   <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4">
                     <p className="text-sm text-blue-700 flex items-center gap-2">
                       <CheckCircle2 size={16} />
-                      Connected via {session.provider.charAt(0).toUpperCase() + session.provider.slice(1)}
+                      Connected via {session.user.provider.charAt(0).toUpperCase() + session.user.provider.slice(1)}
                     </p>
                   </div>
                 )}
@@ -358,11 +396,11 @@ const SettingsPage = () => {
                   <p className="text-sm text-gray-500">Update your password to keep your account secure</p>
                 </div>
 
-                {session?.provider !== "credentials" ? (
+                {session?.user?.provider && session.user.provider !== "credentials" ? (
                   <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-6 text-center">
                     <Lock size={40} className="mx-auto text-amber-600 mb-3" />
                     <p className="text-amber-800 font-medium">
-                      You're signed in with {session.provider}. Password changes are managed through your {session.provider} account.
+                      You're signed in with {session.user.provider}. Password changes are managed through your {session.user.provider} account.
                     </p>
                   </div>
                 ) : (
@@ -476,20 +514,16 @@ const SettingsPage = () => {
                   <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-2xl mb-4">
                     <Gift size={32} className="text-emerald-600" />
                   </div>
-<h3 className="text-xl font-semibold text-[#002147] mb-2">
-  🎉 Enjoy Premium Features — Completely Free!
-</h3>
-<p className="text-gray-500 text-md max-w-2xl font-regular mx-auto">
-  Currently, our platform is completely free. We believe every MBA applicant
-  deserves access to powerful, high-quality application tools.
-  Enjoy all premium features at no cost — we’re here to help you build a
-  strong application and secure admission to your dream MBA program.
-</p>
-
+                  <h3 className="text-xl font-semibold text-[#002147] mb-2">
+                    🎉 Enjoy Premium Features — Completely Free!
+                  </h3>
+                  <p className="text-gray-500 text-md max-w-2xl font-regular mx-auto">
+                    Currently, our platform is completely free. We believe every MBA applicant
+                    deserves access to powerful, high-quality application tools.
+                    Enjoy all premium features at no cost — we're here to help you build a
+                    strong application and secure admission to your dream MBA program.
+                  </p>
                 </div>
-
-             
-            
 
                 {/* Lock Note */}
                 <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4">

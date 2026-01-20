@@ -108,7 +108,8 @@ const Page = () => {
         <div className="relative z-10 w-full max-w-[1130px] mx-auto px-5">
           <Steps />
           <ApplicationManagement />
-          <PricingCards />
+          {/**  <PricingCards /> */}
+        
           <Accordions />
           <ProductShowcase />
           <ContactUsPage />

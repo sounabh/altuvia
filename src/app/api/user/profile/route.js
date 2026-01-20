@@ -6,10 +6,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import {prisma} from "@/lib/prisma";
-import { writeFile } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
+import { prisma } from "@/lib/prisma";
 
 // ==========================================
 // GET: Fetch User Profile
@@ -81,7 +78,7 @@ export async function GET(request) {
 }
 
 // ==========================================
-// PUT: Update User Profile
+// PUT: Update User Profile (Name & Email)
 // ==========================================
 export async function PUT(request) {
   try {
@@ -94,15 +91,22 @@ export async function PUT(request) {
       );
     }
 
-    const formData = await request.formData();
-    const name = formData.get("name");
-    const email = formData.get("email");
-    const imageFile = formData.get("image");
+    // Parse JSON body
+    const body = await request.json();
+    const { name, email } = body;
 
     // Validate required fields
     if (!name || !email) {
       return NextResponse.json(
         { error: "Name and email are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate name
+    if (name.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Name cannot be empty" },
         { status: 400 }
       );
     }
@@ -117,90 +121,26 @@ export async function PUT(request) {
     }
 
     // Check if email is already taken by another user
-    if (email !== session.user.email) {
+    if (email !== session.user?.email) {
       const existingUser = await prisma.user.findUnique({
         where: { email }
       });
 
       if (existingUser && existingUser.id !== session.userId) {
         return NextResponse.json(
-          { error: "Email already in use" },
+          { error: "Email is already in use by another account" },
           { status: 409 }
         );
       }
     }
 
-    // Handle image upload if provided
-    let imageUrl = null;
-    if (imageFile && imageFile.size > 0) {
-      try {
-        // Validate image size (5MB limit)
-        if (imageFile.size > 5 * 1024 * 1024) {
-          return NextResponse.json(
-            { error: "Image size must be less than 5MB" },
-            { status: 400 }
-          );
-        }
-
-        // Validate image type
-        const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
-        if (!validTypes.includes(imageFile.type)) {
-          return NextResponse.json(
-            { error: "Invalid image format. Please use JPG, PNG, or WEBP" },
-            { status: 400 }
-          );
-        }
-
-        // Generate unique filename
-        const bytes = await imageFile.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const fileExtension = imageFile.name.split('.').pop();
-        const uniqueFilename = `${session.userId}-${uuidv4()}.${fileExtension}`;
-        
-        // Save to public/uploads directory
-        const uploadDir = path.join(process.cwd(), "public", "uploads", "profiles");
-        const filePath = path.join(uploadDir, uniqueFilename);
-        
-        // Create directory if it doesn't exist
-        const fs = require('fs');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
-        await writeFile(filePath, buffer);
-        imageUrl = `/uploads/profiles/${uniqueFilename}`;
-
-        // Delete old image if exists
-        const oldUser = await prisma.user.findUnique({
-          where: { id: session.userId },
-          select: { image: true }
-        });
-
-        if (oldUser?.image && oldUser.image.startsWith('/uploads/')) {
-          const oldImagePath = path.join(process.cwd(), "public", oldUser.image);
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-          }
-        }
-      } catch (uploadError) {
-        console.error("❌ Image upload error:", uploadError);
-        return NextResponse.json(
-          { error: "Failed to upload image" },
-          { status: 500 }
-        );
-      }
-    }
-
     // Update user in database
-    const updateData = {
-      name,
-      email,
-      ...(imageUrl && { image: imageUrl })
-    };
-
     const updatedUser = await prisma.user.update({
       where: { id: session.userId },
-      data: updateData,
+      data: {
+        name: name.trim(),
+        email: email.trim(),
+      },
       select: {
         id: true,
         email: true,
