@@ -1,7 +1,10 @@
 "use client"
 
 import React, { useState } from 'react';
-import { MapPin, Calendar, FileText, CheckCircle2, Clock, TrendingUp, Heart } from 'lucide-react';
+import { 
+  MapPin, Calendar, FileText, CheckCircle2, Clock, TrendingUp, Heart,
+  Sparkles, Target, Zap, ChevronRight, Brain, ListChecks
+} from 'lucide-react';
 import Link from 'next/link';
 import Image from "next/image";
 import { toast } from "sonner";
@@ -9,23 +12,31 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 /**
- * Enhanced University card component with clean deadline display
- * NOW WITH CUTOUT DESIGN (Similar to Search Page)
+ * Enhanced University card component with AI Timeline integration
+ * NOW WITH CUTOUT DESIGN + AI TIMELINE PROGRESS
  */
 export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) => {
   const [isAdded, setIsAdded] = useState(Boolean(university.isAdded));
-  const [showAllDeadlines, setShowAllDeadlines] = useState(true); // Changed to true - show all by default
+  const [showAllDeadlines, setShowAllDeadlines] = useState(true);
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Color variations for the content block (matches Search Grid)
+  // Color variations for the content block
   const variations = [
-    { border: "border-blue-100", bg: "bg-blue-50/30" },
-    { border: "border-purple-100", bg: "bg-purple-50/30" },
-    { border: "border-emerald-100", bg: "bg-emerald-50/30" },
-    { border: "border-rose-100", bg: "bg-rose-50/30" },
+    { border: "border-blue-100", bg: "bg-blue-50/30", accent: "blue" },
+    { border: "border-purple-100", bg: "bg-purple-50/30", accent: "purple" },
+    { border: "border-emerald-100", bg: "bg-emerald-50/30", accent: "emerald" },
+    { border: "border-rose-100", bg: "bg-rose-50/30", accent: "rose" },
   ];
   const style = variations[index % variations.length];
+
+  // Logic: AI Timeline Data
+  const aiTimeline = university.aiTimeline;
+  const hasAITimeline = !!aiTimeline;
+  const timelineProgress = aiTimeline?.overallProgress || 0;
+  const completedTimelineTasks = aiTimeline?.completedTasks || 0;
+  const totalTimelineTasks = aiTimeline?.totalTasks || 0;
+  const timelineStatus = aiTimeline?.completionStatus || 'not_started';
 
   // Logic: Formatted Deadlines
   const getFormattedDeadlines = () => {
@@ -122,6 +133,26 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
     }
   };
 
+  // Logic: Timeline Status Badge
+  const getTimelineStatusConfig = (status) => {
+    switch (status) {
+      case 'completed':
+        return { text: 'Completed', bg: 'bg-green-100', text_color: 'text-green-700', icon: CheckCircle2 };
+      case 'in_progress':
+        return { text: 'In Progress', bg: 'bg-blue-100', text_color: 'text-blue-700', icon: Zap };
+      case 'on_track':
+        return { text: 'On Track', bg: 'bg-emerald-100', text_color: 'text-emerald-700', icon: Target };
+      case 'behind':
+        return { text: 'Behind', bg: 'bg-amber-100', text_color: 'text-amber-700', icon: Clock };
+      case 'at_risk':
+        return { text: 'At Risk', bg: 'bg-red-100', text_color: 'text-red-700', icon: Clock };
+      default:
+        return { text: 'Not Started', bg: 'bg-gray-100', text_color: 'text-gray-600', icon: Brain };
+    }
+  };
+
+  const timelineStatusConfig = getTimelineStatusConfig(timelineStatus);
+
   return (
     <div className="group relative flex flex-col w-full break-inside-avoid">
 
@@ -153,6 +184,16 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
           <Heart className="w-3 h-3 fill-current" />
           <span>Added</span>
         </button>
+
+        {/* AI Timeline Badge - Bottom Right (if exists) */}
+        {hasAITimeline && (
+          <div className="absolute bottom-3 right-3">
+            <div className="px-2.5 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg text-[10px] font-bold tracking-wide uppercase text-white shadow-md flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" />
+              AI Timeline Active
+            </div>
+          </div>
+        )}
 
         {/* Completion Icons - Bottom Left Overlay */}
         {(essaysFullyComplete || tasksFullyComplete) && university.status !== 'submitted' && (
@@ -186,8 +227,86 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
             {university.location}
           </div>
 
-          {/* Progress Summary Box */}
-          {hasAnyContent && !essaysFullyComplete && !tasksFullyComplete && (
+          {/* AI Timeline Section - NEW */}
+          {hasAITimeline && (
+            <div className="mb-3 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3 border border-purple-100/50">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
+                    <Brain className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider">AI Timeline</span>
+                </div>
+                <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${timelineStatusConfig.bg} ${timelineStatusConfig.text_color} flex items-center gap-1`}>
+                  <timelineStatusConfig.icon className="w-3 h-3" />
+                  {timelineStatusConfig.text}
+                </div>
+              </div>
+
+              {/* Timeline Progress Bar */}
+              <div className="mb-2">
+                <div className="flex justify-between text-[11px] font-medium text-purple-700 mb-1">
+                  <span>Overall Progress</span>
+                  <span>{timelineProgress}%</span>
+                </div>
+                <div className="w-full bg-white/60 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-500 relative"
+                    style={{ width: `${timelineProgress}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/30 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeline Stats */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[11px] text-purple-700">
+                  <ListChecks className="w-3.5 h-3.5" />
+                  <span className="font-semibold">{completedTimelineTasks}/{totalTimelineTasks}</span>
+                  <span className="text-purple-500">tasks done</span>
+                </div>
+                {aiTimeline?.targetDeadline && (
+                  <div className="flex items-center gap-1 text-[10px] text-purple-600">
+                    <Target className="w-3 h-3" />
+                    <span>Target: {new Date(aiTimeline.targetDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Timeline Phases Preview */}
+              {aiTimeline?.totalPhases > 0 && (
+                <div className="mt-2 pt-2 border-t border-purple-100/50">
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(aiTimeline.totalPhases, 5) }).map((_, i) => {
+                      const phaseProgress = (timelineProgress / 100) * aiTimeline.totalPhases;
+                      const isComplete = i < Math.floor(phaseProgress);
+                      const isCurrent = i === Math.floor(phaseProgress);
+                      
+                      return (
+                        <div
+                          key={i}
+                          className={`flex-1 h-1.5 rounded-full transition-all duration-300 ${
+                            isComplete 
+                              ? 'bg-gradient-to-r from-purple-500 to-indigo-600' 
+                              : isCurrent 
+                                ? 'bg-purple-300' 
+                                : 'bg-white/60'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="text-[10px] text-purple-500 mt-1 text-center">
+                    {aiTimeline.totalPhases} phases total
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Progress Summary Box - Only show if no AI Timeline or incomplete */}
+          {hasAnyContent && !essaysFullyComplete && !tasksFullyComplete && !hasAITimeline && (
             <div className="mb-3 bg-blue-50/50 rounded-lg p-2.5 border border-blue-100">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wider">Analysis</span>
@@ -238,7 +357,7 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
             )}
           </div>
 
-          {/* Deadlines Section - All Rounds Visible by Default */}
+          {/* Deadlines Section */}
           {formattedDeadlines && formattedDeadlines.length > 0 && (() => {
             const now = new Date();
             let nearestIndex = -1;
@@ -265,7 +384,6 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
               }
             });
 
-            // Always show all deadlines when showAllDeadlines is true (default)
             let displayDeadlines;
             if (showAllDeadlines) {
               displayDeadlines = processedDeadlines;
@@ -335,5 +453,3 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
     </div>
   );
 };
-
-export default UniversityCard;

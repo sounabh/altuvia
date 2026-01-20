@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, createContext, useContext, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { CVBuilder } from "./components/CVBuilder";
@@ -15,7 +14,7 @@ import {
   clearVersionsCache,
 } from "./components/VersionManager";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 export const CVDataContext = createContext();
@@ -27,7 +26,7 @@ export const useCVData = () => {
 };
 
 const generateUniqueCVNumber = (userId) => {
-  const userIdPart = userId.slice(-4); // Shorter user ID part
+  const userIdPart = userId.slice(-4);
   const timestamp = Date.now().toString();
   const randomPart = Math.floor(Math.random() * 999).toString().padStart(3, "0");
   return `cv-${userIdPart}-${timestamp}-${randomPart}`;
@@ -36,6 +35,7 @@ const generateUniqueCVNumber = (userId) => {
 const Index = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [cvNumber, setCvNumber] = useState("");
   const [currentCVId, setCurrentCVId] = useState(null);
@@ -43,6 +43,7 @@ const Index = () => {
   const [userEmail, setUserEmail] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showVersionDialog, setShowVersionDialog] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -129,181 +130,212 @@ const Index = () => {
     }
   }, [status, router]);
 
-  // Initialize user data from session - ONLY userId and email from session
+  // Initialize user data from session
   useEffect(() => {
     if (status === "authenticated" && session?.userId && session?.user?.email) {
       setUserId(session.userId);
       setUserEmail(session.user.email);
-
-      // CV ID and CV Number still come from localStorage
-      try {
-        const savedCVId = localStorage.getItem("currentCVId");
-        const savedCVNumber = localStorage.getItem("currentCVNumber");
-
-        if (savedCVId && savedCVNumber) {
-          setCurrentCVId(savedCVId);
-          setCvNumber(savedCVNumber);
-          loadCVData(savedCVId, session.user.email);
-        } else {
-          const uniqueNumber = generateUniqueCVNumber(session.userId);
-          setCvNumber(uniqueNumber);
-          localStorage.setItem("currentCVNumber", uniqueNumber);
-        }
-      } catch (error) {
-        console.error("Error initializing CV:", error);
-        const uniqueNumber = generateUniqueCVNumber(session.userId);
-        setCvNumber(uniqueNumber);
-        localStorage.setItem("currentCVNumber", uniqueNumber);
-      }
     }
   }, [status, session]);
 
-  // Load CV data using email from session - FIXED VERSION
-// Load CV data using email from session - IMPROVED VERSION
-const loadCVData = async (cvId, email) => {
-  try {
-    if (!email) {
-      console.log("No user email found - skipping CV load");
-      return;
-    }
-
-    const response = await fetch(
-      `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
-    );
-
-    // Handle 404 - CV not found
-    if (response.status === 404) {
-      console.log("CV not found - clearing invalid ID");
-      setCurrentCVId(null);
-      localStorage.removeItem("currentCVId");
-      toast.info("Previous CV not found. Starting fresh.");
-      return;
-    }
-
-    // Handle other HTTP errors
-    if (!response.ok) {
-      console.warn(`Failed to load CV: ${response.status}`);
-      
-      // For 401, 403 - auth issues
-      if (response.status === 401 || response.status === 403) {
-        toast.error("Authentication error. Please log in again.");
+  // NEW: Load CV based on URL parameters or localStorage
+  useEffect(() => {
+    const initializeCV = async () => {
+      if (status !== "authenticated" || !userEmail || !userId) {
         return;
       }
-      
-      // For other errors, don't clear the ID yet
-      return;
-    }
 
-    const text = await response.text();
+      try {
+        // Check for cvId in URL parameters (from dashboard)
+        const urlCVId = searchParams.get('cvId');
+        
+        if (urlCVId) {
+          // Load CV from URL parameter
+          console.log("Loading CV from URL parameter:", urlCVId);
+          await loadCVData(urlCVId, userEmail);
+          setCurrentCVId(urlCVId);
+          
+          // Store in localStorage for future sessions
+          localStorage.setItem("currentCVId", urlCVId);
+          
+          // Clean URL (remove query parameter)
+          router.replace('/cv-builder', { scroll: false });
+          
+        } else {
+          // Fallback to localStorage
+          const savedCVId = localStorage.getItem("currentCVId");
+          const savedCVNumber = localStorage.getItem("currentCVNumber");
 
-    if (!text || text.trim() === "") {
-      console.log("Empty response - no CV data available");
-      return;
-    }
+          if (savedCVId && savedCVNumber) {
+            setCurrentCVId(savedCVId);
+            setCvNumber(savedCVNumber);
+            await loadCVData(savedCVId, userEmail);
+          } else {
+            // Create new CV number
+            const uniqueNumber = generateUniqueCVNumber(userId);
+            setCvNumber(uniqueNumber);
+            localStorage.setItem("currentCVNumber", uniqueNumber);
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing CV:", error);
+        const uniqueNumber = generateUniqueCVNumber(userId);
+        setCvNumber(uniqueNumber);
+        localStorage.setItem("currentCVNumber", uniqueNumber);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
 
-    let result;
+    initializeCV();
+  }, [status, userEmail, userId, searchParams]);
+
+  // Load CV data from API
+  const loadCVData = async (cvId, email) => {
     try {
-      result = JSON.parse(text);
-    } catch (parseError) {
-      console.error("Failed to parse CV data:", parseError);
-      return;
-    }
+      if (!email) {
+        console.log("No user email found - skipping CV load");
+        return;
+      }
 
-    if (!result.success || !result.cv) {
-      console.log("Invalid CV data structure received");
-      
-      // If specific error code for CV not found
-      if (result.code === "CV_NOT_FOUND") {
+      const response = await fetch(
+        `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
+      );
+
+      if (response.status === 404) {
+        console.log("CV not found - clearing invalid ID");
         setCurrentCVId(null);
         localStorage.removeItem("currentCVId");
-        toast.info("CV not found. Starting fresh.");
+        toast.info("Previous CV not found. Starting fresh.");
+        return;
       }
-      return;
-    }
 
-    // Successfully loaded - update state
-    setCvData({
-      personal: result.cv.personalInfo || cvData.personal,
-      education:
-        result.cv.educations?.map((edu) => ({
-          id: edu.id,
-          institution: edu.institution || "",
-          degree: edu.degree || "",
-          field: edu.fieldOfStudy || "",
-          startDate: edu.startDate || "",
-          endDate: edu.endDate || "",
-          gpa: edu.gpa || "",
-          description: edu.description || "",
-        })) || cvData.education,
-      experience:
-        result.cv.experiences?.map((exp) => ({
-          id: exp.id,
-          company: exp.company || "",
-          position: exp.position || "",
-          location: exp.location || "",
-          startDate: exp.startDate || "",
-          endDate: exp.endDate || "",
-          isCurrentRole: exp.isCurrent || false,
-          description: exp.description || "",
-        })) || cvData.experience,
-      projects:
-        result.cv.projects?.map((proj) => ({
-          id: proj.id,
-          name: proj.name || "",
-          description: proj.description || "",
-          technologies: proj.technologies?.join(", ") || "",
-          startDate: proj.startDate || "",
-          endDate: proj.endDate || "",
-          githubUrl: proj.githubUrl || "",
-          liveUrl: proj.liveUrl || "",
-          achievements: proj.achievements?.[0] || "",
-        })) || [],
-      skills:
-        result.cv.skills?.map((skill) => ({
-          id: skill.id,
-          name: skill.categoryName || "",
-          skills: skill.skills || [],
-        })) || cvData.skills,
-      achievements:
-        result.cv.achievements?.map((ach) => ({
-          id: ach.id,
-          title: ach.title || "",
-          organization: ach.organization || "",
-          date: ach.date || "",
-          type: ach.type || "",
-          description: ach.description || "",
-        })) || cvData.achievements,
-      volunteer:
-        result.cv.volunteers?.map((vol) => ({
-          id: vol.id,
-          organization: vol.organization || "",
-          role: vol.role || "",
-          location: vol.location || "",
-          startDate: vol.startDate || "",
-          endDate: vol.endDate || "",
-          description: vol.description || "",
-          impact: vol.impact || "",
-        })) || cvData.volunteer,
-    });
+      if (!response.ok) {
+        console.warn(`Failed to load CV: ${response.status}`);
+        
+        if (response.status === 401 || response.status === 403) {
+          toast.error("Authentication error. Please log in again.");
+          return;
+        }
+        return;
+      }
 
-    if (result.cv.templateId) {
-      setSelectedTemplate(result.cv.templateId);
-    }
+      const text = await response.text();
 
-    if (result.cv.colorScheme) {
-      setThemeColor(result.cv.colorScheme);
-    }
+      if (!text || text.trim() === "") {
+        console.log("Empty response - no CV data available");
+        return;
+      }
 
-    console.log("CV data loaded successfully");
-  } catch (error) {
-    console.error("Error loading CV data:", error);
-    
-    // Network error - might be temporary
-    if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
-      toast.error("Network error. Please check your connection.");
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Failed to parse CV data:", parseError);
+        return;
+      }
+
+      if (!result.success || !result.cv) {
+        console.log("Invalid CV data structure received");
+        
+        if (result.code === "CV_NOT_FOUND") {
+          setCurrentCVId(null);
+          localStorage.removeItem("currentCVId");
+          toast.info("CV not found. Starting fresh.");
+        }
+        return;
+      }
+
+      // Update CV number from loaded data
+      if (result.cv.slug) {
+        setCvNumber(result.cv.slug);
+        localStorage.setItem("currentCVNumber", result.cv.slug);
+      }
+
+      // Successfully loaded - update state
+      setCvData({
+        personal: result.cv.personalInfo || cvData.personal,
+        education:
+          result.cv.educations?.map((edu) => ({
+            id: edu.id,
+            institution: edu.institution || "",
+            degree: edu.degree || "",
+            field: edu.fieldOfStudy || "",
+            startDate: edu.startDate || "",
+            endDate: edu.endDate || "",
+            gpa: edu.gpa || "",
+            description: edu.description || "",
+          })) || cvData.education,
+        experience:
+          result.cv.experiences?.map((exp) => ({
+            id: exp.id,
+            company: exp.company || "",
+            position: exp.position || "",
+            location: exp.location || "",
+            startDate: exp.startDate || "",
+            endDate: exp.endDate || "",
+            isCurrentRole: exp.isCurrent || false,
+            description: exp.description || "",
+          })) || cvData.experience,
+        projects:
+          result.cv.projects?.map((proj) => ({
+            id: proj.id,
+            name: proj.name || "",
+            description: proj.description || "",
+            technologies: proj.technologies?.join(", ") || "",
+            startDate: proj.startDate || "",
+            endDate: proj.endDate || "",
+            githubUrl: proj.githubUrl || "",
+            liveUrl: proj.liveUrl || "",
+            achievements: proj.achievements?.[0] || "",
+          })) || [],
+        skills:
+          result.cv.skills?.map((skill) => ({
+            id: skill.id,
+            name: skill.categoryName || "",
+            skills: skill.skills || [],
+          })) || cvData.skills,
+        achievements:
+          result.cv.achievements?.map((ach) => ({
+            id: ach.id,
+            title: ach.title || "",
+            organization: ach.organization || "",
+            date: ach.date || "",
+            type: ach.type || "",
+            description: ach.description || "",
+          })) || cvData.achievements,
+        volunteer:
+          result.cv.volunteers?.map((vol) => ({
+            id: vol.id,
+            organization: vol.organization || "",
+            role: vol.role || "",
+            location: vol.location || "",
+            startDate: vol.startDate || "",
+            endDate: vol.endDate || "",
+            description: vol.description || "",
+            impact: vol.impact || "",
+          })) || cvData.volunteer,
+      });
+
+      if (result.cv.templateId) {
+        setSelectedTemplate(result.cv.templateId);
+      }
+
+      if (result.cv.colorScheme) {
+        setThemeColor(result.cv.colorScheme);
+      }
+
+      console.log("CV data loaded successfully");
+      toast.success(`CV #${result.cv.slug} loaded successfully!`);
+      
+    } catch (error) {
+      console.error("Error loading CV data:", error);
+      
+      if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
+        toast.error("Network error. Please check your connection.");
+      }
     }
-  }
-};
+  };
 
   const updateCVData = (section, data) => {
     setCvData((prev) => ({
@@ -353,13 +385,11 @@ const loadCVData = async (cvId, email) => {
     setShowVersionDialog(true);
   };
 
-  // FIXED VERSION - Handles CV not found gracefully
   const handleSaveWithVersion = async (versionInfo) => {
     try {
       setIsSaving(true);
       setShowVersionDialog(false);
 
-      // Use email from session instead of localStorage
       if (!userEmail) {
         toast.error("Authentication required. Please log in.");
         return;
@@ -392,13 +422,10 @@ const loadCVData = async (cvId, email) => {
       const result = await response.json();
 
       if (result.success) {
-        // Always update currentCVId with the returned ID
-        // This handles cases where backend created a new CV instead of updating
         if (result.cv.id) {
           setCurrentCVId(result.cv.id);
           localStorage.setItem("currentCVId", result.cv.id);
           
-          // Also update CV number if it changed
           if (result.cv.cvNumber) {
             setCvNumber(result.cv.cvNumber);
             localStorage.setItem("currentCVNumber", result.cv.cvNumber);
@@ -407,13 +434,11 @@ const loadCVData = async (cvId, email) => {
 
         clearVersionsCache(userEmail);
 
-        // Show appropriate message based on whether it was a new CV or update
         const action = result.isNewCV ? "created" : "updated";
         toast.success(
           `CV ${action} successfully as version: ${versionInfo.versionName}`
         );
         
-        // If a new CV was created when we expected an update, inform the user
         if (result.isNewCV && currentCVId) {
           toast.info(
             "A new CV was created. Previous CV may have been deleted.",
@@ -426,7 +451,6 @@ const loadCVData = async (cvId, email) => {
     } catch (error) {
       console.error("CV Save Error:", error);
       
-      // If error mentions CV not found, clear the invalid ID
       if (error.message?.includes("not found") || error.message?.includes("CV_NOT_FOUND")) {
         console.log("Clearing invalid CV ID from localStorage");
         setCurrentCVId(null);
@@ -616,19 +640,20 @@ const loadCVData = async (cvId, email) => {
     }
   };
 
-  // Show loading state while checking authentication
-  if (status === "loading") {
+  // Show loading state while checking authentication or loading CV
+  if (status === "loading" || isInitialLoading) {
     return (
       <div className="min-h-screen bg-cvLightBg flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#002147] mx-auto mb-2" />
-          <p className="text-sm text-gray-600">Loading CV Builder...</p>
+          <p className="text-sm text-gray-600">
+            {status === "loading" ? "Loading CV Builder..." : "Loading your CV..."}
+          </p>
         </div>
       </div>
     );
   }
 
-  // Will redirect if unauthenticated
   if (status === "unauthenticated") {
     return null;
   }
