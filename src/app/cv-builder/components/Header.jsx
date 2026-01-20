@@ -49,16 +49,9 @@ export const Header = ({
           <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
             <FileText className="w-4 h-4 text-white" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-base font-bold text-[#002147]">
-              CV Builder
-            </span>
-            {cvNumber && (
-              <span className="text-xs text-gray-500">
-                {cvNumber}
-              </span>
-            )}
-          </div>
+          <span className="text-base font-bold text-[#002147]">
+            CV Builder
+          </span>
         </div>
 
         {/* ATS Score */}

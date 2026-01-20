@@ -12,11 +12,10 @@ export const LoadingStep = memo(({ userData, onComplete }) => {
   const [isComplete, setIsComplete] = useState(false);
   const [phase, setPhase] = useState("processing");
 
-
   const hasSubmittedRef = useRef(false);
   const toastIdRef = useRef(null);
 
-  const isSessionReady = status === "authenticated" && session?.token; //ensure user is logged in and have token
+  const isSessionReady = status === "authenticated" && session?.token; // ensure user is logged in and have token
 
   const prepareSubmissionData = useCallback(
     () => ({
@@ -26,13 +25,13 @@ export const LoadingStep = memo(({ userData, onComplete }) => {
         studyLevel: userData?.studyLevel || "",
       },
       academicInfo: userData?.academicInfo || {},
-      paymentInfo: {
-        name: userData?.paymentInfo?.name || "",
-        email: userData?.paymentInfo?.email || "",
-        cardNumber: userData?.paymentInfo?.cardNumber
-          ? "****" + userData.paymentInfo.cardNumber.slice(-4)
-          : "",
-      },
+      // paymentInfo: {
+      //   name: userData?.paymentInfo?.name || "",
+      //   email: userData?.paymentInfo?.email || "",
+      //   cardNumber: userData?.paymentInfo?.cardNumber
+      //     ? "****" + userData.paymentInfo.cardNumber.slice(-4)
+      //     : "",
+      // },
     }),
     [userData]
   );
@@ -87,7 +86,7 @@ export const LoadingStep = memo(({ userData, onComplete }) => {
           token: data.token || token,
         });
 
-        //redirect to dashboard
+        // redirect to dashboard
         setTimeout(() => router.push("/dashboard"), 2000);
 
         if (onComplete) onComplete(data);

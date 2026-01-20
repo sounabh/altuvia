@@ -191,7 +191,8 @@ const CVBuilderContent = () => {
     };
 
     initializeCV();
-  }, [status, userEmail, userId, searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, userEmail, userId]);
 
   // Load CV data from API
   const loadCVData = async (cvId, email) => {
@@ -329,7 +330,11 @@ const CVBuilderContent = () => {
       }
 
       console.log("CV data loaded successfully");
-      toast.success(`CV #${result.cv.slug} loaded successfully!`);
+      if (result.cv.slug) {
+        toast.success(`CV #${result.cv.slug} loaded successfully!`);
+      } else {
+        toast.success("CV loaded successfully!");
+      }
       
     } catch (error) {
       console.error("Error loading CV data:", error);

@@ -12,10 +12,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Crown,
-  Calendar,
-  CreditCard,
+  Lock as LockIcon,
   Loader2,
-  Shield
+  Shield,
+  Sparkles,
+  Gift,
+  Zap,
+  Check,
+  Star
 } from "lucide-react";
 
 const SettingsPage = () => {
@@ -23,7 +27,6 @@ const SettingsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
-  const [subscription, setSubscription] = useState(null);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -45,24 +48,7 @@ const SettingsPage = () => {
         email: session.user.email || ""
       }));
     }
-    fetchSubscription();
   }, [session]);
-
-  const fetchSubscription = async () => {
-    try {
-      const response = await fetch("/api/user/subscription", {
-        headers: {
-          Authorization: `Bearer ${session?.token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSubscription(data.subscription);
-      }
-    } catch (error) {
-      console.error("Failed to fetch subscription:", error);
-    }
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -191,7 +177,18 @@ const SettingsPage = () => {
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
     { id: "security", label: "Security", icon: Shield },
-    { id: "subscription", label: "Subscription", icon: Crown }
+    { id: "subscription", label: "Subscription", icon: Crown, free: true }
+  ];
+
+  const freeFeatures = [
+    "Unlimited CV Creations",
+    "AI-Powered Analysis",
+    "Multiple Templates",
+    "PDF Export",
+    "Version History",
+    "Smart Tips & Suggestions",
+    "ATS Score Checker",
+    "Real-time Preview"
   ];
 
   return (
@@ -210,7 +207,7 @@ const SettingsPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-3xl md:text-5xl font-bold text-[#002147] mb-4 tracking-tight"
           >
-            Account <span className="text-[#3598FE]">Settings.</span>
+            Account <span className="text-[#3598FE]">Settings</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 10 }}
@@ -218,7 +215,7 @@ const SettingsPage = () => {
             transition={{ delay: 0.1 }}
             className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto font-medium"
           >
-            Manage your profile, security, and subscription preferences
+            Manage your profile, security, and enjoy our free premium features
           </motion.p>
         </div>
       </div>
@@ -245,6 +242,11 @@ const SettingsPage = () => {
               >
                 <Icon size={18} />
                 <span>{tab.label}</span>
+                {tab.free && (
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                    FREE
+                  </span>
+                )}
               </button>
             );
           })}
@@ -468,88 +470,51 @@ const SettingsPage = () => {
             )}
 
             {activeTab === "subscription" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xl font-semibold text-[#002147] mb-1">Subscription Plan</h3>
-                  <p className="text-sm text-gray-500">Manage your subscription and billing</p>
+              <div className="space-y-8">
+                {/* Header */}
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-2xl mb-4">
+                    <Gift size={32} className="text-emerald-600" />
+                  </div>
+<h3 className="text-xl font-semibold text-[#002147] mb-2">
+  🎉 Enjoy Premium Features — Completely Free!
+</h3>
+<p className="text-gray-500 text-md max-w-2xl font-regular mx-auto">
+  Currently, our platform is completely free. We believe every MBA applicant
+  deserves access to powerful, high-quality application tools.
+  Enjoy all premium features at no cost — we’re here to help you build a
+  strong application and secure admission to your dream MBA program.
+</p>
+
                 </div>
 
-                {subscription ? (
-                  <div className="space-y-4">
-                    {/* Plan Info */}
-                    <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-[#002147] rounded-lg">
-                            <Crown size={24} className="text-white" />
-                          </div>
-                          <div>
-                            <h4 className="text-xl font-bold text-[#002147] capitalize">{subscription.plan} Plan</h4>
-                            <p className="text-sm text-gray-600 capitalize">{subscription.status}</p>
-                          </div>
-                        </div>
-                        {subscription.status === "active" && (
-                          <CheckCircle2 size={28} className="text-green-600" />
-                        )}
-                      </div>
+             
+            
+
+                {/* Lock Note */}
+                <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <LockIcon size={20} className="text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-amber-800 font-medium mb-1">
+                        🔒 Currently Locked: Payment System
+                      </p>
+                      <p className="text-amber-700 text-sm">
+                        While we remain free, our payment system is temporarily locked. We'll notify you well in advance 
+                        if we ever introduce paid plans. For now, enjoy unlimited access!
+                      </p>
                     </div>
-
-                    {/* Subscription Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-white border border-gray-200 rounded-lg p-5">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar size={18} className="text-[#002147]" />
-                          <h5 className="font-medium text-gray-700 text-sm">Billing Cycle</h5>
-                        </div>
-                        <p className="text-2xl font-bold text-[#002147] capitalize">
-                          {subscription.billingCycle || "N/A"}
-                        </p>
-                      </div>
-
-                      <div className="bg-white border border-gray-200 rounded-lg p-5">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CreditCard size={18} className="text-[#002147]" />
-                          <h5 className="font-medium text-gray-700 text-sm">Current Period</h5>
-                        </div>
-                        <p className="text-sm font-semibold text-[#002147]">
-                          {subscription.currentPeriodStart
-                            ? new Date(subscription.currentPeriodStart).toLocaleDateString()
-                            : "N/A"}
-                          {" - "}
-                          {subscription.currentPeriodEnd
-                            ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Trial Info */}
-                    {subscription.status === "trial" && subscription.trialEndDate && (
-                      <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-4">
-                        <p className="text-amber-800 text-sm flex items-center gap-2">
-                          <AlertCircle size={16} />
-                          Trial ends on {new Date(subscription.trialEndDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Manage Button */}
-                    <button className="w-full bg-[#002147] text-white py-3 rounded-lg font-medium hover:bg-[#003366] transition-colors">
-                      Manage Subscription
-                    </button>
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                      <Crown size={40} className="text-gray-400" />
-                    </div>
-                    <h4 className="text-xl font-semibold text-gray-700 mb-2">No Active Subscription</h4>
-                    <p className="text-gray-500 mb-6">Upgrade to access premium features</p>
-                    <button className="bg-[#002147] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#003366] transition-colors">
-                      View Plans
-                    </button>
-                  </div>
-                )}
+                </div>
+
+                {/* Final Message */}
+                <div className="text-center pt-4 border-t border-gray-200">
+                  <p className="text-gray-500 text-sm">
+                    <span className="font-semibold text-[#002147]">No Hidden Costs • No Expiration • No Limits</span>
+                    <br />
+                    We're committed to keeping our core features accessible to everyone
+                  </p>
+                </div>
               </div>
             )}
           </motion.div>

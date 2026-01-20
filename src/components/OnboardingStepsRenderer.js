@@ -96,8 +96,7 @@ export const OnboardingStepsRenderer = memo(({
             step={4}
           />
         )}
-
-        {currentStep === 4 && (
+ {/** {currentStep === 4 && (
           <PaymentStep
             paymentInfo={data?.paymentInfo}
             user={user}
@@ -106,9 +105,10 @@ export const OnboardingStepsRenderer = memo(({
             onUpdate={(paymentInfo) => onUpdate({ paymentInfo })}
             step={5}
           />
-        )}
+        )} */}
+       
 
-        {currentStep === 5 && (
+        {currentStep === 4 && (
           <LoadingStep
             userData={data}
             user={user}
