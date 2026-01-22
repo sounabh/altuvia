@@ -7,8 +7,13 @@ import UniversityOverview from './components/UniversityOverview';
 import ApplicationTabs from './components/ApplicationTabs';
 import Header from './components/Header';
 import { useSession } from 'next-auth/react';
+import Head from 'next/head';
 
-// Skeleton Components
+// ============================================
+// SKELETON COMPONENTS
+// Used for loading states
+// ============================================
+
 const HeaderSkeleton = () => (
   <div className="bg-white shadow-sm border-b">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -96,6 +101,12 @@ const ApplicationTabsSkeleton = () => (
 
 const UniversityPageSkeleton = () => (
   <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    {/* SEO for loading state */}
+    <Head>
+      <title>Loading University Details | Altuvia</title>
+      <meta name="description" content="Loading university information and application details..." />
+    </Head>
+    
     <HeaderSkeleton />
     
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -117,17 +128,26 @@ const UniversityPageSkeleton = () => (
   </div>
 );
 
+// ============================================
+// MAIN UNIVERSITY PAGE COMPONENT
+// Displays detailed university information and application workspace
+// ============================================
+
 const UniversityPage = () => {
+  // ========== ROUTING & AUTHENTICATION ==========
   const params = useParams();
   const slug = params?.university;
   const { data: session, status } = useSession();
   
+  // ========== STATE MANAGEMENT ==========
   const [university, setUniversity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Mounted guard to avoid setState after unmount
+  // ========== MOUNTED REF FOR CLEANUP ==========
+  // Prevents setState calls after component unmounts
   const mountedRef = useRef(true);
+  
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -135,8 +155,12 @@ const UniversityPage = () => {
     };
   }, []);
 
+  // ============================================
+  // FETCH UNIVERSITY DATA
+  // Handles API call with authentication and abort controller
+  // ============================================
   useEffect(() => {
-    // If slug is not present or session is still loading, don't fetch yet.
+    // Wait for slug and session status to be determined
     if (!slug || status === 'loading') return;
 
     const controller = new AbortController();
@@ -144,6 +168,7 @@ const UniversityPage = () => {
 
     const fetchUniversity = async () => {
       try {
+        // Only update state if component is mounted
         if (mountedRef.current) {
           setLoading(true);
           setError(null);
@@ -165,8 +190,8 @@ const UniversityPage = () => {
         const response = await fetch(`${API_BASE_URL}/api/university/${slug}`, {
           method: "GET",
           headers,
-          credentials: "include", // kept as-is (you said don't remove anything)
-          signal,
+          credentials: "include", // Include cookies for session
+          signal, // For request cancellation
         });
 
         if (!response.ok) {
@@ -176,13 +201,14 @@ const UniversityPage = () => {
         const data = await response.json();
         console.log("Fetched university data:", data);
 
+        // Only update state if component is still mounted and request wasn't aborted
         if (!signal.aborted && mountedRef.current) {
           setUniversity(data);
         }
       } catch (err) {
+        // Handle abort errors gracefully
         if (err.name === 'AbortError') {
-          // fetch was aborted, do nothing
-          console.log('Fetch aborted');
+          console.log('Fetch aborted - component unmounted');
         } else {
           console.error("Error fetching university:", err);
           if (mountedRef.current) {
@@ -190,6 +216,7 @@ const UniversityPage = () => {
           }
         }
       } finally {
+        // Only update loading state if component is still mounted
         if (mountedRef.current && !signal.aborted) {
           setLoading(false);
         }
@@ -198,75 +225,136 @@ const UniversityPage = () => {
 
     fetchUniversity();
 
+    // Cleanup function to abort fetch on unmount
     return () => {
       controller.abort();
     };
-    // Use stable deps: slug, status, session?.token
-    // Avoid depending on the whole session object to prevent repeated runs.
   }, [slug, status, session?.token]);
 
-  // Show loading skeleton while session is loading or data is being fetched
+  // ============================================
+  // SEO METADATA
+  // Dynamic title and description based on university data
+  // ============================================
+  const getPageTitle = () => {
+    if (!university) return 'University Details | Altuvia';
+    return `${university.name} | University Details & Application | Altuvia`;
+  };
+
+  const getPageDescription = () => {
+    if (!university) return 'View detailed university information and manage your application.';
+    return `Explore ${university.name}, view admission requirements, and manage your application.`;
+  };
+
+  // ============================================
+  // LOADING STATE
+  // Shows skeleton components while data is loading
+  // ============================================
   if (loading || status === 'loading') {
     return <UniversityPageSkeleton />;
   }
 
+  // ============================================
+  // ERROR STATE
+  // Handles fetch errors with user-friendly message
+  // ============================================
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Something went wrong</h2>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="bg-[#002147] text-white px-6 py-2 rounded-lg hover:bg-[#001a36] transition-colors"
-          >
-            Try Again
-          </button>
+      <>
+        <Head>
+          <title>Error Loading University | Altuvia</title>
+          <meta name="description" content="Unable to load university information. Please try again." />
+        </Head>
+        
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white">
+          <div className="text-center max-w-md mx-auto p-6">
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Something went wrong</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-[#002147] text-white px-6 py-2 rounded-lg hover:bg-[#001a36] transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
+  // ============================================
+  // NOT FOUND STATE
+  // Handles cases where university doesn't exist
+  // ============================================
   if (!university) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="text-gray-400 text-6xl mb-4">🏫</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">University not found</h2>
-          <p className="text-gray-600 mb-4">The university you&apos;re looking for doesn&apos;t exist or has been removed.</p>
-          <button 
-            onClick={() => window.history.back()} 
-            className="bg-[#002147] text-white px-6 py-2 rounded-lg hover:bg-[#001a36] transition-colors"
-          >
-            Go Back
-          </button>
+      <>
+        <Head>
+          <title>University Not Found | Altuvia</title>
+          <meta name="description" content="The requested university could not be found." />
+        </Head>
+        
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white">
+          <div className="text-center max-w-md mx-auto p-6">
+            <div className="text-gray-400 text-6xl mb-4">🏫</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">University not found</h2>
+            <p className="text-gray-600 mb-4">The university you&apos;re looking for doesn&apos;t exist or has been removed.</p>
+            <button 
+              onClick={() => window.history.back()} 
+              className="bg-[#002147] text-white px-6 py-2 rounded-lg hover:bg-[#001a36] transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
+  // ============================================
+  // MAIN RENDER
+  // Displays university details and application workspace
+  // ============================================
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <Header university={university} />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* College Showcase Section */}
-        <section className="mb-12">
-          <CollegeShowcase university={university} />
-        </section>
+    <>
+      {/* ========== SEO HEAD SECTION ========== */}
+      <Head>
+        <title>{getPageTitle()}</title>
+        <meta name="description" content={getPageDescription()} />
+        <meta name="keywords" content={`${university.name}, Mba application, college admissions, ${university.location}, admissions requirements`} />
+        <meta property="og:title" content={university.name} />
+        <meta property="og:description" content={`Explore ${university.name} and manage your application.`} />
+        <meta property="og:type" content="website" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
 
-        {/* University Overview Section */}
-        <section className="mb-12">
-          <UniversityOverview university={university} />
-        </section>
+      {/* ========== MAIN CONTENT ========== */}
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        {/* University Header Section */}
+        <Header university={university} />
+        
+        {/* Main Content Area */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* ========== COLLEGE SHOWCASE SECTION ========== */}
+          {/* Displays university images and highlights */}
+          <section className="mb-12" aria-label="University showcase">
+            <CollegeShowcase university={university} />
+          </section>
 
-        {/* Application Workspace Section */}
-        <section className="mb-12">
-          <ApplicationTabs university={university} />
-        </section>
-      </main>
-    </div>
+          {/* ========== UNIVERSITY OVERVIEW SECTION ========== */}
+          {/* Provides detailed information about the university */}
+          <section className="mb-12" aria-label="University overview">
+            <UniversityOverview university={university} />
+          </section>
+
+          {/* ========== APPLICATION WORKSPACE SECTION ========== */}
+          {/* Application management interface */}
+          <section className="mb-12" aria-label="Application workspace">
+            <ApplicationTabs university={university} />
+          </section>
+        </main>
+      </div>
+    </>
   );
 };
 

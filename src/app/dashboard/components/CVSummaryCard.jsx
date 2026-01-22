@@ -1,3 +1,4 @@
+
 "use client"
 
 import React from 'react';
@@ -8,11 +9,27 @@ import {
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
+/**
+ * CV Summary Card Component
+ * 
+ * Displays a summary of the user's CV with key information and quick access to the CV builder.
+ * Includes empty state for users without a CV.
+ * 
+ * SEO Considerations:
+ * - Uses semantic structure with proper heading hierarchy
+ * - Link text is descriptive for screen readers
+ * - Alternative text for icons would be beneficial but not included due to decorative nature
+ * - Consider adding structured data for resume/portfolio if public
+ */
 export const CVSummaryCard = ({ cvSummary }) => {
+  // ========== EMPTY STATE HANDLING ==========
+  // If no CV summary data exists, render empty state component
   if (!cvSummary) {
     return <CVEmptyState />;
   }
 
+  // ========== DATA EXTRACTION ==========
+  // Destructure CV summary data with fallback defaults
   const {
     id,
     atsScore,
@@ -22,25 +39,34 @@ export const CVSummaryCard = ({ cvSummary }) => {
     skills = [],
   } = cvSummary;
 
-  // Use query parameter format for CV Builder
+  // Construct URL for CV Builder with query parameter
   const cvUrl = `/cv-builder?cvId=${id}`;
 
-  const totalSkills = skills.reduce((sum, cat) => sum + (cat.skillCount || 0), 0);
+  // ========== CALCULATED VALUES ==========
+  // Calculate total skills across all categories
+  const totalSkills = skills.reduce((sum, category) => sum + (category.skillCount || 0), 0);
+  
+  // Get latest education and experience entries (most recent first)
   const latestEducation = education[0] || null;
   const latestExperience = experience[0] || null;
 
   return (
+    // ========== ANIMATION WRAPPER ==========
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
     >
+      {/* ========== MAIN CARD CONTAINER ========== */}
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 shadow-sm bg-white">
         
-        {/* Header */}
+        {/* ========== CARD HEADER ========== */}
+        {/* Contains title, description, and ATS score badge (desktop) */}
         <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          
+          {/* Left: Title and Icon */}
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[#002147] rounded-xl">
+            <div className="p-2.5 bg-[#002147] rounded-xl" aria-label="CV Document">
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -49,31 +75,38 @@ export const CVSummaryCard = ({ cvSummary }) => {
             </div>
           </div>
           
-          {/* ATS Badge - Desktop */}
+          {/* Right: ATS Score Badge (Desktop Only) */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200">
             <BarChart3 className="w-4 h-4 text-gray-400" />
             <span className="text-xs font-medium text-gray-500">ATS Score</span>
             <span className="text-xs font-bold text-gray-400">{atsScore || '--'}/100</span>
-            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wider rounded">
+            <span 
+              className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wider rounded"
+              title="ATS scoring feature coming soon"
+            >
               Soon
             </span>
           </div>
         </div>
 
-        {/* Content */}
+        {/* ========== CARD CONTENT ========== */}
+        {/* Grid layout for CV information sections */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
-            {/* Latest Education */}
+            {/* ========== EDUCATION SECTION ========== */}
             <div className="space-y-3">
+              {/* Section Header */}
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-purple-100">
+                <div className="p-1.5 rounded-lg bg-purple-100" aria-label="Education">
                   <GraduationCap className="w-4 h-4 text-purple-600" />
                 </div>
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Education
                 </span>
               </div>
+              
+              {/* Education Content */}
               {latestEducation ? (
                 <div>
                   <p className="text-sm font-semibold text-[#002147] leading-tight">
@@ -89,22 +122,30 @@ export const CVSummaryCard = ({ cvSummary }) => {
               )}
             </div>
 
-            {/* Latest Experience */}
+            {/* ========== EXPERIENCE SECTION ========== */}
             <div className="space-y-3">
+              {/* Section Header */}
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-emerald-100">
+                <div className="p-1.5 rounded-lg bg-emerald-100" aria-label="Work Experience">
                   <Briefcase className="w-4 h-4 text-emerald-600" />
                 </div>
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Experience
                 </span>
+                
+                {/* Current Job Badge */}
                 {latestExperience?.isCurrent && (
-                  <span className="text-[9px] font-bold bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <span 
+                    className="text-[9px] font-bold bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                    title="Current position"
+                  >
                     <Zap className="w-2.5 h-2.5" />
                     Current
                   </span>
                 )}
               </div>
+              
+              {/* Experience Content */}
               {latestExperience ? (
                 <div>
                   <p className="text-sm font-semibold text-[#002147] leading-tight">
@@ -119,16 +160,19 @@ export const CVSummaryCard = ({ cvSummary }) => {
               )}
             </div>
 
-            {/* Total Skills */}
+            {/* ========== SKILLS SECTION ========== */}
             <div className="space-y-3">
+              {/* Section Header */}
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-blue-100">
+                <div className="p-1.5 rounded-lg bg-blue-100" aria-label="Skills">
                   <Star className="w-4 h-4 text-blue-600" />
                 </div>
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Skills
                 </span>
               </div>
+              
+              {/* Skills Content */}
               {totalSkills > 0 ? (
                 <div>
                   <p className="text-sm font-semibold text-[#002147] leading-tight">
@@ -143,8 +187,11 @@ export const CVSummaryCard = ({ cvSummary }) => {
               )}
             </div>
 
-            {/* Action Section */}
+            {/* ========== ACTION SECTION ========== */}
+            {/* Contains personal info and edit button */}
             <div className="flex flex-col justify-between">
+              
+              {/* Personal Information */}
               <div className="space-y-2 mb-3">
                 {personalInfo?.fullName && (
                   <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -160,8 +207,12 @@ export const CVSummaryCard = ({ cvSummary }) => {
                 )}
               </div>
               
+              {/* Edit Button */}
               <Link href={cvUrl}>
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#002147] text-white rounded-xl text-sm font-semibold hover:bg-[#3598FE] transition-all duration-300 group">
+                <button 
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#002147] text-white rounded-xl text-sm font-semibold hover:bg-[#3598FE] transition-all duration-300 group"
+                  aria-label="Continue editing your CV"
+                >
                   Continue Editing
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
@@ -171,7 +222,8 @@ export const CVSummaryCard = ({ cvSummary }) => {
           </div>
         </div>
 
-        {/* Mobile ATS Badge */}
+        {/* ========== MOBILE ATS BADGE ========== */}
+        {/* Hidden on desktop, shown on mobile devices */}
         <div className="sm:hidden px-6 pb-5">
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
             <div className="flex items-center gap-2">
@@ -180,7 +232,10 @@ export const CVSummaryCard = ({ cvSummary }) => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-gray-400">{atsScore || '--'}/100</span>
-              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase rounded">
+              <span 
+                className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase rounded"
+                title="ATS scoring feature coming soon"
+              >
                 Soon
               </span>
             </div>
@@ -192,17 +247,26 @@ export const CVSummaryCard = ({ cvSummary }) => {
   );
 };
 
+/**
+ * Empty State Component for CV Summary
+ * 
+ * Displayed when no CV data exists.
+ * Provides a call-to-action to create a CV.
+ */
 const CVEmptyState = () => {
   return (
+    // ========== ANIMATION WRAPPER ==========
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
     >
+      {/* ========== EMPTY STATE CARD ========== */}
       <div className="relative overflow-hidden rounded-2xl border-2 border-dashed border-gray-200 bg-white/60">
         
+        {/* ========== CARD HEADER ========== */}
         <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-          <div className="p-2.5 bg-[#002147] rounded-xl">
+          <div className="p-2.5 bg-[#002147] rounded-xl" aria-label="CV Document">
             <FileText className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -211,42 +275,56 @@ const CVEmptyState = () => {
           </div>
         </div>
 
+        {/* ========== EMPTY STATE CONTENT ========== */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
+            {/* Empty Education Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-purple-50">
                   <GraduationCap className="w-4 h-4 text-purple-300" />
                 </div>
-                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Education</span>
+                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Education
+                </span>
               </div>
               <p className="text-sm text-gray-300">Not added yet</p>
             </div>
 
+            {/* Empty Experience Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-emerald-50">
                   <Briefcase className="w-4 h-4 text-emerald-300" />
                 </div>
-                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Experience</span>
+                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Experience
+                </span>
               </div>
               <p className="text-sm text-gray-300">Not added yet</p>
             </div>
 
+            {/* Empty Skills Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-blue-50">
                   <Star className="w-4 h-4 text-blue-300" />
                 </div>
-                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Skills</span>
+                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Skills
+                </span>
               </div>
               <p className="text-sm text-gray-300">Not added yet</p>
             </div>
 
+            {/* Create CV Button */}
             <div className="flex flex-col justify-end">
               <Link href="/cv-builder">
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#002147] text-white rounded-xl text-sm font-semibold hover:bg-[#3598FE] transition-all duration-300">
+                <button 
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#002147] text-white rounded-xl text-sm font-semibold hover:bg-[#3598FE] transition-all duration-300"
+                  aria-label="Create your CV"
+                >
                   <Sparkles className="w-4 h-4" />
                   Create Your CV
                 </button>
@@ -256,6 +334,7 @@ const CVEmptyState = () => {
           </div>
         </div>
 
+        {/* ========== MOBILE ATS BADGE ========== */}
         <div className="px-6 pb-5">
           <div className="flex items-center justify-between p-3 bg-gray-50/50 rounded-xl border border-gray-100">
             <div className="flex items-center gap-2">
@@ -264,7 +343,10 @@ const CVEmptyState = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-gray-300">--/100</span>
-              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase rounded">
+              <span 
+                className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase rounded"
+                title="ATS scoring feature coming soon"
+              >
                 Coming Soon
               </span>
             </div>

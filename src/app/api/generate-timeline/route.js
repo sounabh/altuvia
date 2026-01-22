@@ -427,11 +427,12 @@ async function fetchFreshMetadata(userId, universityId) {
 }
 
 /**
- * ✅ FIX 5: Match essay task to user's essay
- */
+ * ✅ COMPLETELY FIXED: Match essay task to user's essay by promptId and content matching
+*/
 function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
   const taskTitleLower = (taskTitle || "").toLowerCase();
 
+  // Check if this is an essay task
   if (
     !taskTitleLower.includes("essay") &&
     !taskTitleLower.includes("writing") &&
@@ -460,44 +461,100 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     };
   }
 
-  const essayNumberMatch =
-    taskTitleLower.match(/essay\s*#?(\d+)/i) ||
-    taskTitleLower.match(/(\d+)(?:st|nd|rd|th)?\s*essay/i) ||
-    taskTitleLower.match(/prompt\s*#?(\d+)/i);
+  // ✅ STRATEGY 1: DIRECT CONTENT MATCHING (Most Accurate)
+  // Extract the content after "Essay #N:" or similar patterns
+  let essayContent = taskTitle;
+  
+  // Remove prefixes like "Essay #1:", "EMBA Essay 1 —", "MBA Essay 1:"
+  essayContent = essayContent
+    .replace(/^(EMBA|MBA|MS)?\s*Essay\s*#?\d+\s*[—:]\s*/i, "")
+    .trim();
 
-  if (essayNumberMatch) {
-    const essayNumber = parseInt(essayNumberMatch[1]);
+  console.log(`🔍 Matching Task: "${taskTitle}"`);
+  console.log(`   Extracted Content: "${essayContent}"`);
 
-    if (essayNumber > 0 && essayNumber <= allEssayPrompts.length) {
-      const promptIndex = essayNumber - 1;
-      const targetPrompt = allEssayPrompts[promptIndex];
+  // Try to find a prompt that matches the essay content
+  let bestMatch = null;
+  let bestMatchScore = 0;
 
-      const matchingEssay = enhancedEssays.find(
-        (essay) =>
-          essay.essayPromptId === targetPrompt.id ||
-          essay.essayPrompt?.id === targetPrompt.id
-      );
+  for (const prompt of allEssayPrompts) {
+    const promptTitleLower = (prompt.promptTitle || "").toLowerCase();
+    const essayContentLower = essayContent.toLowerCase();
 
-      if (matchingEssay) {
-        return {
-          isTaskComplete: matchingEssay.isActuallyCompleted === true,
-          relatedEssayId: matchingEssay.id,
-          matchType: "essay_number_db_match",
-        };
-      } else {
-        return {
-          isTaskComplete: false,
-          relatedEssayId: null,
-          matchType: "essay_not_started",
-        };
+    // Calculate similarity score
+    let score = 0;
+
+    // Exact match
+    if (promptTitleLower === essayContentLower) {
+      score = 100;
+    }
+    // Contains full prompt title
+    else if (essayContentLower.includes(promptTitleLower)) {
+      score = 90;
+    }
+    // Prompt title contains essay content
+    else if (promptTitleLower.includes(essayContentLower)) {
+      score = 85;
+    }
+    // Keyword matching
+    else {
+      const promptWords = promptTitleLower
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !['essay', 'write', 'prompt', 'about', 'your', 'the'].includes(w));
+      
+      const essayWords = essayContentLower
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !['essay', 'write', 'prompt', 'about', 'your', 'the'].includes(w));
+
+      const matchingWords = promptWords.filter(w => essayWords.includes(w));
+      
+      if (matchingWords.length > 0) {
+        score = (matchingWords.length / Math.max(promptWords.length, essayWords.length)) * 70;
       }
+    }
+
+    if (score > bestMatchScore) {
+      bestMatchScore = score;
+      bestMatch = prompt;
     }
   }
 
+  // If we found a good match (score > 50%), check if user has completed it
+  if (bestMatch && bestMatchScore > 50) {
+    console.log(`   ✅ Best Match: "${bestMatch.promptTitle}" (ID: ${bestMatch.id}) - Score: ${bestMatchScore.toFixed(1)}%`);
+
+    // Find the user's essay for this prompt
+    const matchingEssay = enhancedEssays.find(
+      (essay) =>
+        essay.essayPromptId === bestMatch.id ||
+        essay.essayPrompt?.id === bestMatch.id
+    );
+
+    if (matchingEssay) {
+      console.log(`   ✅ User Essay Found: Complete=${matchingEssay.isActuallyCompleted}, Essay ID=${matchingEssay.id}`);
+      return {
+        isTaskComplete: matchingEssay.isActuallyCompleted === true,
+        relatedEssayId: matchingEssay.id,
+        matchType: "content_match",
+        matchScore: bestMatchScore,
+      };
+    } else {
+      console.log(`   ⚠️ Prompt matched but user hasn't started this essay yet`);
+      return {
+        isTaskComplete: false,
+        relatedEssayId: null,
+        matchType: "essay_not_started",
+        matchedPromptId: bestMatch.id,
+      };
+    }
+  }
+
+  // ✅ STRATEGY 2: Check for "all essays" tasks
   if (
     taskTitleLower.includes("all essay") ||
     taskTitleLower.includes("essay drafts") ||
-    taskTitleLower.includes("finalize essays")
+    taskTitleLower.includes("finalize essays") ||
+    taskTitleLower.includes("upload all")
   ) {
     const completedCount = enhancedEssays.filter(
       (e) => e.isActuallyCompleted === true
@@ -505,6 +562,7 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     const totalCount = allEssayPrompts.length;
     const allComplete = completedCount === totalCount && totalCount > 0;
 
+    console.log(`   📊 All Essays Check: ${completedCount}/${totalCount} complete`);
     return {
       isTaskComplete: allComplete,
       relatedEssayId: null,
@@ -512,41 +570,14 @@ function matchEssayTaskToUserEssay(taskTitle, allEssayPrompts, enhancedEssays) {
     };
   }
 
-  for (let i = 0; i < allEssayPrompts.length; i++) {
-    const prompt = allEssayPrompts[i];
-    const promptTitleLower = (prompt.promptTitle || "").toLowerCase();
-
-    const promptWords = promptTitleLower
-      .split(/\s+/)
-      .filter((w) => w.length > 4);
-    const matchingWords = promptWords.filter((word) =>
-      taskTitleLower.includes(word)
-    );
-
-    if (
-      matchingWords.length >= 2 ||
-      (promptTitleLower.length > 10 &&
-        taskTitleLower.includes(promptTitleLower.substring(0, 15)))
-    ) {
-      const matchingEssay = enhancedEssays.find(
-        (essay) =>
-          essay.essayPromptId === prompt.id ||
-          essay.essayPrompt?.id === prompt.id
-      );
-
-      if (matchingEssay) {
-        return {
-          isTaskComplete: matchingEssay.isActuallyCompleted === true,
-          relatedEssayId: matchingEssay.id,
-          matchType: "keyword_match",
-        };
-      }
-    }
-  }
-
-  return { isTaskComplete: false, relatedEssayId: null, matchType: "no_match" };
+  console.log(`   ❌ No match found (best score was ${bestMatchScore.toFixed(1)}%)`);
+  return { 
+    isTaskComplete: false, 
+    relatedEssayId: null, 
+    matchType: "no_match",
+    bestMatchScore: bestMatchScore 
+  };
 }
-
 /**
  * ✅ FIXED: Check if timeline exists in database - Simplified to use ONLY userId + universityId
  */
@@ -749,56 +780,89 @@ async function getExistingTimeline(userId, universityId) {
     if (requiresTOEFL && !freshMetadata.userHasTOEFL) testsNeeded.push("TOEFL");
 
     // Build timeline using database task completion as SOURCE OF TRUTH
-    const timeline = {
-      overview:
-        userProfileData.overview ||
-        `Application timeline for ${existingTimeline.timelineName}`,
-      totalDuration: existingTimeline.totalDuration || "4-6 months",
-      currentProgress: existingTimeline.overallProgress || 0,
-      phases: existingTimeline.phases.map((phase, phaseIdx) => ({
-        id: phase.phaseNumber,
-        phaseNumber: phase.phaseNumber,
-        name: phase.phaseName,
-        description: phase.description || phase.overview,
-        duration: phase.duration,
-        timeframe: phase.timeframe,
-        status: phase.status,
-        objectives: phase.objectives || [],
-        milestones: phase.milestones || [],
-        proTips: phase.proTips || [],
-        commonMistakes: phase.commonMistakes || [],
-        tasks: phase.tasks.map((task, taskIdx) => {
-          const dbIsCompleted = task.isCompleted === true;
+   const timeline = {
+  overview: userProfileData.overview || `Application timeline for ${existingTimeline.timelineName}`,
+  totalDuration: existingTimeline.totalDuration || "4-6 months",
+  currentProgress: existingTimeline.overallProgress || 0,
+  phases: existingTimeline.phases.map((phase, phaseIdx) => ({
+    id: phase.phaseNumber,
+    phaseNumber: phase.phaseNumber,
+    name: phase.phaseName,
+    description: phase.description || phase.overview,
+    duration: phase.duration,
+    timeframe: phase.timeframe,
+    status: phase.status,
+    objectives: phase.objectives || [],
+    milestones: phase.milestones || [],
+    proTips: phase.proTips || [],
+    commonMistakes: phase.commonMistakes || [],
+    tasks: phase.tasks.map((task, taskIdx) => {
+      let finalIsCompleted = task.isCompleted === true;
+      
+      // ✅ FIX: Re-validate essay tasks against fresh essay data
+      if (task.title && (
+        task.title.toLowerCase().includes('essay') ||
+        task.title.toLowerCase().includes('writing') ||
+        task.title.toLowerCase().includes('prompt')
+      )) {
+        const essayMatch = matchEssayTaskToUserEssay(
+          task.title,
+          freshMetadata.allEssayPrompts,
+          freshMetadata.enhancedEssays
+        );
+        
+        if (essayMatch.matchType !== 'no_match' && essayMatch.matchType !== 'not_essay_task') {
+          console.log(`🔄 Re-validating essay task: "${task.title?.substring(0, 40)}" | DB: ${task.isCompleted} | Fresh: ${essayMatch.isTaskComplete} | Match: ${essayMatch.matchType}`);
+          finalIsCompleted = essayMatch.isTaskComplete;
+          
+          // Update relatedEssayId if found
+          if (essayMatch.relatedEssayId && !task.relatedEssayId) {
+            task.relatedEssayId = essayMatch.relatedEssayId;
+          }
+        }
+      }
+      
+      // ✅ Re-validate test tasks against fresh test data
+      if (task.requiresGMAT === true && freshMetadata.userHasGMAT) {
+        console.log(`🔄 Re-validating GMAT task: "${task.title?.substring(0, 40)}" | DB: ${task.isCompleted} | Fresh: true`);
+        finalIsCompleted = true;
+      } else if (task.requiresGRE === true && freshMetadata.userHasGRE) {
+        console.log(`🔄 Re-validating GRE task: "${task.title?.substring(0, 40)}" | DB: ${task.isCompleted} | Fresh: true`);
+        finalIsCompleted = true;
+      } else if (task.requiresIELTS === true && freshMetadata.userHasIELTS) {
+        console.log(`🔄 Re-validating IELTS task: "${task.title?.substring(0, 40)}" | DB: ${task.isCompleted} | Fresh: true`);
+        finalIsCompleted = true;
+      } else if (task.requiresTOEFL === true && freshMetadata.userHasTOEFL) {
+        console.log(`🔄 Re-validating TOEFL task: "${task.title?.substring(0, 40)}" | DB: ${task.isCompleted} | Fresh: true`);
+        finalIsCompleted = true;
+      }
 
-          console.log(
-            `📝 Task loaded from DB: "${task.title?.substring(
-              0,
-              40
-            )}" | DB Status: ${dbIsCompleted} | ID: ${task.id}`
-          );
+      console.log(
+        `📝 Task loaded from DB: "${task.title?.substring(0, 40)}" | DB Status: ${task.isCompleted} | Final Status: ${finalIsCompleted} | ID: ${task.id}`
+      );
 
-          return {
-            id: task.id,
-            taskNumber: task.taskNumber,
-            title: task.title,
-            description: task.description,
-            estimatedTime: task.estimatedTime,
-            priority: task.priority,
-            completed: dbIsCompleted,
-            status: task.status,
-            actionSteps: task.actionSteps || [],
-            tips: task.tips || [],
-            resources: task.resources || [],
-            requiresGMAT: task.requiresGMAT || false,
-            requiresGRE: task.requiresGRE || false,
-            requiresIELTS: task.requiresIELTS || false,
-            requiresTOEFL: task.requiresTOEFL || false,
-            relatedCalendarEventId: task.relatedEventId,
-            relatedEssayId: task.relatedEssayId,
-          };
-        }),
-      })),
-    };
+      return {
+        id: task.id,
+        taskNumber: task.taskNumber,
+        title: task.title,
+        description: task.description,
+        estimatedTime: task.estimatedTime,
+        priority: task.priority,
+        completed: finalIsCompleted,  // ✅ Use re-validated value
+        status: finalIsCompleted ? 'completed' : task.status,  // ✅ Update status too
+        actionSteps: task.actionSteps || [],
+        tips: task.tips || [],
+        resources: task.resources || [],
+        requiresGMAT: task.requiresGMAT || false,
+        requiresGRE: task.requiresGRE || false,
+        requiresIELTS: task.requiresIELTS || false,
+        requiresTOEFL: task.requiresTOEFL || false,
+        relatedCalendarEventId: task.relatedEventId,
+        relatedEssayId: task.relatedEssayId,
+      };
+    }),
+  })),
+};
 
     // Calculate progress from database task completion
     const totalTasks = timeline.phases.reduce(
