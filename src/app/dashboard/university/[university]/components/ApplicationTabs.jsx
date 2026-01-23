@@ -79,6 +79,17 @@ const EssayAnalytics = lazy(() =>
 );
 
 // ============================================
+// HELPER COMPONENTS
+// ============================================
+
+const PanelLoader = () => (
+  <div className="flex items-center justify-center py-8">
+    <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+    <span className="ml-3 text-sm text-white/60">Loading...</span>
+  </div>
+);
+
+// ============================================
 // MAIN APPLICATION TABS COMPONENT
 // ============================================
 
@@ -88,7 +99,6 @@ const ApplicationTabs = ({ university }) => {
   const { data: session, status: sessionStatus } = useSession();
 
   // ========== EXTRACT USER ID AND UNIVERSITY NAME ==========
-  
   const userId = session?.userId || session?.user?.id || null;
   const userEmail = session?.user?.email || null;
   
@@ -99,59 +109,81 @@ const ApplicationTabs = ({ university }) => {
   const universityName = university?.name || universityNameFromUrl || '';
 
   // ========== STATE MANAGEMENT ==========
-  
   const [activeView, setActiveView] = useState('list');
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalType, setAddModalType] = useState('task');
-
   const [workspaceData, setWorkspaceData] = useState(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState(null);
-
   const [activeProgramId, setActiveProgramId] = useState(null);
   const [activeEssayPromptId, setActiveEssayPromptId] = useState(null);
-
-  // Panel stack - array of panel names, last one is on top
   const [openPanels, setOpenPanels] = useState([]);
-
   const [lastSaved, setLastSaved] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isCreatingEssay, setIsCreatingEssay] = useState(false);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
 
+  // ========== REFS FOR DEBOUNCING AND PERFORMANCE ==========
   const autoSaveTimerRef = useRef(null);
   const lastContentRef = useRef('');
   const isUpdatingRef = useRef(false);
   const lastTypingTimeRef = useRef(Date.now());
+  const pendingContentRef = useRef(null);
+  const updateDebounceRef = useRef(null);
+  const isEditorActiveRef = useRef(false);
+  const saveVersionRef = useRef(null);
 
-  // ========== PANEL TOGGLE FUNCTION ==========
-  
+  // ========== PANEL MANAGEMENT ==========
+  const Panel = useCallback(({ name, title, icon: Icon, iconColor, children, isOpen, onClose }) => {
+    if (!isOpen) return null;
+    
+    return (
+      <div className="mb-4 animate-in slide-in-from-top-4 duration-300">
+        <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+            <div className="flex items-center space-x-2">
+              <div className={`p-1.5 bg-gradient-to-br ${iconColor} rounded-lg`}>
+                <Icon className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-sm font-semibold text-white">{title}</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  }, []);
+
   const togglePanel = useCallback((panelName) => {
     setOpenPanels(prev => {
       if (prev.includes(panelName)) {
-        // Close the panel
         return prev.filter(p => p !== panelName);
       } else {
-        // Open the panel and bring to front (add to end)
         return [...prev, panelName];
       }
     });
+  }, []);
+
+  const closePanel = useCallback((panelName) => {
+    setOpenPanels(prev => prev.filter(p => p !== panelName));
   }, []);
 
   const isPanelOpen = useCallback((panelName) => {
     return openPanels.includes(panelName);
   }, [openPanels]);
 
-  const closePanel = useCallback((panelName) => {
-    setOpenPanels(prev => prev.filter(p => p !== panelName));
-  }, []);
+  // ========== DERIVED DATA - MEMOIZED ==========
+  const tasksAndEvents = useMemo(() => 
+    university?.tasksAndEvents || []
+  , [university?.tasksAndEvents]);
 
-  // ========== DERIVED DATA - FILTER PROGRAMS WITH ESSAYS ==========
-
-  const tasksAndEvents = university?.tasksAndEvents || [];
-
-  // Filter programs to only include those with essays
   const programsWithEssays = useMemo(() => {
     if (!workspaceData?.programs) return [];
     return workspaceData.programs.filter(program => 
@@ -172,7 +204,6 @@ const ApplicationTabs = ({ university }) => {
   }, [currentEssayData]);
 
   // ========== PROGRESS CALCULATION ==========
-
   const progressData = useMemo(() => {
     if (!university) {
       return {
@@ -266,7 +297,6 @@ const ApplicationTabs = ({ university }) => {
   ]);
 
   // ========== API FUNCTIONS ==========
-
   const fetchWorkspaceData = useCallback(async () => {
     if (!universityName || !userId) return;
 
@@ -291,7 +321,7 @@ const ApplicationTabs = ({ university }) => {
       const data = await response.json();
       setWorkspaceData(data);
 
-      // Filter and set default selections - only programs with essays
+      // Filter and set default selections
       const programsWithContent = data.programs?.filter(p => p.essays && p.essays.length > 0) || [];
       
       if (programsWithContent.length > 0) {
@@ -328,6 +358,14 @@ const ApplicationTabs = ({ university }) => {
       return false;
     }
 
+    // Use pending content if available
+    let contentToSave = currentEssay.content;
+    let wordCountToSave = currentEssay.wordCount;
+    if (pendingContentRef.current) {
+      contentToSave = pendingContentRef.current.content;
+      wordCountToSave = pendingContentRef.current.wordCount;
+    }
+
     try {
       setIsSaving(true);
       isUpdatingRef.current = true;
@@ -339,8 +377,8 @@ const ApplicationTabs = ({ university }) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             essayId: currentEssay.id,
-            content: currentEssay.content,
-            wordCount: currentEssay.wordCount,
+            content: contentToSave,
+            wordCount: wordCountToSave,
             isAutoSave: true,
             userId,
           }),
@@ -350,6 +388,8 @@ const ApplicationTabs = ({ university }) => {
       if (response.ok) {
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
+        // Clear pending content after successful save
+        pendingContentRef.current = null;
         return true;
       }
       return false;
@@ -427,50 +467,90 @@ const ApplicationTabs = ({ university }) => {
     }
   }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId]);
 
+  // ========== OPTIMIZED ESSAY CONTENT UPDATE ==========
   const updateEssayContent = useCallback((content, wordCount) => {
-    if (isUpdatingRef.current || content === lastContentRef.current) return;
-
-    if (!currentEssay) {
-      createEssay();
-      return;
+    // Store the pending update
+    pendingContentRef.current = { content, wordCount };
+    
+    // Mark editor as active to prevent external sync
+    isEditorActiveRef.current = true;
+    
+    // Clear existing debounce timer
+    if (updateDebounceRef.current) {
+      clearTimeout(updateDebounceRef.current);
     }
+    
+    // Debounce state updates to prevent re-renders during typing
+    updateDebounceRef.current = setTimeout(() => {
+      if (!pendingContentRef.current) return;
+      
+      const { content: newContent, wordCount: newWordCount } = pendingContentRef.current;
+      
+      // If no essay exists, create one
+      if (!currentEssay) {
+        createEssay();
+        return;
+      }
 
-    lastTypingTimeRef.current = Date.now();
-    lastContentRef.current = content;
-
-    // Single atomic update
-    setWorkspaceData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        programs: prev.programs.map(program =>
-          program.id === activeProgramId
-            ? {
-                ...program,
-                essays: program.essays.map(essayData =>
-                  essayData.promptId === activeEssayPromptId
-                    ? {
-                        ...essayData,
-                        userEssay: {
-                          ...essayData.userEssay,
-                          content,
-                          wordCount,
-                          lastModified: new Date(),
-                        },
-                      }
-                    : essayData
-                ),
-              }
-            : program
-        ),
-      };
-    });
-
-    setHasUnsavedChanges(true);
+      // Batch the state update
+      setWorkspaceData((prev) => {
+        if (!prev) return prev;
+        
+        // Find the program
+        const programIndex = prev.programs.findIndex(p => p.id === activeProgramId);
+        if (programIndex === -1) return prev;
+        
+        const program = prev.programs[programIndex];
+        if (!program.essays) return prev;
+        
+        // Find the essay
+        const essayIndex = program.essays.findIndex(e => e.promptId === activeEssayPromptId);
+        if (essayIndex === -1) return prev;
+        
+        // Check if content actually changed
+        const currentContent = program.essays[essayIndex].userEssay?.content;
+        if (currentContent === newContent) return prev;
+        
+        // Create new state immutably with minimal object creation
+        const newPrograms = [...prev.programs];
+        const newProgram = { ...program };
+        const newEssays = [...program.essays];
+        const newEssayData = { ...newEssays[essayIndex] };
+        
+        newEssayData.userEssay = {
+          ...newEssayData.userEssay,
+          content: newContent,
+          wordCount: newWordCount,
+          lastModified: new Date(),
+        };
+        
+        newEssays[essayIndex] = newEssayData;
+        newProgram.essays = newEssays;
+        newPrograms[programIndex] = newProgram;
+        
+        return { ...prev, programs: newPrograms };
+      });
+      
+      setHasUnsavedChanges(true);
+      pendingContentRef.current = null;
+      
+      // Keep editor active flag for a bit longer
+      setTimeout(() => {
+        isEditorActiveRef.current = false;
+      }, 100);
+    }, 600); // 600ms debounce
   }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay]);
 
   const saveVersion = useCallback(async (label) => {
     if (!currentEssay || isSaving || isSavingVersion || !userId) return false;
+
+    // Use pending content if available
+    let contentToSave = currentEssay.content;
+    let wordCountToSave = currentEssay.wordCount;
+    if (pendingContentRef.current) {
+      contentToSave = pendingContentRef.current.content;
+      wordCountToSave = pendingContentRef.current.wordCount;
+    }
 
     try {
       setIsSavingVersion(true);
@@ -491,8 +571,8 @@ const ApplicationTabs = ({ university }) => {
           body: JSON.stringify({
             action: "save_version",
             essayId: currentEssay.id,
-            content: currentEssay.content,
-            wordCount: currentEssay.wordCount,
+            content: contentToSave,
+            wordCount: wordCountToSave,
             label: label || `Version ${new Date().toLocaleString()}`,
             userId,
           }),
@@ -649,9 +729,16 @@ const ApplicationTabs = ({ university }) => {
   };
 
   // ========== HANDLERS ==========
-
   const handleProgramSelect = useCallback((programId) => {
     if (programId === activeProgramId) return;
+
+    // Clear any pending updates
+    if (updateDebounceRef.current) {
+      clearTimeout(updateDebounceRef.current);
+      updateDebounceRef.current = null;
+    }
+    pendingContentRef.current = null;
+    isEditorActiveRef.current = false;
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -674,6 +761,14 @@ const ApplicationTabs = ({ university }) => {
 
   const handleEssayPromptSelect = useCallback((promptId) => {
     if (promptId === activeEssayPromptId) return;
+
+    // Clear any pending updates
+    if (updateDebounceRef.current) {
+      clearTimeout(updateDebounceRef.current);
+      updateDebounceRef.current = null;
+    }
+    pendingContentRef.current = null;
+    isEditorActiveRef.current = false;
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -716,8 +811,20 @@ const ApplicationTabs = ({ university }) => {
     setOpenPanels([]);
   };
 
-  // ========== EFFECTS ==========
+  // ========== MEMOIZED EDITOR PROPS ==========
+  const editorKey = useMemo(() => {
+    return `editor-${currentEssay?.id || 'new'}-${activeProgramId}-${activeEssayPromptId}`;
+  }, [currentEssay?.id, activeProgramId, activeEssayPromptId]);
 
+  const editorContent = useMemo(() => {
+    // Only get content when essay changes, not during typing
+    if (isEditorActiveRef.current) {
+      return undefined; // Let editor manage its own content
+    }
+    return currentEssay?.content || '';
+  }, [currentEssay?.id]); // Only depend on ID, not content
+
+  // ========== EFFECTS ==========
   // Optimized auto-save - triggers after 25s of inactivity
   useEffect(() => {
     if (!hasUnsavedChanges || !currentEssay || isSaving || activeView !== 'editor') {
@@ -740,116 +847,22 @@ const ApplicationTabs = ({ university }) => {
     }
   }, [activeView, workspaceData, universityName, userId, fetchWorkspaceData]);
 
+  // Cleanup on unmount
   useEffect(() => {
-    if (activeView === 'editor' && userId && universityName && !workspaceData) {
-      fetchWorkspaceData();
-    }
-  }, [userId, activeView, universityName, workspaceData, fetchWorkspaceData]);
-
-  // ========== HELPER COMPONENTS ==========
-
-  const PanelLoader = () => (
-    <div className="flex items-center justify-center py-8">
-      <Loader2 className="w-6 h-6 animate-spin text-white/50" />
-      <span className="ml-3 text-sm text-white/60">Loading...</span>
-    </div>
-  );
-
-  // Panel wrapper component for consistent styling
-  const Panel = useCallback(({ name, title, icon: Icon, iconColor, children }) => {
-    if (!isPanelOpen(name)) return null;
-    
-    return (
-      <div className="mb-4 animate-in slide-in-from-top-4 duration-300">
-        <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-            <div className="flex items-center space-x-2">
-              <div className={`p-1.5 bg-gradient-to-br ${iconColor} rounded-lg`}>
-                <Icon className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-white">{title}</span>
-            </div>
-            <button
-              onClick={() => closePanel(name)}
-              className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          {children}
-        </div>
-      </div>
-    );
-  }, [isPanelOpen, closePanel]);
-
-  const renderPanels = () => {
-    if (!currentEssay || openPanels.length === 0) return null;
-
-    return (
-      <>
-        <Panel 
-          name="versions" 
-          title="Version History" 
-          icon={Layers}
-          iconColor="from-blue-500/20 to-cyan-500/20"
-        >
-          <Suspense fallback={<PanelLoader />}>
-            <VersionManager
-              versions={currentEssay.versions || []}
-              currentContent={currentEssay.content || ''}
-              onRestoreVersion={handleRestoreVersion}
-              onDeleteVersion={handleDeleteVersion}
-              essayId={currentEssay.id}
-              universityName={universityName}
-              isLoading={workspaceLoading}
-            />
-          </Suspense>
-        </Panel>
-
-        <Panel 
-          name="analytics" 
-          title="Essay Analytics" 
-          icon={PieChart}
-          iconColor="from-purple-500/20 to-pink-500/20"
-        >
-          <Suspense fallback={<PanelLoader />}>
-            <EssayAnalytics
-              essay={{
-                ...currentEssay,
-                wordLimit: currentEssayData.wordLimit,
-                priority: currentEssayData.priority
-              }}
-              allEssays={programsWithEssays.flatMap(p => p.essays.map(e => e.userEssay).filter(Boolean))}
-              essayId={currentEssay.id}
-              userId={userId}
-              universityName={universityName}
-            />
-          </Suspense>
-        </Panel>
-
-        <Panel 
-          name="ai" 
-          title="AI Assistant" 
-          icon={Brain}
-          iconColor="from-amber-500/20 to-orange-500/20"
-        >
-          <AISuggestions
-            content={currentEssay.content || ''}
-            prompt={currentEssayData.promptText}
-            wordCount={currentEssay.wordCount || 0}
-            wordLimit={currentEssayData.wordLimit}
-            essayId={currentEssay.id}
-            universityName={universityName}
-            currentVersionId={null}
-            versions={currentEssay.versions || []}
-          />
-        </Panel>
-      </>
-    );
-  };
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      if (updateDebounceRef.current) {
+        clearTimeout(updateDebounceRef.current);
+      }
+      if (saveVersionRef.current) {
+        clearTimeout(saveVersionRef.current);
+      }
+    };
+  }, []);
 
   // ========== HELPER FUNCTIONS ==========
-
   const getProgressBarColor = () => {
     if (progressData.applicationStatus === 'submitted') return 'bg-green-500';
     if (progressData.applicationStatus === 'in-progress') return 'bg-blue-500';
@@ -967,7 +980,7 @@ const ApplicationTabs = ({ university }) => {
     };
   };
 
-  // Memoized EssayCard component to reduce re-renders
+  // Memoized EssayCard component
   const EssayCard = useCallback(({ essay, index }) => {
     const actualProgress = getEssayProgress(essay);
     const statusConfig = getEssayStatus(essay);
@@ -1054,8 +1067,80 @@ const ApplicationTabs = ({ university }) => {
     );
   }, [handleOpenEditor]);
 
-  // ========== RENDER ==========
+  // ========== RENDER PANELS ==========
+  const renderPanels = () => {
+    if (!currentEssay || openPanels.length === 0) return null;
 
+    return (
+      <>
+        <Panel 
+          name="versions" 
+          title="Version History" 
+          icon={Layers}
+          iconColor="from-blue-500/20 to-cyan-500/20"
+          isOpen={isPanelOpen('versions')}
+          onClose={() => closePanel('versions')}
+        >
+          <Suspense fallback={<PanelLoader />}>
+            <VersionManager
+              versions={currentEssay.versions || []}
+              currentContent={currentEssay.content || ''}
+              onRestoreVersion={handleRestoreVersion}
+              onDeleteVersion={handleDeleteVersion}
+              essayId={currentEssay.id}
+              universityName={universityName}
+              isLoading={workspaceLoading}
+            />
+          </Suspense>
+        </Panel>
+
+        <Panel 
+          name="analytics" 
+          title="Essay Analytics" 
+          icon={PieChart}
+          iconColor="from-purple-500/20 to-pink-500/20"
+          isOpen={isPanelOpen('analytics')}
+          onClose={() => closePanel('analytics')}
+        >
+          <Suspense fallback={<PanelLoader />}>
+            <EssayAnalytics
+              essay={{
+                ...currentEssay,
+                wordLimit: currentEssayData.wordLimit,
+                priority: currentEssayData.priority
+              }}
+              allEssays={programsWithEssays.flatMap(p => p.essays.map(e => e.userEssay).filter(Boolean))}
+              essayId={currentEssay.id}
+              userId={userId}
+              universityName={universityName}
+            />
+          </Suspense>
+        </Panel>
+
+        <Panel 
+          name="ai" 
+          title="AI Assistant" 
+          icon={Brain}
+          iconColor="from-amber-500/20 to-orange-500/20"
+          isOpen={isPanelOpen('ai')}
+          onClose={() => closePanel('ai')}
+        >
+          <AISuggestions
+            content={currentEssay.content || ''}
+            prompt={currentEssayData.promptText}
+            wordCount={currentEssay.wordCount || 0}
+            wordLimit={currentEssayData.wordLimit}
+            essayId={currentEssay.id}
+            universityName={universityName}
+            currentVersionId={null}
+            versions={currentEssay.versions || []}
+          />
+        </Panel>
+      </>
+    );
+  };
+
+  // ========== RENDER ==========
   if (sessionStatus === 'loading') {
     return (
       <div className="my-20">
@@ -1490,15 +1575,15 @@ const ApplicationTabs = ({ university }) => {
                             </p>
                           </div>
 
-                          {/* Stacked Panels - Appear above editor */}
+                          {/* Stacked Panels */}
                           {renderPanels()}
 
                           {/* Editor or Create Button */}
                           {currentEssay ? (
                             <>
                               <EssayEditor
-                                key={`editor-${currentEssay.id}`}
-                                content={currentEssay.content || ''}
+                                key={editorKey}
+                                content={editorContent}
                                 onChange={updateEssayContent}
                                 wordLimit={currentEssayData.wordLimit}
                                 essayId={currentEssay.id}
