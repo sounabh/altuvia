@@ -796,7 +796,7 @@ function EmbeddedAISuggestions({
     setError(null);
 
     try {
-      const response = await fetch(`/api/essay/${encodeURIComponent(universityName)}/ai-suggestions`, {
+      const response = await fetch(`/api/essay/${encodeURIComponent(universityName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
