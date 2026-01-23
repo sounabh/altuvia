@@ -65,7 +65,7 @@ export const ProgressSummary = ({ universities }) => {
         
         <div>
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-600">Tasks Completed</span>
+            <span className="text-sm font-medium text-gray-600">Events Completed</span>
             <span className="text-sm font-bold text-[#002147]">
               {summary.completedTasks}/{summary.totalTasks}
             </span>

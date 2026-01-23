@@ -425,7 +425,7 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
               <div>
                 <div className="flex justify-between text-[12px] font-semibold text-gray-600 mb-1">
                   <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" /> Tasks
+                    <Calendar className="w-3.5 h-3.5" /> Events
                   </span>
                   <span className={tasksFullyComplete ? "text-green-600" : ""}>
                     {completedTasks}/{totalTasks}
