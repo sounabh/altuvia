@@ -882,21 +882,18 @@ async function getEssayAnalytics(data) {
         {
           error: "Essay prompt data is missing",
           essayId,
-          suggestion:
-            "This essay may be orphaned. Consider reassigning it to a valid prompt.",
+          suggestion: "This essay may be orphaned. Consider reassigning it to a valid prompt.",
         },
         { status: 400 }
       );
     }
 
-    // FIXED: Corrected the NOT clause structure
+    // Fetch all user essays with proper filtering
     const allUserEssays = userId
       ? await prisma.essay.findMany({
           where: {
             userId,
-            essayPromptId: {
-              not: null, // This is the correct syntax for NOT NULL
-            },
+            essayPromptId: { not: null },
           },
           include: {
             essayPrompt: true,
@@ -904,8 +901,10 @@ async function getEssayAnalytics(data) {
         })
       : [];
 
-    // Filter out any essays that still have null essayPrompt after the query
-    const validUserEssays = allUserEssays.filter((e) => e.essayPrompt !== null);
+    // Filter out any essays that still have null essayPrompt AND have valid wordLimit
+    const validUserEssays = allUserEssays.filter(
+      (e) => e.essayPrompt !== null && e.essayPrompt.wordLimit > 0
+    );
 
     const analytics = {
       completion: {
@@ -967,16 +966,17 @@ async function getEssayAnalytics(data) {
       progress: {
         overall:
           validUserEssays.length > 0
-            ? validUserEssays.reduce(
-                (acc, e) =>
-                  acc +
-                  Math.min(100, (e.wordCount / e.essayPrompt.wordLimit) * 100),
-                0
-              ) / validUserEssays.length
+            ? validUserEssays.reduce((acc, e) => {
+                // Additional safety check
+                if (!e.essayPrompt || !e.essayPrompt.wordLimit) return acc;
+                return acc + Math.min(100, (e.wordCount / e.essayPrompt.wordLimit) * 100);
+              }, 0) / validUserEssays.length
             : 0,
-        completed: validUserEssays.filter(
-          (e) => e.wordCount >= e.essayPrompt.wordLimit * 0.8
-        ).length,
+        completed: validUserEssays.filter((e) => {
+          // Additional safety check
+          if (!e.essayPrompt || !e.essayPrompt.wordLimit) return false;
+          return e.wordCount >= e.essayPrompt.wordLimit * 0.8;
+        }).length,
         total: validUserEssays.length,
         orphaned: allUserEssays.length - validUserEssays.length,
       },
@@ -995,7 +995,6 @@ async function getEssayAnalytics(data) {
     );
   }
 }
-
 async function deleteVersion(data) {
   const { versionId, essayId } = data;
 

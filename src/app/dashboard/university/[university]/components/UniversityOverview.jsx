@@ -1,28 +1,30 @@
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   TrendingUp,
   Users,
   Clock,
   DollarSign,
   Award,
-  Calendar,
   Target,
   Globe,
   GraduationCap,
   BookOpen,
   CheckCircle,
   School,
-  Building2,
   Phone,
   Mail,
-  Download,
-  ChevronRight,
   Sparkles,
+  ArrowUpRight,
+  Calendar,
 } from "lucide-react";
 
 const UniversityOverview = ({ university }) => {
+  // Primary colors
+  const primaryColor = "#002147";
+  const secondaryColor = "#3598FE";
+  const lightBg = "#F8FAFC";
+
+  // Validation helper
   const isValidValue = (val) => {
     if (val === null || val === undefined) return false;
     if (val === "" || val === "N/A" || val === "n/a") return false;
@@ -42,33 +44,7 @@ const UniversityOverview = ({ university }) => {
     return digits.length >= 6;
   };
 
-  const renderContactValue = (val) => {
-    if (!isValidValue(val)) return null;
-    const text = val.trim();
-    if (isEmail(text)) {
-      return (
-        <a
-          href={`mailto:${text}`}
-          className="text-sm text-[#3598FE] hover:underline break-all"
-        >
-          {text}
-        </a>
-      );
-    }
-    if (isPhone(text)) {
-      const tel = text.replace(/[^+\d]/g, "");
-      return (
-        <a
-          href={`tel:${tel}`}
-          className="text-sm text-[#3598FE] hover:underline"
-        >
-          {text}
-        </a>
-      );
-    }
-    return <p className="text-sm text-gray-600">{text}</p>;
-  };
-
+  // Format deadlines
   const getFormattedDeadlines = () => {
     let formattedDeadlines = [];
 
@@ -97,25 +73,14 @@ const UniversityOverview = ({ university }) => {
         .filter(Boolean);
 
       parts.forEach((part, idx) => {
-        const trimmedPart = part
-          .trim()
-          .replace(/,\s*$/, "")
-          .replace(/^\s*,/, "");
-
+        const trimmedPart = part.trim().replace(/,\s*$/, "").replace(/^\s*,/, "");
         const match = trimmedPart.match(/^(Round\s*\d+|Deferred)\s*:\s*(.+)$/i);
 
         if (match) {
           const roundLabel = match[1].replace(/round\s*/i, "Round ").trim();
-          const dateValue = match[2]
-            .trim()
-            .replace(/,\s*$/, "")
-            .replace(/\s+/g, " ");
-
+          const dateValue = match[2].trim().replace(/,\s*$/, "").replace(/\s+/g, " ");
           if (roundLabel && dateValue) {
-            formattedDeadlines.push({
-              round: roundLabel,
-              date: dateValue,
-            });
+            formattedDeadlines.push({ round: roundLabel, date: dateValue });
           }
         } else if (trimmedPart && !trimmedPart.match(/^\s*$/)) {
           formattedDeadlines.push({
@@ -143,8 +108,9 @@ const UniversityOverview = ({ university }) => {
     return `${symbol}${amount.toLocaleString()}`;
   };
 
-  const buildStats = () => {
-    const statsArray = [];
+  // Build hero stats (top 4 most important)
+  const buildHeroStats = () => {
+    const stats = [];
 
     const ranking =
       university.ftGlobalRanking ||
@@ -152,500 +118,480 @@ const UniversityOverview = ({ university }) => {
       university.qsRanking ||
       university.timesRanking;
     if (isValidValue(ranking)) {
-      statsArray.push({
-        icon: Award,
-        label: "Global Ranking",
-        value: `#${ranking}`,
+      stats.push({ 
+        icon: Award, 
+        label: "Global Ranking", 
+        value: `#${ranking}`, 
+        color: "text-amber-600", 
+        bg: "bg-amber-50",
+        subtitle: "World Rank"
       });
     }
 
-    if (
-      isValidValue(university.gmatScoreMin) &&
-      isValidValue(university.gmatScoreMax)
-    ) {
-      statsArray.push({
-        icon: TrendingUp,
-        label: "GMAT Range",
-        value: `${university.gmatScoreMin}-${university.gmatScoreMax}`,
+    if (isValidValue(university.gmatScoreMin) && isValidValue(university.gmatScoreMax)) {
+      stats.push({ 
+        icon: TrendingUp, 
+        label: "GMAT Range", 
+        value: `${university.gmatScoreMin}-${university.gmatScoreMax}`, 
+        color: "text-[#002147]", 
+        bg: "bg-blue-50",
+        subtitle: "Score Range"
       });
     } else if (isValidValue(university.gmatAverageScore)) {
-      statsArray.push({
-        icon: TrendingUp,
-        label: "Avg GMAT",
-        value: `${university.gmatAverageScore}`,
-      });
-    }
-
-    if (isValidValue(university.averageProgramLengthMonths)) {
-      statsArray.push({
-        icon: Clock,
-        label: "Duration",
-        value: `${university.averageProgramLengthMonths} Months`,
+      stats.push({ 
+        icon: TrendingUp, 
+        label: "Avg GMAT", 
+        value: `${university.gmatAverageScore}`, 
+        color: "text-[#002147]", 
+        bg: "bg-blue-50",
+        subtitle: "Average Score"
       });
     }
 
     if (isValidValue(university.acceptanceRate)) {
-      statsArray.push({
-        icon: Users,
-        label: "Acceptance",
-        value: `${university.acceptanceRate.toFixed(1)}%`,
+      stats.push({ 
+        icon: Users, 
+        label: "Acceptance Rate", 
+        value: `${university.acceptanceRate.toFixed(1)}%`, 
+        color: "text-emerald-600", 
+        bg: "bg-emerald-50",
+        subtitle: "Admission Rate"
       });
     }
 
     const tuition = formatCurrency(university.tuitionFees, university.currency);
     if (tuition) {
-      statsArray.push({ icon: DollarSign, label: "Tuition", value: tuition });
+      stats.push({ 
+        icon: DollarSign, 
+        label: "Tuition Fee", 
+        value: tuition, 
+        color: "text-violet-600", 
+        bg: "bg-violet-50",
+        subtitle: "Annual Fee"
+      });
+    }
+
+    if (isValidValue(university.averageProgramLengthMonths)) {
+      stats.push({ 
+        icon: Clock, 
+        label: "Program Duration", 
+        value: `${university.averageProgramLengthMonths} Months`, 
+        color: "text-rose-600", 
+        bg: "bg-rose-50",
+        subtitle: "Course Length"
+      });
     }
 
     if (isValidValue(university.studentsPerYear)) {
-      statsArray.push({
-        icon: GraduationCap,
-        label: "Students/Year",
-        value: university.studentsPerYear.toLocaleString(),
+      stats.push({ 
+        icon: GraduationCap, 
+        label: "Class Size", 
+        value: university.studentsPerYear.toLocaleString(), 
+        color: "text-cyan-600", 
+        bg: "bg-cyan-50",
+        subtitle: "Students/Year"
       });
     }
 
-    if (isValidValue(university.minimumGpa)) {
-      statsArray.push({
-        icon: BookOpen,
-        label: "Min GPA",
-        value: university.minimumGpa.toFixed(1),
-      });
-    }
-
-    if (isValidValue(university.intakes)) {
-      statsArray.push({
-        icon: Calendar,
-        label: "Intakes",
-        value: university.intakes,
-      });
-    }
-
-    return statsArray;
+    return stats;
   };
 
-  const allStats = buildStats();
+  const heroStats = buildHeroStats();
 
+  // Build all rankings
   const buildRankings = () => {
     const rankings = [];
-    if (isValidValue(university.ftGlobalRanking))
-      rankings.push({
-        value: university.ftGlobalRanking,
-        label: "Financial Times",
-      });
-    if (isValidValue(university.usNewsRanking))
-      rankings.push({ value: university.usNewsRanking, label: "US News" });
-    if (isValidValue(university.qsRanking))
-      rankings.push({ value: university.qsRanking, label: "QS World" });
-    if (isValidValue(university.timesRanking))
-      rankings.push({
-        value: university.timesRanking,
-        label: "Times Higher Ed",
-      });
+    if (isValidValue(university.ftGlobalRanking)) {
+      rankings.push({ value: university.ftGlobalRanking, label: "Financial Times", color: "text-amber-600", bg: "bg-amber-50", icon: Award });
+    }
+    if (isValidValue(university.usNewsRanking)) {
+      rankings.push({ value: university.usNewsRanking, label: "US News & World Report", color: "text-blue-600", bg: "bg-blue-50", icon: BookOpen });
+    }
+    if (isValidValue(university.qsRanking)) {
+      rankings.push({ value: university.qsRanking, label: "QS World Rankings", color: "text-violet-600", bg: "bg-violet-50", icon: Globe });
+    }
+    if (isValidValue(university.timesRanking)) {
+      rankings.push({ value: university.timesRanking, label: "Times Higher Education", color: "text-emerald-600", bg: "bg-emerald-50", icon: TrendingUp });
+    }
     return rankings;
   };
 
   const rankings = buildRankings();
 
+  // Build highlights
   const highlights =
-    university.whyChooseHighlights && university.whyChooseHighlights.length > 0
-      ? university.whyChooseHighlights.slice(0, 3).map((text, index) => {
-          const hasColon = text.includes(":");
-          return {
-            icon: index === 0 ? Target : index === 1 ? Award : School,
-            title: hasColon ? text.split(":")[0] : `Excellence ${index + 1}`,
-            description: hasColon ? text.split(":")[1].trim() : text,
-          };
-        })
-      : [
-          {
-            icon: Target,
-            title: "World-Class Faculty",
-            description: "Learn from renowned professors and industry experts",
-          },
-          {
-            icon: Award,
-            title: "Career Excellence",
-            description:
-              "Outstanding employment rates and advancement opportunities",
-          },
-          {
-            icon: School,
-            title: "Global Network",
-            description: "Join an influential alumni network worldwide",
-          },
-        ];
+    university.whyChooseHighlights?.slice(0, 3).map((text, index) => {
+      const hasColon = text.includes(":");
+      return {
+        icon: index === 0 ? Target : index === 1 ? Award : School,
+        title: hasColon ? text.split(":")[0] : `Key Strength ${index + 1}`,
+        description: hasColon ? text.split(":")[1].trim() : text,
+      };
+    }) || [];
 
-  const hasContactInfo =
-    isValidValue(university.admissionsOfficeContact) ||
-    isValidValue(university.internationalOfficeContact) ||
-    isValidValue(university.generalInquiriesContact);
+  // Build contacts
+  const contacts = [
+    { label: "Admissions Office", value: university.admissionsOfficeContact, icon: Mail },
+    { label: "International Office", value: university.internationalOfficeContact, icon: Globe },
+    { label: "General Inquiries", value: university.generalInquiriesContact, icon: Phone },
+  ].filter((c) => isValidValue(c.value));
 
-  const hasAcademicRequirements =
-    isValidValue(university.languageTestRequirements) ||
-    isValidValue(university.minimumGpa) ||
-    isValidValue(university.gmatScoreMin) ||
-    isValidValue(university.gmatAverageScore);
-
-  const hasFinancialInfo =
-    isValidValue(university.scholarshipInfo) ||
-    isValidValue(university.financialAidDetails) ||
-    isValidValue(university.tuitionFees);
-
-  // Section Header Component for consistency
-  const SectionHeader = ({ icon: Icon, title }) => (
-    <div className="flex items-center gap-3 mb-5">
-      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10">
-        <Icon className="w-4 h-4 text-[#3598FE]" />
-      </div>
-      <h3 className="text-sm font-bold text-[#002147] uppercase tracking-wider">
-        {title}
-      </h3>
-      <div className="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent"></div>
-    </div>
-  );
+  // Check for valid sections
+  const hasRankings = rankings.length > 1;
+  const hasHighlights = highlights.length > 0;
+  const hasScholarship = isValidValue(university.scholarshipInfo);
+  const hasFinancialAid = isValidValue(university.financialAidDetails);
+  const hasLanguage = isValidValue(university.languageTestRequirements);
+  const hasMinGpa = isValidValue(university.minimumGpa);
+  const hasContacts = contacts.length > 0;
+  const hasDeadlines = formattedDeadlines && formattedDeadlines.length > 0;
 
   return (
-    <div className="w-full">
-      <Card className="bg-white shadow-xl border-0 overflow-hidden rounded-2xl">
-        <CardContent className="p-0">
-          {/* Header - Enhanced with gradient */}
-          <div className="relative bg-gradient-to-r from-[#002147] via-[#002147] to-[#003366] px-8 py-6">
-            <div className='absolute inset-0 bg-[url(&apos;data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.03"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E&apos;)] opacity-50'></div>
-
-            <div className="relative flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="w-4 h-4 text-[#3598FE]" />
-                  <span className="text-xs font-medium text-blue-300 uppercase tracking-wider">
-                    Complete Overview
-                  </span>
+    <div className="w-full space-y-8">
+      
+      {/* ============ HERO STATS SECTION ============ */}
+      {heroStats.length > 0 && (
+        <section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            {heroStats.slice(0, 4).map((stat, index) => {
+              const IconComponent = stat.icon;
+              return (
+                <div 
+                  key={index} 
+                  className="group relative bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition-all duration-300 hover:shadow-sm"
+                >
+                  <div className="relative p-4 lg:p-5">
+                    {/* Icon */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${stat.bg}`}>
+                        <IconComponent className={`w-5 h-5 ${stat.color}`} />
+                      </div>
+                      <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        {stat.subtitle}
+                      </div>
+                    </div>
+                    
+                    {/* Value */}
+                    <div className={`text-2xl lg:text-3xl font-bold ${stat.color} mb-1`}>
+                      {stat.value}
+                    </div>
+                    
+                    {/* Label */}
+                    <div className="text-sm font-medium text-gray-600">
+                      {stat.label}
+                    </div>
+                  </div>
                 </div>
-                <h2 className="text-2xl font-bold text-white">
-                  University Overview
-                </h2>
-                <p className="text-blue-200/80 text-sm mt-1">
-                  Everything you need to know about {university.name}
-                </p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-[#3598FE] to-[#2080E5] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Award className="h-7 w-7 text-white" />
-              </div>
-            </div>
+              );
+            })}
           </div>
 
-          <div className="p-8">
-            {/* Top Section: Stats + Deadlines */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-              {/* Key Statistics */}
-              {allStats.length > 0 && (
-                <div className="lg:col-span-2">
-                  <SectionHeader icon={TrendingUp} title="Key Statistics" />
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {allStats.map((stat, index) => (
-                      <div
-                        key={index}
-                        className="group bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-4 hover:border-[#3598FE]/30 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-md bg-[#3598FE]/10 flex items-center justify-center group-hover:bg-[#3598FE]/20 transition-colors">
-                            <stat.icon className="h-3.5 w-3.5 text-[#3598FE]" />
-                          </div>
-                          <span className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">
-                            {stat.label}
-                          </span>
+          {/* Secondary Stats Row - More compact */}
+          {heroStats.length > 4 && (
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {heroStats.slice(4).map((stat, index) => {
+                  const IconComponent = stat.icon;
+                  return (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div className={`p-2 rounded-lg ${stat.bg}`}>
+                        <IconComponent className={`w-4 h-4 ${stat.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-500 truncate">{stat.label}</div>
+                        <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ============ MAIN CONTENT GRID ============ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* LEFT COLUMN - Main Content */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* RANKINGS SECTION */}
+          {hasRankings && (
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
+                  <Award className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-[#002147]">Global Rankings</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {rankings.map((r, i) => {
+                  const RankingIcon = r.icon;
+                  return (
+                    <div 
+                      key={i} 
+                      className={`${r.bg} rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-all duration-300`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-1.5 rounded-lg bg-white">
+                          <RankingIcon className={`w-3.5 h-3.5 ${r.color}`} />
                         </div>
-                        <p className="text-lg font-bold text-[#002147] group-hover:text-[#3598FE] transition-colors">
-                          {stat.value}
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                          {r.label}
+                        </div>
+                      </div>
+                      <div className={`text-3xl font-bold ${r.color}`}>
+                        #{r.value}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* REQUIREMENTS SECTION */}
+          {(hasLanguage || hasMinGpa) && (
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-[#002147]">Academic Requirements</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {hasLanguage && (
+                  <div className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-white shadow-xs flex items-center justify-center flex-shrink-0">
+                        <Globe className="w-4 h-4 text-[#002147]" />
+                      </div>
+                      <div className="text-sm font-bold text-[#002147]">
+                        Language Requirements
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-700 leading-relaxed">
+                      {university.languageTestRequirements}
+                    </div>
+                  </div>
+                )}
+                
+                {hasMinGpa && (
+                  <div className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-white shadow-xs flex items-center justify-center flex-shrink-0">
+                        <TrendingUp className="w-4 h-4 text-[#002147]" />
+                      </div>
+                      <div className="text-sm font-bold text-[#002147]">
+                        Minimum GPA
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-[#002147]">
+                      {university.minimumGpa.toFixed(1)}
+                      <span className="text-sm font-normal text-gray-500 ml-1">out of 4.0</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* WHY CHOOSE SECTION */}
+          {hasHighlights && (
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-[#002147]">
+                  Why Choose {university.name}?
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {highlights.map((h, i) => {
+                  const HighlightIcon = h.icon;
+                  return (
+                    <div
+                      key={i}
+                      className="group relative p-4 rounded-xl bg-white border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-300"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
+                        <HighlightIcon className="w-5 h-5 text-[#002147]" />
+                      </div>
+                      
+                      <h4 className="text-sm font-bold text-[#002147] mb-2">
+                        {h.title}
+                      </h4>
+                      
+                      <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
+                        {h.description}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* FINANCIAL SECTION */}
+          {(hasScholarship || hasFinancialAid) && (
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-[#002147]">Financial Support</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {hasScholarship && (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-emerald-800 mb-1">
+                          Scholarships Available
+                        </div>
+                        <p className="text-xs text-emerald-700 leading-relaxed line-clamp-3">
+                          {university.scholarshipInfo}
                         </p>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Application Deadlines */}
-              {formattedDeadlines && formattedDeadlines.length > 0 && (
-                <div className="lg:col-span-1">
-                  <SectionHeader icon={Calendar} title="Deadlines" />
-                  <div className="bg-gradient-to-br from-[#002147] to-[#001a38] rounded-xl p-5 shadow-xl shadow-[#002147]/20">
-                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-[#3598FE] rounded-full animate-pulse"></div>
-                        <span className="text-xs font-semibold text-white/90 uppercase tracking-wider">
-                          {formattedDeadlines.length > 1
-                            ? "Application Rounds"
-                            : "Deadline"}
-                        </span>
+                {hasFinancialAid && (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <Target className="w-5 h-5 text-amber-600" />
                       </div>
-                      {formattedDeadlines.length > 1 && (
-                        <span className="text-[10px] bg-[#3598FE] text-white px-2.5 py-1 rounded-full font-semibold">
-                          {formattedDeadlines.length} Rounds
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="space-y-4">
-                      {formattedDeadlines.map((deadline, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-3 group"
-                        >
-                          <div className="mt-1 w-6 h-6 rounded-full bg-[#3598FE]/20 flex items-center justify-center flex-shrink-0">
-                            <span className="text-[10px] font-bold text-[#3598FE]">
-                              {index + 1}
-                            </span>
-                          </div>
-                          <div className="flex-1">
-                            <span className="text-sm text-white font-semibold block">
-                              {deadline.round}
-                            </span>
-                            <span className="text-sm text-blue-200/80">
-                              {deadline.date}
-                            </span>
-                          </div>
+                      <div>
+                        <div className="text-sm font-bold text-amber-800 mb-1">
+                          Financial Aid Options
                         </div>
-                      ))}
+                        <p className="text-xs text-amber-700 leading-relaxed line-clamp-3">
+                          {university.financialAidDetails}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </section>
+          )}
 
-            {/* Rankings Row */}
-            {rankings.length > 0 && (
-              <div className="mb-10">
-                <SectionHeader icon={Award} title="University Rankings" />
-                <div className="flex flex-wrap gap-4">
-                  {rankings.map((ranking, index) => (
-                    <div
-                      key={index}
-                      className="group relative bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl px-6 py-4 text-center hover:shadow-xl hover:shadow-blue-500/10 hover:border-[#3598FE]/30 transition-all duration-300 min-w-[140px]"
+          {/* CONTACT SECTION */}
+          {hasContacts && (
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
+                  <Mail className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-[#002147]">Get in Touch</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {contacts.map((contact, i) => {
+                  const ContactIcon = contact.icon;
+                  const text = contact.value.trim();
+                  const isEmailContact = isEmail(text);
+                  const isPhoneContact = isPhone(text);
+                  
+                  const href = isEmailContact 
+                    ? `mailto:${text}` 
+                    : isPhoneContact 
+                      ? `tel:${text.replace(/[^+\d]/g, "")}` 
+                      : null;
+
+                  return (
+                    <a
+                      key={i}
+                      href={href || "#"}
+                      className="group flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-[#002147] transition-all duration-300"
                     >
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-gradient-to-br from-[#3598FE] to-[#2080E5] rounded-full flex items-center justify-center shadow-lg">
-                        <Award className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="pt-3">
-                        <div className="text-2xl font-black text-[#002147] group-hover:text-[#3598FE] transition-colors">
-                          #{ranking.value}
+                      <ContactIcon className="w-4 h-4 text-[#002147] group-hover:text-white transition-colors" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-400 group-hover:text-blue-200 font-medium uppercase tracking-wide truncate transition-colors">
+                          {contact.label}
                         </div>
-                        <div className="text-[11px] text-gray-500 font-semibold uppercase tracking-wide mt-1">
-                          {ranking.label}
+                        <div className="text-sm text-[#002147] group-hover:text-white font-medium truncate transition-colors">
+                          {text}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-white opacity-0 group-hover:opacity-100 transition-all" />
+                    </a>
+                  );
+                })}
               </div>
-            )}
+            </section>
+          )}
+        </div>
 
-            {/* Academic Requirements */}
-            {hasAcademicRequirements && (
-              <div className="mb-10">
-                <SectionHeader icon={BookOpen} title="Academic Requirements" />
-                <div className="flex flex-wrap gap-4">
-                  {isValidValue(university.languageTestRequirements) && (
-                    <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-5 hover:shadow-lg hover:border-[#3598FE]/30 transition-all duration-300 max-w-xs">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 flex items-center justify-center">
-                          <Globe className="h-5 w-5 text-[#3598FE]" />
-                        </div>
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">
-                          Language
-                        </span>
-                      </div>
-                      <p className="text-sm text-[#002147] font-medium leading-relaxed">
-                        {university.languageTestRequirements}
-                      </p>
-                    </div>
-                  )}
-                  {isValidValue(university.minimumGpa) && (
-                    <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-5 text-center hover:shadow-lg hover:border-[#3598FE]/30 transition-all duration-300 min-w-[130px]">
-                      <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 flex items-center justify-center">
-                        <BookOpen className="h-5 w-5 text-[#3598FE]" />
-                      </div>
-                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">
-                        Min GPA
-                      </div>
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#3598FE] to-[#002147] bg-clip-text text-transparent">
-                        {university.minimumGpa.toFixed(1)}
-                      </div>
-                    </div>
-                  )}
-                  {(isValidValue(university.gmatScoreMin) ||
-                    isValidValue(university.gmatAverageScore)) && (
-                    <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-5 text-center hover:shadow-lg hover:border-[#3598FE]/30 transition-all duration-300 min-w-[130px]">
-                      <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 flex items-center justify-center">
-                        <TrendingUp className="h-5 w-5 text-[#3598FE]" />
-                      </div>
-                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">
-                        GMAT
-                      </div>
-                      <div className="text-3xl font-black bg-gradient-to-r from-[#3598FE] to-[#002147] bg-clip-text text-transparent">
-                        {isValidValue(university.gmatScoreMin) &&
-                        isValidValue(university.gmatScoreMax)
-                          ? `${university.gmatScoreMin}-${university.gmatScoreMax}`
-                          : university.gmatAverageScore}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Financial Information */}
-            {hasFinancialInfo && (
-              <div className="mb-10">
-                <SectionHeader
-                  icon={DollarSign}
-                  title="Financial Information"
-                />
-                <div className="flex flex-wrap gap-4">
-                  {isValidValue(university.tuitionFees) && (
-                    <div className="relative bg-gradient-to-br from-[#002147] to-[#001a38] rounded-xl p-5 shadow-lg shadow-[#002147]/20 overflow-hidden">
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-[#3598FE]/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-                      <div className="relative">
-                        <div className="flex items-center gap-2 mb-2">
-                          <DollarSign className="w-4 h-4 text-blue-300" />
-                          <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">
-                            Tuition Fee
-                          </div>
-                        </div>
-                        <div className="text-2xl font-black text-white">
-                          {formatCurrency(
-                            university.tuitionFees,
-                            university.currency
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {isValidValue(university.scholarshipInfo) && (
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50/50 border border-green-100 rounded-xl p-5 max-w-sm hover:shadow-lg transition-all duration-300">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        </div>
-                        <span className="text-xs text-green-700 font-bold uppercase tracking-wider">
-                          Scholarships
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">
-                        {university.scholarshipInfo}
-                      </p>
-                    </div>
-                  )}
-                  {isValidValue(university.financialAidDetails) && (
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-100 rounded-xl p-5 max-w-md hover:shadow-lg transition-all duration-300">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                          <Target className="h-5 w-5 text-amber-600" />
-                        </div>
-                        <span className="text-xs text-amber-700 font-bold uppercase tracking-wider">
-                          Financial Aid
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">
-                        {university.financialAidDetails}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Why Choose Section */}
-            <div className="mb-10">
-              <div className="relative bg-gradient-to-br from-gray-50 via-white to-blue-50/30 border border-gray-100 rounded-2xl overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#3598FE] via-[#002147] to-[#3598FE]"></div>
-                <div className="bg-gradient-to-r from-[#002147] via-[#002147] to-[#003366] px-6 py-4">
-                  <div className="flex items-center justify-center gap-3">
-                    <Sparkles className="w-5 h-5 text-[#3598FE]" />
-                    <h3 className="text-lg font-bold text-white">
-                      Why Choose {university.name}?
-                    </h3>
+        {/* RIGHT COLUMN - Deadlines Sidebar */}
+        {hasDeadlines && (
+          <div className="lg:col-span-1">
+            <div className="sticky top-6">
+              <div className="bg-[#002147] rounded-2xl p-5 shadow-lg">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-[#3598FE]" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      Application Deadlines
+                    </span>
                   </div>
+                  {formattedDeadlines.length > 1 && (
+                    <span className="text-xs bg-[#3598FE] text-white px-2 py-1 rounded-full font-bold">
+                      {formattedDeadlines.length} Rounds
+                    </span>
+                  )}
                 </div>
-                <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {highlights.map((highlight, index) => (
-                    <div key={index} className="group text-center">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-blue-500/20 transition-all duration-300">
-                        <highlight.icon className="h-7 w-7 text-[#3598FE]" />
+
+                {/* Deadline List */}
+                <div className="space-y-3">
+                  {formattedDeadlines.map((deadline, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-[#3598FE] flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-white">
+                          {index + 1}
+                        </span>
                       </div>
-                      <h4 className="text-sm font-bold text-[#002147] mb-2">
-                        {highlight.title}
-                      </h4>
-                      <p className="text-sm text-gray-600 leading-relaxed">
-                        {highlight.description}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-white mb-0.5 truncate">
+                          {deadline.round}
+                        </div>
+                        <div className="text-xs text-blue-200/80 truncate">
+                          {deadline.date}
+                        </div>
+                      </div>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   ))}
+                </div>
+
+                {/* CTA */}
+                <div className="mt-4 pt-3 border-t border-white/10">
+                  <div className="text-center">
+                    <span className="text-xs text-blue-300/70">
+                      Plan your application timeline
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Contact Information */}
-            {hasContactInfo && (
-              <div>
-                <SectionHeader icon={Mail} title="Contact Information" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {isValidValue(university.admissionsOfficeContact) && (
-                    <div className="group bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-5 hover:shadow-lg hover:border-[#3598FE]/30 transition-all duration-300">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Mail className="h-6 w-6 text-[#3598FE]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
-                            Admissions
-                          </div>
-                          {renderContactValue(
-                            university.admissionsOfficeContact
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {isValidValue(university.internationalOfficeContact) && (
-                    <div className="group bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-5 hover:shadow-lg hover:border-[#3598FE]/30 transition-all duration-300">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Globe className="h-6 w-6 text-[#3598FE]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
-                            International
-                          </div>
-                          {renderContactValue(
-                            university.internationalOfficeContact
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {isValidValue(university.generalInquiriesContact) && (
-                    <div className="group bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl p-5 hover:shadow-lg hover:border-[#3598FE]/30 transition-all duration-300">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3598FE]/10 to-[#002147]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Phone className="h-6 w-6 text-[#3598FE]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
-                            General
-                          </div>
-                          {renderContactValue(
-                            university.generalInquiriesContact
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 };
