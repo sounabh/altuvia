@@ -165,7 +165,7 @@ export const UniversityCard = ({ university, index = 0, onRemove, onUpdate }) =>
       case 'in-progress':
         // Provide more specific status based on completion state
         if (essaysFullyComplete && !tasksFullyComplete) return 'Essays Done';
-        if (!essaysFullyComplete && tasksFullyComplete) return 'Tasks Done';
+        if (!essaysFullyComplete && tasksFullyComplete) return 'Events Done';
         return 'In Progress';
       default: 
         return 'Not Started';
