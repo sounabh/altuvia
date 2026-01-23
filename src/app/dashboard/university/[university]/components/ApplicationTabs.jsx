@@ -477,7 +477,7 @@ function EmbeddedEssayEditor({
         </div>
       </div>
 
-      {/* Editor Area - INCREASED HEIGHT */}
+      {/* Editor Area */}
       <div className="bg-white relative">
         {!isReady && (
           <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-10">
@@ -531,7 +531,7 @@ function EmbeddedEssayEditor({
 }
 
 // ============================================
-// EMBEDDED VERSION MANAGER COMPONENT - IMPROVED UI
+// EMBEDDED VERSION MANAGER COMPONENT - ALWAYS VISIBLE ACTIONS
 // ============================================
 
 function EmbeddedVersionManager({
@@ -542,7 +542,8 @@ function EmbeddedVersionManager({
   essayId,
   universityName,
   isLoading = false,
-  compact = false
+  compact = false,
+  onClose
 }) {
   const [expandedVersion, setExpandedVersion] = useState(null);
   const [restoringId, setRestoringId] = useState(null);
@@ -608,7 +609,7 @@ function EmbeddedVersionManager({
       {versions.slice(0, compact ? 5 : 10).map((version, index) => (
         <div
           key={version.id}
-          className={`group p-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] ${
+          className={`p-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] ${
             index === 0 
               ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-400/30 shadow-lg shadow-blue-500/10' 
               : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
@@ -643,7 +644,8 @@ function EmbeddedVersionManager({
               </div>
             </div>
 
-            <div className="flex items-center space-x-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* ALWAYS VISIBLE ACTION BUTTONS */}
+            <div className="flex items-center space-x-1 ml-2">
               <button
                 onClick={() => setExpandedVersion(expandedVersion === version.id ? null : version.id)}
                 className="p-2 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
@@ -701,7 +703,7 @@ function EmbeddedVersionManager({
 }
 
 // ============================================
-// EMBEDDED AI SUGGESTIONS COMPONENT - IMPROVED UI
+// EMBEDDED AI SUGGESTIONS COMPONENT
 // ============================================
 
 function EmbeddedAISuggestions({
@@ -711,7 +713,8 @@ function EmbeddedAISuggestions({
   wordLimit,
   essayId,
   universityName,
-  compact = false
+  compact = false,
+  onClose
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -958,14 +961,15 @@ function EmbeddedAISuggestions({
 }
 
 // ============================================
-// EMBEDDED ANALYTICS COMPONENT - IMPROVED UI
+// EMBEDDED ANALYTICS COMPONENT
 // ============================================
 
 function EmbeddedEssayAnalytics({
   essay,
   allEssays = [],
   essayId,
-  compact = false
+  compact = false,
+  onClose
 }) {
   const content = essay?.content || '';
   const wordCount = essay?.wordCount || 0;
@@ -984,13 +988,6 @@ function EmbeddedEssayAnalytics({
     if (progress >= 80) return '#10B981';
     if (progress >= 50) return '#F59E0B';
     return '#6B7280';
-  };
-
-  const getProgressGradient = () => {
-    if (wordCount > wordLimit) return 'from-red-500 to-rose-500';
-    if (progress >= 80) return 'from-emerald-500 to-teal-500';
-    if (progress >= 50) return 'from-amber-500 to-orange-500';
-    return 'from-gray-400 to-gray-500';
   };
 
   const stats = [
@@ -1141,10 +1138,8 @@ const ApplicationTabs = ({ university }) => {
   const [activeProgramId, setActiveProgramId] = useState(null);
   const [activeEssayPromptId, setActiveEssayPromptId] = useState(null);
 
-  const [showVersions, setShowVersions] = useState(true);
-  const [showAI, setShowAI] = useState(true);
-  const [showAnalytics, setShowAnalytics] = useState(true);
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  // Panel stack - array of panel names, last one is on top
+  const [openPanels, setOpenPanels] = useState([]);
 
   const [lastSaved, setLastSaved] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1155,6 +1150,29 @@ const ApplicationTabs = ({ university }) => {
   const autoSaveTimerRef = useRef(null);
   const lastContentRef = useRef('');
   const isUpdatingRef = useRef(false);
+  const lastTypingTimeRef = useRef(Date.now());
+
+  // ========== PANEL TOGGLE FUNCTION ==========
+  
+  const togglePanel = useCallback((panelName) => {
+    setOpenPanels(prev => {
+      if (prev.includes(panelName)) {
+        // Close the panel
+        return prev.filter(p => p !== panelName);
+      } else {
+        // Open the panel and bring to front (add to end)
+        return [...prev, panelName];
+      }
+    });
+  }, []);
+
+  const isPanelOpen = useCallback((panelName) => {
+    return openPanels.includes(panelName);
+  }, [openPanels]);
+
+  const closePanel = useCallback((panelName) => {
+    setOpenPanels(prev => prev.filter(p => p !== panelName));
+  }, []);
 
   // ========== DERIVED DATA - FILTER PROGRAMS WITH ESSAYS ==========
 
@@ -1442,6 +1460,9 @@ const ApplicationTabs = ({ university }) => {
 
     if (content === lastContentRef.current) return;
 
+    // Update last typing time
+    lastTypingTimeRef.current = Date.now();
+
     try {
       isUpdatingRef.current = true;
 
@@ -1680,6 +1701,7 @@ const ApplicationTabs = ({ university }) => {
     setHasUnsavedChanges(false);
     setLastSaved(null);
     lastContentRef.current = "";
+    setOpenPanels([]);
   }, [activeProgramId, programsWithEssays]);
 
   const handleEssayPromptSelect = useCallback((promptId) => {
@@ -1692,6 +1714,7 @@ const ApplicationTabs = ({ university }) => {
     setActiveEssayPromptId(promptId);
     setHasUnsavedChanges(false);
     setLastSaved(null);
+    setOpenPanels([]);
 
     const newEssayData = currentProgram?.essays?.find(e => e.promptId === promptId);
     lastContentRef.current = newEssayData?.userEssay?.content || "";
@@ -1722,10 +1745,12 @@ const ApplicationTabs = ({ university }) => {
       await autoSaveEssay();
     }
     setActiveView('list');
+    setOpenPanels([]);
   };
 
   // ========== EFFECTS ==========
 
+  // Auto-save after 25 seconds of no typing
   useEffect(() => {
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -1733,8 +1758,12 @@ const ApplicationTabs = ({ university }) => {
 
     if (hasUnsavedChanges && currentEssay && !isSaving && activeView === 'editor') {
       autoSaveTimerRef.current = setTimeout(() => {
-        autoSaveEssay();
-      }, 3000);
+        const timeSinceLastType = Date.now() - lastTypingTimeRef.current;
+        // Only auto-save if user hasn't typed for at least 20 seconds
+        if (timeSinceLastType >= 20000) {
+          autoSaveEssay();
+        }
+      }, 25000); // 25 seconds
     }
 
     return () => {
@@ -1833,7 +1862,6 @@ const ApplicationTabs = ({ university }) => {
     return 0;
   };
 
-  // IMPROVED: Better status colors with more visibility
   const getEssayStatus = (essay) => {
     const hasContent = essay.wordCount && essay.wordCount > 0;
     
@@ -1890,6 +1918,123 @@ const ApplicationTabs = ({ university }) => {
       </div>
     );
   }
+
+  // Get panels in render order (first = bottom layer, last = top layer)
+  const renderPanels = () => {
+    if (!currentEssay || openPanels.length === 0) return null;
+
+    return openPanels.map((panelName, index) => {
+      const zIndex = 30 + index; // Each panel gets higher z-index
+      const isTopPanel = index === openPanels.length - 1;
+
+      const panelContent = () => {
+        switch (panelName) {
+          case 'versions':
+            return (
+              <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-lg">
+                      <Layers className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">Version History</span>
+                    <span className="text-xs text-white/40 bg-white/10 px-2 py-1 rounded-full">
+                      {currentEssay.versions?.length || 0} saved
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => closePanel('versions')}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <EmbeddedVersionManager
+                  versions={currentEssay.versions || []}
+                  currentContent={currentEssay.content || ''}
+                  onRestoreVersion={handleRestoreVersion}
+                  onDeleteVersion={handleDeleteVersion}
+                  essayId={currentEssay.id}
+                  universityName={universityName}
+                  isLoading={workspaceLoading}
+                  compact={true}
+                  onClose={() => closePanel('versions')}
+                />
+              </div>
+            );
+          case 'analytics':
+            return (
+              <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg">
+                      <PieChart className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">Essay Analytics</span>
+                  </div>
+                  <button
+                    onClick={() => closePanel('analytics')}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <EmbeddedEssayAnalytics
+                  essay={{
+                    ...currentEssay,
+                    wordLimit: currentEssayData.wordLimit
+                  }}
+                  essayId={currentEssay.id}
+                  compact={true}
+                  onClose={() => closePanel('analytics')}
+                />
+              </div>
+            );
+          case 'ai':
+            return (
+              <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-lg">
+                      <Brain className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">AI Assistant</span>
+                  </div>
+                  <button
+                    onClick={() => closePanel('ai')}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <EmbeddedAISuggestions
+                  content={currentEssay.content || ''}
+                  prompt={currentEssayData.promptText}
+                  wordCount={currentEssay.wordCount || 0}
+                  wordLimit={currentEssayData.wordLimit}
+                  essayId={currentEssay.id}
+                  universityName={universityName}
+                  compact={true}
+                  onClose={() => closePanel('ai')}
+                />
+              </div>
+            );
+          default:
+            return null;
+        }
+      };
+
+      return (
+        <div
+          key={panelName}
+          className="mb-4 animate-in slide-in-from-top-4 duration-300"
+          style={{ zIndex }}
+        >
+          {panelContent()}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="my-20">
@@ -2323,26 +2468,60 @@ const ApplicationTabs = ({ university }) => {
                       </div>
                     </div>
 
-                    {/* Main Editor - INCREASED SPACE */}
-                    <div className={`col-span-12 ${showRightPanel ? 'lg:col-span-5' : 'lg:col-span-9'}`}>
+                    {/* Main Editor Area */}
+                    <div className="col-span-12 lg:col-span-9">
                       {currentEssayData ? (
                         <div className="space-y-5">
-                          {/* Essay Header */}
-                          <div className="flex items-center justify-between">
+                          {/* Essay Header with Panel Toggles */}
+                          <div className="flex items-center justify-between flex-wrap gap-3">
                             <div>
                               <h3 className="text-xl font-bold text-white">{currentEssayData.promptTitle}</h3>
                               <p className="text-sm text-white/60">{currentProgram?.name}</p>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowRightPanel(!showRightPanel)}
-                                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                              >
-                                {showRightPanel ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-                              </Button>
-                            </div>
+                            
+                            {/* Panel Toggle Buttons */}
+                            {currentEssay && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => togglePanel('versions')}
+                                  className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
+                                    isPanelOpen('versions') 
+                                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' 
+                                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                  }`}
+                                >
+                                  <Layers className="w-4 h-4 mr-2" />
+                                  Versions
+                                  {currentEssay.versions?.length > 0 && (
+                                    <span className="ml-2 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
+                                      {currentEssay.versions.length}
+                                    </span>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => togglePanel('analytics')}
+                                  className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
+                                    isPanelOpen('analytics') 
+                                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30' 
+                                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                  }`}
+                                >
+                                  <PieChart className="w-4 h-4 mr-2" />
+                                  Stats
+                                </button>
+                                <button
+                                  onClick={() => togglePanel('ai')}
+                                  className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
+                                    isPanelOpen('ai') 
+                                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
+                                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                  }`}
+                                >
+                                  <Brain className="w-4 h-4 mr-2" />
+                                  AI
+                                </button>
+                              </div>
+                            )}
                           </div>
 
                           {/* Prompt Display */}
@@ -2356,6 +2535,9 @@ const ApplicationTabs = ({ university }) => {
                               Word limit: {currentEssayData.wordLimit}
                             </p>
                           </div>
+
+                          {/* Stacked Panels - Appear above editor */}
+                          {renderPanels()}
 
                           {/* Editor or Create Button */}
                           {currentEssay ? (
@@ -2377,20 +2559,32 @@ const ApplicationTabs = ({ university }) => {
                                 <span className="flex items-center">
                                   <Clock className="w-3 h-3 mr-1" />
                                   Last modified: {currentEssay.lastModified ? new Date(currentEssay.lastModified).toLocaleString() : 'Never'}
+                                  <span className="ml-3 text-white/30">• Auto-saves after 25s of inactivity</span>
                                 </span>
-                                <Button
-                                  size="sm"
-                                  onClick={() => saveVersion()}
-                                  disabled={isSaving || isSavingVersion}
-                                  className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
-                                >
-                                  {isSavingVersion ? (
-                                    <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                                  ) : (
-                                    <Save className="w-3 h-3 mr-1.5" />
-                                  )}
-                                  Save Version
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => autoSaveEssay()}
+                                    disabled={isSaving || !hasUnsavedChanges}
+                                    className="bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 hover:from-blue-500/30 hover:to-indigo-500/30 border border-blue-400/30 disabled:opacity-50"
+                                  >
+                                    {isSaving ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1.5" />}
+                                    Save Now
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => saveVersion()}
+                                    disabled={isSaving || isSavingVersion}
+                                    className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
+                                  >
+                                    {isSavingVersion ? (
+                                      <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                                    ) : (
+                                      <Save className="w-3 h-3 mr-1.5" />
+                                    )}
+                                    Save Version
+                                  </Button>
+                                </div>
                               </div>
                             </>
                           ) : (
@@ -2430,182 +2624,6 @@ const ApplicationTabs = ({ university }) => {
                         </div>
                       )}
                     </div>
-
-                    {/* Right Sidebar - IMPROVED PANELS */}
-                    {showRightPanel && currentEssay && (
-                      <div className="col-span-12 lg:col-span-4 space-y-4">
-                        {/* Panel Toggles */}
-                        <div className="flex flex-wrap gap-2 p-2 bg-white/5 rounded-xl border border-white/10">
-                          <button
-                            onClick={() => setShowVersions(!showVersions)}
-                            className={`flex-1 text-xs px-3 py-2 rounded-lg transition-all flex items-center justify-center font-medium ${
-                              showVersions 
-                                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg' 
-                                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                            }`}
-                          >
-                            <Layers className="w-3.5 h-3.5 mr-1.5" />
-                            Versions
-                            {currentEssay.versions?.length > 0 && (
-                              <span className="ml-1.5 text-[10px] bg-white/20 px-1.5 rounded-full">
-                                {currentEssay.versions.length}
-                              </span>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => setShowAnalytics(!showAnalytics)}
-                            className={`flex-1 text-xs px-3 py-2 rounded-lg transition-all flex items-center justify-center font-medium ${
-                              showAnalytics 
-                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                            }`}
-                          >
-                            <PieChart className="w-3.5 h-3.5 mr-1.5" />
-                            Stats
-                          </button>
-                          <button
-                            onClick={() => setShowAI(!showAI)}
-                            className={`flex-1 text-xs px-3 py-2 rounded-lg transition-all flex items-center justify-center font-medium ${
-                              showAI 
-                                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg' 
-                                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                            }`}
-                          >
-                            <Brain className="w-3.5 h-3.5 mr-1.5" />
-                            AI
-                          </button>
-                        </div>
-
-                        {/* Version Manager Panel */}
-                        {showVersions && (
-                          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
-                            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-                              <div className="flex items-center space-x-2">
-                                <div className="p-1.5 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-lg">
-                                  <Layers className="w-4 h-4 text-blue-400" />
-                                </div>
-                                <span className="text-sm font-semibold text-white">Version History</span>
-                              </div>
-                              <span className="text-xs text-white/40 bg-white/10 px-2 py-1 rounded-full">
-                                {currentEssay.versions?.length || 0} saved
-                              </span>
-                            </div>
-                            <EmbeddedVersionManager
-                              versions={currentEssay.versions || []}
-                              currentContent={currentEssay.content || ''}
-                              onRestoreVersion={handleRestoreVersion}
-                              onDeleteVersion={handleDeleteVersion}
-                              essayId={currentEssay.id}
-                              universityName={universityName}
-                              isLoading={workspaceLoading}
-                              compact={true}
-                            />
-                          </div>
-                        )}
-
-                        {/* Analytics Panel */}
-                        {showAnalytics && (
-                          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
-                            <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-white/10">
-                              <div className="p-1.5 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg">
-                                <PieChart className="w-4 h-4 text-purple-400" />
-                              </div>
-                              <span className="text-sm font-semibold text-white">Essay Analytics</span>
-                            </div>
-                            <EmbeddedEssayAnalytics
-                              essay={{
-                                ...currentEssay,
-                                wordLimit: currentEssayData.wordLimit
-                              }}
-                              essayId={currentEssay.id}
-                              compact={true}
-                            />
-                          </div>
-                        )}
-
-                        {/* AI Suggestions Panel */}
-                        {showAI && (
-                          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
-                            <EmbeddedAISuggestions
-                              content={currentEssay.content || ''}
-                              prompt={currentEssayData.promptText}
-                              wordCount={currentEssay.wordCount || 0}
-                              wordLimit={currentEssayData.wordLimit}
-                              essayId={currentEssay.id}
-                              universityName={universityName}
-                              compact={true}
-                            />
-                          </div>
-                        )}
-
-                        {/* Quick Actions */}
-                        <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
-                          <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-white/10">
-                            <div className="p-1.5 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-lg">
-                              <Zap className="w-4 h-4 text-amber-400" />
-                            </div>
-                            <span className="text-sm font-semibold text-white">Quick Actions</span>
-                          </div>
-                          <div className="space-y-2">
-                            <Button
-                              size="sm"
-                              onClick={() => saveVersion()}
-                              disabled={isSaving || isSavingVersion}
-                              className="w-full justify-start bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30 text-xs h-10"
-                            >
-                              {isSavingVersion ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                              Save New Version
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => autoSaveEssay()}
-                              disabled={isSaving || !hasUnsavedChanges}
-                              className="w-full justify-start bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 hover:from-blue-500/30 hover:to-indigo-500/30 border border-blue-400/30 text-xs h-10 disabled:opacity-50"
-                            >
-                              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                              Save Changes
-                            </Button>
-                          </div>
-
-                          {/* Word Progress */}
-                          <div className="mt-4 p-3 bg-gradient-to-r from-white/5 to-white/10 rounded-xl">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-white/60 font-medium">Word Progress</span>
-                              <span className={`text-xs font-bold ${
-                                currentEssay.wordCount > currentEssayData.wordLimit ? 'text-red-400' :
-                                currentEssay.wordCount >= currentEssayData.wordLimit * 0.8 ? 'text-emerald-400' : 'text-white'
-                              }`}>
-                                {currentEssay.wordCount > 0 
-                                  ? Math.round((currentEssay.wordCount / currentEssayData.wordLimit) * 100)
-                                  : 0}%
-                              </span>
-                            </div>
-                            <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className="h-2.5 rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${currentEssay.wordCount > 0 
-                                    ? Math.min((currentEssay.wordCount / currentEssayData.wordLimit) * 100, 100)
-                                    : 0}%`,
-                                  background: currentEssay.wordCount > currentEssayData.wordLimit
-                                    ? 'linear-gradient(to right, #EF4444, #F87171)'
-                                    : currentEssay.wordCount > currentEssayData.wordLimit * 0.8
-                                    ? 'linear-gradient(to right, #10B981, #34D399)'
-                                    : 'linear-gradient(to right, #3B82F6, #60A5FA)'
-                                }}
-                              />
-                            </div>
-                            <div className="flex justify-between text-[11px] text-white/40 mt-2">
-                              <span className="flex items-center">
-                                <FileText className="w-3 h-3 mr-1" />
-                                {currentEssay.wordCount || 0} words
-                              </span>
-                              <span>{currentEssayData.wordLimit} limit</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
