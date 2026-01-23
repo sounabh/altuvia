@@ -151,16 +151,16 @@ export async function PUT(request) {
       }
     });
 
+    console.log("✅ User profile updated in database:", {
+      userId: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+    });
+
     return NextResponse.json({
       success: true,
       message: "Profile updated successfully",
       user: updatedUser,
-      // ✅ Include session update data
-      sessionUpdate: {
-        name: updatedUser.name,
-        email: updatedUser.email,
-        image: updatedUser.image,
-      }
     });
 
   } catch (error) {

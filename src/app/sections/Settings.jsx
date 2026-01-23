@@ -102,7 +102,7 @@ const SettingsPage = () => {
     const newErrors = {};
     
     // Only require current password if user signed up with credentials
-    if (session?.user?.provider === "credentials") {
+    if (session?.provider === "credentials") {
       if (!formData.currentPassword) {
         newErrors.currentPassword = "Current password is required";
       }
@@ -122,6 +122,7 @@ const SettingsPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ FIXED: Proper session update after profile save
   const handleSaveProfile = async () => {
     if (!validateProfile()) return;
 
@@ -143,17 +144,18 @@ const SettingsPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ CORRECTED: Update session properly
+        console.log("✅ Profile updated, updating session...", data.user);
+
+        // ✅ FIXED: Correct way to update session
         await updateSession({
-          ...session,
           user: {
-            ...session?.user,
             name: data.user.name,
             email: data.user.email,
-            ...(data.user.image && { image: data.user.image })
+            image: data.user.image || session?.user?.image,
           }
         });
 
+        console.log("✅ Session update called successfully");
         toast.success("Profile updated successfully!", { id: toastId });
       } else {
         toast.error(data.error || "Failed to update profile", { id: toastId });
@@ -365,11 +367,11 @@ const SettingsPage = () => {
                 </div>
 
                 {/* Provider Info */}
-                {session?.user?.provider && session.user.provider !== "credentials" && (
+                {session?.provider && session.provider !== "credentials" && (
                   <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4">
                     <p className="text-sm text-blue-700 flex items-center gap-2">
                       <CheckCircle2 size={16} />
-                      Connected via {session.user.provider.charAt(0).toUpperCase() + session.user.provider.slice(1)}
+                      Connected via {session.provider.charAt(0).toUpperCase() + session.provider.slice(1)}
                     </p>
                   </div>
                 )}
@@ -397,11 +399,11 @@ const SettingsPage = () => {
                   <p className="text-sm text-gray-500">Update your password to keep your account secure</p>
                 </div>
 
-                {session?.user?.provider && session.user.provider !== "credentials" ? (
+                {session?.provider && session.provider !== "credentials" ? (
                   <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-6 text-center">
                     <Lock size={40} className="mx-auto text-amber-600 mb-3" />
                     <p className="text-amber-800 font-medium">
-                      You're signed in with {session.user.provider}. Password changes are managed through your {session.user.provider} account.
+                      You're signed in with {session.provider}. Password changes are managed through your {session.provider} account.
                     </p>
                   </div>
                 ) : (
@@ -559,4 +561,4 @@ const SettingsPage = () => {
   );
 };
 
-export default SettingsPage
+export default SettingsPage;

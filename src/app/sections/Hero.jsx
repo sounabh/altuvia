@@ -46,7 +46,7 @@ const Hero = () => {
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated" && !!session?.user;
 
-  //console.log("🔐 Hero Session Data:", session);
+  console.log("🔐 Hero Session Data:", session);
 
   return (
     <>

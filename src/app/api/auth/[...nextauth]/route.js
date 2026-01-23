@@ -1,8 +1,6 @@
 // ==========================================
 // FILE: app/api/auth/[...nextauth]/route.js
 // DESCRIPTION: NextAuth.js API route configuration for authentication
-//
-//
 // ==========================================
 
 import NextAuth from "next-auth";
@@ -256,7 +254,6 @@ export const authOptions = {
             accessToken: user.token,
             refreshToken: account.refresh_token,
             accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000,
-            // ✅ FIX: These come from your backend, not hardcoded
             hasCompleteProfile: user.hasCompleteProfile || false,
             isNewUser: user.isNewUser || false,
             userId: user.id,
@@ -267,15 +264,21 @@ export const authOptions = {
           };
         }
 
-        // ✅ FIX: Handle session updates from profile completion
+        // ✅ FIX: Handle session updates from profile completion AND profile updates
         if (trigger === "update" && session) {
-          console.log("🔄 JWT - Session update:", session);
+          console.log("🔄 JWT - Session update received:", session);
+
           return {
             ...token,
-            hasCompleteProfile:
-              session.hasCompleteProfile ?? token.hasCompleteProfile,
+            // Update profile completion flags
+            hasCompleteProfile: session.hasCompleteProfile ?? token.hasCompleteProfile,
             isNewUser: session.isNewUser ?? token.isNewUser,
             accessToken: session.token ?? token.accessToken,
+
+            // ✅ FIXED: Update user profile fields (name, email, picture)
+            name: session.user?.name ?? token.name,
+            email: session.user?.email ?? token.email,
+            picture: session.user?.image ?? token.picture,
           };
         }
 
@@ -298,6 +301,7 @@ export const authOptions = {
         };
       }
     },
+
     // ==========================================
     // SESSION CALLBACK: Session data preparation
     // ==========================================
@@ -305,13 +309,14 @@ export const authOptions = {
     async session({ session, token }) {
       try {
         if (token) {
-          /*
           console.log("📦 Session callback - Token data:", {
-            userId: token.userId,  // Should be YOUR database ID
+            userId: token.userId,
+            name: token.name,
+            email: token.email,
             hasCompleteProfile: token.hasCompleteProfile,
             isNewUser: token.isNewUser,
           });
-*/
+
           // Populate session with user data
           session.provider = token.provider;
           session.userId = token.userId;
@@ -322,17 +327,17 @@ export const authOptions = {
 
           // Populate user object in session
           if (session.user) {
-            session.user.id = token.userId; // ✅ Use YOUR database ID
+            session.user.id = token.userId;
             session.user.name = token.name || session.user.name;
             session.user.email = token.email || session.user.email;
             session.user.image = token.picture || session.user.image;
           }
 
-          console.log(
-            "✅ Session prepared with database userId:",
-            session.userId,
-            session.token
-          );
+          console.log("✅ Session prepared:", {
+            userId: session.userId,
+            name: session.user?.name,
+            email: session.user?.email,
+          });
         }
 
         return session;
@@ -385,12 +390,11 @@ export const authOptions = {
 
   events: {
     async signIn({ user, account, profile, isNewUser }) {
-      /*
       console.log("🎉 Sign in event:", {
-        userId: user.id,  // Should be YOUR database ID
+        userId: user.id,
         email: user.email,
-        provider: account.provider
-      });*/
+        provider: account.provider,
+      });
     },
     async signOut({ token }) {
       console.log("👋 Sign out event:", {
@@ -404,9 +408,9 @@ export const authOptions = {
   // ==========================================
 
   session: {
-    strategy: "jwt", // Use JWT for session management
-    maxAge: 30 * 24 * 60 * 60, // 30 days session duration
-    updateAge: 24 * 60 * 60, // Update session every 24 hours
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
   },
 
   // ==========================================
@@ -414,7 +418,7 @@ export const authOptions = {
   // ==========================================
 
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 days JWT lifetime
+    maxAge: 30 * 24 * 60 * 60,
   },
 
   // ==========================================
@@ -453,13 +457,10 @@ export const authOptions = {
 
 // ==========================================
 // TOKEN REFRESH FUNCTION
-// DESCRIPTION: Handles access token refresh for OAuth providers
-// SECURITY: Implements proper token refresh flow with error handling
 // ==========================================
 
 async function refreshAccessToken(token) {
   try {
-    // Currently only supports Google token refresh
     if (token.provider === "google") {
       const response = await fetch("https://oauth2.googleapis.com/token", {
         headers: {
@@ -483,13 +484,12 @@ async function refreshAccessToken(token) {
       return {
         ...token,
         accessToken: refreshedTokens.access_token,
-        accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+        accessTokenExpires: Date.now() + 30 * 24 * 60 * 60 * 1000,
         refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
         error: undefined,
       };
     }
 
-    // Return original token for unsupported providers
     return token;
   } catch (error) {
     console.error("❌ Error refreshing access token:", error);
