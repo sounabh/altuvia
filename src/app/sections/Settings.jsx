@@ -143,13 +143,14 @@ const SettingsPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Update the session with new user data
+        // ✅ CORRECTED: Update session properly
         await updateSession({
           ...session,
           user: {
-            ...session.user,
+            ...session?.user,
             name: data.user.name,
-            email: data.user.email
+            email: data.user.email,
+            ...(data.user.image && { image: data.user.image })
           }
         });
 
@@ -558,4 +559,4 @@ const SettingsPage = () => {
   );
 };
 
-export default SettingsPage;
+export default SettingsPage

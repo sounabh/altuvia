@@ -154,7 +154,13 @@ export async function PUT(request) {
     return NextResponse.json({
       success: true,
       message: "Profile updated successfully",
-      user: updatedUser
+      user: updatedUser,
+      // ✅ Include session update data
+      sessionUpdate: {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        image: updatedUser.image,
+      }
     });
 
   } catch (error) {
