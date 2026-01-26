@@ -11,17 +11,17 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata = {
-  metadataBase: new URL('https://altuvia-beta.vercel.app'), // Replace with your actual domain
- title: {
-  default: "All-in-One AI Platform for University Applications",
-  template: "%s | AI University Applications"
-},
-
- description: "Manage university Mba applications with universities key infos, write essays, build CVs, plan timelines, track progress, and never miss deadlines.",
+  metadataBase: new URL('https://altuvia-beta.vercel.app'),
+  title: {
+    default: "All-in-One AI Platform for University Applications",
+    template: "%s | AI University Applications"
+  },
+  description: "Manage university Mba applications with universities key infos, write essays, build CVs, plan timelines, track progress, and never miss deadlines.",
   keywords: ["MBA admissions", "college applications", "Essay editor with ai", "CV Builder"],
   authors: [{ name: "Altuvia" }],
   creator: "Altuvia",
   publisher: "Altuvia",
+  
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -31,12 +31,27 @@ export const metadata = {
     description: "Centralize all your MBA & college applications for a stress-free experience",
     images: [
       {
-        url: "/public/logo_emblem.png", // Create this image (1200x630px)
+        url: "/logo_emblem.png",
         width: 1200,
         height: 630,
         alt: "Your Education Journey"
       }
     ]
+  },
+  
+  twitter: {
+    card: "summary_large_image",
+    title: "Admissions Made Effortless | Your Education Journey",
+    description: "Centralize all your MBA & college applications for a stress-free experience",
+    creator: "@altuvia",
+    images: ["/logo_emblem.png"],
+  },
+  
+  // Discord and other social platforms use Open Graph, but we can add specific overrides
+  other: {
+    'og:image': '/discord.png', // Discord-specific image
+    'og:image:width': '1200',
+    'og:image:height': '630',
   },
   
   robots: {
@@ -50,7 +65,6 @@ export const metadata = {
       'max-snippet': -1,
     },
   },
-  
 };
 
 export default function RootLayout({ children }) {
