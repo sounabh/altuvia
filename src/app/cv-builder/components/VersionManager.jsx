@@ -5,37 +5,74 @@ import { Badge } from '@/components/ui/badge';
 import { X, GitBranch, Eye, Download, Copy, Calendar, Trash2, Loader2, FileText, Star, FolderOpen, RefreshCw, Clock, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Cache for storing versions data to minimize API calls
 const versionsCache = new Map();
 
+/**
+ * Clears the cache for a specific user
+ * @param {string} userEmail - User's email to clear cache for
+ */
 export const clearVersionsCache = (userEmail) => {
   if (userEmail) {
     versionsCache.delete(`versions_${userEmail}`);
   }
 };
 
+/**
+ * VersionManager - Modal component for managing CV versions
+ * @param {Object} props - Component props
+ * @param {Function} props.onClose - Callback to close the modal
+ * @param {string} props.cvId - Current CV ID (optional)
+ * @param {Function} props.onLoadVersion - Callback to load a specific version
+ * @param {string} props.userEmail - User's email for filtering versions
+ * @returns {JSX.Element} Version manager modal
+ */
 export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
+  // State for storing all versions
   const [versions, setVersions] = useState([]);
+  
+  // Loading state for initial load
   const [loading, setLoading] = useState(true);
+  
+  // Refreshing state for manual refresh
   const [refreshing, setRefreshing] = useState(false);
+  
+  // State for grouped versions by CV slug
   const [groupedVersions, setGroupedVersions] = useState({});
+  
+  // State for tracking expanded/collapsed groups
   const [expandedGroups, setExpandedGroups] = useState({});
+  
+  // Ref to track if initial fetch has been done
   const hasFetchedRef = useRef(false);
+  
+  // Cache key based on user email
   const cacheKey = `versions_${userEmail}`;
 
+  // Effect to load versions when component mounts or userEmail changes
   useEffect(() => {
     if (userEmail) {
       loadAllVersions(false);
     } else {
       setLoading(false);
     }
+    
+    // Cleanup function
     return () => {
       hasFetchedRef.current = false;
     };
   }, [userEmail]);
 
+  /**
+   * Groups versions by their CV slug
+   * @param {Array} versionsList - Array of version objects
+   * @returns {Object} Grouped versions by CV slug
+   */
   const groupVersions = (versionsList) => {
     return versionsList.reduce((acc, version) => {
       const key = version.cvSlug;
+      
+      // Create new group if it doesn't exist
       if (!acc[key]) {
         acc[key] = {
           cvTitle: version.cvTitle,
@@ -43,41 +80,59 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
           versions: [],
         };
       }
+      
+      // Add version to group
       acc[key].versions.push(version);
+      
       return acc;
     }, {});
   };
 
+  /**
+   * Loads all versions from API with caching support
+   * @param {boolean} forceRefresh - Whether to bypass cache
+   */
   const loadAllVersions = async (forceRefresh = false) => {
     try {
+      // Check cache first (unless force refresh)
       if (!forceRefresh && versionsCache.has(cacheKey)) {
         const cachedData = versionsCache.get(cacheKey);
         const cacheAge = Date.now() - cachedData.timestamp;
+        
+        // Use cache if less than 30 seconds old
         if (cacheAge < 30000) {
           setVersions(cachedData.versions);
           setGroupedVersions(cachedData.grouped);
           setLoading(false);
+          
+          // Trigger background refresh if first load
           if (!hasFetchedRef.current) {
             hasFetchedRef.current = true;
             setTimeout(() => fetchVersionsInBackground(), 100);
           }
+          
           return;
         }
       }
 
+      // Set loading states
       if (forceRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
       }
 
+      // Fetch versions from API
       const response = await fetch(`/api/cv/versions?userEmail=${userEmail}&cvId=${cvId || ''}`);
       const data = await response.json();
       
       if (data.success) {
+        // Group versions and update state
         const grouped = groupVersions(data.versions);
         setVersions(data.versions);
         setGroupedVersions(grouped);
+        
+        // Update cache
         versionsCache.set(cacheKey, {
           versions: data.versions,
           grouped: grouped,
@@ -95,6 +150,9 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
     }
   };
 
+  /**
+   * Fetches versions in background to check for updates
+   */
   const fetchVersionsInBackground = async () => {
     try {
       const response = await fetch(`/api/cv/versions?userEmail=${userEmail}&cvId=${cvId || ''}`);
@@ -102,15 +160,19 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       
       if (data.success) {
         const grouped = groupVersions(data.versions);
+        
+        // Check if versions have changed
         const currentVersionIds = versions.map(v => v.id).sort().join(',');
         const newVersionIds = data.versions.map(v => v.id).sort().join(',');
         
+        // Only update if versions differ
         if (currentVersionIds !== newVersionIds) {
           versionsCache.set(cacheKey, {
             versions: data.versions,
             grouped: grouped,
             timestamp: Date.now()
           });
+          
           setVersions(data.versions);
           setGroupedVersions(grouped);
         }
@@ -120,8 +182,13 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
     }
   };
 
+  /**
+   * Handles duplicating a version
+   * @param {Object} version - Version object to duplicate
+   */
   const handleDuplicate = async (version) => {
     try {
+      // Create optimistic duplicate for immediate UI update
       const optimisticDuplicate = {
         ...version,
         id: `temp_${Date.now()}`,
@@ -131,6 +198,7 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
         isOptimistic: true
       };
 
+      // Update state optimistically
       setVersions(prev => [optimisticDuplicate, ...prev]);
       setGroupedVersions(prev => {
         const key = version.cvSlug;
@@ -145,6 +213,7 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
 
       toast.info('Duplicating version...');
       
+      // Make API call to create duplicate
       const response = await fetch('/api/cv/versions/duplicate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,10 +223,12 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       const data = await response.json();
       
       if (data.success) {
+        // Clear cache and reload fresh data
         versionsCache.delete(cacheKey);
         await loadAllVersions(true);
         toast.success('Version duplicated!');
       } else {
+        // Revert optimistic update on failure
         setVersions(prev => prev.filter(v => v.id !== optimisticDuplicate.id));
         setGroupedVersions(prev => {
           const key = version.cvSlug;
@@ -177,20 +248,30 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
     }
   };
 
+  /**
+   * Handles deleting a version
+   * @param {string} versionId - ID of version to delete
+   */
   const handleDelete = async (versionId) => {
+    // Confirm deletion
     if (!confirm('Delete this version? This cannot be undone.')) return;
 
     try {
+      // Find version to delete
       const versionToDelete = versions.find(v => v.id === versionId);
       
+      // Optimistically remove from UI
       setVersions(prev => prev.filter(v => v.id !== versionId));
       setGroupedVersions(prev => {
         const key = versionToDelete.cvSlug;
         const newVersions = prev[key].versions.filter(v => v.id !== versionId);
+        
+        // Remove group if empty
         if (newVersions.length === 0) {
           const { [key]: removed, ...rest } = prev;
           return rest;
         }
+        
         return {
           ...prev,
           [key]: { ...prev[key], versions: newVersions }
@@ -199,13 +280,16 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
 
       toast.info('Deleting...');
       
+      // Make API call to delete
       const response = await fetch(`/api/cv/versions/${versionId}`, { method: 'DELETE' });
       const data = await response.json();
       
       if (data.success) {
+        // Clear cache on successful deletion
         versionsCache.delete(cacheKey);
         toast.success('Version deleted!');
       } else {
+        // Reload data if deletion failed
         await loadAllVersions(true);
         toast.error('Failed to delete');
       }
@@ -216,13 +300,20 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
     }
   };
 
+  /**
+   * Handles exporting a version as PDF
+   * @param {Object} version - Version object to export
+   */
   const handleExportVersion = async (version) => {
     try {
       toast.info('Generating PDF...');
+      
+      // Fetch PDF from API
       const response = await fetch(`/api/cv/export-pdf?versionId=${version.id}`);
       
       if (!response.ok) throw new Error('Failed to generate PDF');
 
+      // Create download link
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -230,6 +321,8 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
       a.download = `CV-${version.versionLabel.replace(/\s+/g, '-')}.pdf`;
       document.body.appendChild(a);
       a.click();
+      
+      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
@@ -240,16 +333,25 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
     }
   };
 
+  /**
+   * Toggles expanded state of a version group
+   * @param {string} slug - CV slug of the group
+   */
   const toggleGroup = (slug) => {
     setExpandedGroups(prev => ({ ...prev, [slug]: !prev[slug] }));
   };
 
   return (
+    // Modal overlay
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      
+      {/* Main modal container */}
       <div className="bg-gradient-to-b from-slate-50 to-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden border border-slate-200">
         
-        {/* Header */}
+        {/* Header section */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+          
+          {/* Left side: Title and icon */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#002147] flex items-center justify-center shadow-lg shadow-[#002147]/20">
               <GitBranch className="w-5 h-5 text-white" />
@@ -259,6 +361,8 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
               <p className="text-xs text-slate-500">{versions.length} versions saved</p>
             </div>
           </div>
+
+          {/* Right side: Refresh and close buttons */}
           <div className="flex items-center gap-2">
             <button 
               onClick={() => loadAllVersions(true)}
@@ -276,21 +380,31 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
           </div>
         </div>
 
-        {/* Content */}
+        {/* Main content area */}
         <div className="flex-1 overflow-y-auto p-4">
+          
+          {/* Loading state */}
           {loading ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-[#3598FE]" />
               <p className="text-sm text-slate-500">Loading versions...</p>
             </div>
-          ) : !userEmail ? (
+          
+          ) : 
+          
+          /* No user logged in state */
+          !userEmail ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
               <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
                 <FileText className="w-8 h-8 text-slate-300" />
               </div>
               <p className="text-sm text-slate-500">Please log in to view versions</p>
             </div>
-          ) : versions.length === 0 ? (
+          
+          ) : 
+          
+          /* No versions state */
+          versions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
               <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
                 <FileText className="w-8 h-8 text-slate-300" />
@@ -298,14 +412,20 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
               <p className="text-sm font-medium text-slate-600">No versions saved yet</p>
               <p className="text-xs text-slate-400">Create and save CV versions to see them here</p>
             </div>
-          ) : (
+          
+          ) : 
+          
+          /* Versions list */
+          (
             <div className="space-y-3">
+              {/* Render each CV group */}
               {Object.entries(groupedVersions).map(([cvSlug, cvGroup]) => {
                 const isExpanded = expandedGroups[cvSlug] !== false;
                 
                 return (
                   <div key={cvSlug} className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-                    {/* Group Header */}
+                    
+                    {/* Group header - clickable to expand/collapse */}
                     <button
                       onClick={() => toggleGroup(cvSlug)}
                       className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
@@ -315,14 +435,18 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
                       </div>
                       <div className="flex-1 text-left">
                         <h3 className="text-sm font-semibold text-[#002147]">{cvGroup.cvTitle}</h3>
-                        <p className="text-[11px] text-slate-400">{cvGroup.versions.length} version{cvGroup.versions.length !== 1 ? 's' : ''}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {cvGroup.versions.length} version{cvGroup.versions.length !== 1 ? 's' : ''}
+                        </p>
                       </div>
                       <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                     </button>
                     
-                    {/* Version List */}
+                    {/* Expanded versions list */}
                     {isExpanded && (
                       <div className="border-t border-slate-100">
+                        
+                        {/* Render each version in the group */}
                         {cvGroup.versions.map((version) => (
                           <div 
                             key={version.id}
@@ -330,27 +454,39 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
                               version.isOptimistic ? 'opacity-50' : ''
                             }`}
                           >
-                            {/* Version Info */}
+                            
+                            {/* Version information */}
                             <div className="flex-1 min-w-0">
+                              {/* Version label and badges */}
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-[13px] font-medium text-[#002147] truncate">
                                   {version.versionLabel}
                                 </span>
+                                
+                                {/* Optimistic loading indicator */}
                                 {version.isOptimistic && (
                                   <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
                                 )}
+                                
+                                {/* Bookmark indicator */}
                                 {version.isBookmarked && (
                                   <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                                 )}
+                                
+                                {/* Current version badge */}
                                 {version.isCurrentCV && (
                                   <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded">
                                     Current
                                   </span>
                                 )}
+                                
+                                {/* Version number badge */}
                                 <span className="px-1.5 py-0.5 bg-[#3598FE]/10 text-[#3598FE] text-[10px] font-medium rounded">
                                   v{version.versionNumber}
                                 </span>
                               </div>
+                              
+                              {/* Version metadata */}
                               <div className="flex items-center gap-3 text-[11px] text-slate-400">
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
@@ -360,13 +496,18 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
                                 </span>
                                 <span>{version.templateId}</span>
                               </div>
+                              
+                              {/* Change description */}
                               {version.changeDescription && (
-                                <p className="text-[11px] text-slate-500 mt-1 truncate">{version.changeDescription}</p>
+                                <p className="text-[11px] text-slate-500 mt-1 truncate">
+                                  {version.changeDescription}
+                                </p>
                               )}
                             </div>
 
-                            {/* Actions */}
+                            {/* Action buttons */}
                             <div className="flex items-center gap-1">
+                              {/* Load button */}
                               <button
                                 onClick={() => onLoadVersion(version)}
                                 disabled={version.isOptimistic}
@@ -375,6 +516,8 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
+                              
+                              {/* Duplicate button */}
                               <button
                                 onClick={() => handleDuplicate(version)}
                                 disabled={version.isOptimistic}
@@ -383,6 +526,8 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
                               >
                                 <Copy className="w-3.5 h-3.5" />
                               </button>
+                              
+                              {/* Export button */}
                               <button
                                 onClick={() => handleExportVersion(version)}
                                 disabled={version.isOptimistic}
@@ -391,6 +536,8 @@ export const VersionManager = ({ onClose, cvId, onLoadVersion, userEmail }) => {
                               >
                                 <Download className="w-3.5 h-3.5" />
                               </button>
+                              
+                              {/* Delete button */}
                               <button
                                 onClick={() => handleDelete(version.id)}
                                 disabled={version.isOptimistic}

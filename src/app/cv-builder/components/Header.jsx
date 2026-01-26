@@ -10,8 +10,9 @@ import {
   Plus,
   Loader2,
   TrendingUp,
-  FileText,
+  ArrowLeft,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export const Header = ({
   onPreviewToggle,
@@ -28,6 +29,7 @@ export const Header = ({
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isAIHovered, setIsAIHovered] = useState(false);
+  const router = useRouter();
 
   const handleExportPDF = async () => {
     try {
@@ -44,15 +46,17 @@ export const Header = ({
     <header className="bg-white border-b border-gray-100 px-5 py-5 flex items-center justify-between">
       {/* Left Section */}
       <div className="flex items-center gap-5">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#002147] flex items-center justify-center">
-            <FileText className="w-4 h-4 text-white" />
+        {/* Dashboard Navigation Button */}
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="flex items-center gap-2.5 text-gray-700 hover:text-[#002147] hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors group"
+          title="Back to Dashboard"
+        >
+          <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-[#002147] flex items-center justify-center transition-colors">
+            <ArrowLeft className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
           </div>
-          <span className="text-base font-bold text-[#002147]">
-            CV Builder
-          </span>
-        </div>
+          <span className="text-base font-medium">Dashboard</span>
+        </button>
 
         {/* ATS Score */}
         {atsScore !== null && atsScore !== undefined && (

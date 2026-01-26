@@ -1,18 +1,35 @@
-// app/api/cv/save/route.js
+// ================================================================================
+// FILE: app/api/cv/save/route.js
+// PURPOSE: Handle CV creation, loading, and updates with version management
+// ================================================================================
+
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
-// ========================================
+// ================================================================================
 // GET HANDLER - Load CV Data
-// ========================================
+// ================================================================================
+/**
+ * Retrieves a specific CV with all related sections
+ * @param {Request} request - Contains cvId and userEmail as query params
+ * @returns {Response} CV data with all sections ordered by displayOrder
+ * 
+ * PERFORMANCE OPTIMIZATIONS:
+ * - Single combined query (user + CV) instead of 2 separate queries
+ * - Select only required fields to reduce payload size
+ */
 export async function GET(request) {
   try {
+    // ========================================
+    // 1. EXTRACT & VALIDATE REQUEST PARAMS
+    // ========================================
     const { searchParams } = new URL(request.url);
     const cvId = searchParams.get("cvId");
     const userEmail = searchParams.get("userEmail");
 
+    // Validate authentication
     if (!userEmail) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -20,6 +37,7 @@ export async function GET(request) {
       );
     }
 
+    // Validate CV ID
     if (!cvId) {
       return NextResponse.json(
         { error: "CV ID is required" },
@@ -27,47 +45,122 @@ export async function GET(request) {
       );
     }
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    // Find CV by ID and verify ownership
+    // ========================================
+    // 2. OPTIMIZED: SINGLE QUERY FOR USER + CV
+    // ========================================
+    // Instead of 2 queries (findUser, then findCV), use 1 query with nested where
     const cv = await prisma.cV.findFirst({
       where: {
         id: cvId,
-        userId: user.id,
+        user: {
+          email: userEmail, // Validate user ownership in same query
+        },
       },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        templateId: true,
+        colorScheme: true,
+        createdAt: true,
+        updatedAt: true,
         personalInfo: true,
         educations: {
-          orderBy: { displayOrder: 'asc' }
+          orderBy: { displayOrder: 'asc' },
+          // Select only necessary fields to reduce payload
+          select: {
+            id: true,
+            institution: true,
+            degree: true,
+            fieldOfStudy: true,
+            location: true,
+            startDate: true,
+            endDate: true,
+            isCurrent: true,
+            gpa: true,
+            gpaScale: true,
+            description: true,
+            coursework: true,
+            honors: true,
+            displayOrder: true,
+          },
         },
         experiences: {
-          orderBy: { displayOrder: 'asc' }
+          orderBy: { displayOrder: 'asc' },
+          select: {
+            id: true,
+            company: true,
+            position: true,
+            location: true,
+            startDate: true,
+            endDate: true,
+            isCurrent: true,
+            description: true,
+            achievements: true,
+            skillsUsed: true,
+            displayOrder: true,
+          },
         },
         projects: {
-          orderBy: { displayOrder: 'asc' }
+          orderBy: { displayOrder: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            technologies: true,
+            startDate: true,
+            endDate: true,
+            githubUrl: true,
+            liveUrl: true,
+            demoUrl: true,
+            achievements: true,
+            displayOrder: true,
+            isFeatured: true,
+          },
         },
         skills: {
-          orderBy: { displayOrder: 'asc' }
+          orderBy: { displayOrder: 'asc' },
+          select: {
+            id: true,
+            categoryName: true,
+            skills: true,
+            proficiencyLevel: true,
+            displayOrder: true,
+          },
         },
         achievements: {
-          orderBy: { displayOrder: 'asc' }
+          orderBy: { displayOrder: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            organization: true,
+            type: true,
+            date: true,
+            description: true,
+            impact: true,
+            displayOrder: true,
+          },
         },
         volunteers: {
-          orderBy: { displayOrder: 'asc' }
+          orderBy: { displayOrder: 'asc' },
+          select: {
+            id: true,
+            organization: true,
+            role: true,
+            location: true,
+            startDate: true,
+            endDate: true,
+            isCurrent: true,
+            description: true,
+            activities: true,
+            impact: true,
+            displayOrder: true,
+          },
         },
       },
     });
 
+    // Validate CV existence and ownership
     if (!cv) {
       return NextResponse.json(
         { 
@@ -79,6 +172,9 @@ export async function GET(request) {
       );
     }
 
+    // ========================================
+    // 3. RETURN FORMATTED CV DATA
+    // ========================================
     return NextResponse.json({
       success: true,
       cv: {
@@ -111,11 +207,25 @@ export async function GET(request) {
   }
 }
 
-// ========================================
+// ================================================================================
 // POST HANDLER - Save/Update CV
-// ========================================
+// ================================================================================
+/**
+ * Creates a new CV or updates an existing one with version tracking
+ * @param {Request} request - Contains CV data, template settings, and version info
+ * @returns {Response} Created/updated CV with metadata
+ * 
+ * PERFORMANCE OPTIMIZATIONS:
+ * - Parallel delete operations using Promise.all
+ * - Batch inserts with createMany instead of individual creates
+ * - Single transaction for version creation
+ * - Reduced nested includes (only fetch what's needed)
+ */
 export async function POST(request) {
   try {
+    // ========================================
+    // 1. AUTHENTICATE USER
+    // ========================================
     const session = await getServerSession(authOptions);
     const body = await request.json();
     const userEmail = body.userEmail || session?.user?.email;
@@ -127,8 +237,12 @@ export async function POST(request) {
       );
     }
 
+    // ========================================
+    // 2. FIND OR CREATE USER
+    // ========================================
     let user = await prisma.user.findUnique({
       where: { email: userEmail },
+      select: { id: true, email: true, name: true }, // Only fetch needed fields
     });
 
     if (!user) {
@@ -137,23 +251,37 @@ export async function POST(request) {
           email: userEmail,
           name: body.userName || userEmail.split("@")[0],
         },
+        select: { id: true, email: true, name: true },
       });
     }
 
-    const { cvData, selectedTemplate, themeColor, cvTitle, cvId, versionInfo } = body;
+    // ========================================
+    // 3. EXTRACT REQUEST DATA
+    // ========================================
+    const { 
+      cvData, 
+      selectedTemplate, 
+      themeColor, 
+      cvTitle, 
+      cvId, 
+      versionInfo 
+    } = body;
     let { cvNumber } = body;
 
     let cv;
     let isNewCV = false;
     let shouldCreateNewCV = false;
 
+    // ========================================
+    // 4. VALIDATE EXISTING CV (if cvId provided)
+    // ========================================
     if (cvId) {
-      // VALIDATE CV EXISTS AND BELONGS TO USER
       const existingCV = await prisma.cV.findFirst({
         where: { 
           id: cvId,
           userId: user.id 
         },
+        select: { id: true }, // Only need to verify existence
       });
 
       if (!existingCV) {
@@ -162,38 +290,43 @@ export async function POST(request) {
       }
     }
 
-    // CREATE NEW CV (if no cvId or CV doesn't exist)
+    // ========================================
+    // 5. CREATE NEW CV
+    // ========================================
     if (!cvId || shouldCreateNewCV) {
       isNewCV = true;
 
-      // ========================================
-      // Handle duplicate slug gracefully
-      // ========================================
+      // ----------------------------------------
+      // 5a. Generate Unique Slug
+      // ----------------------------------------
       let cvSlug = cvNumber || `cv-${Date.now()}`;
       let slugAttempt = 0;
       let isSlugUnique = false;
 
-      // Try to find a unique slug (max 10 attempts)
+      // Try up to 10 times to find unique slug
       while (!isSlugUnique && slugAttempt < 10) {
         const existingCVWithSlug = await prisma.cV.findUnique({
           where: { slug: cvSlug },
+          select: { id: true }, // Only check existence
         });
 
         if (!existingCVWithSlug) {
           isSlugUnique = true;
         } else {
-          // Append random suffix to make it unique
           slugAttempt++;
           const randomSuffix = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
           cvSlug = `${cvNumber || `cv-${Date.now()}`}-${randomSuffix}`;
         }
       }
 
+      // Fallback to timestamp + random string
       if (!isSlugUnique) {
-        // Fallback: use timestamp + random
         cvSlug = `cv-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       }
 
+      // ----------------------------------------
+      // 5b. OPTIMIZED: Create CV with All Sections
+      // ----------------------------------------
       cv = await prisma.cV.create({
         data: {
           userId: user.id,
@@ -204,6 +337,7 @@ export async function POST(request) {
           isActive: false,
           isPublic: false,
 
+          // Personal Information
           personalInfo: {
             create: {
               fullName: cvData.personal?.fullName || "",
@@ -216,6 +350,7 @@ export async function POST(request) {
             },
           },
 
+          // Education Section
           educations: {
             create: cvData.education?.map((edu, index) => ({
               institution: edu.institution || "",
@@ -229,6 +364,7 @@ export async function POST(request) {
             })) || [],
           },
 
+          // Experience Section
           experiences: {
             create: cvData.experience?.map((exp, index) => ({
               company: exp.company || "",
@@ -243,6 +379,7 @@ export async function POST(request) {
             })) || [],
           },
 
+          // Projects Section
           projects: {
             create: cvData.projects?.map((proj, index) => ({
               name: proj.name || "",
@@ -257,10 +394,11 @@ export async function POST(request) {
             })) || [],
           },
 
+          // Skills Section
           skills: {
             create: cvData.skills?.map((skillGroup, index) => ({
               categoryName: skillGroup.name || "",
-              // ✅ FIX: Extract skill names from objects
+              // Extract skill names from objects or strings
               skills: Array.isArray(skillGroup.skills) 
                 ? skillGroup.skills.map(skill => 
                     typeof skill === 'string' ? skill : skill.name
@@ -270,6 +408,7 @@ export async function POST(request) {
             })) || [],
           },
 
+          // Achievements Section
           achievements: {
             create: cvData.achievements?.map((ach, index) => ({
               title: ach.title || "",
@@ -281,6 +420,7 @@ export async function POST(request) {
             })) || [],
           },
 
+          // Volunteer Section
           volunteers: {
             create: cvData.volunteer?.map((vol, index) => ({
               organization: vol.organization || "",
@@ -294,18 +434,21 @@ export async function POST(request) {
             })) || [],
           },
         },
-        include: {
-          personalInfo: true,
-          educations: true,
-          experiences: true,
-          projects: true,
-          skills: true,
-          achievements: true,
-          volunteers: true,
+        select: {
+          // Only return essential fields, not all relations
+          id: true,
+          slug: true,
+          title: true,
+          templateId: true,
+          colorScheme: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
 
-      // Create initial version if versionInfo provided
+      // ----------------------------------------
+      // 5c. Create Initial Version Snapshot
+      // ----------------------------------------
       if (versionInfo) {
         await prisma.cVVersion.create({
           data: {
@@ -327,6 +470,9 @@ export async function POST(request) {
         });
       }
 
+      // ----------------------------------------
+      // 5d. Return Success Response
+      // ----------------------------------------
       return NextResponse.json(
         {
           success: true,
@@ -347,7 +493,13 @@ export async function POST(request) {
       );
     }
 
-    // UPDATE EXISTING CV (only reached if CV exists and belongs to user)
+    // ========================================
+    // 6. UPDATE EXISTING CV
+    // ========================================
+
+    // ----------------------------------------
+    // 6a. Update CV Metadata
+    // ----------------------------------------
     cv = await prisma.cV.update({
       where: { id: cvId },
       data: {
@@ -355,9 +507,20 @@ export async function POST(request) {
         colorScheme: themeColor || "#1e40af",
         updatedAt: new Date(),
       },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        templateId: true,
+        colorScheme: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
-    // Delete old sections
+    // ----------------------------------------
+    // 6b. OPTIMIZED: Parallel Delete Operations
+    // ----------------------------------------
     await Promise.all([
       prisma.cVEducation.deleteMany({ where: { cvId } }),
       prisma.cVExperience.deleteMany({ where: { cvId } }),
@@ -367,7 +530,9 @@ export async function POST(request) {
       prisma.cVVolunteer.deleteMany({ where: { cvId } }),
     ]);
 
-    // Update personal info
+    // ----------------------------------------
+    // 6c. Update Personal Info
+    // ----------------------------------------
     if (cvData.personal) {
       await prisma.cVPersonalInfo.upsert({
         where: { cvId },
@@ -393,112 +558,142 @@ export async function POST(request) {
       });
     }
 
-    // Recreate all sections with new data
+    // ----------------------------------------
+    // 6d. OPTIMIZED: Parallel Batch Inserts
+    // ----------------------------------------
+    const insertOperations = [];
+
+    // Education Section
     if (cvData.education?.length > 0) {
-      await prisma.cVEducation.createMany({
-        data: cvData.education.map((edu, index) => ({
-          cvId,
-          institution: edu.institution || "",
-          degree: edu.degree || "",
-          fieldOfStudy: edu.field || "",
-          startDate: edu.startDate ? new Date(edu.startDate) : new Date(),
-          endDate: edu.endDate ? new Date(edu.endDate) : null,
-          gpa: edu.gpa || null,
-          description: edu.description || "",
-          displayOrder: index,
-        })),
-      });
+      insertOperations.push(
+        prisma.cVEducation.createMany({
+          data: cvData.education.map((edu, index) => ({
+            cvId,
+            institution: edu.institution || "",
+            degree: edu.degree || "",
+            fieldOfStudy: edu.field || "",
+            startDate: edu.startDate ? new Date(edu.startDate) : new Date(),
+            endDate: edu.endDate ? new Date(edu.endDate) : null,
+            gpa: edu.gpa || null,
+            description: edu.description || "",
+            displayOrder: index,
+          })),
+        })
+      );
     }
 
+    // Experience Section
     if (cvData.experience?.length > 0) {
-      await prisma.cVExperience.createMany({
-        data: cvData.experience.map((exp, index) => ({
-          cvId,
-          company: exp.company || "",
-          position: exp.position || "",
-          location: exp.location || "",
-          startDate: exp.startDate ? new Date(exp.startDate) : new Date(),
-          endDate: exp.endDate ? new Date(exp.endDate) : null,
-          isCurrent: exp.isCurrentRole || false,
-          description: exp.description || "",
-          achievements: exp.description ? [exp.description] : [],
-          displayOrder: index,
-        })),
-      });
+      insertOperations.push(
+        prisma.cVExperience.createMany({
+          data: cvData.experience.map((exp, index) => ({
+            cvId,
+            company: exp.company || "",
+            position: exp.position || "",
+            location: exp.location || "",
+            startDate: exp.startDate ? new Date(exp.startDate) : new Date(),
+            endDate: exp.endDate ? new Date(exp.endDate) : null,
+            isCurrent: exp.isCurrentRole || false,
+            description: exp.description || "",
+            achievements: exp.description ? [exp.description] : [],
+            displayOrder: index,
+          })),
+        })
+      );
     }
 
+    // Projects Section
     if (cvData.projects?.length > 0) {
-      await prisma.cVProject.createMany({
-        data: cvData.projects.map((proj, index) => ({
-          cvId,
-          name: proj.name || "",
-          description: proj.description || "",
-          technologies: proj.technologies?.split(",").map(t => t.trim()) || [],
-          startDate: proj.startDate ? new Date(proj.startDate) : null,
-          endDate: proj.endDate ? new Date(proj.endDate) : null,
-          githubUrl: proj.githubUrl || null,
-          liveUrl: proj.liveUrl || null,
-          achievements: proj.achievements ? [proj.achievements] : [],
-          displayOrder: index,
-        })),
-      });
+      insertOperations.push(
+        prisma.cVProject.createMany({
+          data: cvData.projects.map((proj, index) => ({
+            cvId,
+            name: proj.name || "",
+            description: proj.description || "",
+            technologies: proj.technologies?.split(",").map(t => t.trim()) || [],
+            startDate: proj.startDate ? new Date(proj.startDate) : null,
+            endDate: proj.endDate ? new Date(proj.endDate) : null,
+            githubUrl: proj.githubUrl || null,
+            liveUrl: proj.liveUrl || null,
+            achievements: proj.achievements ? [proj.achievements] : [],
+            displayOrder: index,
+          })),
+        })
+      );
     }
 
+    // Skills Section
     if (cvData.skills?.length > 0) {
-      await prisma.cVSkill.createMany({
-        data: cvData.skills.map((skillGroup, index) => ({
-          cvId,
-          categoryName: skillGroup.name || "",
-          // ✅ FIX: Extract skill names from objects
-          skills: Array.isArray(skillGroup.skills)
-            ? skillGroup.skills.map(skill => 
-                typeof skill === 'string' ? skill : skill.name
-              ).filter(Boolean)
-            : [],
-          displayOrder: index,
-        })),
-      });
+      insertOperations.push(
+        prisma.cVSkill.createMany({
+          data: cvData.skills.map((skillGroup, index) => ({
+            cvId,
+            categoryName: skillGroup.name || "",
+            // Extract skill names from objects or strings
+            skills: Array.isArray(skillGroup.skills)
+              ? skillGroup.skills.map(skill => 
+                  typeof skill === 'string' ? skill : skill.name
+                ).filter(Boolean)
+              : [],
+            displayOrder: index,
+          })),
+        })
+      );
     }
 
+    // Achievements Section
     if (cvData.achievements?.length > 0) {
-      await prisma.cVAchievement.createMany({
-        data: cvData.achievements.map((ach, index) => ({
-          cvId,
-          title: ach.title || "",
-          organization: ach.organization || "",
-          type: ach.type || "academic",
-          date: ach.date ? new Date(ach.date) : null,
-          description: ach.description || "",
-          displayOrder: index,
-        })),
-      });
+      insertOperations.push(
+        prisma.cVAchievement.createMany({
+          data: cvData.achievements.map((ach, index) => ({
+            cvId,
+            title: ach.title || "",
+            organization: ach.organization || "",
+            type: ach.type || "academic",
+            date: ach.date ? new Date(ach.date) : null,
+            description: ach.description || "",
+            displayOrder: index,
+          })),
+        })
+      );
     }
 
+    // Volunteer Section
     if (cvData.volunteer?.length > 0) {
-      await prisma.cVVolunteer.createMany({
-        data: cvData.volunteer.map((vol, index) => ({
-          cvId,
-          organization: vol.organization || "",
-          role: vol.role || "",
-          location: vol.location || "",
-          startDate: vol.startDate ? new Date(vol.startDate) : new Date(),
-          endDate: vol.endDate ? new Date(vol.endDate) : null,
-          description: vol.description || "",
-          impact: vol.impact || null,
-          displayOrder: index,
-        })),
-      });
+      insertOperations.push(
+        prisma.cVVolunteer.createMany({
+          data: cvData.volunteer.map((vol, index) => ({
+            cvId,
+            organization: vol.organization || "",
+            role: vol.role || "",
+            location: vol.location || "",
+            startDate: vol.startDate ? new Date(vol.startDate) : new Date(),
+            endDate: vol.endDate ? new Date(vol.endDate) : null,
+            description: vol.description || "",
+            impact: vol.impact || null,
+            displayOrder: index,
+          })),
+        })
+      );
     }
 
-    // CREATE VERSION SNAPSHOT if versionInfo provided
+    // Execute all inserts in parallel
+    await Promise.all(insertOperations);
+
+    // ----------------------------------------
+    // 6e. Create Version Snapshot
+    // ----------------------------------------
     if (versionInfo) {
+      // Get last version number
       const lastVersion = await prisma.cVVersion.findFirst({
         where: { cvId },
         orderBy: { versionNumber: 'desc' },
+        select: { versionNumber: true }, // Only need version number
       });
 
       const nextVersionNumber = lastVersion ? lastVersion.versionNumber + 1 : 1;
 
+      // Create new version
       await prisma.cVVersion.create({
         data: {
           cvId,
@@ -519,6 +714,9 @@ export async function POST(request) {
       });
     }
 
+    // ----------------------------------------
+    // 6f. Return Success Response
+    // ----------------------------------------
     return NextResponse.json(
       {
         success: true,
@@ -537,6 +735,7 @@ export async function POST(request) {
       },
       { status: 200 }
     );
+
   } catch (error) {
     console.error("CV Save Error:", error);
     return NextResponse.json(

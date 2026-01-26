@@ -1,20 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { Lightbulb, Sparkles, TrendingUp, AlertCircle, CheckCircle, ChevronDown, ChevronUp, Loader2, XCircle } from 'lucide-react';
 
+/**
+ * SmartTipsPanel - Sidebar panel showing intelligent tips and analysis for CV sections
+ * @param {Object} props - Component props
+ * @param {string} props.activeSection - Currently active CV section
+ * @param {boolean} props.isVisible - Controls panel visibility
+ * @param {Object} props.cvData - Complete CV data object
+ * @param {Object} props.aiAnalysis - AI analysis results
+ * @param {boolean} props.isAnalyzing - Whether AI analysis is in progress
+ * @param {Function} props.onRequestAnalysis - Callback to trigger AI analysis
+ * @returns {JSX.Element|null} Smart tips panel or null when hidden
+ */
 function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyzing, onRequestAnalysis }) {
+  
+  // State for expanded/collapsed tips
   const [expandedTips, setExpandedTips] = useState({});
+  
+  // Local tips generated from section data
   const [localTips, setLocalTips] = useState([]);
+  
+  // ATS (Applicant Tracking System) warnings
   const [atsWarnings, setAtsWarnings] = useState([]);
 
+  /**
+   * Effect to regenerate tips when dependencies change
+   * Runs whenever activeSection, cvData, or aiAnalysis changes
+   */
   useEffect(() => {
     generateSectionTips();
     generateATSWarnings();
   }, [activeSection, cvData, aiAnalysis]);
 
+  /**
+   * Generates tips for the current section based on data and AI analysis
+   */
   const generateSectionTips = () => {
     const tips = [];
 
+    // Check if section data exists
     if (!cvData || !cvData[activeSection]) {
+      // Add empty section tip
       tips.push({
         id: 'empty',
         type: 'error',
@@ -30,7 +56,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
 
     const sectionData = cvData[activeSection];
 
-    // Generate base tips based on section
+    // Generate tips specific to each section type
     switch(activeSection) {
       case 'personal':
         generatePersonalTips(sectionData, tips);
@@ -54,6 +80,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
         generateVolunteerTips(sectionData, tips);
         break;
       default:
+        // Generic tip for unknown sections
         tips.push({
           id: 'default',
           type: 'info',
@@ -64,7 +91,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
         });
     }
 
-    // Add AI-based tips if analysis exists
+    // Add AI-generated tips if analysis exists
     if (aiAnalysis && aiAnalysis.sectionAnalyses && aiAnalysis.sectionAnalyses[activeSection]) {
       addAIBasedTips(aiAnalysis.sectionAnalyses[activeSection], tips);
     }
@@ -72,7 +99,13 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     setLocalTips(tips);
   };
 
+  /**
+   * Generates tips for the Personal Information section
+   * @param {Object} data - Personal section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generatePersonalTips = (data, tips) => {
+    // Check for full name
     if (data.fullName) {
       tips.push({
         id: 'name-good',
@@ -94,6 +127,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       });
     }
 
+    // Check for professional summary
     if (!data.summary || data.summary.length < 50) {
       tips.push({
         id: 'summary-short',
@@ -125,6 +159,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       });
     }
 
+    // Check for contact information
     if (!data.email || !data.phone) {
       tips.push({
         id: 'contact-incomplete',
@@ -137,6 +172,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       });
     }
 
+    // Check for professional links
     if (!data.linkedin && !data.website) {
       tips.push({
         id: 'links-missing',
@@ -150,9 +186,15 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     }
   };
 
+  /**
+   * Generates tips for the Experience section
+   * @param {Object} data - Experience section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generateExperienceTips = (data, tips) => {
     const exp = Array.isArray(data) ? data : [data];
     
+    // Check if experience exists
     if (exp.length === 0 || !exp[0].company) {
       tips.push({
         id: 'exp-empty',
@@ -166,6 +208,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       return;
     }
 
+    // Count of positions
     tips.push({
       id: 'exp-count',
       type: 'success',
@@ -175,7 +218,9 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       priority: 'low'
     });
 
+    // Analyze each experience entry
     exp.forEach((e, idx) => {
+      // Check for description
       if (!e.description || e.description.length < 50) {
         tips.push({
           id: `desc-missing-${idx}`,
@@ -187,6 +232,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           priority: 'high'
         });
       } else if (e.description.includes('•')) {
+        // Check bullet point count
         const bulletCount = (e.description.match(/•/g) || []).length;
         if (bulletCount < 3) {
           tips.push({
@@ -209,6 +255,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           });
         }
       } else {
+        // Suggest using bullet points
         tips.push({
           id: `bullets-needed-${idx}`,
           type: 'warning',
@@ -220,7 +267,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
         });
       }
 
-      // Check for quantifiable achievements
+      // Check for quantifiable achievements (numbers)
       const hasNumbers = /\d+/.test(e.description);
       if (!hasNumbers && e.description) {
         tips.push({
@@ -236,9 +283,15 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     });
   };
 
+  /**
+   * Generates tips for the Education section
+   * @param {Object} data - Education section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generateEducationTips = (data, tips) => {
     const edu = Array.isArray(data) ? data : [data];
     
+    // Check if education exists
     if (edu.length === 0 || !edu[0].institution) {
       tips.push({
         id: 'edu-empty',
@@ -252,6 +305,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       return;
     }
 
+    // Count of education entries
     tips.push({
       id: 'edu-count',
       type: 'success',
@@ -261,7 +315,9 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       priority: 'low'
     });
 
+    // Analyze each education entry
     edu.forEach((e, idx) => {
+      // Check GPA
       if (e.gpa && parseFloat(e.gpa) >= 3.5) {
         tips.push({
           id: `gpa-good-${idx}`,
@@ -283,6 +339,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
         });
       }
 
+      // Check for additional details
       if (!e.description || e.description.length < 20) {
         tips.push({
           id: `edu-details-${idx}`,
@@ -297,9 +354,15 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     });
   };
 
+  /**
+   * Generates tips for the Projects section
+   * @param {Object} data - Projects section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generateProjectsTips = (data, tips) => {
     const proj = Array.isArray(data) ? data : [data];
     
+    // Check if projects exist (optional section)
     if (proj.length === 0 || !proj[0].name) {
       tips.push({
         id: 'proj-empty',
@@ -313,6 +376,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       return;
     }
 
+    // Count of projects
     tips.push({
       id: 'proj-count',
       type: 'success',
@@ -322,7 +386,9 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       priority: 'low'
     });
 
+    // Analyze each project
     proj.forEach((p, idx) => {
+      // Check for project links
       if (!p.githubUrl && !p.liveUrl) {
         tips.push({
           id: `links-${idx}`,
@@ -335,6 +401,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
         });
       }
 
+      // Check for technologies list
       if (!p.technologies || p.technologies.length < 10) {
         tips.push({
           id: `tech-${idx}`,
@@ -349,10 +416,16 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     });
   };
 
+  /**
+   * Generates tips for the Skills section
+   * @param {Object} data - Skills section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generateSkillsTips = (data, tips) => {
     const skills = Array.isArray(data) ? data : [data];
     const totalSkills = skills.reduce((sum, group) => sum + (group.skills?.length || 0), 0);
     
+    // Check if skills exist
     if (totalSkills === 0) {
       tips.push({
         id: 'skills-empty',
@@ -366,6 +439,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       return;
     }
 
+    // Count of skills
     tips.push({
       id: 'skills-count',
       type: 'success',
@@ -375,6 +449,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       priority: 'low'
     });
 
+    // Check if enough skills are listed
     if (totalSkills < 10) {
       tips.push({
         id: 'skills-few',
@@ -387,6 +462,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       });
     }
 
+    // ATS optimization tip
     tips.push({
       id: 'skills-ats',
       type: 'info',
@@ -398,9 +474,15 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     });
   };
 
+  /**
+   * Generates tips for the Achievements section
+   * @param {Object} data - Achievements section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generateAchievementsTips = (data, tips) => {
     const ach = Array.isArray(data) ? data : [data];
     
+    // Check if achievements exist (optional section)
     if (ach.length === 0 || !ach[0].title) {
       tips.push({
         id: 'ach-empty',
@@ -414,6 +496,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       return;
     }
 
+    // Count of achievements
     tips.push({
       id: 'ach-count',
       type: 'success',
@@ -424,9 +507,15 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     });
   };
 
+  /**
+   * Generates tips for the Volunteer section
+   * @param {Object} data - Volunteer section data
+   * @param {Array} tips - Array to add tips to
+   */
   const generateVolunteerTips = (data, tips) => {
     const vol = Array.isArray(data) ? data : [data];
     
+    // Check if volunteer experience exists (optional section)
     if (vol.length === 0 || !vol[0].organization) {
       tips.push({
         id: 'vol-empty',
@@ -440,6 +529,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       return;
     }
 
+    // Count of volunteer entries
     tips.push({
       id: 'vol-count',
       type: 'success',
@@ -450,10 +540,15 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     });
   };
 
+  /**
+   * Adds AI-generated tips to the tips array
+   * @param {Object} analysis - AI analysis for the section
+   * @param {Array} tips - Array to add AI tips to
+   */
   const addAIBasedTips = (analysis, tips) => {
     if (!analysis) return;
 
-    // Add critical AI tip at the top
+    // Add critical AI tip at the top based on score
     if (analysis.score < 50) {
       tips.unshift({
         id: 'ai-critical',
@@ -488,7 +583,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
       });
     }
 
-    // Add top improvement if available
+    // Add top improvement suggestion if available
     if (analysis.improvements && analysis.improvements.length > 0) {
       tips.splice(1, 0, {
         id: 'ai-top-improvement',
@@ -503,10 +598,14 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     }
   };
 
+  /**
+   * Generates ATS (Applicant Tracking System) warnings based on AI analysis
+   */
   const generateATSWarnings = () => {
     const warnings = [];
 
     if (aiAnalysis && aiAnalysis.atsScore) {
+      // Determine ATS score level and add appropriate warning
       if (aiAnalysis.atsScore < 50) {
         warnings.push({
           id: 'ats-critical',
@@ -545,6 +644,10 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     setAtsWarnings(warnings);
   };
 
+  /**
+   * Toggles expanded state of a tip
+   * @param {string} id - Tip ID to toggle
+   */
   const toggleTip = (id) => {
     setExpandedTips(prev => ({
       ...prev,
@@ -552,18 +655,21 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
     }));
   };
 
+  // Return null if panel is not visible
   if (!isVisible) return null;
 
-  // Sort tips by priority
+  // Sort tips by priority (critical, high, medium, low)
   const sortedTips = [...localTips].sort((a, b) => {
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     return (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
   });
 
   return (
+    /* Sidebar panel container */
     <div className="w-80 border-l border-gray-200 bg-gradient-to-b from-blue-50 via-indigo-50 to-white p-4 overflow-y-auto">
       <div className="space-y-4">
-        {/* Header */}
+        
+        {/* Panel header */}
         <div className="sticky top-0 bg-gradient-to-b from-blue-50 via-indigo-50 to-white pb-3 -m-4 p-4 z-10">
           <div className="flex items-center gap-2 mb-2">
             <Lightbulb className="w-5 h-5 text-amber-500" />
@@ -572,10 +678,11 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           <p className="text-xs text-gray-600">Suggestions for {activeSection}</p>
         </div>
 
-        {/* ATS Warnings */}
+        {/* ATS warnings section */}
         {atsWarnings.length > 0 && (
           <div className="space-y-2">
             {atsWarnings.map(warning => {
+              // Define styling based on warning type
               const bgColors = {
                 error: 'bg-red-100 border-red-300',
                 warning: 'bg-amber-100 border-amber-300',
@@ -596,7 +703,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           </div>
         )}
 
-        {/* Analysis Button */}
+        {/* AI analysis trigger button */}
         {!aiAnalysis && (
           <button
             onClick={onRequestAnalysis}
@@ -617,7 +724,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           </button>
         )}
 
-        {/* Tips List */}
+        {/* Tips list section */}
         <div className="space-y-2">
           {sortedTips.length === 0 ? (
             <div className="p-4 bg-blue-50 rounded-lg text-center">
@@ -626,18 +733,22 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           ) : (
             sortedTips.map(tip => {
               const Icon = tip.icon;
+              
+              // Define styling based on tip type
               const bgColors = {
                 error: 'bg-red-50',
                 warning: 'bg-amber-50',
                 success: 'bg-green-50',
                 info: 'bg-blue-50'
               };
+              
               const borderColors = {
                 error: 'border-red-200',
                 warning: 'border-amber-200',
                 success: 'border-green-200',
                 info: 'border-blue-200'
               };
+              
               const iconColors = {
                 error: 'text-red-600',
                 warning: 'text-amber-600',
@@ -662,13 +773,19 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
                           <Sparkles className="w-3 h-3 text-purple-600" />
                         )}
                       </div>
+                      
+                      {/* Expanded tip content */}
                       {expandedTips[tip.id] && (
                         <p className="text-xs text-gray-700 mt-1">{tip.description}</p>
                       )}
+                      
+                      {/* Collapsed tip preview */}
                       {!expandedTips[tip.id] && tip.description && (
                         <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{tip.description}</p>
                       )}
                     </div>
+                    
+                    {/* Expand/collapse chevron */}
                     {expandedTips[tip.id] ? (
                       <ChevronUp className="w-4 h-4 text-gray-600 mt-0.5" />
                     ) : (
@@ -681,7 +798,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           )}
         </div>
 
-        {/* Overall CV Score */}
+        {/* Overall CV score display */}
         {aiAnalysis && aiAnalysis.overallAnalysis && (
           <div className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border-2 border-blue-200">
             <div className="flex items-center gap-2 mb-2">
@@ -709,7 +826,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           </div>
         )}
 
-        {/* Section Analysis */}
+        {/* Section-specific AI analysis */}
         {aiAnalysis && aiAnalysis.sectionAnalyses && aiAnalysis.sectionAnalyses[activeSection] && (
           <div className="p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200">
             <div className="flex items-center gap-2 mb-2">
@@ -733,7 +850,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           </div>
         )}
 
-        {/* AI Strengths */}
+        {/* AI-identified strengths */}
         {aiAnalysis && aiAnalysis.sectionAnalyses && aiAnalysis.sectionAnalyses[activeSection]?.strengths?.length > 0 && (
           <div className="p-3 bg-green-50 rounded-lg border border-green-200">
             <div className="flex items-center gap-2 mb-2">
@@ -751,7 +868,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           </div>
         )}
 
-        {/* AI Improvements */}
+        {/* AI-identified improvements */}
         {aiAnalysis && aiAnalysis.sectionAnalyses && aiAnalysis.sectionAnalyses[activeSection]?.improvements?.length > 0 && (
           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
             <div className="flex items-center gap-2 mb-2">
@@ -769,7 +886,7 @@ function SmartTipsPanel({ activeSection, isVisible, cvData, aiAnalysis, isAnalyz
           </div>
         )}
 
-        {/* Critical Issues Warning */}
+        {/* Critical issues warning */}
         {aiAnalysis && aiAnalysis.overallAnalysis?.criticalIssues?.length > 0 && (
           <div className="p-3 bg-red-50 rounded-lg border-2 border-red-300">
             <div className="flex items-center gap-2 mb-2">

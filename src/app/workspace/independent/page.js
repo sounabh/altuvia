@@ -38,6 +38,7 @@ import {
   CheckCircle2,
   Circle,
   Filter,
+  ArrowLeft, // Added for back button
 } from "lucide-react";
 
 // ==========================================
@@ -1243,7 +1244,7 @@ export default function IndependentWorkspacePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
-      {/* Dynamic Header */}
+      {/* Dynamic Header - UPDATED WITH BACK TO DASHBOARD BUTTON */}
       <header
         className="backdrop-blur-lg border-b sticky top-0 z-50 shadow-sm transition-all duration-300"
         style={{
@@ -1255,33 +1256,28 @@ export default function IndependentWorkspacePage() {
       >
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
+            {/* Left Section: Back to Dashboard Button */}
             <div className="flex items-center space-x-4">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-105"
-                style={{
-                  background: currentUniversity
-                    ? `linear-gradient(135deg, ${currentUniversity.color}, ${currentUniversity.color}CC)`
-                    : "linear-gradient(135deg, #002147, #003366)",
-                }}
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center space-x-3 px-4 py-3 bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 hover:shadow-md active:scale-95 transition-all group"
+                title="Back to Dashboard"
               >
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[#002147]">
-                  {currentUniversity?.name || "Essay Workspace"}
-                </h1>
-                <p className="text-sm text-[#6C7280]">
-                  {selectedUniversityId === "all"
-                    ? `${
-                        workspaceData?.universities?.length || 0
-                      } universities • ${
-                        workspaceData?.stats?.totalPrograms || 0
-                      } programs`
-                    : `${currentProgram?.name || "Select a program"}`}
-                </p>
-              </div>
+                <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#3598FE] flex items-center justify-center transition-colors">
+                  <ArrowLeft className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-[#002147] group-hover:text-[#3598FE] transition-colors">
+                    Back to Dashboard
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Return to main dashboard
+                  </p>
+                </div>
+              </button>
             </div>
 
+            {/* Right Section: University Selector and Controls */}
             <div className="flex items-center space-x-4">
               {/* University Selector */}
               <UniversitySelector
@@ -1318,7 +1314,7 @@ export default function IndependentWorkspacePage() {
                 </div>
               )}
 
-              {/* Toggle Buttons - FIXED UI */}
+              {/* Toggle Buttons */}
               <div className="flex items-center space-x-2">
                 <Button
                   variant={showAnalytics ? "default" : "outline"}
@@ -1447,216 +1443,215 @@ export default function IndependentWorkspacePage() {
           </div>
 
           {/* Main Editor Area */}
-        {/* Main Editor Area */}
-<div className="col-span-12 lg:col-span-6">
-  <Card className="min-h-[600px] shadow-xl border-0 bg-white/70 backdrop-blur-sm hover:shadow-2xl transition-shadow">
-    <div className="p-6">
-      {currentEssayData && currentEssay ? (
-        <>
-          {/* Essay Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1 pr-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <div
-                  className="w-3 h-3 rounded-full shadow-sm flex-shrink-0"
-                  style={{
-                    backgroundColor:
-                      currentProgram?.universityColor || "#002147",
-                  }}
-                />
-                <span className="text-xs text-gray-500">
-                  {currentProgram?.universityName} •{" "}
-                  {currentProgram?.name}
-                </span>
+          <div className="col-span-12 lg:col-span-6">
+            <Card className="min-h-[600px] shadow-xl border-0 bg-white/70 backdrop-blur-sm hover:shadow-2xl transition-shadow">
+              <div className="p-6">
+                {currentEssayData && currentEssay ? (
+                  <>
+                    {/* Essay Header */}
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex-1 pr-4">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <div
+                            className="w-3 h-3 rounded-full shadow-sm flex-shrink-0"
+                            style={{
+                              backgroundColor:
+                                currentProgram?.universityColor || "#002147",
+                            }}
+                          />
+                          <span className="text-xs text-gray-500">
+                            {currentProgram?.universityName} •{" "}
+                            {currentProgram?.name}
+                          </span>
+                        </div>
+                        <h2 className="text-xl font-bold text-[#002147]">
+                          {currentEssayData.promptTitle}
+                        </h2>
+                        
+                        {/* FIXED: Full prompt text without truncation */}
+                        <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                          <p className="text-xs text-blue-700 font-medium mb-1">
+                            Essay Prompt:
+                          </p>
+                          <p 
+                            className="text-sm text-gray-700 leading-relaxed"
+                            style={{
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              overflow: 'visible',
+                            }}
+                          >
+                            {currentEssayData.promptText}
+                          </p>
+                          <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
+                            <span>Word limit: {currentEssayData.wordLimit}</span>
+                            {currentEssayData.isMandatory && (
+                              <span className="text-red-600 font-medium">• Required</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Versions Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          handlePanelToggle('versions', showVersions);
+                          setShowVersions(!showVersions);
+                        }}
+                        className={`
+                          transition-all duration-200 font-medium shadow-sm flex-shrink-0
+                          ${showVersions
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
+                            : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                          }
+                        `}
+                      >
+                        <Clock className="w-4 h-4 mr-2" />
+                        Versions ({currentEssay.versions?.length || 0})
+                      </Button>
+                    </div>
+
+                    {/* Editor */}
+                    <EssayEditor
+                      key={`editor-${currentEssay.id}`}
+                      content={currentEssay.content}
+                      onChange={updateEssayContent}
+                      wordLimit={currentEssayData.wordLimit}
+                      essayId={currentEssay.id}
+                      lastSaved={lastSaved}
+                      hasUnsavedChanges={hasUnsavedChanges}
+                      isSaving={isSaving}
+                      onSave={manualSave}
+                    />
+
+                    {/* Footer Actions */}
+                    <div className="mt-6 flex justify-between items-center">
+                      <div className="flex items-center space-x-4 text-xs text-[#6C7280]">
+                        <span>
+                          Last modified:{" "}
+                          {new Date(currentEssay.lastModified).toLocaleString()}
+                        </span>
+                        {lastSaved && (
+                          <span className="text-green-600">
+                            Saved: {lastSaved.toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          saveVersion(
+                            `Manual Save ${new Date().toLocaleTimeString()}`
+                          )
+                        }
+                        disabled={isSaving || isSavingVersion}
+                        className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:bg-green-100 hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm"
+                      >
+                        {isSaving || isSavingVersion ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Version
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                ) : currentEssayData && !currentEssay ? (
+                  /* Start Essay State - FIXED */
+                  <div className="h-full flex flex-col items-center justify-center py-16">
+                    <div
+                      className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg"
+                      style={{
+                        backgroundColor: `${
+                          currentProgram?.universityColor || "#002147"
+                        }20`,
+                      }}
+                    >
+                      <FileText
+                        className="w-8 h-8"
+                        style={{
+                          color: currentProgram?.universityColor || "#002147",
+                        }}
+                      />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[#002147] mb-4">
+                      {currentEssayData.promptTitle}
+                    </h3>
+                    
+                    {/* FIXED: Full prompt text without truncation */}
+                    <div className="w-full max-w-2xl px-4 mb-6">
+                      <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                        <p className="text-xs text-blue-700 font-medium mb-2">
+                          Essay Prompt:
+                        </p>
+                        <p 
+                          className="text-sm text-gray-700 leading-relaxed"
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            overflow: 'visible',
+                          }}
+                        >
+                          {currentEssayData.promptText}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3 text-xs text-gray-500 mb-6">
+                      <span>{currentEssayData.wordLimit} words max</span>
+                      {currentEssayData.isMandatory && (
+                        <>
+                          <span>•</span>
+                          <span className="text-red-600 font-medium">Required</span>
+                        </>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() =>
+                        handleCreateEssay(
+                          currentProgram.id,
+                          currentEssayData.promptId
+                        )
+                      }
+                      disabled={isCreatingEssay}
+                      className="bg-[#3598FE] hover:bg-[#2563EB] shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200"
+                    >
+                      {isCreatingEssay ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Start Writing
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center py-16">
+                    <GraduationCap className="w-16 h-16 text-gray-300 mb-6" />
+                    <h3 className="text-lg font-semibold text-[#002147] mb-2">
+                      Select an Essay
+                    </h3>
+                    <p className="text-sm text-gray-600 text-center max-w-md">
+                      Choose a program and essay from the sidebar to start
+                      editing
+                    </p>
+                  </div>
+                )}
               </div>
-              <h2 className="text-xl font-bold text-[#002147]">
-                {currentEssayData.promptTitle}
-              </h2>
-              
-              {/* FIXED: Full prompt text without truncation */}
-              <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                <p className="text-xs text-blue-700 font-medium mb-1">
-                  Essay Prompt:
-                </p>
-                <p 
-                  className="text-sm text-gray-700 leading-relaxed"
-                  style={{
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    overflow: 'visible',
-                  }}
-                >
-                  {currentEssayData.promptText}
-                </p>
-                <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
-                  <span>Word limit: {currentEssayData.wordLimit}</span>
-                  {currentEssayData.isMandatory && (
-                    <span className="text-red-600 font-medium">• Required</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Versions Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                handlePanelToggle('versions', showVersions);
-                setShowVersions(!showVersions);
-              }}
-              className={`
-                transition-all duration-200 font-medium shadow-sm flex-shrink-0
-                ${showVersions
-                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                  : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
-                }
-              `}
-            >
-              <Clock className="w-4 h-4 mr-2" />
-              Versions ({currentEssay.versions?.length || 0})
-            </Button>
+            </Card>
           </div>
-
-          {/* Editor */}
-          <EssayEditor
-            key={`editor-${currentEssay.id}`}
-            content={currentEssay.content}
-            onChange={updateEssayContent}
-            wordLimit={currentEssayData.wordLimit}
-            essayId={currentEssay.id}
-            lastSaved={lastSaved}
-            hasUnsavedChanges={hasUnsavedChanges}
-            isSaving={isSaving}
-            onSave={manualSave}
-          />
-
-          {/* Footer Actions */}
-          <div className="mt-6 flex justify-between items-center">
-            <div className="flex items-center space-x-4 text-xs text-[#6C7280]">
-              <span>
-                Last modified:{" "}
-                {new Date(currentEssay.lastModified).toLocaleString()}
-              </span>
-              {lastSaved && (
-                <span className="text-green-600">
-                  Saved: {lastSaved.toLocaleTimeString()}
-                </span>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                saveVersion(
-                  `Manual Save ${new Date().toLocaleTimeString()}`
-                )
-              }
-              disabled={isSaving || isSavingVersion}
-              className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:bg-green-100 hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm"
-            >
-              {isSaving || isSavingVersion ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Version
-                </>
-              )}
-            </Button>
-          </div>
-        </>
-      ) : currentEssayData && !currentEssay ? (
-        /* Start Essay State - FIXED */
-        <div className="h-full flex flex-col items-center justify-center py-16">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg"
-            style={{
-              backgroundColor: `${
-                currentProgram?.universityColor || "#002147"
-              }20`,
-            }}
-          >
-            <FileText
-              className="w-8 h-8"
-              style={{
-                color: currentProgram?.universityColor || "#002147",
-              }}
-            />
-          </div>
-          <h3 className="text-lg font-semibold text-[#002147] mb-4">
-            {currentEssayData.promptTitle}
-          </h3>
-          
-          {/* FIXED: Full prompt text without truncation */}
-          <div className="w-full max-w-2xl px-4 mb-6">
-            <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
-              <p className="text-xs text-blue-700 font-medium mb-2">
-                Essay Prompt:
-              </p>
-              <p 
-                className="text-sm text-gray-700 leading-relaxed"
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  overflow: 'visible',
-                }}
-              >
-                {currentEssayData.promptText}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3 text-xs text-gray-500 mb-6">
-            <span>{currentEssayData.wordLimit} words max</span>
-            {currentEssayData.isMandatory && (
-              <>
-                <span>•</span>
-                <span className="text-red-600 font-medium">Required</span>
-              </>
-            )}
-          </div>
-          <Button
-            onClick={() =>
-              handleCreateEssay(
-                currentProgram.id,
-                currentEssayData.promptId
-              )
-            }
-            disabled={isCreatingEssay}
-            className="bg-[#3598FE] hover:bg-[#2563EB] shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200"
-          >
-            {isCreatingEssay ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Start Writing
-              </>
-            )}
-          </Button>
-        </div>
-      ) : (
-        <div className="h-full flex flex-col items-center justify-center py-16">
-          <GraduationCap className="w-16 h-16 text-gray-300 mb-6" />
-          <h3 className="text-lg font-semibold text-[#002147] mb-2">
-            Select an Essay
-          </h3>
-          <p className="text-sm text-gray-600 text-center max-w-md">
-            Choose a program and essay from the sidebar to start
-            editing
-          </p>
-        </div>
-      )}
-    </div>
-  </Card>
-</div>
 
           {/* Right Sidebar - Panels in Order */}
           <div className="col-span-12 lg:col-span-3 space-y-6">

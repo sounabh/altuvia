@@ -17,10 +17,17 @@ import {
   Loader2,
   AlertCircle,
   Save,
+  ArrowLeft,
+  Home,
+  GraduationCap,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function EssayWorkspace({ universityName, userId, userEmail }) {
   // console.log("EssayWorkspace props:", { universityName, userId, userEmail });
+
+  // Add router for navigation
+  const router = useRouter();
 
   // Core state management
   const [workspaceData, setWorkspaceData] = useState(null);
@@ -709,6 +716,13 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
           <p className="text-sm text-gray-600">
             No programs available for {universityName}.
           </p>
+          <Button
+            onClick={() => router.push("/dashboard")}
+            className="mt-4 bg-[#3598FE] hover:bg-[#2563EB]"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
         </Card>
       </div>
     );
@@ -720,18 +734,53 @@ export function EssayWorkspace({ universityName, userId, userEmail }) {
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
-            {/* Left side - Logo and title */}
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#002147] to-[#003366] rounded-xl flex items-center justify-center shadow-lg">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[#002147]">
-                  Essay Workspace
-                </h1>
-                <p className="text-sm text-[#6C7280]">
-                  {workspaceData.university.name}
-                </p>
+            {/* Left side - Navigation and University Info */}
+            <div className="flex items-center space-x-6">
+              {/* Back to Dashboard Button (replaces the logo) */}
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="flex items-center gap-2.5 text-gray-700 hover:text-[#002147] hover:bg-gray-50 px-3 py-2.5 rounded-lg transition-all duration-200 group active:scale-95"
+                title="Back to Dashboard"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#002147] to-[#003366] flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+                  <ArrowLeft className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-semibold text-[#002147] block">
+                    Back to Dashboard
+                  </span>
+                  <span className="text-xs text-gray-500 block mt-0.5">
+                    Return to all applications
+                  </span>
+                </div>
+              </button>
+
+              {/* University Info Separator */}
+              <div className="w-px h-8 bg-gray-300" />
+
+              {/* University Information (kept from original) */}
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#002147] to-[#003366] rounded-xl flex items-center justify-center shadow-lg">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[#002147]">
+                    Essay Workspace
+                  </h1>
+                  <div className="flex items-center space-x-4 mt-1">
+                    <p className="text-sm text-[#6C7280]">
+                      {workspaceData.university.name}
+                    </p>
+                    <div className="flex items-center space-x-2 text-xs text-[#6C7280]">
+                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                        {workspaceData.stats.totalEssayPrompts} essays
+                      </span>
+                      <span className="bg-green-50 text-green-700 px-2 py-1 rounded">
+                        {workspaceData.programs.length} programs
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -1,10 +1,20 @@
 import React from "react";
 import { Eye, Palette, Mail, Phone, MapPin, Linkedin, Globe } from "lucide-react";
 
+/**
+ * Label component for form labels
+ * @param {Object} props - Component props
+ * @param {React.ReactNode} props.children - Label content
+ * @param {string} props.className - Additional CSS classes
+ */
 const Label = ({ children, className }) => (
   <span className={className}>{children}</span>
 );
 
+/**
+ * Available theme colors for the CV templates
+ * Each theme has a main color and a light variant for backgrounds
+ */
 const THEME_COLORS = [
   { name: "Navy Blue", value: "#1e40af", light: "#dbeafe" },
   { name: "Emerald", value: "#059669", light: "#d1fae5" },
@@ -21,7 +31,11 @@ const THEME_COLORS = [
 // HELPER FUNCTIONS
 // ============================================
 
-// Extract skill name from various formats (string or object)
+/**
+ * Extracts skill name from various formats (string or object)
+ * @param {string|Object} skill - Skill data in various formats
+ * @returns {string} Cleaned skill name
+ */
 const getSkillName = (skill) => {
   if (!skill) return '';
   if (typeof skill === 'string') return skill.trim();
@@ -32,7 +46,11 @@ const getSkillName = (skill) => {
   return String(skill);
 };
 
-// Clean HTML tags and entities from text
+/**
+ * Cleans HTML tags and entities from text
+ * @param {string} text - Text containing HTML
+ * @returns {string} Clean text without HTML
+ */
 const stripHtmlTags = (text) => {
   if (!text) return '';
   if (typeof text !== 'string') return String(text);
@@ -47,7 +65,11 @@ const stripHtmlTags = (text) => {
     .trim();
 };
 
-// Get skills list as array of strings
+/**
+ * Gets skills list as array of strings from a category
+ * @param {Object} category - Skill category object
+ * @returns {Array} Array of skill names
+ */
 const getSkillsList = (category) => {
   if (!category || !category.skills) return [];
   if (!Array.isArray(category.skills)) return [];
@@ -56,9 +78,24 @@ const getSkillsList = (category) => {
     .filter(name => name.length > 0);
 };
 
+/**
+ * PreviewPanel - Main component for displaying CV preview with template selection
+ * @param {Object} props - Component props
+ * @param {string} props.selectedTemplate - Currently selected template name
+ * @param {Function} props.onTemplateChange - Callback for template change
+ * @param {Object} props.cvData - CV data object
+ * @param {string} props.themeColor - Current theme color
+ * @param {Function} props.onThemeColorChange - Callback for theme color change
+ * @returns {JSX.Element} Preview panel component
+ */
 export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#1e40af", onThemeColorChange }) => {
   console.log("PreviewPanel - cvData received:", cvData);
   
+  /**
+   * Formats date from YYYY-MM format to human readable format
+   * @param {string} date - Date in YYYY-MM format
+   * @returns {string} Formatted date (e.g., "Jan 2023")
+   */
   const formatDate = (date) => {
     if (!date) return "";
     const [year, month] = date.split("-");
@@ -69,6 +106,11 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     return `${monthNames[parseInt(month) - 1]} ${year}`;
   };
 
+  /**
+   * Renders description content, handling arrays and strings
+   * @param {string|Array} description - Description content
+   * @returns {Array|null} Array of cleaned description items or null
+   */
   const renderDescription = (description) => {
     if (!description) return null;
     
@@ -86,6 +128,9 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     return null;
   };
 
+  /**
+   * Safely extracts and validates CV data with default values
+   */
   const safeData = {
     personal: cvData.personal || {},
     education: Array.isArray(cvData.education) ? cvData.education : [],
@@ -96,6 +141,11 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     volunteer: Array.isArray(cvData.volunteer) ? cvData.volunteer : [],
   };
 
+  /**
+   * Checks if a value has meaningful content (not empty or placeholder)
+   * @param {*} value - Value to check
+   * @returns {boolean} True if value is meaningful
+   */
   const hasMeaningfulValue = (value) => {
     if (value === null || value === undefined) return false;
     if (Array.isArray(value)) {
@@ -120,6 +170,11 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     return true;
   };
 
+  /**
+   * Checks if a section array has meaningful data
+   * @param {Array} section - Section data array
+   * @returns {boolean} True if section has meaningful data
+   */
   const hasData = (section) => {
     if (!section || !Array.isArray(section)) return false;
     return section.some((item) => {
@@ -130,6 +185,11 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     });
   };
 
+  /**
+   * Checks if a specific section has data
+   * @param {string} sectionName - Name of the section
+   * @returns {boolean} True if section has data
+   */
   const hasSectionData = (sectionName) => {
     const section = safeData[sectionName];
     if (sectionName === 'personal') {
@@ -147,18 +207,32 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     return hasData(section);
   };
 
+  /**
+   * Checks if contact information exists
+   * @returns {boolean} True if contact info exists
+   */
   const hasContactInfo = () => {
     const { fullName, summary, ...contactFields } = safeData.personal;
     return Object.values(contactFields).some(value => hasMeaningfulValue(value));
   };
 
+  /**
+   * Checks if professional summary exists
+   * @returns {boolean} True if summary exists
+   */
   const hasSummary = () => {
     return hasMeaningfulValue(safeData.personal?.summary);
   };
 
+  // Get current theme object based on selected color
   const currentTheme = THEME_COLORS.find(t => t.value === themeColor) || THEME_COLORS[0];
 
+  /**
+   * Renders the selected template component
+   * @returns {JSX.Element} Template component
+   */
   const renderTemplate = () => {
+    // Common props passed to all templates
     const commonProps = {
       data: safeData,
       formatDate,
@@ -185,8 +259,13 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
   };
 
   return (
+    /* Main container for preview panel */
     <div className="h-full flex flex-col bg-white">
+      
+      {/* Preview controls header */}
       <div className="p-4 border-b border-gray-300 bg-gray-50">
+        
+        {/* Title section */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Eye className="w-5 h-5 text-blue-600" />
@@ -194,7 +273,10 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
           </div>
         </div>
 
+        {/* Template and theme controls */}
         <div className="flex items-center justify-between gap-4">
+          
+          {/* Template selection */}
           <div className="flex items-center space-x-3">
             <Palette className="w-4 h-4 text-gray-600" />
             <Label className="text-gray-700 text-sm">Template:</Label>
@@ -209,6 +291,7 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
             </select>
           </div>
 
+          {/* Theme color selection */}
           <div className="flex items-center space-x-3">
             <Label className="text-gray-700 text-sm">Theme:</Label>
             <div className="flex gap-2">
@@ -230,7 +313,10 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
         </div>
       </div>
 
+      {/* Preview content area */}
       <div className="flex-1 overflow-auto p-6 bg-gray-100">
+        
+        {/* CV preview container (A4 size simulation) */}
         <div className="bg-white shadow-xl mx-auto max-w-[210mm] rounded-sm overflow-hidden">
           {renderTemplate()}
         </div>
@@ -242,7 +328,29 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
 // ============================================
 // MODERN TEMPLATE - Clean with accent colors
 // ============================================
+
+/**
+ * ModernPreview - Clean, contemporary CV template with accent colors
+ * @param {Object} props - Template props
+ * @param {Object} props.data - CV data
+ * @param {Function} props.formatDate - Date formatting function
+ * @param {Function} props.hasSectionData - Section data checker
+ * @param {Function} props.renderDescription - Description renderer
+ * @param {Object} props.themeColor - Theme color object
+ * @param {Function} props.hasContactInfo - Contact info checker
+ * @param {Function} props.hasSummary - Summary checker
+ * @param {Function} props.getSkillsList - Skills list getter
+ * @param {Function} props.stripHtmlTags - HTML stripper
+ * @returns {JSX.Element} Modern template component
+ */
 const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
+  
+  /**
+   * BulletList component for rendering bullet points
+   * @param {Object} props - Component props
+   * @param {Array|string} props.items - Items to render as bullets
+   * @returns {JSX.Element|null} Bullet list or null if no items
+   */
   const BulletList = ({ items }) => {
     const parsedItems = renderDescription(items);
     if (!parsedItems || parsedItems.length === 0) return null;
@@ -251,6 +359,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
       <ul className="space-y-1.5 mt-2">
         {parsedItems.map((item, idx) => (
           <li key={idx} className="flex items-start gap-3 text-sm text-slate-700">
+            {/* Custom bullet point using theme color */}
             <span 
               className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" 
               style={{ backgroundColor: themeColor.value }}
@@ -263,9 +372,13 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
   };
 
   return (
+    /* Modern template container */
     <div className="p-10 font-sans antialiased bg-white">
-      {/* Header */}
+      
+      {/* Header with name and contact info */}
       <header className="mb-6">
+        
+        {/* Full name */}
         <h1 
           className="text-4xl font-bold tracking-tight mb-1"
           style={{ color: themeColor.value }}
@@ -273,8 +386,11 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
           {data.personal?.fullName || "Your Name"}
         </h1>
         
+        {/* Contact information */}
         {hasContactInfo() && (
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600 mt-4">
+            
+            {/* Email */}
             {data.personal?.email && (
               <div className="flex items-center gap-2">
                 <div 
@@ -286,6 +402,8 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <span>{data.personal.email}</span>
               </div>
             )}
+            
+            {/* Phone */}
             {data.personal?.phone && (
               <div className="flex items-center gap-2">
                 <div 
@@ -297,6 +415,8 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <span>{data.personal.phone}</span>
               </div>
             )}
+            
+            {/* Location */}
             {data.personal?.location && (
               <div className="flex items-center gap-2">
                 <div 
@@ -308,6 +428,8 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <span>{data.personal.location}</span>
               </div>
             )}
+            
+            {/* LinkedIn */}
             {data.personal?.linkedin && (
               <div className="flex items-center gap-2">
                 <div 
@@ -319,6 +441,8 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <span>{data.personal.linkedin}</span>
               </div>
             )}
+            
+            {/* Website */}
             {data.personal?.website && (
               <div className="flex items-center gap-2">
                 <div 
@@ -334,7 +458,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         )}
       </header>
 
-      {/* Accent Line */}
+      {/* Accent line separator */}
       <div 
         className="h-1 w-full rounded-full mb-6"
         style={{ 
@@ -342,7 +466,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         }}
       />
 
-      {/* Professional Summary */}
+      {/* Professional Summary section */}
       {hasSummary() && (
         <section className="mb-6">
           <h2 
@@ -361,7 +485,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         </section>
       )}
 
-      {/* Education */}
+      {/* Education section */}
       {hasSectionData('education') && (
         <section className="mb-6">
           <h2 
@@ -382,6 +506,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                     <h3 className="font-semibold text-slate-900">
                       {edu.degree}{edu.field && ` in ${edu.field}`}
                     </h3>
+                    {/* Date range with theme styling */}
                     {(edu.startDate || edu.endDate) && (
                       <span 
                         className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
@@ -407,7 +532,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         </section>
       )}
 
-      {/* Experience */}
+      {/* Work Experience section */}
       {hasSectionData('experience') && (
         <section className="mb-6">
           <h2 
@@ -426,6 +551,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <div key={i}>
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-semibold text-slate-900">{exp.position}</h3>
+                    {/* Date range with theme styling */}
                     {(exp.startDate || exp.endDate) && (
                       <span 
                         className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
@@ -446,7 +572,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         </section>
       )}
 
-      {/* Projects */}
+      {/* Projects section */}
       {hasSectionData('projects') && (
         <section className="mb-6">
           <h2 
@@ -465,6 +591,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <div key={i}>
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-semibold text-slate-900">{proj.name}</h3>
+                    {/* Project date range */}
                     {(proj.startDate || proj.endDate) && (
                       <span 
                         className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
@@ -475,6 +602,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                       </span>
                     )}
                   </div>
+                  {/* Technology tags */}
                   {proj.technologies && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {proj.technologies.split(',').map((tech, idx) => (
@@ -488,6 +616,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                     </div>
                   )}
                   {proj.description && <BulletList items={proj.description} />}
+                  {/* Project links */}
                   {(proj.githubUrl || proj.liveUrl) && (
                     <div className="flex gap-4 mt-2 text-xs" style={{ color: themeColor.value }}>
                       {proj.githubUrl && <span>GitHub: {proj.githubUrl}</span>}
@@ -501,7 +630,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         </section>
       )}
 
-      {/* Skills - FIXED */}
+      {/* Technical Skills section */}
       {hasSectionData('skills') && (
         <section className="mb-6">
           <h2 
@@ -536,7 +665,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         </section>
       )}
 
-      {/* Achievements - FIXED */}
+      {/* Achievements section */}
       {hasSectionData('achievements') && (
         <section className="mb-6">
           <h2 
@@ -572,7 +701,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         </section>
       )}
 
-      {/* Volunteer */}
+      {/* Volunteer Experience section */}
       {hasSectionData('volunteer') && (
         <section>
           <h2 
@@ -591,6 +720,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                 <div key={i}>
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-semibold text-slate-900">{vol.role}</h3>
+                    {/* Volunteer date range */}
                     {(vol.startDate || vol.endDate) && (
                       <span 
                         className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
@@ -617,7 +747,29 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
 // ============================================
 // CLASSIC TEMPLATE - Traditional formal style
 // ============================================
+
+/**
+ * ClassicPreview - Traditional, formal CV template
+ * @param {Object} props - Template props
+ * @param {Object} props.data - CV data
+ * @param {Function} props.formatDate - Date formatting function
+ * @param {Function} props.hasSectionData - Section data checker
+ * @param {Function} props.renderDescription - Description renderer
+ * @param {Object} props.themeColor - Theme color object
+ * @param {Function} props.hasContactInfo - Contact info checker
+ * @param {Function} props.hasSummary - Summary checker
+ * @param {Function} props.getSkillsList - Skills list getter
+ * @param {Function} props.stripHtmlTags - HTML stripper
+ * @returns {JSX.Element} Classic template component
+ */
 const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
+  
+  /**
+   * BulletList component for classic template
+   * @param {Object} props - Component props
+   * @param {Array|string} props.items - Items to render as bullets
+   * @returns {JSX.Element|null} Bullet list or null if no items
+   */
   const BulletList = ({ items }) => {
     const parsedItems = renderDescription(items);
     if (!parsedItems || parsedItems.length === 0) return null;
@@ -637,9 +789,13 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
   };
 
   return (
+    /* Classic template container with serif font */
     <div className="p-10 font-serif antialiased bg-white text-gray-900">
-      {/* Header */}
+      
+      {/* Centered header with border */}
       <header className="text-center mb-8 pb-5 border-b-2" style={{ borderColor: themeColor.value }}>
+        
+        {/* Uppercase name */}
         <h1 
           className="text-3xl font-bold tracking-wide mb-2"
           style={{ color: themeColor.value }}
@@ -647,6 +803,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
           {(data.personal?.fullName || "Your Name").toUpperCase()}
         </h1>
         
+        {/* Contact info in centered paragraphs */}
         {hasContactInfo() && (
           <div className="text-sm text-gray-600 space-y-0.5">
             <p>
@@ -659,7 +816,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         )}
       </header>
 
-      {/* Professional Summary */}
+      {/* Professional Summary section */}
       {hasSummary() && (
         <section className="mb-6">
           <h2 
@@ -674,7 +831,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Education */}
+      {/* Education section */}
       {hasSectionData('education') && (
         <section className="mb-6">
           <h2 
@@ -713,7 +870,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Experience */}
+      {/* Professional Experience section */}
       {hasSectionData('experience') && (
         <section className="mb-6">
           <h2 
@@ -743,7 +900,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Projects */}
+      {/* Technical Projects section */}
       {hasSectionData('projects') && (
         <section className="mb-6">
           <h2 
@@ -782,7 +939,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Skills - FIXED */}
+      {/* Technical Skills section */}
       {hasSectionData('skills') && (
         <section className="mb-6">
           <h2 
@@ -807,7 +964,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Achievements - FIXED */}
+      {/* Achievements section */}
       {hasSectionData('achievements') && (
         <section className="mb-6">
           <h2 
@@ -839,7 +996,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Volunteer */}
+      {/* Volunteer Experience section */}
       {hasSectionData('volunteer') && (
         <section>
           <h2 
@@ -877,7 +1034,29 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
 // ============================================
 // MINIMAL TEMPLATE - Ultra clean, lots of whitespace
 // ============================================
+
+/**
+ * MinimalPreview - Clean, minimalist CV template with ample whitespace
+ * @param {Object} props - Template props
+ * @param {Object} props.data - CV data
+ * @param {Function} props.formatDate - Date formatting function
+ * @param {Function} props.hasSectionData - Section data checker
+ * @param {Function} props.renderDescription - Description renderer
+ * @param {Object} props.themeColor - Theme color object
+ * @param {Function} props.hasContactInfo - Contact info checker
+ * @param {Function} props.hasSummary - Summary checker
+ * @param {Function} props.getSkillsList - Skills list getter
+ * @param {Function} props.stripHtmlTags - HTML stripper
+ * @returns {JSX.Element} Minimal template component
+ */
 const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
+  
+  /**
+   * BulletList component for minimal template
+   * @param {Object} props - Component props
+   * @param {Array|string} props.items - Items to render as bullets
+   * @returns {JSX.Element|null} Bullet list or null if no items
+   */
   const BulletList = ({ items }) => {
     const parsedItems = renderDescription(items);
     if (!parsedItems || parsedItems.length === 0) return null;
@@ -895,8 +1074,10 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
   };
 
   return (
+    /* Minimal template container with light font weight */
     <div className="p-12 font-sans antialiased bg-white" style={{ fontWeight: 300 }}>
-      {/* Header */}
+      
+      {/* Header with extra-light typography */}
       <header className="mb-10">
         <h1 
           className="text-5xl font-extralight tracking-tight mb-2"
@@ -905,6 +1086,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
           {data.personal?.fullName || "Your Name"}
         </h1>
         
+        {/* Horizontal contact info with separator pipes */}
         {hasContactInfo() && (
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 mt-4">
             {data.personal?.email && <span>{data.personal.email}</span>}
@@ -920,10 +1102,10 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         )}
       </header>
 
-      {/* Thin Divider */}
+      {/* Thin divider line */}
       <div className="w-16 h-px mb-10" style={{ backgroundColor: themeColor.value }} />
 
-      {/* Summary */}
+      {/* Summary section */}
       {hasSummary() && (
         <section className="mb-10">
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
@@ -935,7 +1117,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Education */}
+      {/* Education section */}
       {hasSectionData('education') && (
         <section className="mb-10">
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
@@ -968,7 +1150,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Experience */}
+      {/* Experience section */}
       {hasSectionData('experience') && (
         <section className="mb-10">
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
@@ -995,7 +1177,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Projects */}
+      {/* Projects section */}
       {hasSectionData('projects') && (
         <section className="mb-10">
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
@@ -1031,7 +1213,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Skills - FIXED */}
+      {/* Skills section with two-column layout */}
       {hasSectionData('skills') && (
         <section className="mb-10">
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
@@ -1053,7 +1235,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Achievements - FIXED */}
+      {/* Achievements section */}
       {hasSectionData('achievements') && (
         <section className="mb-10">
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
@@ -1084,7 +1266,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
         </section>
       )}
 
-      {/* Volunteer */}
+      {/* Volunteer section */}
       {hasSectionData('volunteer') && (
         <section>
           <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">

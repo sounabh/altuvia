@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, createContext, useContext, useEffect, Suspense } from "react";
@@ -17,14 +18,29 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+/**
+ * CVDataContext - React context for sharing CV data across components
+ * Provides cvData and updateCVData function to child components
+ */
 export const CVDataContext = createContext();
 
+/**
+ * useCVData - Custom hook to access CV data context
+ * @returns {Object} CV data context containing cvData and updateCVData
+ * @throws {Error} If used outside CVDataProvider
+ */
 export const useCVData = () => {
   const context = useContext(CVDataContext);
   if (!context) throw new Error("useCVData must be used within CVDataProvider");
   return context;
 };
 
+/**
+ * Generates a unique CV number based on user ID
+ * Format: cv-{userIdLast4}-{timestamp}-{random3Digits}
+ * @param {string} userId - User's unique identifier
+ * @returns {string} Unique CV number
+ */
 const generateUniqueCVNumber = (userId) => {
   const userIdPart = userId.slice(-4);
   const timestamp = Date.now().toString();
@@ -32,25 +48,37 @@ const generateUniqueCVNumber = (userId) => {
   return `cv-${userIdPart}-${timestamp}-${randomPart}`;
 };
 
-// Separate component that uses useSearchParams
+/**
+ * CVBuilderContent - Main content component that uses search params
+ * Handles authentication, CV loading, and state management
+ */
 const CVBuilderContent = () => {
+  // NextAuth session and routing
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // CV identification states
   const [cvNumber, setCvNumber] = useState("");
   const [currentCVId, setCurrentCVId] = useState(null);
   const [userId, setUserId] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
+  
+  // UI and operation states
   const [isSaving, setIsSaving] = useState(false);
   const [showVersionDialog, setShowVersionDialog] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
+  // AI Analysis states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [atsScore, setAtsScore] = useState(null);
   const [showAIChat, setShowAIChat] = useState(false);
 
+  /**
+   * Main CV data structure with default empty values
+   * Organized by sections: personal, education, experience, projects, skills, achievements, volunteer
+   */
   const [cvData, setCvData] = useState({
     personal: {
       fullName: "",
@@ -117,13 +145,17 @@ const CVBuilderContent = () => {
     ],
   });
 
+  // UI and preview states
   const [activeSection, setActiveSection] = useState("personal");
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
   const [themeColor, setThemeColor] = useState("#1e40af");
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showVersionManager, setShowVersionManager] = useState(false);
 
-  // Redirect to login if not authenticated
+  /**
+   * Effect: Redirect to login if user is not authenticated
+   * Runs when authentication status changes
+   */
   useEffect(() => {
     if (status === "unauthenticated") {
       toast.error("Please login to access CV Builder");
@@ -131,7 +163,10 @@ const CVBuilderContent = () => {
     }
   }, [status, router]);
 
-  // Initialize user data from session
+  /**
+   * Effect: Initialize user data from session
+   * Sets userId and userEmail when session is available
+   */
   useEffect(() => {
     if (status === "authenticated" && session?.userId && session?.user?.email) {
       setUserId(session.userId);
@@ -139,9 +174,13 @@ const CVBuilderContent = () => {
     }
   }, [status, session]);
 
-  // Load CV based on URL parameters or localStorage
+  /**
+   * Effect: Load CV based on URL parameters or localStorage
+   * Handles CV initialization from URL params, localStorage, or creating new CV
+   */
   useEffect(() => {
     const initializeCV = async () => {
+      // Wait for authentication and user data
       if (status !== "authenticated" || !userEmail || !userId) {
         return;
       }
@@ -165,7 +204,7 @@ const CVBuilderContent = () => {
           router.replace('/cv-builder', { scroll: false });
           
         } else {
-          // Fallback to localStorage
+          // Fallback to localStorage for existing CV
           const savedCVId = localStorage.getItem("currentCVId");
           const savedCVNumber = localStorage.getItem("currentCVNumber");
 
@@ -174,7 +213,7 @@ const CVBuilderContent = () => {
             setCvNumber(savedCVNumber);
             await loadCVData(savedCVId, userEmail);
           } else {
-            // Create new CV number
+            // Create new CV number for new user
             const uniqueNumber = generateUniqueCVNumber(userId);
             setCvNumber(uniqueNumber);
             localStorage.setItem("currentCVNumber", uniqueNumber);
@@ -182,6 +221,7 @@ const CVBuilderContent = () => {
         }
       } catch (error) {
         console.error("Error initializing CV:", error);
+        // Fallback to new CV on error
         const uniqueNumber = generateUniqueCVNumber(userId);
         setCvNumber(uniqueNumber);
         localStorage.setItem("currentCVNumber", uniqueNumber);
@@ -194,7 +234,11 @@ const CVBuilderContent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, userEmail, userId]);
 
-  // Load CV data from API
+  /**
+   * Loads CV data from API based on CV ID and user email
+   * @param {string} cvId - CV identifier
+   * @param {string} email - User's email for authentication
+   */
   const loadCVData = async (cvId, email) => {
     try {
       if (!email) {
@@ -202,10 +246,12 @@ const CVBuilderContent = () => {
         return;
       }
 
+      // Fetch CV data from API
       const response = await fetch(
         `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
       );
 
+      // Handle 404 - CV not found
       if (response.status === 404) {
         console.log("CV not found - clearing invalid ID");
         setCurrentCVId(null);
@@ -214,6 +260,7 @@ const CVBuilderContent = () => {
         return;
       }
 
+      // Handle other response errors
       if (!response.ok) {
         console.warn(`Failed to load CV: ${response.status}`);
         
@@ -226,6 +273,7 @@ const CVBuilderContent = () => {
 
       const text = await response.text();
 
+      // Handle empty response
       if (!text || text.trim() === "") {
         console.log("Empty response - no CV data available");
         return;
@@ -239,6 +287,7 @@ const CVBuilderContent = () => {
         return;
       }
 
+      // Validate response structure
       if (!result.success || !result.cv) {
         console.log("Invalid CV data structure received");
         
@@ -256,7 +305,7 @@ const CVBuilderContent = () => {
         localStorage.setItem("currentCVNumber", result.cv.slug);
       }
 
-      // Successfully loaded - update state
+      // Successfully loaded - update state with transformed data
       setCvData({
         personal: result.cv.personalInfo || cvData.personal,
         education:
@@ -321,6 +370,7 @@ const CVBuilderContent = () => {
           })) || cvData.volunteer,
       });
 
+      // Load template and theme preferences
       if (result.cv.templateId) {
         setSelectedTemplate(result.cv.templateId);
       }
@@ -339,12 +389,18 @@ const CVBuilderContent = () => {
     } catch (error) {
       console.error("Error loading CV data:", error);
       
+      // Handle network errors
       if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
         toast.error("Network error. Please check your connection.");
       }
     }
   };
 
+  /**
+   * Updates CV data for a specific section
+   * @param {string} section - Section name (personal, education, etc.)
+   * @param {Object} data - New data for the section
+   */
   const updateCVData = (section, data) => {
     setCvData((prev) => ({
       ...prev,
@@ -352,6 +408,10 @@ const CVBuilderContent = () => {
     }));
   };
 
+  /**
+   * Triggers AI analysis of the CV
+   * Sends CV data to analysis API and updates state with results
+   */
   const handleAnalyzeCV = async () => {
     setIsAnalyzing(true);
 
@@ -371,6 +431,7 @@ const CVBuilderContent = () => {
 
       const data = await response.json();
 
+      // Update analysis state
       setAiAnalysis(data);
       setAtsScore(data.atsScore);
 
@@ -385,24 +446,36 @@ const CVBuilderContent = () => {
     }
   };
 
+  /**
+   * Opens the AI chat popup
+   */
   const handleOpenAIChat = () => {
     setShowAIChat(true);
   };
 
+  /**
+   * Shows version save dialog
+   */
   const handleSaveClick = () => {
     setShowVersionDialog(true);
   };
 
+  /**
+   * Saves CV with version information
+   * @param {Object} versionInfo - Version metadata (name, description, bookmark)
+   */
   const handleSaveWithVersion = async (versionInfo) => {
     try {
       setIsSaving(true);
       setShowVersionDialog(false);
 
+      // Authentication check
       if (!userEmail) {
         toast.error("Authentication required. Please log in.");
         return;
       }
 
+      // Prepare save payload
       const payload = {
         cvData,
         selectedTemplate,
@@ -414,6 +487,7 @@ const CVBuilderContent = () => {
         versionInfo,
       };
 
+      // Send save request to API
       const response = await fetch("/api/cv/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -430,6 +504,7 @@ const CVBuilderContent = () => {
       const result = await response.json();
 
       if (result.success) {
+        // Update current CV ID and number
         if (result.cv.id) {
           setCurrentCVId(result.cv.id);
           localStorage.setItem("currentCVId", result.cv.id);
@@ -440,13 +515,16 @@ const CVBuilderContent = () => {
           }
         }
 
+        // Clear versions cache for this user
         clearVersionsCache(userEmail);
 
+        // Show appropriate success message
         const action = result.isNewCV ? "created" : "updated";
         toast.success(
           `CV ${action} successfully as version: ${versionInfo.versionName}`
         );
         
+        // Additional info for new CV creation
         if (result.isNewCV && currentCVId) {
           toast.info(
             "A new CV was created. Previous CV may have been deleted.",
@@ -459,6 +537,7 @@ const CVBuilderContent = () => {
     } catch (error) {
       console.error("CV Save Error:", error);
       
+      // Handle CV not found errors
       if (error.message?.includes("not found") || error.message?.includes("CV_NOT_FOUND")) {
         console.log("Clearing invalid CV ID from localStorage");
         setCurrentCVId(null);
@@ -473,22 +552,32 @@ const CVBuilderContent = () => {
     }
   };
 
+  /**
+   * Creates a new CV with default empty data
+   * Resets all CV-related state and localStorage
+   */
   const handleNewCV = () => {
+    // User authentication check
     if (!userId) {
       toast.error("User ID not found. Please log in again.");
       return;
     }
 
+    // Generate new unique CV number
     const uniqueNumber = generateUniqueCVNumber(userId);
+    
+    // Reset CV identification
     setCurrentCVId(null);
     localStorage.removeItem("currentCVId");
     setCvNumber(uniqueNumber);
     localStorage.setItem("currentCVNumber", uniqueNumber);
 
+    // Reset analysis and theme
     setAiAnalysis(null);
     setAtsScore(null);
     setThemeColor("#1e40af");
 
+    // Reset CV data to default empty state
     setCvData({
       personal: {
         fullName: "",
@@ -555,14 +644,20 @@ const CVBuilderContent = () => {
       ],
     });
 
+    // Reset UI state
     setActiveSection("personal");
     toast.success(`New CV #${uniqueNumber} created!`);
   };
 
+  /**
+   * Exports current CV as PDF
+   * Generates PDF using API and triggers browser download
+   */
   const handleExportPDF = async () => {
     try {
       toast.info("Generating PDF...");
 
+      // Request PDF generation from API
       const response = await fetch("/api/cv/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -576,6 +671,7 @@ const CVBuilderContent = () => {
 
       if (!response.ok) throw new Error("Failed to generate PDF");
 
+      // Create download link for PDF blob
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -593,8 +689,13 @@ const CVBuilderContent = () => {
     }
   };
 
+  /**
+   * Loads a specific saved version into the editor
+   * @param {Object} version - Version object containing CV data snapshots
+   */
   const handleLoadVersion = (version) => {
     try {
+      // Parse and update CV data from version snapshots
       const newCvData = {
         personal: version.personalInfoSnapshot
           ? JSON.parse(version.personalInfoSnapshot)
@@ -621,6 +722,7 @@ const CVBuilderContent = () => {
 
       setCvData(newCvData);
 
+      // Restore template and theme preferences
       if (version.templateId) {
         setSelectedTemplate(version.templateId);
       }
@@ -629,9 +731,11 @@ const CVBuilderContent = () => {
         setThemeColor(version.colorScheme);
       }
 
+      // Reset analysis for loaded version
       setAiAnalysis(null);
       setAtsScore(null);
 
+      // Update CV identification
       setCurrentCVId(version.cvId);
       setCvNumber(version.cvSlug);
       localStorage.setItem("currentCVId", version.cvId);
@@ -641,6 +745,7 @@ const CVBuilderContent = () => {
         `Loaded CV #${version.cvSlug} - version: ${version.versionLabel}`
       );
 
+      // Close version manager after loading
       setShowVersionManager(false);
     } catch (error) {
       console.error("Failed to load version:", error);
@@ -648,7 +753,10 @@ const CVBuilderContent = () => {
     }
   };
 
-  // Show loading state while checking authentication or loading CV
+  /**
+   * Loading state while checking authentication or initializing CV
+   * Shows spinner with appropriate message
+   */
   if (status === "loading" || isInitialLoading) {
     return (
       <div className="min-h-screen bg-cvLightBg flex items-center justify-center">
@@ -662,13 +770,21 @@ const CVBuilderContent = () => {
     );
   }
 
+  /**
+   * Return null if unauthenticated (will redirect via useEffect)
+   */
   if (status === "unauthenticated") {
     return null;
   }
 
   return (
+    /* CV Data Context Provider for sharing data across components */
     <CVDataContext.Provider value={{ cvData, updateCVData }}>
+      
+      {/* Main container with background */}
       <div className="min-h-screen bg-cvLightBg mb-10">
+        
+        {/* Header component with all action buttons */}
         <Header
           onPreviewToggle={() => setIsPreviewMode(!isPreviewMode)}
           isPreviewMode={isPreviewMode}
@@ -687,24 +803,30 @@ const CVBuilderContent = () => {
           onExportPDF={handleExportPDF}
         />
 
+        {/* Main content area with sidebar and builder */}
         <div className="flex h-[calc(100vh-80px)]">
+          
+          {/* Sidebar navigation for CV sections */}
           <Sidebar
             activeSection={activeSection}
             onSectionChange={setActiveSection}
           />
 
+          {/* Builder area with dynamic width based on preview mode */}
           <div className="flex-1 flex">
             <div
               className={`transition-all duration-300 ${
                 isPreviewMode ? "w-1/2" : "flex-1"
               }`}
             >
+              {/* Main CV builder form */}
               <CVBuilder
                 activeSection={activeSection}
                 onSectionChange={setActiveSection}
               />
             </div>
 
+            {/* Preview panel (only shown in preview mode) */}
             {isPreviewMode && (
               <div className="w-1/2 border-l border-cvBorder">
                 <PreviewPanel
@@ -718,6 +840,7 @@ const CVBuilderContent = () => {
             )}
           </div>
 
+          {/* AI Chat Popup (conditionally rendered) */}
           {showAIChat && (
             <AIAnalysisChatPopup
               onClose={() => setShowAIChat(false)}
@@ -726,6 +849,7 @@ const CVBuilderContent = () => {
             />
           )}
 
+          {/* Version Manager Modal (conditionally rendered) */}
           {showVersionManager && (
             <VersionManager
               onClose={() => setShowVersionManager(false)}
@@ -735,6 +859,7 @@ const CVBuilderContent = () => {
             />
           )}
 
+          {/* Smart Tips Panel (shown when not in preview mode) */}
           <SmartTipsPanel
             activeSection={activeSection}
             isVisible={!isPreviewMode}
@@ -745,6 +870,7 @@ const CVBuilderContent = () => {
           />
         </div>
 
+        {/* Version Save Dialog (conditionally rendered) */}
         {showVersionDialog && (
           <VersionSaveDialog
             isOpen={showVersionDialog}
@@ -758,7 +884,10 @@ const CVBuilderContent = () => {
   );
 };
 
-// Main component wrapped with Suspense
+/**
+ * Index - Main component wrapped with Suspense for loading states
+ * Provides fallback UI while components are loading
+ */
 const Index = () => {
   return (
     <Suspense fallback={
