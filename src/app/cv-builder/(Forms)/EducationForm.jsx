@@ -61,7 +61,7 @@ import {
   BookOpen,
   Award,
 } from "lucide-react";
-import { useCVData } from "../page";
+import { useCVData } from "@/lib/constants/CVDataContext";
 
 // Import React Quill dynamically to avoid SSR issues
 const ReactQuill = dynamic(() => import("react-quill-new"), { 

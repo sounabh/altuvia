@@ -89,7 +89,6 @@ const getSkillsList = (category) => {
  * @returns {JSX.Element} Preview panel component
  */
 export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#1e40af", onThemeColorChange }) => {
-  console.log("PreviewPanel - cvData received:", cvData);
   
   /**
    * Formats date from YYYY-MM format to human readable format
@@ -107,22 +106,78 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
   };
 
   /**
-   * Renders description content, handling arrays and strings
+   * Enhanced bullet point parsing with multiple format support
    * @param {string|Array} description - Description content
    * @returns {Array|null} Array of cleaned description items or null
    */
   const renderDescription = (description) => {
     if (!description) return null;
     
+    // If already an array, clean each item
     if (Array.isArray(description)) {
       return description.map(item => stripHtmlTags(item)).filter(Boolean);
     }
     
     if (typeof description === 'string') {
-      // First strip HTML tags, then split by newlines
-      const cleanedDesc = stripHtmlTags(description);
+      let text = description;
+      
+      // Method 1: Parse HTML paragraph tags
+      if (text.includes('<p>')) {
+        const items = text
+          .split(/<\/p>/i)
+          .map(item => {
+            let cleaned = item.replace(/<p[^>]*>/gi, '');
+            cleaned = cleaned.replace(/<[^>]*>/g, '');
+            cleaned = cleaned.replace(/&nbsp;/g, ' ');
+            cleaned = cleaned.replace(/&amp;/g, '&');
+            cleaned = cleaned.trim();
+            cleaned = cleaned.replace(/^[•\s]+/, '');
+            return cleaned.trim();
+          })
+          .filter(item => item.length > 0);
+        
+        if (items.length > 0) return items;
+      }
+      
+      // Method 2: Split by bullet characters or list items
+      if (text.includes('<li>')) {
+        const items = text
+          .split(/<\/li>/i)
+          .map(item => {
+            let cleaned = item.replace(/<li[^>]*>/gi, '');
+            cleaned = cleaned.replace(/<[^>]*>/g, '');
+            cleaned = cleaned.replace(/&nbsp;/g, ' ');
+            cleaned = cleaned.replace(/&amp;/g, '&');
+            cleaned = cleaned.trim();
+            cleaned = cleaned.replace(/^[•\-\s]+/, '');
+            return cleaned.trim();
+          })
+          .filter(item => item.length > 0);
+        
+        if (items.length > 0) return items;
+      }
+      
+      // Method 3: Strip HTML and split by newlines
+      const cleanedDesc = stripHtmlTags(text);
       const lines = cleanedDesc.split('\n').filter(line => line.trim());
-      return lines.map(line => line.replace(/^[•\-]\s*/, '').trim()).filter(Boolean);
+      const cleanedLines = lines.map(line => line.replace(/^[•\-]\s*/, '').trim()).filter(Boolean);
+      
+      if (cleanedLines.length > 1) return cleanedLines;
+      
+      // Method 4: Split by bullet character
+      if (cleanedDesc.includes('•')) {
+        const items = cleanedDesc.split('•').map(item => item.trim()).filter(Boolean);
+        if (items.length > 1) return items;
+      }
+      
+      // Method 5: Split by dash
+      if (cleanedDesc.includes('-')) {
+        const items = cleanedDesc.split('-').map(item => item.trim()).filter(Boolean);
+        if (items.length > 1) return items.slice(1); // Skip first empty item
+      }
+      
+      // Fallback: return as single item if it has content
+      return cleanedLines.length > 0 ? cleanedLines : null;
     }
     
     return null;
@@ -349,14 +404,15 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
    * BulletList component for rendering bullet points
    * @param {Object} props - Component props
    * @param {Array|string} props.items - Items to render as bullets
+   * @param {string} props.className - Additional CSS classes
    * @returns {JSX.Element|null} Bullet list or null if no items
    */
-  const BulletList = ({ items }) => {
+  const BulletList = ({ items, className = "" }) => {
     const parsedItems = renderDescription(items);
     if (!parsedItems || parsedItems.length === 0) return null;
     
     return (
-      <ul className="space-y-1.5 mt-2">
+      <ul className={`space-y-1.5 mt-2 ${className}`}>
         {parsedItems.map((item, idx) => (
           <li key={idx} className="flex items-start gap-3 text-sm text-slate-700">
             {/* Custom bullet point using theme color */}
@@ -522,9 +578,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                   {edu.gpa && (
                     <p className="text-sm text-slate-500">GPA: {edu.gpa}</p>
                   )}
-                  {edu.description && (
-                    <p className="text-xs text-slate-600 mt-2">{stripHtmlTags(edu.description)}</p>
-                  )}
+                  {edu.description && <BulletList items={edu.description} />}
                 </div>
               )
             ))}
@@ -691,9 +745,7 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
                   {ach.organization && (
                     <p className="text-sm text-slate-600">{stripHtmlTags(ach.organization)}</p>
                   )}
-                  {ach.description && (
-                    <p className="text-sm text-slate-600 mt-1">{stripHtmlTags(ach.description)}</p>
-                  )}
+                  {ach.description && <BulletList items={ach.description} />}
                 </div>
               )
             ))}
@@ -861,9 +913,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
                     <span className="font-semibold">GPA:</span> {edu.gpa}
                   </p>
                 )}
-                {edu.description && (
-                  <p className="text-sm text-gray-700 mt-1">{stripHtmlTags(edu.description)}</p>
-                )}
+                {edu.description && <BulletList items={edu.description} />}
               </div>
             )
           ))}
@@ -986,9 +1036,7 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
                   {ach.organization && (
                     <p className="text-sm text-gray-600">{stripHtmlTags(ach.organization)}</p>
                   )}
-                  {ach.description && (
-                    <p className="text-sm text-gray-700 mt-1">{stripHtmlTags(ach.description)}</p>
-                  )}
+                  {ach.description && <BulletList items={ach.description} />}
                 </div>
               )
             ))}
@@ -1143,6 +1191,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
                   {edu.gpa && (
                     <p className="text-sm text-gray-400 mt-1">GPA: {edu.gpa}</p>
                   )}
+                  {edu.description && <BulletList items={edu.description} />}
                 </div>
               )
             ))}
@@ -1256,9 +1305,7 @@ const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, t
                   {ach.organization && (
                     <p className="text-sm text-gray-500">{stripHtmlTags(ach.organization)}</p>
                   )}
-                  {ach.description && (
-                    <p className="text-sm text-gray-600 mt-1">{stripHtmlTags(ach.description)}</p>
-                  )}
+                  {ach.description && <BulletList items={ach.description} />}
                 </div>
               )
             ))}

@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Send, Loader2, Copy, Check, Sparkles, CheckCircle } from 'lucide-react';
-import { useCVData } from '../page';
+import { useCVData } from "@/lib/constants/CVDataContext";
 import { toast } from 'sonner';
 
 /**

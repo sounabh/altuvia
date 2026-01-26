@@ -39,6 +39,9 @@ const Index = () => {
   const { status } = useSession();
   const router = useRouter();
 
+  console.log('====================================');
+  console.log(cvSummary);
+  console.log('====================================');
   // ============================================
   // SEO METADATA
   // ============================================

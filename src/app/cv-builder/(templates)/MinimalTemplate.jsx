@@ -1,116 +1,268 @@
+// MinimalTemplate.jsx
 import React from 'react';
 
-export const MinimalTemplate = () => {
+// =============================================
+// HELPER FUNCTIONS
+// =============================================
+
+const getText = (value) => (!value ? '' : typeof value === 'string' ? value : String(value));
+
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString + '-01');
+  return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+};
+
+const parseBullets = (description) => {
+  if (!description) return [];
+  let text = typeof description === 'string' ? description : String(description);
+  if (!text.trim()) return [];
+
+  // Method 1: HTML <li> tags
+  if (text.includes('<li')) {
+    const items = text.split(/<\/li>/i)
+      .map(item => item.replace(/<ul[^>]*>/gi, '').replace(/<ol[^>]*>/gi, '').replace(/<li[^>]*>/gi, '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim())
+      .filter(item => item.length > 0);
+    if (items.length > 0) return items;
+  }
+
+  // Method 2: Clean HTML
+  let cleanText = text.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<\/li>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  if (!cleanText) return [];
+
+  // Method 3: Split by •
+  if (cleanText.includes('•')) {
+    const items = cleanText.split(/\s*•\s*/).map(item => item.trim()).filter(item => item.length > 0);
+    if (items.length > 1) return items;
+  }
+
+  // Method 4: Split by newlines
+  if (cleanText.includes('\n')) {
+    const items = cleanText.split(/\n+/).map(line => line.replace(/^[\s•\-\*\d.]+\s*/, '').trim()).filter(line => line.length > 0);
+    if (items.length > 1) return items;
+  }
+
+  // Fallback
+  return [cleanText];
+};
+
+// =============================================
+// BULLET LIST COMPONENT
+// =============================================
+
+const BulletList = ({ items }) => {
+  if (!items || items.length === 0) return null;
+
   return (
-    <div className="p-12 h-full bg-white font-light">
-      {/* Header */}
-      <header className="mb-10">
-        <h1 className="text-5xl font-extralight tracking-tight text-gray-900 mb-2">John Doe</h1>
-        <p className="text-xl text-gray-400 font-light mb-6">Software Engineer</p>
-        
-        <div className="flex flex-wrap gap-6 text-sm text-gray-500">
-          <span>john.doe@email.com</span>
-          <span className="text-gray-300">|</span>
-          <span>+1 (555) 123-4567</span>
-          <span className="text-gray-300">|</span>
-          <span>New York, NY</span>
-          <span className="text-gray-300">|</span>
-          <span>linkedin.com/in/johndoe</span>
+    <div style={{ marginTop: '14px' }}>
+      {items.map((item, index) => (
+        <div
+          key={index}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            marginBottom: '12px',
+          }}
+        >
+          <span
+            style={{
+              color: '#d1d5db',
+              marginRight: '18px',
+              flexShrink: 0,
+              fontSize: '16px',
+              lineHeight: '1.5',
+            }}
+          >
+            —
+          </span>
+          <span style={{ fontSize: '13px', color: '#4b5563', lineHeight: '1.75' }}>
+            {item}
+          </span>
         </div>
-      </header>
-
-      {/* Thin Divider */}
-      <div className="w-16 h-px bg-gray-300 mb-10"></div>
-
-      {/* Summary */}
-      <section className="mb-10">
-        <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">Summary</h2>
-        <p className="text-sm text-gray-600 leading-loose max-w-2xl">
-          Computer Science student with experience in full-stack development. 
-          Passionate about creating clean, efficient code and learning new technologies.
-        </p>
-      </section>
-
-      {/* Education */}
-      <section className="mb-10">
-        <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">Education</h2>
-        <div>
-          <div className="flex justify-between items-baseline mb-1">
-            <h3 className="text-base font-normal text-gray-900">Computer Science, BS</h3>
-            <span className="text-sm text-gray-400">2021 — 2025</span>
-          </div>
-          <p className="text-sm text-gray-500">Harvard University</p>
-          <p className="text-sm text-gray-400 mt-1">GPA: 3.8/4.0</p>
-        </div>
-      </section>
-
-      {/* Experience */}
-      <section className="mb-10">
-        <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">Experience</h2>
-        <div>
-          <div className="flex justify-between items-baseline mb-1">
-            <h3 className="text-base font-normal text-gray-900">Software Engineering Intern</h3>
-            <span className="text-sm text-gray-400">Jun — Aug 2024</span>
-          </div>
-          <p className="text-sm text-gray-500 mb-4">Google Inc.</p>
-          <ul className="text-sm text-gray-600 space-y-2">
-            <li className="flex items-start gap-4">
-              <span className="text-gray-300 mt-0.5">—</span>
-              <span>Developed web applications using React and Node.js</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-gray-300 mt-0.5">—</span>
-              <span>Collaborated with engineering teams on feature development</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-gray-300 mt-0.5">—</span>
-              <span>Improved application performance by 25%</span>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      {/* Projects */}
-      <section className="mb-10">
-        <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">Projects</h2>
-        <div>
-          <h3 className="text-base font-normal text-gray-900 mb-1">E-commerce Platform</h3>
-          <p className="text-sm text-gray-400 mb-4">React, Node.js, MongoDB</p>
-          <ul className="text-sm text-gray-600 space-y-2">
-            <li className="flex items-start gap-4">
-              <span className="text-gray-300 mt-0.5">—</span>
-              <span>Full-stack web application with payment processing</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-gray-300 mt-0.5">—</span>
-              <span>User authentication and RESTful API design</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-gray-300 mt-0.5">—</span>
-              <span>Deployed on AWS with Docker containers</span>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      {/* Skills */}
-      <section>
-        <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">Skills</h2>
-        <div className="space-y-3 text-sm">
-          <div className="flex">
-            <span className="w-28 text-gray-400 flex-shrink-0">Languages</span>
-            <span className="text-gray-600">JavaScript, Python, Java, TypeScript</span>
-          </div>
-          <div className="flex">
-            <span className="w-28 text-gray-400 flex-shrink-0">Frameworks</span>
-            <span className="text-gray-600">React, Node.js, Express, Django</span>
-          </div>
-          <div className="flex">
-            <span className="w-28 text-gray-400 flex-shrink-0">Tools</span>
-            <span className="text-gray-600">Git, Docker, AWS, MongoDB, PostgreSQL</span>
-          </div>
-        </div>
-      </section>
+      ))}
     </div>
   );
 };
+
+// =============================================
+// MAIN TEMPLATE
+// =============================================
+
+export const MinimalTemplate = ({ cvData, themeColor = '#374151' }) => {
+  const personal = cvData?.personal || {};
+  const education = cvData?.education || [];
+  const experience = cvData?.experience || [];
+  const projects = cvData?.projects || [];
+  const skills = cvData?.skills || [];
+  const achievements = cvData?.achievements || [];
+  const volunteer = cvData?.volunteer || [];
+
+  return (
+    <div style={{ padding: '50px', backgroundColor: 'white', fontFamily: 'system-ui, sans-serif', fontWeight: '300' }}>
+      
+      {/* HEADER */}
+      <header style={{ marginBottom: '44px' }}>
+        <h1 style={{ fontSize: '42px', fontWeight: '200', color: '#111827', marginBottom: '10px', letterSpacing: '-1px' }}>
+          {getText(personal.fullName) || 'Your Name'}
+        </h1>
+        {personal.headline && (
+          <p style={{ fontSize: '18px', color: '#9ca3af', fontWeight: '300', marginBottom: '28px' }}>
+            {getText(personal.headline)}
+          </p>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '13px', color: '#6b7280' }}>
+          {personal.email && <span>{getText(personal.email)}</span>}
+          {personal.email && personal.phone && <span style={{ color: '#d1d5db' }}>|</span>}
+          {personal.phone && <span>{getText(personal.phone)}</span>}
+          {personal.phone && personal.location && <span style={{ color: '#d1d5db' }}>|</span>}
+          {personal.location && <span>{getText(personal.location)}</span>}
+          {personal.location && personal.linkedin && <span style={{ color: '#d1d5db' }}>|</span>}
+          {personal.linkedin && <span>{getText(personal.linkedin)}</span>}
+        </div>
+      </header>
+
+      {/* DIVIDER */}
+      <div style={{ width: '50px', height: '1px', backgroundColor: themeColor, marginBottom: '44px' }} />
+
+      {/* SUMMARY */}
+      {personal.summary && (
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Summary
+          </h2>
+          <p style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.85', maxWidth: '640px' }}>
+            {getText(personal.summary).replace(/<[^>]*>/g, '')}
+          </p>
+        </section>
+      )}
+
+      {/* EDUCATION */}
+      {education.length > 0 && (
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Education
+          </h2>
+          {education.map((edu, index) => (
+            <div key={edu.id || index} style={{ marginBottom: '22px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '400', color: '#111827' }}>
+                  {getText(edu.degree)}{edu.field ? `, ${getText(edu.field)}` : ''}
+                </h3>
+                <span style={{ fontSize: '13px', color: '#9ca3af' }}>
+                  {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
+                </span>
+              </div>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>{getText(edu.institution)}</p>
+              {edu.gpa && <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>GPA: {getText(edu.gpa)}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* EXPERIENCE */}
+      {experience.length > 0 && (
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Experience
+          </h2>
+          {experience.map((exp, index) => (
+            <div key={exp.id || index} style={{ marginBottom: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '400', color: '#111827' }}>{getText(exp.position)}</h3>
+                <span style={{ fontSize: '13px', color: '#9ca3af' }}>
+                  {formatDate(exp.startDate)} — {exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}
+                </span>
+              </div>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>{getText(exp.company)}</p>
+              
+              {/* BULLET POINTS */}
+              {exp.description && <BulletList items={parseBullets(exp.description)} />}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* PROJECTS */}
+      {projects.length > 0 && (
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Projects
+          </h2>
+          {projects.map((proj, index) => (
+            <div key={proj.id || index} style={{ marginBottom: '32px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '400', color: '#111827' }}>{getText(proj.name)}</h3>
+              {proj.technologies && (
+                <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '6px', fontStyle: 'italic' }}>
+                  {getText(proj.technologies)}
+                </p>
+              )}
+              
+              {/* BULLET POINTS */}
+              {proj.description && <BulletList items={parseBullets(proj.description)} />}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* SKILLS */}
+      {skills.length > 0 && (
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Skills
+          </h2>
+          {skills.map((category, index) => (
+            <div key={category.id || index} style={{ display: 'flex', marginBottom: '14px', fontSize: '13px' }}>
+              <span style={{ width: '130px', color: '#9ca3af', flexShrink: 0 }}>{getText(category.name)}</span>
+              <span style={{ color: '#4b5563' }}>
+                {(category.skills || []).map(s => getText(s.name || s)).join('  •  ')}
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ACHIEVEMENTS */}
+      {achievements.length > 0 && (
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Achievements
+          </h2>
+          {achievements.map((ach, index) => (
+            <div key={ach.id || index} style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '400', color: '#111827' }}>{getText(ach.title)}</h3>
+                {ach.date && <span style={{ fontSize: '13px', color: '#9ca3af' }}>{getText(ach.date)}</span>}
+              </div>
+              {ach.organization && <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>{getText(ach.organization)}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* VOLUNTEER */}
+      {volunteer.length > 0 && (
+        <section>
+          <h2 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', color: '#9ca3af', marginBottom: '18px' }}>
+            Volunteer
+          </h2>
+          {volunteer.map((vol, index) => (
+            <div key={vol.id || index} style={{ marginBottom: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '400', color: '#111827' }}>{getText(vol.role)}</h3>
+                <span style={{ fontSize: '13px', color: '#9ca3af' }}>
+                  {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
+                </span>
+              </div>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>{getText(vol.organization)}</p>
+              
+              {/* BULLET POINTS */}
+              {vol.description && <BulletList items={parseBullets(vol.description)} />}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+};
+
+export default MinimalTemplate;

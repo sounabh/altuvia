@@ -8,15 +8,6 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
-/**
- * Retrieves all CV versions belonging to the authenticated user
- * @param {Request} request - Contains userEmail and optional cvId as query params
- * @returns {Response} List of all versions with CV metadata
- * 
- * PERFORMANCE OPTIMIZATIONS:
- * - Single query to get CV IDs (select only needed fields)
- * - Efficient ordering with compound index support
- */
 export async function GET(request) {
   try {
     // ========================================
@@ -40,7 +31,7 @@ export async function GET(request) {
     const userCVs = await prisma.cV.findMany({
       where: { 
         user: {
-          email: userEmail, // Filter by email directly
+          email: userEmail,
         }
       },
       select: { 
@@ -61,7 +52,7 @@ export async function GET(request) {
     const cvIds = userCVs.map(cv => cv.id);
 
     // ========================================
-    // 3. FETCH ALL VERSIONS FROM ALL CVs
+    // 3. FETCH ALL VERSIONS WITH SNAPSHOTS
     // ========================================
     const versions = await prisma.cVVersion.findMany({
       where: {
@@ -79,6 +70,16 @@ export async function GET(request) {
         templateId: true,
         colorScheme: true,
         createdAt: true,
+        
+        // ✅ ADD THESE SNAPSHOT FIELDS
+        personalInfoSnapshot: true,
+        educationSnapshot: true,
+        experienceSnapshot: true,
+        projectsSnapshot: true,
+        skillsSnapshot: true,
+        achievementsSnapshot: true,
+        volunteerSnapshot: true,
+        
         // Fetch only needed CV fields
         cv: {
           select: {
@@ -88,8 +89,8 @@ export async function GET(request) {
         },
       },
       orderBy: [
-        { isBookmarked: 'desc' }, // Bookmarked versions first
-        { createdAt: 'desc' },    // Then by most recent
+        { isBookmarked: 'desc' },
+        { createdAt: 'desc' },
       ],
     });
 
@@ -108,7 +109,16 @@ export async function GET(request) {
       createdAt: version.createdAt,
       cvTitle: version.cv.title,
       cvSlug: version.cv.slug,
-      isCurrentCV: version.cvId === cvId, // Flag if version belongs to current CV
+      isCurrentCV: version.cvId === cvId,
+      
+      // ✅ INCLUDE SNAPSHOTS IN RESPONSE
+      personalInfoSnapshot: version.personalInfoSnapshot,
+      educationSnapshot: version.educationSnapshot,
+      experienceSnapshot: version.experienceSnapshot,
+      projectsSnapshot: version.projectsSnapshot,
+      skillsSnapshot: version.skillsSnapshot,
+      achievementsSnapshot: version.achievementsSnapshot,
+      volunteerSnapshot: version.volunteerSnapshot,
     }));
 
     // ========================================

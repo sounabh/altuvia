@@ -1,119 +1,268 @@
+// ClassicTemplate.jsx
 import React from 'react';
 
-export const ClassicTemplate = () => {
+// =============================================
+// HELPER FUNCTIONS
+// =============================================
+
+const getText = (value) => (!value ? '' : typeof value === 'string' ? value : String(value));
+
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString + '-01');
+  return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+
+const parseBullets = (description) => {
+  if (!description) return [];
+  let text = typeof description === 'string' ? description : String(description);
+  if (!text.trim()) return [];
+
+  // Method 1: HTML <li> tags
+  if (text.includes('<li')) {
+    const items = text.split(/<\/li>/i)
+      .map(item => item.replace(/<ul[^>]*>/gi, '').replace(/<ol[^>]*>/gi, '').replace(/<li[^>]*>/gi, '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim())
+      .filter(item => item.length > 0);
+    if (items.length > 0) return items;
+  }
+
+  // Method 2: Clean HTML
+  let cleanText = text.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<\/li>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  if (!cleanText) return [];
+
+  // Method 3: Split by •
+  if (cleanText.includes('•')) {
+    const items = cleanText.split(/\s*•\s*/).map(item => item.trim()).filter(item => item.length > 0);
+    if (items.length > 1) return items;
+  }
+
+  // Method 4: Split by newlines
+  if (cleanText.includes('\n')) {
+    const items = cleanText.split(/\n+/).map(line => line.replace(/^[\s•\-\*\d.]+\s*/, '').trim()).filter(line => line.length > 0);
+    if (items.length > 1) return items;
+  }
+
+  // Fallback
+  return [cleanText];
+};
+
+// =============================================
+// BULLET LIST COMPONENT
+// =============================================
+
+const BulletList = ({ items }) => {
+  if (!items || items.length === 0) return null;
+
   return (
-    <div className="p-10 h-full bg-white font-serif text-gray-900">
-      {/* Header */}
-      <header className="text-center mb-8 pb-6 border-b-2 border-gray-900">
-        <h1 className="text-3xl font-bold tracking-wide mb-2">JOHN DOE</h1>
-        <p className="text-base text-gray-700 mb-4">Software Engineering Student</p>
-        <div className="text-sm text-gray-600 space-y-0.5">
-          <p>john.doe@email.com  •  +1 (555) 123-4567</p>
-          <p>New York, NY  •  linkedin.com/in/johndoe</p>
+    <div style={{ marginTop: '14px', marginLeft: '18px' }}>
+      {items.map((item, index) => (
+        <div
+          key={index}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            marginBottom: '10px',
+          }}
+        >
+          <span
+            style={{
+              color: '#6b7280',
+              marginRight: '14px',
+              flexShrink: 0,
+              fontSize: '14px',
+              lineHeight: '1.6',
+            }}
+          >
+            •
+          </span>
+          <span style={{ fontSize: '12px', color: '#374151', lineHeight: '1.7' }}>
+            {item}
+          </span>
         </div>
-      </header>
-
-      {/* Professional Summary */}
-      <section className="mb-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-2 mb-4">
-          Professional Summary
-        </h2>
-        <p className="text-sm leading-relaxed text-justify text-gray-700">
-          Dedicated Computer Science student with demonstrated experience in software development and 
-          strong analytical skills. Proficient in multiple programming languages and frameworks with 
-          a passion for creating efficient, scalable solutions. Seeking to leverage technical expertise 
-          and academic knowledge in a challenging internship role.
-        </p>
-      </section>
-
-      {/* Education */}
-      <section className="mb-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-2 mb-4">
-          Education
-        </h2>
-        <div>
-          <div className="flex justify-between items-start mb-1">
-            <strong className="text-sm">Bachelor of Science, Computer Science</strong>
-            <span className="text-sm text-gray-600">2021 – 2025</span>
-          </div>
-          <p className="text-sm italic text-gray-600 mb-2">Harvard University, Cambridge, MA</p>
-          <p className="text-sm text-gray-700 mb-1">
-            <span className="font-semibold">GPA:</span> 3.8/4.0
-          </p>
-          <p className="text-sm text-gray-700">
-            <span className="font-semibold">Relevant Coursework:</span> Data Structures and Algorithms, Software Engineering, 
-            Database Systems, Computer Networks, Machine Learning, Operating Systems
-          </p>
-        </div>
-      </section>
-
-      {/* Experience */}
-      <section className="mb-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-2 mb-4">
-          Professional Experience
-        </h2>
-        <div>
-          <div className="flex justify-between items-start mb-1">
-            <strong className="text-sm">Software Engineering Intern</strong>
-            <span className="text-sm text-gray-600">June 2024 – August 2024</span>
-          </div>
-          <p className="text-sm italic text-gray-600 mb-3">Google Inc., Mountain View, CA</p>
-          <ul className="text-sm text-gray-700 space-y-1.5 ml-4">
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Developed responsive web applications using React.js and Node.js
-            </li>
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Collaborated with senior engineers on feature development and code reviews
-            </li>
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Optimized application performance resulting in 25% improvement in load times
-            </li>
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Participated in daily standups and sprint planning meetings
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      {/* Projects */}
-      <section className="mb-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-2 mb-4">
-          Technical Projects
-        </h2>
-        <div>
-          <div className="flex justify-between items-start mb-1">
-            <strong className="text-sm">E-commerce Platform</strong>
-            <span className="text-sm text-gray-600">2024</span>
-          </div>
-          <p className="text-sm italic text-gray-600 mb-3">
-            Technologies: React, Node.js, MongoDB, Express.js, Stripe API
-          </p>
-          <ul className="text-sm text-gray-700 space-y-1.5 ml-4">
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Designed and implemented full-stack web application with user authentication
-            </li>
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Integrated secure payment processing using Stripe API
-            </li>
-            <li className="relative pl-4 before:content-['•'] before:absolute before:left-0 before:text-gray-400">
-              Deployed application using Docker containers on AWS EC2 instances
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      {/* Skills */}
-      <section>
-        <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-2 mb-4">
-          Technical Skills
-        </h2>
-        <div className="text-sm text-gray-700 space-y-2">
-          <p><span className="font-semibold">Programming Languages:</span> JavaScript, Python, Java, C++, TypeScript, SQL</p>
-          <p><span className="font-semibold">Frameworks & Libraries:</span> React, Node.js, Express.js, Django, Spring Boot, Bootstrap</p>
-          <p><span className="font-semibold">Tools & Technologies:</span> Git, Docker, AWS, MongoDB, PostgreSQL, REST APIs</p>
-          <p><span className="font-semibold">Development Tools:</span> VS Code, IntelliJ IDEA, Postman, Chrome DevTools</p>
-        </div>
-      </section>
+      ))}
     </div>
   );
 };
+
+// =============================================
+// MAIN TEMPLATE
+// =============================================
+
+export const ClassicTemplate = ({ cvData, themeColor = '#1e3a5f' }) => {
+  const personal = cvData?.personal || {};
+  const education = cvData?.education || [];
+  const experience = cvData?.experience || [];
+  const projects = cvData?.projects || [];
+  const skills = cvData?.skills || [];
+  const achievements = cvData?.achievements || [];
+  const volunteer = cvData?.volunteer || [];
+
+  return (
+    <div style={{ padding: '44px', backgroundColor: 'white', fontFamily: 'Georgia, "Times New Roman", serif', color: '#1f2937' }}>
+      
+      {/* HEADER */}
+      <header style={{ textAlign: 'center', marginBottom: '30px', paddingBottom: '22px', borderBottom: `2px solid ${themeColor}` }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '2px', color: themeColor, marginBottom: '10px', textTransform: 'uppercase' }}>
+          {getText(personal.fullName) || 'Your Name'}
+        </h1>
+        {personal.headline && (
+          <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '14px' }}>{getText(personal.headline)}</p>
+        )}
+        <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
+          {[personal.email, personal.phone].filter(Boolean).map(getText).join('  •  ')}
+        </p>
+        <p style={{ fontSize: '12px', color: '#6b7280' }}>
+          {[personal.location, personal.linkedin, personal.website].filter(Boolean).map(getText).join('  •  ')}
+        </p>
+      </header>
+
+      {/* SUMMARY */}
+      {personal.summary && (
+        <section style={{ marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Professional Summary
+          </h2>
+          <p style={{ fontSize: '12px', color: '#374151', lineHeight: '1.85', textAlign: 'justify' }}>
+            {getText(personal.summary).replace(/<[^>]*>/g, '')}
+          </p>
+        </section>
+      )}
+
+      {/* EDUCATION */}
+      {education.length > 0 && (
+        <section style={{ marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Education
+          </h2>
+          {education.map((edu, index) => (
+            <div key={edu.id || index} style={{ marginBottom: '22px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <strong style={{ fontSize: '13px', color: '#111827' }}>
+                  {getText(edu.degree)}{edu.field ? `, ${getText(edu.field)}` : ''}
+                </strong>
+                <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                  {formatDate(edu.startDate)} – {formatDate(edu.endDate)}
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#6b7280', marginTop: '4px' }}>
+                {getText(edu.institution)}{edu.location ? `, ${getText(edu.location)}` : ''}
+              </p>
+              {edu.gpa && (
+                <p style={{ fontSize: '12px', color: '#374151', marginTop: '4px' }}>
+                  <span style={{ fontWeight: '600' }}>GPA:</span> {getText(edu.gpa)}
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* EXPERIENCE */}
+      {experience.length > 0 && (
+        <section style={{ marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Professional Experience
+          </h2>
+          {experience.map((exp, index) => (
+            <div key={exp.id || index} style={{ marginBottom: '28px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <strong style={{ fontSize: '13px', color: '#111827' }}>{getText(exp.position)}</strong>
+                <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                  {formatDate(exp.startDate)} – {exp.isCurrentRole ? 'Present' : formatDate(exp.endDate)}
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#6b7280', marginTop: '4px' }}>
+                {getText(exp.company)}{exp.location ? `, ${getText(exp.location)}` : ''}
+              </p>
+              
+              {/* BULLET POINTS */}
+              {exp.description && <BulletList items={parseBullets(exp.description)} />}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* PROJECTS */}
+      {projects.length > 0 && (
+        <section style={{ marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Technical Projects
+          </h2>
+          {projects.map((proj, index) => (
+            <div key={proj.id || index} style={{ marginBottom: '28px' }}>
+              <strong style={{ fontSize: '13px', color: '#111827' }}>{getText(proj.name)}</strong>
+              {proj.technologies && (
+                <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#6b7280', marginTop: '6px' }}>
+                  Technologies: {getText(proj.technologies)}
+                </p>
+              )}
+              
+              {/* BULLET POINTS */}
+              {proj.description && <BulletList items={parseBullets(proj.description)} />}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* SKILLS */}
+      {skills.length > 0 && (
+        <section style={{ marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Technical Skills
+          </h2>
+          {skills.map((category, index) => (
+            <p key={category.id || index} style={{ fontSize: '12px', color: '#374151', marginBottom: '10px', lineHeight: '1.7' }}>
+              <span style={{ fontWeight: '600' }}>{getText(category.name)}:</span>{' '}
+              {(category.skills || []).map(s => getText(s.name || s)).join(', ')}
+            </p>
+          ))}
+        </section>
+      )}
+
+      {/* ACHIEVEMENTS */}
+      {achievements.length > 0 && (
+        <section style={{ marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Achievements
+          </h2>
+          {achievements.map((ach, index) => (
+            <div key={ach.id || index} style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <strong style={{ fontSize: '13px', color: '#111827' }}>{getText(ach.title)}</strong>
+                {ach.date && <span style={{ fontSize: '12px', color: '#6b7280' }}>{getText(ach.date)}</span>}
+              </div>
+              {ach.organization && <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>{getText(ach.organization)}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* VOLUNTEER */}
+      {volunteer.length > 0 && (
+        <section>
+          <h2 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', color: themeColor, borderBottom: '1px solid #9ca3af', paddingBottom: '10px', marginBottom: '18px' }}>
+            Volunteer Experience
+          </h2>
+          {volunteer.map((vol, index) => (
+            <div key={vol.id || index} style={{ marginBottom: '28px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <strong style={{ fontSize: '13px', color: '#111827' }}>{getText(vol.role)}</strong>
+                <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                  {formatDate(vol.startDate)} – {formatDate(vol.endDate)}
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#6b7280', marginTop: '4px' }}>
+                {getText(vol.organization)}{vol.location ? `, ${getText(vol.location)}` : ''}
+              </p>
+              
+              {/* BULLET POINTS */}
+              {vol.description && <BulletList items={parseBullets(vol.description)} />}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+};
+
+export default ClassicTemplate;

@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { useCVData } from "../page";
+import { useCVData } from "@/lib/constants/CVDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

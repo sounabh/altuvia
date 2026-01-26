@@ -52,7 +52,7 @@ import {
   Target,
   HelpCircle,
 } from "lucide-react";
-import { useCVData } from "../page";
+import { useCVData } from "@/lib/constants/CVDataContext";
 
 // Pre-MBA focused skill suggestions (for MBA applicants from diverse backgrounds)
 const skillSuggestions = {
