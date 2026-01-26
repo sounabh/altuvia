@@ -579,125 +579,116 @@ export const useCVBuilder = () => {
  * Loads a specific saved version into the editor
  * @param {Object} version - Version object containing CV data snapshots
  */
+/**
+ * Loads a specific saved version into the editor
+ * @param {Object} version - Version object containing CV data snapshots
+ */
 const handleLoadVersion = useCallback(
   (version) => {
     try {
-      // Parse snapshots
-      const personalSnapshot = version.personalInfoSnapshot
-        ? JSON.parse(version.personalInfoSnapshot)
-        : null;
-      const educationSnapshot = version.educationSnapshot
-        ? JSON.parse(version.educationSnapshot)
-        : null;
-      const experienceSnapshot = version.experienceSnapshot
-        ? JSON.parse(version.experienceSnapshot)
-        : null;
-      const projectsSnapshot = version.projectsSnapshot
-        ? JSON.parse(version.projectsSnapshot)
-        : null;
-      const skillsSnapshot = version.skillsSnapshot
-        ? JSON.parse(version.skillsSnapshot)
-        : null;
-      const achievementsSnapshot = version.achievementsSnapshot
-        ? JSON.parse(version.achievementsSnapshot)
-        : null;
-      const volunteerSnapshot = version.volunteerSnapshot
-        ? JSON.parse(version.volunteerSnapshot)
-        : null;
+      // Helper function to safely parse JSON (handles both string and object)
+      const safeJsonParse = (data) => {
+        if (!data) return null;
+        if (typeof data === 'object') return data; // Already parsed
+        try {
+          return JSON.parse(data);
+        } catch (e) {
+          console.error("Failed to parse snapshot:", e);
+          return null;
+        }
+      };
+
+      // Parse snapshots safely
+      const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
+      const educationSnapshot = safeJsonParse(version.educationSnapshot);
+      const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
+      const projectsSnapshot = safeJsonParse(version.projectsSnapshot);
+      const skillsSnapshot = safeJsonParse(version.skillsSnapshot);
+      const achievementsSnapshot = safeJsonParse(version.achievementsSnapshot);
+      const volunteerSnapshot = safeJsonParse(version.volunteerSnapshot);
 
       // Transform data to match expected format (same as loadCVData)
       const newCvData = {
-        personal: personalSnapshot || cvData.personal,
+        personal: personalSnapshot || DEFAULT_CV_DATA.personal,
         
-        education: educationSnapshot
-          ? (Array.isArray(educationSnapshot) 
-              ? educationSnapshot.map((edu) => ({
-                  id: edu.id,
-                  institution: edu.institution || "",
-                  degree: edu.degree || "",
-                  field: edu.fieldOfStudy || edu.field || "",
-                  startDate: edu.startDate || "",
-                  endDate: edu.endDate || "",
-                  gpa: edu.gpa || "",
-                  description: edu.description || "",
-                }))
-              : cvData.education)
-          : cvData.education,
+        education: educationSnapshot && Array.isArray(educationSnapshot)
+          ? educationSnapshot.map((edu) => ({
+              id: edu.id,
+              institution: edu.institution || "",
+              degree: edu.degree || "",
+              field: edu.fieldOfStudy || edu.field || "",
+              startDate: edu.startDate || "",
+              endDate: edu.endDate || "",
+              gpa: edu.gpa || "",
+              description: edu.description || "",
+            }))
+          : DEFAULT_CV_DATA.education,
         
-        experience: experienceSnapshot
-          ? (Array.isArray(experienceSnapshot)
-              ? experienceSnapshot.map((exp) => ({
-                  id: exp.id,
-                  company: exp.company || "",
-                  position: exp.position || "",
-                  location: exp.location || "",
-                  startDate: exp.startDate || "",
-                  endDate: exp.endDate || "",
-                  isCurrentRole: exp.isCurrent || exp.isCurrentRole || false,
-                  description: exp.description || "",
-                }))
-              : cvData.experience)
-          : cvData.experience,
+        experience: experienceSnapshot && Array.isArray(experienceSnapshot)
+          ? experienceSnapshot.map((exp) => ({
+              id: exp.id,
+              company: exp.company || "",
+              position: exp.position || "",
+              location: exp.location || "",
+              startDate: exp.startDate || "",
+              endDate: exp.endDate || "",
+              isCurrentRole: exp.isCurrent || exp.isCurrentRole || false,
+              description: exp.description || "",
+            }))
+          : DEFAULT_CV_DATA.experience,
         
-        projects: projectsSnapshot
-          ? (Array.isArray(projectsSnapshot)
-              ? projectsSnapshot.map((proj) => ({
-                  id: proj.id,
-                  name: proj.name || "",
-                  description: proj.description || "",
-                  technologies: Array.isArray(proj.technologies) 
-                    ? proj.technologies.join(", ") 
-                    : (proj.technologies || ""),
-                  startDate: proj.startDate || "",
-                  endDate: proj.endDate || "",
-                  githubUrl: proj.githubUrl || "",
-                  liveUrl: proj.liveUrl || "",
-                  achievements: Array.isArray(proj.achievements) 
-                    ? proj.achievements[0] 
-                    : (proj.achievements || ""),
-                }))
-              : [])
-          : cvData.projects,
+        projects: projectsSnapshot && Array.isArray(projectsSnapshot)
+          ? projectsSnapshot.map((proj) => ({
+              id: proj.id,
+              name: proj.name || "",
+              description: proj.description || "",
+              technologies: Array.isArray(proj.technologies) 
+                ? proj.technologies.join(", ") 
+                : (proj.technologies || ""),
+              startDate: proj.startDate || "",
+              endDate: proj.endDate || "",
+              githubUrl: proj.githubUrl || "",
+              liveUrl: proj.liveUrl || "",
+              achievements: Array.isArray(proj.achievements) 
+                ? proj.achievements[0] 
+                : (proj.achievements || ""),
+            }))
+          : [],
         
-        skills: skillsSnapshot
-          ? (Array.isArray(skillsSnapshot)
-              ? skillsSnapshot.map((skill) => ({
-                  id: skill.id,
-                  name: skill.categoryName || skill.name || "",
-                  skills: skill.skills || [],
-                }))
-              : cvData.skills)
-          : cvData.skills,
+        skills: skillsSnapshot && Array.isArray(skillsSnapshot)
+          ? skillsSnapshot.map((skill) => ({
+              id: skill.id,
+              name: skill.categoryName || skill.name || "",
+              skills: skill.skills || [],
+            }))
+          : DEFAULT_CV_DATA.skills,
         
-        achievements: achievementsSnapshot
-          ? (Array.isArray(achievementsSnapshot)
-              ? achievementsSnapshot.map((ach) => ({
-                  id: ach.id,
-                  title: ach.title || "",
-                  organization: ach.organization || "",
-                  date: ach.date || "",
-                  type: ach.type || "",
-                  description: ach.description || "",
-                }))
-              : cvData.achievements)
-          : cvData.achievements,
+        achievements: achievementsSnapshot && Array.isArray(achievementsSnapshot)
+          ? achievementsSnapshot.map((ach) => ({
+              id: ach.id,
+              title: ach.title || "",
+              organization: ach.organization || "",
+              date: ach.date || "",
+              type: ach.type || "",
+              description: ach.description || "",
+            }))
+          : DEFAULT_CV_DATA.achievements,
         
-        volunteer: volunteerSnapshot
-          ? (Array.isArray(volunteerSnapshot)
-              ? volunteerSnapshot.map((vol) => ({
-                  id: vol.id,
-                  organization: vol.organization || "",
-                  role: vol.role || "",
-                  location: vol.location || "",
-                  startDate: vol.startDate || "",
-                  endDate: vol.endDate || "",
-                  description: vol.description || "",
-                  impact: vol.impact || "",
-                }))
-              : cvData.volunteer)
-          : cvData.volunteer,
+        volunteer: volunteerSnapshot && Array.isArray(volunteerSnapshot)
+          ? volunteerSnapshot.map((vol) => ({
+              id: vol.id,
+              organization: vol.organization || "",
+              role: vol.role || "",
+              location: vol.location || "",
+              startDate: vol.startDate || "",
+              endDate: vol.endDate || "",
+              description: vol.description || "",
+              impact: vol.impact || "",
+            }))
+          : DEFAULT_CV_DATA.volunteer,
       };
 
+      // Update CV data state
       setCvData(newCvData);
 
       // Restore template and theme preferences
@@ -730,7 +721,7 @@ const handleLoadVersion = useCallback(
       toast.error("Failed to load version");
     }
   },
-  [cvData]
+  [] // Remove cvData dependency to prevent stale closure issues
 );
 
   // Return all state and handlers
