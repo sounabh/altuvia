@@ -728,6 +728,12 @@ const ApplicationTabs = ({ university }) => {
   const saveVersionRef = useRef(null);
   const isFetchingRef = useRef(false);
 
+  // ✅ FIX B: Force immediate refetch helper function
+  const forceRefresh = useCallback(async () => {
+    isFetchingRef.current = false; // Reset fetch lock
+    await fetchWorkspaceData();
+  }, [fetchWorkspaceData]);
+
   // ========== HANDLE ADD UNIVERSITY TO DASHBOARD ==========
   const handleAddUniversity = async () => {
     const validation = validateUserAndUniversity("addUniversity");
@@ -826,60 +832,13 @@ const ApplicationTabs = ({ university }) => {
         const result = await response.json();
 
         if (result.success && result.essay) {
-          // Update workspace data immediately
-          setWorkspaceData((prev) => {
-            if (!prev) return prev;
-
-            // Find or create STANDALONE program
-            let standaloneProgram = prev.programs.find(
-              (p) =>
-                p.universityId === university.id &&
-                p.degreeType === "STANDALONE",
-            );
-
-            if (!standaloneProgram) {
-              // Create new standalone program in state
-              standaloneProgram = {
-                id: result.programId,
-                universityId: university.id,
-                programName: "My Custom Essays",
-                degreeType: "STANDALONE",
-                universityName: university.name || universityName,
-                universityColor: university.brandColor || "#002147",
-                essays: [],
-              };
-            }
-
-            // Add new essay to program
-            const newEssayData = {
-              promptId: result.essayPromptId,
-              promptTitle: result.essay.title,
-              promptText: result.essay.prompt,
-              wordLimit: result.essay.wordLimit,
-              userEssay: result.essay,
-            };
-
-            // Update or add program
-            const updatedPrograms = prev.programs.some(
-              (p) => p.id === standaloneProgram.id,
-            )
-              ? prev.programs.map((p) =>
-                  p.id === standaloneProgram.id
-                    ? { ...p, essays: [...(p.essays || []), newEssayData] }
-                    : p,
-                )
-              : [
-                  ...prev.programs,
-                  { ...standaloneProgram, essays: [newEssayData] },
-                ];
-
-            return { ...prev, programs: updatedPrograms };
-          });
-
           setShowCustomEssayModal(false);
           toast.success("Custom essay created successfully");
-
-          // Navigate to the new custom essay immediately
+          
+          // ✅ FIX C: Force immediate refresh from API
+          await forceRefresh();
+          
+          // Then navigate to the new essay
           setActiveProgramId(result.programId);
           setActiveEssayPromptId(result.essayPromptId);
           setSelectedEssayInfo({
@@ -1266,18 +1225,19 @@ const ApplicationTabs = ({ university }) => {
     university?.id,
   ]);
 
+  // ✅ FIX A: Auto-save function - removed hasUnsavedChanges check
   const autoSaveEssay = useCallback(async () => {
     if (
       !currentEssay ||
       isSaving ||
-      !hasUnsavedChanges ||
       isUpdatingRef.current ||
       !userId ||
       !isUniversityAdded
     ) {
       return false;
     }
-
+    
+    // ✅ FIX: Don't check hasUnsavedChanges - always save when called
     // Use pending content if available
     let contentToSave = currentEssay.content;
     let wordCountToSave = currentEssay.wordCount;
@@ -1355,7 +1315,6 @@ const ApplicationTabs = ({ university }) => {
   }, [
     currentEssay,
     isSaving,
-    hasUnsavedChanges,
     universityName,
     userId,
     userEmail,
@@ -1550,7 +1509,7 @@ const ApplicationTabs = ({ university }) => {
     ],
   );
 
-  // ========== SAVE VERSION ==========
+  // ✅ FIX D: Update saveVersion to refresh data and update UI
   const saveVersion = useCallback(
     async (label) => {
       if (
@@ -1605,46 +1564,45 @@ const ApplicationTabs = ({ university }) => {
         if (response.ok) {
           const result = await response.json();
 
-          if (result.version) {
-            // Update workspace data with new version
-            setWorkspaceData((prev) => {
-              if (!prev) return prev;
-
-              return {
-                ...prev,
-                programs: prev.programs.map((program) =>
-                  program.id === activeProgramId
-                    ? {
-                        ...program,
-                        essays: program.essays.map((essayData) =>
-                          essayData.promptId === activeEssayPromptId
-                            ? {
-                                ...essayData,
-                                userEssay: {
-                                  ...essayData.userEssay,
-                                  versions: [
-                                    result.version,
-                                    ...(essayData.userEssay?.versions || []),
-                                  ],
-                                  lastModified: new Date(),
-                                },
-                              }
-                            : essayData,
-                        ),
-                      }
-                    : program,
-                ),
-              };
-            });
-          }
-
           toast.success("Version saved successfully");
+          
+          // ✅ FIX: Force immediate refresh to get updated data
+          await forceRefresh();
+          
+          // ✅ FIX: Update UI immediately with optimistic update
+          setWorkspaceData((prev) => {
+            if (!prev) return prev;
 
-          // Navigate back to list view after saving version
+            return {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: {
+                                ...essayData.userEssay,
+                                ...result.essay, // Use latest from server
+                                versions: result.essay.versions || essayData.userEssay.versions,
+                                lastModified: new Date(),
+                              },
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+          });
+
+          // Navigate back to list view after short delay for smooth UX
           setTimeout(() => {
             setActiveView("list");
             setOpenPanels([]);
-          }, 500);
+          }, 300);
 
           return true;
         }
@@ -1670,6 +1628,7 @@ const ApplicationTabs = ({ university }) => {
       userEmail,
       isUniversityAdded,
       currentProgram,
+      forceRefresh,
     ],
   );
 
@@ -2552,24 +2511,19 @@ const ApplicationTabs = ({ university }) => {
     isUniversityAdded,
   ]);
 
+  // ✅ FIX E: Update effect to fetch on mount
   useEffect(() => {
-    if (
-      activeView === "editor" &&
-      !workspaceData &&
-      universityName &&
-      userId &&
-      isUniversityAdded
-    ) {
+    if (universityName && userId && isUniversityAdded) {
       fetchWorkspaceData();
     }
-  }, [
-    activeView,
-    workspaceData,
-    universityName,
-    userId,
-    fetchWorkspaceData,
-    isUniversityAdded,
-  ]);
+  }, [universityName, userId, isUniversityAdded, fetchWorkspaceData]);
+  
+  // Separate effect for editor view
+  useEffect(() => {
+    if (activeView === "editor" && !workspaceData && universityName && userId && isUniversityAdded) {
+      fetchWorkspaceData();
+    }
+  }, [activeView, workspaceData, universityName, userId, fetchWorkspaceData, isUniversityAdded]);
 
   useEffect(() => {
     return () => {

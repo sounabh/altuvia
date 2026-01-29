@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from "react"
+import { toast } from "sonner" // Added import
 import { 
   Bold, 
   Italic, 
@@ -367,8 +368,13 @@ export const EssayEditor = memo(function EssayEditor({
           break
         case 's':
           e.preventDefault()
-          // Manual save triggers auto-save immediately
-          performAutoSave()
+          // ✅ FIX: Call onSave callback directly
+          if (onSaveRef.current && editorRef.current) {
+            const currentContent = editorRef.current.innerHTML
+            const currentWordCount = countWords(currentContent)
+            onSaveRef.current(currentContent, currentWordCount)
+            toast.success('Changes saved')
+          }
           break
         case 'z':
           if (e.shiftKey) {
@@ -393,7 +399,7 @@ export const EssayEditor = memo(function EssayEditor({
     if (e.key === 'Escape' && isFullscreen) {
       setIsFullscreen(false)
     }
-  }, [execCommand, insertLink, isFullscreen, performAutoSave])
+  }, [execCommand, insertLink, isFullscreen])
 
   // Handle paste - preserve some formatting
   const handlePaste = useCallback((e) => {

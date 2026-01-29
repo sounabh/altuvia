@@ -653,17 +653,39 @@ export async function PUT(request) {
 
     console.log(`📊 Update data:`, JSON.stringify(updateData, null, 2));
 
+    // ✅ FIX A: Updated include structure with program and university data
     const updatedEssay = await prisma.essay.update({
       where: { id: essayId },
       data: updateData,
       include: {
-        versions: { orderBy: { timestamp: "desc" }, take: 10 },
+        versions: { 
+          orderBy: { timestamp: "desc" }, 
+          take: 20,  // ✅ FIX: Get more versions
+          include: {
+            aiResults: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
         aiResults: {
           where: { essayVersionId: null },
           orderBy: { createdAt: "desc" },
-          take: 3,
+          take: 5,  // ✅ FIX: Get more AI results
         },
         essayPrompt: true,
+        program: {  // ✅ FIX: Include program data
+          include: {
+            university: {
+              select: {
+                id: true,
+                universityName: true,
+                slug: true,
+                brandColor: true,
+              }
+            }
+          }
+        }
       },
     });
 
@@ -696,7 +718,12 @@ export async function PUT(request) {
       }
     }
 
-    return NextResponse.json({ essay: updatedEssay });
+    // ✅ FIX A: Return formatted response with all needed data
+    return NextResponse.json({ 
+      essay: updatedEssay,
+      success: true,
+      message: isAutoSave ? 'Auto-saved' : 'Saved'
+    });
   } catch (error) {
     console.error("Error updating essay:", error);
     return NextResponse.json(
@@ -1220,6 +1247,7 @@ async function deleteEssay(data) {
   }
 }
 
+// ✅ FIX B: Updated saveVersion function with complete essay data
 async function saveVersion(data) {
   const {
     essayId,
@@ -1281,13 +1309,46 @@ async function saveVersion(data) {
     },
   });
 
-  // ✅ FIXED: Update main essay with version content
-  await prisma.essay.update({
+  // ✅ FIX B: Update main essay with version content AND return full essay data
+  const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
     data: { 
-      content: content || "",           // ← UPDATE MAIN ESSAY CONTENT
-      wordCount: wordCount || 0,        // ← UPDATE MAIN ESSAY WORD COUNT
-      lastModified: new Date() 
+      content: content || "",
+      wordCount: wordCount || 0,
+      lastModified: new Date(),
+      completionPercentage: essay.essayPrompt?.wordLimit 
+        ? Math.min(100, (wordCount / essay.essayPrompt.wordLimit) * 100)
+        : 0,
+    },
+    include: {
+      versions: { 
+        orderBy: { timestamp: "desc" }, 
+        take: 20,
+        include: {
+          aiResults: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+      aiResults: {
+        where: { essayVersionId: null },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+      essayPrompt: true,
+      program: {
+        include: {
+          university: {
+            select: {
+              id: true,
+              universityName: true,
+              slug: true,
+              brandColor: true,
+            }
+          }
+        }
+      }
     },
   });
 
@@ -1312,10 +1373,12 @@ async function saveVersion(data) {
   }
 
   return NextResponse.json({
+    success: true,
     version: {
       ...version,
       aiAnalysis,
     },
+    essay: updatedEssay,  // ✅ FIX B: Include full updated essay
     aiAnalysis,
   });
 }
