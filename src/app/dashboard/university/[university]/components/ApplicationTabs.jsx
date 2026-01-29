@@ -401,7 +401,7 @@ const CustomEssayModal = ({
                 disabled={!isUniversityAdded}
               />
               {wordLimitError && (
-                <p className="mt-1 text-sm text-red-400 text-xs flex items-center">
+                <p className="mt-1 text-red-400 text-xs flex items-center">
                   <AlertCircle className="w-3 h-3 mr-1" />
                   {wordLimitError}
                 </p>
@@ -728,7 +728,289 @@ const ApplicationTabs = ({ university }) => {
   const saveVersionRef = useRef(null);
   const isFetchingRef = useRef(false);
 
-  // ✅ FIX B: Force immediate refetch helper function
+  // ========== PANEL MANAGEMENT ==========
+  const Panel = useCallback(
+    ({ name, title, icon: Icon, iconColor, children, isOpen, onClose }) => {
+      if (!isOpen) return null;
+
+      return (
+        <div className="mb-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <div
+                  className={`p-1.5 bg-gradient-to-br ${iconColor} rounded-lg`}
+                >
+                  <Icon className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-sm font-semibold text-white">
+                  {title}
+                </span>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {children}
+          </div>
+        </div>
+      );
+    },
+    [],
+  );
+
+  const togglePanel = useCallback((panelName) => {
+    setOpenPanels((prev) => {
+      if (prev.includes(panelName)) {
+        return prev.filter((p) => p !== panelName);
+      } else {
+        return [...prev, panelName];
+      }
+    });
+  }, []);
+
+  const closePanel = useCallback((panelName) => {
+    setOpenPanels((prev) => prev.filter((p) => p !== panelName));
+  }, []);
+
+  const isPanelOpen = useCallback(
+    (panelName) => {
+      return openPanels.includes(panelName);
+    },
+    [openPanels],
+  );
+
+  // ========== DERIVED DATA ==========
+  const tasksAndEvents = useMemo(
+    () => university?.tasksAndEvents || [],
+    [university?.tasksAndEvents],
+  );
+
+  const programsWithEssays = useMemo(() => {
+    if (!workspaceData?.programs) return [];
+    return workspaceData.programs.filter(
+      (program) =>
+        program.essays &&
+        program.essays.length > 0 &&
+        program.degreeType !== "STANDALONE" &&
+        !program.isCustom,
+    );
+  }, [workspaceData]);
+
+  const currentProgram = useMemo(() => {
+    if (!activeProgramId) return null;
+    return workspaceData?.programs?.find((p) => p.id === activeProgramId);
+  }, [workspaceData, activeProgramId]);
+
+  const currentEssayData = useMemo(() => {
+    if (!currentProgram || !activeEssayPromptId) return null;
+
+    return currentProgram.essays?.find(
+      (e) => e.promptId === activeEssayPromptId,
+    );
+  }, [currentProgram, activeEssayPromptId]);
+
+  const currentEssay = useMemo(() => {
+    return currentEssayData?.userEssay;
+  }, [currentEssayData]);
+
+  // ========== PROGRESS CALCULATION ==========
+  const progressData = useMemo(() => {
+    if (!university) {
+      return {
+        overallProgress: 0,
+        essayProgress: 0,
+        taskProgress: 0,
+        completedEssays: 0,
+        totalEssays: 0,
+        completedTasks: 0,
+        totalTasks: 0,
+        applicationStatus: "not-started",
+      };
+    }
+
+    if (university.enhancedStats) {
+      return {
+        overallProgress: university.overallProgress || 0,
+        essayProgress: university.essayProgress || 0,
+        taskProgress: university.taskProgress || 0,
+        completedEssays: university.enhancedStats.essays?.completed || 0,
+        totalEssays: university.enhancedStats.essays?.total || 0,
+        completedTasks: university.enhancedStats.tasks?.completed || 0,
+        totalTasks: university.enhancedStats.tasks?.total || 0,
+        applicationStatus: university.status || "not-started",
+        upcomingDeadlines: university.upcomingDeadlines || 0,
+        overdueEvents: university.overdueEvents || 0,
+      };
+    }
+
+    const essayPrompts = university.allEssayPrompts || [];
+    const calendarEvents = university.calendarEvents || [];
+    const tasksEvents = university.tasksAndEvents || [];
+
+    // Include custom essays in total count
+    const allEssays = [...essayPrompts, ...customEssays];
+
+    const completedEssays = allEssays.filter(
+      (essay) =>
+        essay.status === "COMPLETED" ||
+        essay.status === "completed" ||
+        (essay.wordCount &&
+          essay.wordLimit &&
+          essay.wordCount >= essay.wordLimit * 0.98) ||
+        essay.isCompleted,
+    ).length;
+
+    const allTasks = [...calendarEvents, ...tasksEvents];
+    const completedTasks = allTasks.filter(
+      (event) =>
+        event.completionStatus === "completed" || event.status === "completed",
+    ).length;
+
+    const essayProgress =
+      allEssays.length > 0
+        ? Math.round((completedEssays / allEssays.length) * 100)
+        : 0;
+
+    const taskProgress =
+      allTasks.length > 0
+        ? Math.round((completedTasks / allTasks.length) * 100)
+        : 0;
+
+    const overallProgress =
+      allEssays.length > 0 && allTasks.length > 0
+        ? Math.round(essayProgress * 0.7 + taskProgress * 0.3)
+        : allEssays.length > 0
+          ? essayProgress
+          : taskProgress;
+
+    let applicationStatus = "not-started";
+    if (completedEssays > 0 || completedTasks > 0) {
+      if (
+        completedEssays === allEssays.length &&
+        completedTasks === allTasks.length &&
+        (allEssays.length > 0 || allTasks.length > 0)
+      ) {
+        applicationStatus = "submitted";
+      } else {
+        applicationStatus = "in-progress";
+      }
+    }
+
+    return {
+      overallProgress,
+      essayProgress,
+      taskProgress,
+      completedEssays,
+      totalEssays: allEssays.length,
+      completedTasks,
+      totalTasks: allTasks.length,
+      applicationStatus,
+      upcomingDeadlines: allTasks.filter(
+        (task) =>
+          new Date(task.date) > new Date() &&
+          task.status !== "completed" &&
+          task.completionStatus !== "completed",
+      ).length,
+      overdueEvents: allTasks.filter(
+        (task) =>
+          new Date(task.date) < new Date() &&
+          task.status !== "completed" &&
+          task.completionStatus !== "completed",
+      ).length,
+    };
+  }, [university, customEssays]);
+
+  // ========== API FUNCTIONS ==========
+  // ✅ FIX: Define fetchWorkspaceData BEFORE forceRefresh
+  const fetchWorkspaceData = useCallback(async () => {
+    if (
+      !universityName ||
+      !userId ||
+      !isUniversityAdded ||
+      isFetchingRef.current
+    )
+      return;
+
+    try {
+      isFetchingRef.current = true;
+      setWorkspaceLoading(true);
+      setWorkspaceError(null);
+
+      const response = await fetch(
+        `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}&userId=${encodeURIComponent(userId)}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-cache",
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `Failed to fetch data`);
+      }
+
+      const data = await response.json();
+
+      // Set workspace data - custom essays are already included
+      setWorkspaceData(data);
+
+      // Don't auto-select if we already have a selection
+      if (activeProgramId && activeEssayPromptId) {
+        return;
+      }
+
+      // Filter and set default selections
+      const programsWithContent =
+        data.programs?.filter((p) => p.essays && p.essays.length > 0) || [];
+
+      if (programsWithContent.length > 0) {
+        let programToSelect = activeProgramId
+          ? programsWithContent.find((p) => p.id === activeProgramId)
+          : null;
+
+        if (!programToSelect) {
+          programToSelect = programsWithContent[0];
+          setActiveProgramId(programToSelect.id);
+        }
+
+        if (programToSelect.essays && programToSelect.essays.length > 0) {
+          let essayToSelect = activeEssayPromptId
+            ? programToSelect.essays.find(
+                (e) => e.promptId === activeEssayPromptId,
+              )
+            : null;
+
+          if (!essayToSelect) {
+            essayToSelect = programToSelect.essays[0];
+            setActiveEssayPromptId(essayToSelect.promptId);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching workspace data:", err);
+      setWorkspaceError(err.message);
+      toast.error("Failed to load workspace data");
+    } finally {
+      setWorkspaceLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [
+    universityName,
+    userId,
+    activeProgramId,
+    activeEssayPromptId,
+    isUniversityAdded,
+    university?.id,
+  ]);
+
+  // ✅ FIX B: Force immediate refetch helper function - NOW DEFINED AFTER fetchWorkspaceData
   const forceRefresh = useCallback(async () => {
     isFetchingRef.current = false; // Reset fetch lock
     await fetchWorkspaceData();
@@ -943,287 +1225,6 @@ const ApplicationTabs = ({ university }) => {
       essayTitle,
     });
   };
-
-  // ========== PANEL MANAGEMENT ==========
-  const Panel = useCallback(
-    ({ name, title, icon: Icon, iconColor, children, isOpen, onClose }) => {
-      if (!isOpen) return null;
-
-      return (
-        <div className="mb-4 animate-in slide-in-from-top-4 duration-300">
-          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-              <div className="flex items-center space-x-2">
-                <div
-                  className={`p-1.5 bg-gradient-to-br ${iconColor} rounded-lg`}
-                >
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-sm font-semibold text-white">
-                  {title}
-                </span>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {children}
-          </div>
-        </div>
-      );
-    },
-    [],
-  );
-
-  const togglePanel = useCallback((panelName) => {
-    setOpenPanels((prev) => {
-      if (prev.includes(panelName)) {
-        return prev.filter((p) => p !== panelName);
-      } else {
-        return [...prev, panelName];
-      }
-    });
-  }, []);
-
-  const closePanel = useCallback((panelName) => {
-    setOpenPanels((prev) => prev.filter((p) => p !== panelName));
-  }, []);
-
-  const isPanelOpen = useCallback(
-    (panelName) => {
-      return openPanels.includes(panelName);
-    },
-    [openPanels],
-  );
-
-  // ========== DERIVED DATA ==========
-  const tasksAndEvents = useMemo(
-    () => university?.tasksAndEvents || [],
-    [university?.tasksAndEvents],
-  );
-
-  const programsWithEssays = useMemo(() => {
-    if (!workspaceData?.programs) return [];
-    return workspaceData.programs.filter(
-      (program) =>
-        program.essays &&
-        program.essays.length > 0 &&
-        program.degreeType !== "STANDALONE" &&
-        !program.isCustom,
-    );
-  }, [workspaceData]);
-
-  const currentProgram = useMemo(() => {
-    if (!activeProgramId) return null;
-    return workspaceData?.programs?.find((p) => p.id === activeProgramId);
-  }, [workspaceData, activeProgramId]);
-
-  const currentEssayData = useMemo(() => {
-    if (!currentProgram || !activeEssayPromptId) return null;
-
-    return currentProgram.essays?.find(
-      (e) => e.promptId === activeEssayPromptId,
-    );
-  }, [currentProgram, activeEssayPromptId]);
-
-  const currentEssay = useMemo(() => {
-    return currentEssayData?.userEssay;
-  }, [currentEssayData]);
-
-  // ========== PROGRESS CALCULATION ==========
-  const progressData = useMemo(() => {
-    if (!university) {
-      return {
-        overallProgress: 0,
-        essayProgress: 0,
-        taskProgress: 0,
-        completedEssays: 0,
-        totalEssays: 0,
-        completedTasks: 0,
-        totalTasks: 0,
-        applicationStatus: "not-started",
-      };
-    }
-
-    if (university.enhancedStats) {
-      return {
-        overallProgress: university.overallProgress || 0,
-        essayProgress: university.essayProgress || 0,
-        taskProgress: university.taskProgress || 0,
-        completedEssays: university.enhancedStats.essays?.completed || 0,
-        totalEssays: university.enhancedStats.essays?.total || 0,
-        completedTasks: university.enhancedStats.tasks?.completed || 0,
-        totalTasks: university.enhancedStats.tasks?.total || 0,
-        applicationStatus: university.status || "not-started",
-        upcomingDeadlines: university.upcomingDeadlines || 0,
-        overdueEvents: university.overdueEvents || 0,
-      };
-    }
-
-    const essayPrompts = university.allEssayPrompts || [];
-    const calendarEvents = university.calendarEvents || [];
-    const tasksEvents = university.tasksAndEvents || [];
-
-    // Include custom essays in total count
-    const allEssays = [...essayPrompts, ...customEssays];
-
-    const completedEssays = allEssays.filter(
-      (essay) =>
-        essay.status === "COMPLETED" ||
-        essay.status === "completed" ||
-        (essay.wordCount &&
-          essay.wordLimit &&
-          essay.wordCount >= essay.wordLimit * 0.98) ||
-        essay.isCompleted,
-    ).length;
-
-    const allTasks = [...calendarEvents, ...tasksEvents];
-    const completedTasks = allTasks.filter(
-      (event) =>
-        event.completionStatus === "completed" || event.status === "completed",
-    ).length;
-
-    const essayProgress =
-      allEssays.length > 0
-        ? Math.round((completedEssays / allEssays.length) * 100)
-        : 0;
-
-    const taskProgress =
-      allTasks.length > 0
-        ? Math.round((completedTasks / allTasks.length) * 100)
-        : 0;
-
-    const overallProgress =
-      allEssays.length > 0 && allTasks.length > 0
-        ? Math.round(essayProgress * 0.7 + taskProgress * 0.3)
-        : allEssays.length > 0
-          ? essayProgress
-          : taskProgress;
-
-    let applicationStatus = "not-started";
-    if (completedEssays > 0 || completedTasks > 0) {
-      if (
-        completedEssays === allEssays.length &&
-        completedTasks === allTasks.length &&
-        (allEssays.length > 0 || allTasks.length > 0)
-      ) {
-        applicationStatus = "submitted";
-      } else {
-        applicationStatus = "in-progress";
-      }
-    }
-
-    return {
-      overallProgress,
-      essayProgress,
-      taskProgress,
-      completedEssays,
-      totalEssays: allEssays.length,
-      completedTasks,
-      totalTasks: allTasks.length,
-      applicationStatus,
-      upcomingDeadlines: allTasks.filter(
-        (task) =>
-          new Date(task.date) > new Date() &&
-          task.status !== "completed" &&
-          task.completionStatus !== "completed",
-      ).length,
-      overdueEvents: allTasks.filter(
-        (task) =>
-          new Date(task.date) < new Date() &&
-          task.status !== "completed" &&
-          task.completionStatus !== "completed",
-      ).length,
-    };
-  }, [university, customEssays]);
-
-  // ========== API FUNCTIONS ==========
-  const fetchWorkspaceData = useCallback(async () => {
-    if (
-      !universityName ||
-      !userId ||
-      !isUniversityAdded ||
-      isFetchingRef.current
-    )
-      return;
-
-    try {
-      isFetchingRef.current = true;
-      setWorkspaceLoading(true);
-      setWorkspaceError(null);
-
-      const response = await fetch(
-        `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}&userId=${encodeURIComponent(userId)}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-cache",
-        },
-      );
-
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: response.statusText }));
-        throw new Error(errorData.error || `Failed to fetch data`);
-      }
-
-      const data = await response.json();
-
-      // Set workspace data - custom essays are already included
-      setWorkspaceData(data);
-
-      // Don't auto-select if we already have a selection
-      if (activeProgramId && activeEssayPromptId) {
-        return;
-      }
-
-      // Filter and set default selections
-      const programsWithContent =
-        data.programs?.filter((p) => p.essays && p.essays.length > 0) || [];
-
-      if (programsWithContent.length > 0) {
-        let programToSelect = activeProgramId
-          ? programsWithContent.find((p) => p.id === activeProgramId)
-          : null;
-
-        if (!programToSelect) {
-          programToSelect = programsWithContent[0];
-          setActiveProgramId(programToSelect.id);
-        }
-
-        if (programToSelect.essays && programToSelect.essays.length > 0) {
-          let essayToSelect = activeEssayPromptId
-            ? programToSelect.essays.find(
-                (e) => e.promptId === activeEssayPromptId,
-              )
-            : null;
-
-          if (!essayToSelect) {
-            essayToSelect = programToSelect.essays[0];
-            setActiveEssayPromptId(essayToSelect.promptId);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching workspace data:", err);
-      setWorkspaceError(err.message);
-      toast.error("Failed to load workspace data");
-    } finally {
-      setWorkspaceLoading(false);
-      isFetchingRef.current = false;
-    }
-  }, [
-    universityName,
-    userId,
-    activeProgramId,
-    activeEssayPromptId,
-    isUniversityAdded,
-    university?.id,
-  ]);
 
   // ✅ FIX A: Auto-save function - removed hasUnsavedChanges check
   const autoSaveEssay = useCallback(async () => {
@@ -1681,8 +1682,8 @@ const ApplicationTabs = ({ university }) => {
                       ),
                     }
                   : program,
-              ),
-            };
+            
+              )}
           });
           lastContentRef.current = result.essay.content;
           setHasUnsavedChanges(false);
