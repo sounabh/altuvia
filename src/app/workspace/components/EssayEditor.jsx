@@ -12,7 +12,6 @@ import {
   AlignRight,
   Undo2,
   Redo2,
-  Save,
   Loader2,
   Check,
   AlertCircle,
@@ -21,7 +20,6 @@ import {
   Heading1,
   Heading2,
   Strikethrough,
-  Highlighter,
   Link2,
   Unlink,
   Minus,
@@ -46,8 +44,6 @@ export const EssayEditor = memo(function EssayEditor({
   essayId,
   onSave,
   lastSaved,
-  hasUnsavedChanges = false,
-  isSaving = false 
 }) {
   const editorRef = useRef(null)
   const [wordCount, setWordCount] = useState(0)
@@ -65,16 +61,28 @@ export const EssayEditor = memo(function EssayEditor({
   
   // Refs to prevent stale closures and re-renders
   const onChangeRef = useRef(onChange)
+  const onSaveRef = useRef(onSave)
   const debounceRef = useRef(null)
   const lastSyncedContentRef = useRef(content)
   const isUserTypingRef = useRef(false)
   const skipNextSyncRef = useRef(false)
   const initialContentRef = useRef(content)
+  
+  // Auto-save refs - completely isolated from render cycle
+  const autoSaveIntervalRef = useRef(null)
+  const lastAutoSavedContentRef = useRef(content)
+  const saveIndicatorRef = useRef(null)
+  const isSavingRef = useRef(false)
+  const hasUnsavedChangesRef = useRef(false)
 
   // Update refs without triggering re-renders
   useEffect(() => {
     onChangeRef.current = onChange
   }, [onChange])
+
+  useEffect(() => {
+    onSaveRef.current = onSave
+  }, [onSave])
 
   // Count words utility
   const countWords = useCallback((text) => {
@@ -175,12 +183,95 @@ export const EssayEditor = memo(function EssayEditor({
     setReadingTime(reading)
   }, [countWords, countChars, countSentences, countParagraphs, calculateReadingTime])
 
+  // Silent auto-save function - uses DOM manipulation only, no state updates
+  const performAutoSave = useCallback(() => {
+    if (!editorRef.current || !onSaveRef.current || isSavingRef.current) return
+    
+    const currentContent = editorRef.current.innerHTML
+    
+    // Only save if content has changed since last auto-save
+    if (currentContent === lastAutoSavedContentRef.current) return
+    
+    isSavingRef.current = true
+    
+    // Show subtle saving indicator using pure DOM manipulation
+    if (saveIndicatorRef.current) {
+      saveIndicatorRef.current.style.opacity = '1'
+      saveIndicatorRef.current.classList.add('pulse-save')
+    }
+    
+    // Perform save
+    try {
+      onSaveRef.current(currentContent, countWords(currentContent))
+      lastAutoSavedContentRef.current = currentContent
+      hasUnsavedChangesRef.current = false
+      
+      // Update indicator to show success after brief delay
+      setTimeout(() => {
+        if (saveIndicatorRef.current) {
+          saveIndicatorRef.current.classList.remove('pulse-save')
+          saveIndicatorRef.current.classList.add('saved-success')
+          
+          // Fade out after showing success
+          setTimeout(() => {
+            if (saveIndicatorRef.current) {
+              saveIndicatorRef.current.classList.remove('saved-success')
+              saveIndicatorRef.current.style.opacity = '0.6'
+            }
+            isSavingRef.current = false
+          }, 800)
+        }
+      }, 300)
+    } catch (error) {
+      console.error('Auto-save failed:', error)
+      isSavingRef.current = false
+      if (saveIndicatorRef.current) {
+        saveIndicatorRef.current.classList.remove('pulse-save')
+        saveIndicatorRef.current.style.opacity = '0.6'
+      }
+    }
+  }, [countWords])
+
+  // Initialize auto-save interval - runs completely in background
+  useEffect(() => {
+    // Start auto-save interval (15 seconds)
+    autoSaveIntervalRef.current = setInterval(() => {
+      performAutoSave()
+    }, 15000)
+    
+    // Also save on page visibility change (when user switches tabs)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        performAutoSave()
+      }
+    }
+    
+    // Save before unload
+    const handleBeforeUnload = () => {
+      if (hasUnsavedChangesRef.current && editorRef.current && onSaveRef.current) {
+        onSaveRef.current(editorRef.current.innerHTML, countWords(editorRef.current.innerHTML))
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [performAutoSave, countWords])
+
   // Handle content changes with debounce
   const handleContentChange = useCallback(() => {
     if (!editorRef.current) return
 
     isUserTypingRef.current = true
     skipNextSyncRef.current = true
+    hasUnsavedChangesRef.current = true
 
     const htmlContent = editorRef.current.innerHTML
     
@@ -256,17 +347,6 @@ export const EssayEditor = memo(function EssayEditor({
     execCommand('removeFormat')
   }, [execCommand])
 
-  // Reset to initial content
-  const resetContent = useCallback(() => {
-    if (!editorRef.current) return
-    
-    const confirmed = confirm('Reset to original content? This cannot be undone.')
-    if (confirmed) {
-      editorRef.current.innerHTML = initialContentRef.current || ''
-      handleContentChange()
-    }
-  }, [handleContentChange])
-
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e) => {
     // Only handle shortcuts with modifier keys
@@ -286,7 +366,8 @@ export const EssayEditor = memo(function EssayEditor({
           break
         case 's':
           e.preventDefault()
-          if (onSave) onSave()
+          // Manual save triggers auto-save immediately
+          performAutoSave()
           break
         case 'z':
           if (e.shiftKey) {
@@ -311,7 +392,7 @@ export const EssayEditor = memo(function EssayEditor({
     if (e.key === 'Escape' && isFullscreen) {
       setIsFullscreen(false)
     }
-  }, [execCommand, onSave, insertLink, isFullscreen])
+  }, [execCommand, insertLink, isFullscreen, performAutoSave])
 
   // Handle paste - preserve some formatting
   const handlePaste = useCallback((e) => {
@@ -369,6 +450,7 @@ export const EssayEditor = memo(function EssayEditor({
     if (content) {
       editor.innerHTML = content
       lastSyncedContentRef.current = content
+      lastAutoSavedContentRef.current = content
       initialContentRef.current = content
     }
 
@@ -402,6 +484,7 @@ export const EssayEditor = memo(function EssayEditor({
 
       editorRef.current.innerHTML = externalContent
       lastSyncedContentRef.current = externalContent
+      lastAutoSavedContentRef.current = externalContent
       updateStats(externalContent)
 
       if (hadFocus) {
@@ -495,6 +578,35 @@ export const EssayEditor = memo(function EssayEditor({
 
   return (
     <div className={containerClass}>
+      {/* Auto-save indicator styles - injected once */}
+      <style jsx global>{`
+        @keyframes pulse-save-animation {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.2); opacity: 0.8; }
+        }
+        
+        @keyframes saved-success-animation {
+          0% { transform: scale(1); }
+          30% { transform: scale(1.3); }
+          100% { transform: scale(1); }
+        }
+        
+        .pulse-save {
+          animation: pulse-save-animation 0.5s ease-in-out infinite;
+        }
+        
+        .pulse-save .save-dot {
+          background-color: #3b82f6 !important;
+          box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+        }
+        
+        .saved-success .save-dot {
+          background-color: #22c55e !important;
+          box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
+          animation: saved-success-animation 0.4s ease-out;
+        }
+      `}</style>
+
       {/* Main Toolbar */}
       <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200 p-2 flex-shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -793,7 +905,7 @@ export const EssayEditor = memo(function EssayEditor({
         </div>
       )}
 
-      {/* Word Count Progress Bar */}
+      {/* Word Count Progress Bar with Auto-save Indicator */}
       <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">
@@ -828,51 +940,20 @@ export const EssayEditor = memo(function EssayEditor({
             </span>
           </div>
 
-          {/* Save status & actions */}
+          {/* Auto-save indicator - subtle, non-intrusive */}
           <div className="flex items-center gap-2">
-            {isSaving && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium border border-blue-100">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Saving...
-              </div>
-            )}
-            
-            {!isSaving && hasUnsavedChanges && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-xs font-medium border border-amber-100">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Unsaved changes
-              </div>
-            )}
-            
-            {!isSaving && !hasUnsavedChanges && lastSaved && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-medium border border-green-100">
-                <Check className="w-3.5 h-3.5" />
-                Saved
-              </div>
-            )}
-
-            {/* Save button */}
-            {onSave && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  onSave()
-                }}
-                disabled={isSaving}
-                className={`
-                  flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium
-                  transition-all duration-150 shadow-md hover:shadow-lg
-                  ${isSaving 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600'
-                  }
-                `}
-              >
-                <Save className="w-4 h-4" />
-                Save
-              </button>
-            )}
+            <div 
+              ref={saveIndicatorRef}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300"
+              style={{ opacity: 0.6 }}
+            >
+              <div 
+                className="save-dot w-2 h-2 rounded-full bg-green-400 transition-all duration-300"
+              />
+              <span className="text-xs text-gray-500 font-medium">
+                Auto-saving
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -903,13 +984,17 @@ export const EssayEditor = memo(function EssayEditor({
                 </li>
                 <li className="flex items-center gap-2">
                   <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Ctrl+S</kbd>
-                  <span>Save</span>
+                  <span>Save now</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Ctrl+K</kbd>
                   <span>Insert Link</span>
                 </li>
               </ul>
+              <p className="opacity-60 text-xs mt-3 flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-green-400" />
+                Your work is auto-saved every 15 seconds
+              </p>
             </div>
           </div>
         )}
@@ -989,7 +1074,7 @@ export const EssayEditor = memo(function EssayEditor({
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-gray-200 rounded font-mono">Ctrl+S</kbd>
-              <span>save</span>
+              <span>save now</span>
             </span>
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 bg-gray-200 rounded font-mono">Ctrl+B</kbd>
@@ -1006,6 +1091,10 @@ export const EssayEditor = memo(function EssayEditor({
           </div>
           
           <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5 text-green-600">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Auto-save enabled
+            </span>
             {lastSaved && (
               <span className="text-gray-400">
                 Last saved: {new Date(lastSaved).toLocaleTimeString()}
@@ -1027,14 +1116,12 @@ export const EssayEditor = memo(function EssayEditor({
     </div>
   )
 }, (prevProps, nextProps) => {
-  // Custom comparison - prevent re-renders during typing
+  // Custom comparison - prevent re-renders during typing and auto-save
   return (
     prevProps.essayId === nextProps.essayId &&
     prevProps.wordLimit === nextProps.wordLimit &&
-    prevProps.isSaving === nextProps.isSaving &&
-    prevProps.hasUnsavedChanges === nextProps.hasUnsavedChanges &&
     prevProps.lastSaved === nextProps.lastSaved
-    // NOT comparing content or onChange - handled internally
+    // NOT comparing content, onChange, onSave - all handled via refs
   )
 })
 

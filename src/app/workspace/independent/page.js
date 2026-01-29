@@ -38,17 +38,14 @@ import {
   CheckCircle2,
   Circle,
   Filter,
-  ArrowLeft, // Added for back button
+  ArrowLeft,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // ==========================================
 // HELPER FUNCTION: calculateStats
 // ==========================================
 
-/**
- * Recalculates all statistics from current workspace data
- * This ensures stats are always in sync with actual data
- */
 const calculateStats = (workspaceData) => {
   if (!workspaceData?.programs) return null;
 
@@ -57,25 +54,38 @@ const calculateStats = (workspaceData) => {
     totalEssayPrompts: 0,
     completedEssays: 0,
     totalWords: 0,
+    standaloneEssays: 0,
+    standaloneCompleted: 0,
     programsByUniversity: {},
   };
 
   workspaceData.programs.forEach((program) => {
-    // Initialize university group
+    // Check if this is a standalone essay (no programId in essays or custom flag)
+    const isStandaloneProgram = program.degreeType === "STANDALONE" || 
+                                 program.programName === "My Custom Essays";
+
     if (!stats.programsByUniversity[program.universityId]) {
       stats.programsByUniversity[program.universityId] = [];
     }
     stats.programsByUniversity[program.universityId].push(program);
 
-    // Count essays
     if (program.essays) {
       stats.totalEssayPrompts += program.essays.length;
 
       program.essays.forEach((essay) => {
         if (essay.userEssay) {
           stats.totalWords += essay.userEssay.wordCount || 0;
-          if (essay.userEssay.isCompleted) {
-            stats.completedEssays++;
+          
+          if (isStandaloneProgram) {
+            stats.standaloneEssays++;
+            if (essay.userEssay.isCompleted) {
+              stats.standaloneCompleted++;
+              stats.completedEssays++;
+            }
+          } else {
+            if (essay.userEssay.isCompleted) {
+              stats.completedEssays++;
+            }
           }
         }
       });
@@ -90,7 +100,370 @@ const calculateStats = (workspaceData) => {
   return stats;
 };
 
-// University Selector Component
+// ==========================================
+// STANDALONE ESSAY CREATION MODAL
+// ==========================================
+
+function StandaloneEssayModal({ 
+  isOpen, 
+  onClose, 
+  onCreateEssay, 
+  savedUniversities,
+  isCreating 
+}) {
+  const [formData, setFormData] = useState({
+    customTitle: '',
+    customPrompt: '',
+    wordLimit: 500,
+    taggedUniversityId: '', // Optional
+    priority: 'medium',
+  });
+
+  const [errors, setErrors] = useState({});
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.customTitle.trim()) {
+      newErrors.customTitle = 'Essay title is required';
+    }
+    
+    if (!formData.customPrompt.trim()) {
+      newErrors.customPrompt = 'Essay prompt/question is required';
+    }
+    
+    if (formData.wordLimit < 100 || formData.wordLimit > 5000) {
+      newErrors.wordLimit = 'Word limit must be between 100 and 5000';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onCreateEssay(formData);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      customTitle: '',
+      customPrompt: '',
+      wordLimit: 500,
+      taggedUniversityId: '',
+      priority: 'medium',
+    });
+    setErrors({});
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-[#002147]">Create Custom Essay</h2>
+              <p className="text-sm text-gray-500">Write your own essay with custom prompt</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="p-6 space-y-6">
+          {/* Essay Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Essay Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.customTitle}
+              onChange={(e) => setFormData({ ...formData, customTitle: e.target.value })}
+              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all ${
+                errors.customTitle ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
+              placeholder="e.g., Leadership Experience Essay"
+            />
+            {errors.customTitle && (
+              <p className="mt-1 text-sm text-red-600 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-1" />
+                {errors.customTitle}
+              </p>
+            )}
+          </div>
+
+          {/* Essay Prompt */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Essay Prompt / Question <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={formData.customPrompt}
+              onChange={(e) => setFormData({ ...formData, customPrompt: e.target.value })}
+              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all resize-none ${
+                errors.customPrompt ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
+              rows={4}
+              placeholder="Enter the essay question or topic you're writing about..."
+            />
+            {errors.customPrompt && (
+              <p className="mt-1 text-sm text-red-600 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-1" />
+                {errors.customPrompt}
+              </p>
+            )}
+            <p className="mt-1.5 text-xs text-gray-500">
+              This will be your essay prompt that guides your writing
+            </p>
+          </div>
+
+          {/* Word Limit & Priority */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Word Limit <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.wordLimit}
+                onChange={(e) => setFormData({ ...formData, wordLimit: parseInt(e.target.value) || 500 })}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all ${
+                  errors.wordLimit ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
+                min={100}
+                max={5000}
+              />
+              {errors.wordLimit && (
+                <p className="mt-1 text-sm text-red-600 text-xs">{errors.wordLimit}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priority
+              </label>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              >
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+              </select>
+            </div>
+          </div>
+
+          {/* University Tag (Optional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tag University <span className="text-gray-400">(Optional)</span>
+            </label>
+            <select
+              value={formData.taggedUniversityId}
+              onChange={(e) => setFormData({ ...formData, taggedUniversityId: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+            >
+              <option value="">📝 No University (Personal Essay)</option>
+              {savedUniversities?.map((uni) => (
+                <option key={uni.id} value={uni.id}>
+                  🎓 {uni.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-gray-500">
+              Optionally tag this essay with a university to organize it with your applications
+            </p>
+          </div>
+
+          {/* Info Box */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-900 mb-1">
+                  Your custom essay will have:
+                </p>
+                <ul className="text-xs text-purple-700 space-y-1">
+                  <li>✓ Full version history with restore capabilities</li>
+                  <li>✓ AI-powered analysis and writing suggestions</li>
+                  <li>✓ Auto-save and manual save options</li>
+                  <li>✓ Progress tracking and completion analytics</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-200 flex justify-end space-x-3 sticky bottom-0 bg-white">
+          <button
+            onClick={onClose}
+            disabled={isCreating}
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isCreating}
+            className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center space-x-2"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                <span>Create Essay</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// STANDALONE ESSAY CARD COMPONENT
+// ==========================================
+
+function StandaloneEssayCard({ 
+  essayData,
+  isActive, 
+  onSelect, 
+  onDelete,
+  onToggleCompletion,
+  universityName 
+}) {
+  const essay = essayData.userEssay;
+  if (!essay) return null;
+
+  const progress = essayData.wordLimit > 0 
+    ? (essay.wordCount / essayData.wordLimit) * 100 
+    : 0;
+
+  const priorityColors = {
+    high: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' },
+    medium: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
+    low: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-500' },
+  };
+
+  const priorityConfig = priorityColors[essay.priority] || priorityColors.medium;
+
+  return (
+    <div
+      className={`group relative p-3 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
+        isActive
+          ? 'bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-300 shadow-md'
+          : 'bg-white border-gray-200 hover:border-purple-200'
+      }`}
+      onClick={onSelect}
+    >
+      {/* Priority Badge */}
+      <div className="absolute top-2 right-2">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`}></span>
+          {essay.priority}
+        </span>
+      </div>
+
+      {/* Essay Title */}
+      <div className="pr-20 mb-2">
+        <div className="flex items-center space-x-1.5 mb-1">
+          <Sparkles className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+          <h4 className="text-sm font-semibold text-[#002147] line-clamp-2">
+            {essayData.promptTitle}
+          </h4>
+        </div>
+      </div>
+
+      {/* Tagged University (if any) */}
+      {universityName && (
+        <div className="flex items-center space-x-1 text-xs text-gray-500 mb-2">
+          <Building2 className="w-3 h-3" />
+          <span className="truncate">{universityName}</span>
+        </div>
+      )}
+
+      {/* Progress Bar */}
+      <div className="mb-2">
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+          <span>{essay.wordCount} / {essayData.wordLimit} words</span>
+          <span>{Math.round(progress)}%</span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-1.5">
+          <div
+            className="h-1.5 rounded-full transition-all duration-500 bg-gradient-to-r from-purple-500 to-indigo-500"
+            style={{ width: `${Math.min(progress, 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCompletion();
+          }}
+          className={`flex items-center space-x-1 text-xs transition-colors ${
+            essay.isCompleted
+              ? 'text-green-600 hover:text-green-700'
+              : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          {essay.isCompleted ? (
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : (
+            <Circle className="w-3.5 h-3.5" />
+          )}
+          <span className="font-medium">{essay.isCompleted ? 'Completed' : 'Mark Complete'}</span>
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50"
+          title="Delete essay"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// UNIVERSITY SELECTOR COMPONENT
+// ==========================================
+
 function UniversitySelector({
   universities,
   selectedUniversityId,
@@ -218,7 +591,10 @@ function UniversitySelector({
   );
 }
 
-// Program Card Component - FIXED
+// ==========================================
+// PROGRAM CARD COMPONENT
+// ==========================================
+
 function ProgramCard({
   program,
   isExpanded,
@@ -227,12 +603,16 @@ function ProgramCard({
   onEssaySelect,
   onDeleteEssay,
   onCreateEssay,
-  onToggleCompletion, // Add this prop
+  onToggleCompletion,
 }) {
   const completedEssays =
     program.essays?.filter((e) => e.userEssay?.isCompleted).length || 0;
   const totalEssays = program.essays?.length || 0;
   const progress = totalEssays > 0 ? (completedEssays / totalEssays) * 100 : 0;
+
+  // Check if this is a standalone program
+  const isStandaloneProgram = program.degreeType === "STANDALONE" || 
+                               program.programName === "My Custom Essays";
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow">
@@ -377,7 +757,11 @@ function ProgramCard({
     </div>
   );
 }
-// Stats Summary Component
+
+// ==========================================
+// STATS SUMMARY COMPONENT
+// ==========================================
+
 function StatsSummary({ stats, selectedUniversityId, universities }) {
   const displayStats = useMemo(() => {
     if (selectedUniversityId === "all") {
@@ -388,6 +772,8 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
         completed: stats?.completedEssays || 0,
         words: stats?.totalWords || 0,
         progress: stats?.averageProgress || 0,
+        standalone: stats?.standaloneEssays || 0,
+        standaloneCompleted: stats?.standaloneCompleted || 0,
       };
     }
 
@@ -417,11 +803,13 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
       completed: uniCompleted,
       words: uniWords,
       progress: uniEssays > 0 ? (uniCompleted / uniEssays) * 100 : 0,
+      standalone: stats?.standaloneEssays || 0,
+      standaloneCompleted: stats?.standaloneCompleted || 0,
     };
   }, [stats, selectedUniversityId, universities]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 border border-gray-200 hover:shadow-md transition-shadow">
         <div className="flex items-center space-x-2">
           <Building2 className="w-4 h-4 text-purple-500" />
@@ -454,6 +842,16 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
 
       <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 border border-gray-200 hover:shadow-md transition-shadow">
         <div className="flex items-center space-x-2">
+          <Sparkles className="w-4 h-4 text-purple-500" />
+          <span className="text-xs text-gray-500">Custom</span>
+        </div>
+        <p className="text-xl font-bold text-[#002147] mt-1">
+          {displayStats.standaloneCompleted}/{displayStats.standalone}
+        </p>
+      </div>
+
+      <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="flex items-center space-x-2">
           <TrendingUp className="w-4 h-4 text-orange-500" />
           <span className="text-xs text-gray-500">Total Words</span>
         </div>
@@ -464,6 +862,10 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
     </div>
   );
 }
+
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
 
 export default function IndependentWorkspacePage() {
   const { data: session, status } = useSession();
@@ -482,10 +884,8 @@ export default function IndependentWorkspacePage() {
   const [showVersions, setShowVersions] = useState(false);
   const [showAI, setShowAI] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(true);
-  const [filterStatus, setFilterStatus] = useState("all"); // all, completed, in-progress, not-started
-
-  // Panel order management
-  const [panelOrder, setPanelOrder] = useState(['versions', 'analytics', 'ai']); // Default order
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [panelOrder, setPanelOrder] = useState(['versions', 'analytics', 'ai']);
 
   // Save state
   const [isSaving, setIsSaving] = useState(false);
@@ -493,6 +893,10 @@ export default function IndependentWorkspacePage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isCreatingEssay, setIsCreatingEssay] = useState(false);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
+
+  // Standalone essay state
+  const [showStandaloneEssayModal, setShowStandaloneEssayModal] = useState(false);
+  const [isCreatingStandaloneEssay, setIsCreatingStandaloneEssay] = useState(false);
 
   // Activity tracking
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
@@ -505,25 +909,55 @@ export default function IndependentWorkspacePage() {
   const activityTimeoutRef = useRef(null);
 
   // ==========================================
-  // UPDATED enhancedStats USEMEMO
+  // COMPUTED DATA
   // ==========================================
+
   const enhancedStats = useMemo(() => {
     if (!workspaceData) return null;
-
-    // Recalculate stats in real-time from current data
     const freshStats = calculateStats(workspaceData);
-    
     return {
       ...freshStats,
       savedUniversitiesCount: workspaceData.universities?.length || 0,
     };
-  }, [workspaceData]); // Only depends on workspaceData
+  }, [workspaceData]);
+
+  // Separate standalone essays from regular program essays
+  const { standaloneEssays, regularPrograms } = useMemo(() => {
+    if (!workspaceData?.programs) {
+      return { standaloneEssays: [], regularPrograms: [] };
+    }
+
+    const standalone = [];
+    const regular = [];
+
+    workspaceData.programs.forEach(program => {
+      const isStandaloneProgram = program.degreeType === "STANDALONE" || 
+                                   program.programName === "My Custom Essays";
+      
+      if (isStandaloneProgram) {
+        // Extract essays from standalone programs
+        program.essays?.forEach(essayData => {
+          if (essayData.userEssay) {
+            standalone.push({
+              ...essayData,
+              programId: program.id,
+              universityId: program.universityId,
+              universityName: program.universityName,
+              universityColor: program.universityColor,
+            });
+          }
+        });
+      } else {
+        regular.push(program);
+      }
+    });
+
+    return { standaloneEssays: standalone, regularPrograms: regular };
+  }, [workspaceData]);
 
   // Filtered programs based on selected university and status filter
   const filteredPrograms = useMemo(() => {
-    if (!workspaceData?.programs) return [];
-
-    let programs = workspaceData.programs;
+    let programs = regularPrograms;
 
     // Filter by university
     if (selectedUniversityId !== "all") {
@@ -553,7 +987,7 @@ export default function IndependentWorkspacePage() {
     programs = programs.filter((p) => p.essays && p.essays.length > 0);
 
     return programs;
-  }, [workspaceData, selectedUniversityId, filterStatus]);
+  }, [regularPrograms, selectedUniversityId, filterStatus]);
 
   // Current program and essay
   const currentProgram = useMemo(() => {
@@ -580,15 +1014,10 @@ export default function IndependentWorkspacePage() {
     );
   }, [workspaceData, selectedUniversityId]);
 
-  // Handle panel clicks for ordering
-  const handlePanelToggle = useCallback((panelName, currentState) => {
-    if (!currentState) {
-      // If turning ON, move to front
-      setPanelOrder(prev => [panelName, ...prev.filter(p => p !== panelName)]);
-    }
-  }, []);
+  // ==========================================
+  // API FUNCTIONS
+  // ==========================================
 
-  // Fetch workspace data
   const fetchWorkspaceData = useCallback(async () => {
     if (status === "loading") return;
 
@@ -646,7 +1075,10 @@ export default function IndependentWorkspacePage() {
     fetchWorkspaceData();
   }, [fetchWorkspaceData]);
 
-  // Auto-save function
+  // ==========================================
+  // AUTO-SAVE LOGIC
+  // ==========================================
+
   const autoSaveEssay = useCallback(async () => {
     if (
       !currentEssay ||
@@ -768,8 +1200,9 @@ export default function IndependentWorkspacePage() {
   }, []);
 
   // ==========================================
-  // UPDATED updateEssayContent FUNCTION
+  // ESSAY CONTENT UPDATE
   // ==========================================
+
   const updateEssayContent = useCallback(
     (content, wordCount) => {
       if (isUpdatingRef.current || !currentEssay) return;
@@ -805,7 +1238,6 @@ export default function IndependentWorkspacePage() {
             ),
           };
 
-          // Recalculate stats immediately
           updated.stats = calculateStats(updated);
           
           return updated;
@@ -822,7 +1254,16 @@ export default function IndependentWorkspacePage() {
     [currentEssay, activeProgramId, activeEssayPromptId]
   );
 
-  // Handle essay selection
+  // ==========================================
+  // EVENT HANDLERS
+  // ==========================================
+
+  const handlePanelToggle = useCallback((panelName, currentState) => {
+    if (!currentState) {
+      setPanelOrder(prev => [panelName, ...prev.filter(p => p !== panelName)]);
+    }
+  }, []);
+
   const handleEssaySelect = useCallback(
     (programId, promptId) => {
       if (autoSaveTimerRef.current) {
@@ -836,7 +1277,6 @@ export default function IndependentWorkspacePage() {
       setLastSaved(null);
       setError(null);
 
-      // Auto-expand the program
       setExpandedPrograms((prev) => new Set([...prev, programId]));
 
       const program = workspaceData?.programs?.find((p) => p.id === programId);
@@ -846,7 +1286,6 @@ export default function IndependentWorkspacePage() {
     [workspaceData]
   );
 
-  // Toggle program expansion
   const toggleProgramExpansion = useCallback((programId) => {
     setExpandedPrograms((prev) => {
       const next = new Set(prev);
@@ -859,15 +1298,11 @@ export default function IndependentWorkspacePage() {
     });
   }, []);
 
-  // Manual save
   const manualSave = useCallback(async () => {
     if (!currentEssay || isSaving) return false;
     return await autoSaveEssay();
   }, [currentEssay, isSaving, autoSaveEssay]);
 
-  // ==========================================
-  // UPDATED saveVersion FUNCTION
-  // ==========================================
   const saveVersion = useCallback(
     async (label) => {
       if (!currentEssay || isSaving || isSavingVersion) return false;
@@ -929,7 +1364,6 @@ export default function IndependentWorkspacePage() {
                 ),
               };
 
-              // Recalculate stats
               updated.stats = calculateStats(updated);
               
               return updated;
@@ -961,9 +1395,6 @@ export default function IndependentWorkspacePage() {
     ]
   );
 
-  // ==========================================
-  // UPDATED handleCreateEssay FUNCTION
-  // ==========================================
   const handleCreateEssay = async (programId, essayPromptId) => {
     try {
       setIsCreatingEssay(true);
@@ -1010,7 +1441,6 @@ export default function IndependentWorkspacePage() {
             ),
           };
 
-          // Recalculate stats
           updated.stats = calculateStats(updated);
           
           return updated;
@@ -1021,20 +1451,70 @@ export default function IndependentWorkspacePage() {
         setLastSaved(new Date());
 
         handleEssaySelect(programId, essayPromptId);
+        toast.success('Essay created successfully!');
       }
     } catch (error) {
       console.error("Error creating essay:", error);
       setError(error.message);
+      toast.error(error.message);
     } finally {
       setIsCreatingEssay(false);
     }
   };
 
   // ==========================================
-  // UPDATED handleDeleteEssay FUNCTION
+  // STANDALONE ESSAY HANDLERS
   // ==========================================
+
+  const handleCreateStandaloneEssay = async (formData) => {
+    try {
+      setIsCreatingStandaloneEssay(true);
+      setError(null);
+
+      const response = await fetch(`/api/essay/independent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'create_standalone_essay',
+          ...formData,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create custom essay');
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Refresh workspace data to get the new essay
+        await fetchWorkspaceData();
+        
+        setShowStandaloneEssayModal(false);
+        toast.success('Custom essay created successfully! 🎉', {
+          description: 'Your essay is ready for writing',
+        });
+
+        // Auto-select the newly created essay if possible
+        if (result.essayPromptId && result.programId) {
+          setTimeout(() => {
+            handleEssaySelect(result.programId, result.essayPromptId);
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating standalone essay:', error);
+      setError(error.message);
+      toast.error(error.message || 'Failed to create custom essay');
+    } finally {
+      setIsCreatingStandaloneEssay(false);
+    }
+  };
+
   const handleDeleteEssay = async (essayId) => {
-    if (!confirm("Are you sure you want to delete this essay?")) return;
+    if (!confirm("Are you sure you want to delete this essay? This action cannot be undone.")) return;
 
     try {
       const response = await fetch(`/api/essay/independent`, {
@@ -1049,7 +1529,6 @@ export default function IndependentWorkspacePage() {
 
       if (!response.ok) throw new Error("Failed to delete essay");
 
-      // Update local state instead of full refresh
       setWorkspaceData((prev) => {
         if (!prev) return prev;
 
@@ -1061,14 +1540,13 @@ export default function IndependentWorkspacePage() {
               essayData.userEssay?.id === essayId
                 ? {
                     ...essayData,
-                    userEssay: null, // Remove the user essay
+                    userEssay: null,
                   }
                 : essayData
             ),
           })),
         };
 
-        // Recalculate stats
         updated.stats = calculateStats(updated);
         
         return updated;
@@ -1078,18 +1556,17 @@ export default function IndependentWorkspacePage() {
         setActiveEssayPromptId(null);
         lastContentRef.current = "";
       }
+
+      toast.success('Essay deleted successfully');
     } catch (error) {
       setError(error.message);
+      toast.error('Failed to delete essay');
     }
   };
 
-  // ==========================================
-  // ADDED toggleEssayCompletion FUNCTION (NEW)
-  // ==========================================
   const toggleEssayCompletion = useCallback(
     async (essayId, currentStatus) => {
       try {
-        // Optimistically update UI
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1111,13 +1588,11 @@ export default function IndependentWorkspacePage() {
             })),
           };
 
-          // Recalculate stats immediately
           updated.stats = calculateStats(updated);
           
           return updated;
         });
 
-        // Make API call
         const response = await fetch(`/api/essay/independent`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -1129,7 +1604,6 @@ export default function IndependentWorkspacePage() {
         });
 
         if (!response.ok) {
-          // Revert on error
           setWorkspaceData((prev) => {
             if (!prev) return prev;
 
@@ -1157,9 +1631,14 @@ export default function IndependentWorkspacePage() {
 
           throw new Error("Failed to update completion status");
         }
+
+        toast.success(
+          !currentStatus ? 'Essay marked as complete! 🎉' : 'Essay marked as incomplete'
+        );
       } catch (error) {
         console.error("Error toggling completion:", error);
         setError(error.message);
+        toast.error(error.message);
       }
     },
     []
@@ -1174,7 +1653,10 @@ export default function IndependentWorkspacePage() {
     };
   }, []);
 
-  // Loading state
+  // ==========================================
+  // LOADING & ERROR STATES
+  // ==========================================
+
   if (loading || status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
@@ -1195,7 +1677,6 @@ export default function IndependentWorkspacePage() {
     );
   }
 
-  // Error state
   if (error && !workspaceData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
@@ -1216,7 +1697,6 @@ export default function IndependentWorkspacePage() {
     );
   }
 
-  // No saved universities
   if (
     workspaceData &&
     (!workspaceData.universities || workspaceData.universities.length === 0)
@@ -1229,22 +1709,35 @@ export default function IndependentWorkspacePage() {
             No Saved Universities
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Save universities to start working on their essays
+            Save universities to start working on their essays or create custom essays
           </p>
-          <Button
-            onClick={() => router.push("/dashboard/search")}
-            className="bg-[#3598FE] hover:bg-[#2563EB] shadow-md hover:shadow-lg active:scale-95"
-          >
-            Browse Universities
-          </Button>
+          <div className="flex gap-3 justify-center">
+            <Button
+              onClick={() => router.push("/dashboard/search")}
+              className="bg-[#3598FE] hover:bg-[#2563EB] shadow-md hover:shadow-lg active:scale-95"
+            >
+              Browse Universities
+            </Button>
+            <Button
+              onClick={() => setShowStandaloneEssayModal(true)}
+              className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:shadow-lg active:scale-95"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Create Custom Essay
+            </Button>
+          </div>
         </Card>
       </div>
     );
   }
 
+  // ==========================================
+  // MAIN RENDER
+  // ==========================================
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
-      {/* Dynamic Header - UPDATED WITH BACK TO DASHBOARD BUTTON */}
+      {/* Dynamic Header */}
       <header
         className="backdrop-blur-lg border-b sticky top-0 z-50 shadow-sm transition-all duration-300"
         style={{
@@ -1256,7 +1749,7 @@ export default function IndependentWorkspacePage() {
       >
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
-            {/* Left Section: Back to Dashboard Button */}
+            {/* Left Section */}
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => router.push("/dashboard")}
@@ -1266,7 +1759,7 @@ export default function IndependentWorkspacePage() {
                 <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-[#3598FE] flex items-center justify-center transition-colors">
                   <ArrowLeft className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
                 </div>
-                <div className="text-left">
+                <div className="text-left hidden sm:block">
                   <p className="text-sm font-semibold text-[#002147] group-hover:text-[#3598FE] transition-colors">
                     Back to Dashboard
                   </p>
@@ -1277,7 +1770,7 @@ export default function IndependentWorkspacePage() {
               </button>
             </div>
 
-            {/* Right Section: University Selector and Controls */}
+            {/* Right Section */}
             <div className="flex items-center space-x-4">
               {/* University Selector */}
               <UniversitySelector
@@ -1287,9 +1780,19 @@ export default function IndependentWorkspacePage() {
                 stats={enhancedStats}
               />
 
+              {/* Create Custom Essay Button */}
+              <button
+                onClick={() => setShowStandaloneEssayModal(true)}
+                className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-medium hidden sm:inline">Create Essay</span>
+                <span className="text-sm font-medium sm:hidden">New</span>
+              </button>
+
               {/* Word Count Display */}
               {currentEssay && (
-                <div className="flex items-center space-x-3 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                <div className="hidden lg:flex items-center space-x-3 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                   <Target className="w-5 h-5 text-[#6C7280]" />
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-semibold text-[#002147]">
@@ -1315,7 +1818,7 @@ export default function IndependentWorkspacePage() {
               )}
 
               {/* Toggle Buttons */}
-              <div className="flex items-center space-x-2">
+              <div className="hidden lg:flex items-center space-x-2">
                 <Button
                   variant={showAnalytics ? "default" : "outline"}
                   size="sm"
@@ -1395,7 +1898,7 @@ export default function IndependentWorkspacePage() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-[#002147]">
-                    Programs & Essays
+                    Essays
                   </h3>
 
                   {/* Status Filter */}
@@ -1411,30 +1914,87 @@ export default function IndependentWorkspacePage() {
                   </select>
                 </div>
 
-                {/* Programs List */}
-                <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
-                  {filteredPrograms.map((program) => (
-                    <ProgramCard
-                      key={program.id}
-                      program={program}
-                      isExpanded={expandedPrograms.has(program.id)}
-                      onToggle={() => toggleProgramExpansion(program.id)}
-                      activeEssayPromptId={activeEssayPromptId}
-                      onEssaySelect={handleEssaySelect}
-                      onDeleteEssay={handleDeleteEssay}
-                      onCreateEssay={handleCreateEssay}
-                      onToggleCompletion={toggleEssayCompletion} // Pass the toggle function
-                    />
-                  ))}
+                {/* Scrollable Content */}
+                <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+                  {/* Standalone Essays Section */}
+                  {standaloneEssays.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-3 px-2">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center space-x-2">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                          <span>My Custom Essays</span>
+                        </h4>
+                        <span className="text-xs text-gray-400 bg-purple-50 px-2 py-0.5 rounded-full">
+                          {standaloneEssays.length}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {standaloneEssays.map((essayData) => (
+                          <StandaloneEssayCard
+                            key={essayData.promptId}
+                            essayData={essayData}
+                            isActive={activeEssayPromptId === essayData.promptId}
+                            onSelect={() => handleEssaySelect(essayData.programId, essayData.promptId)}
+                            onDelete={() => handleDeleteEssay(essayData.userEssay.id)}
+                            onToggleCompletion={() => toggleEssayCompletion(
+                              essayData.userEssay.id,
+                              essayData.userEssay.isCompleted
+                            )}
+                            universityName={essayData.universityName}
+                          />
+                        ))}
+                      </div>
 
-                  {filteredPrograms.length === 0 && (
+                      <div className="border-t border-gray-200 my-4" />
+                    </div>
+                  )}
+
+                  {/* Regular Programs */}
+                  {filteredPrograms.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3 px-2">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          Program Essays
+                        </h4>
+                        <span className="text-xs text-gray-400">
+                          {filteredPrograms.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {filteredPrograms.map((program) => (
+                          <ProgramCard
+                            key={program.id}
+                            program={program}
+                            isExpanded={expandedPrograms.has(program.id)}
+                            onToggle={() => toggleProgramExpansion(program.id)}
+                            activeEssayPromptId={activeEssayPromptId}
+                            onEssaySelect={handleEssaySelect}
+                            onDeleteEssay={handleDeleteEssay}
+                            onCreateEssay={handleCreateEssay}
+                            onToggleCompletion={toggleEssayCompletion}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {filteredPrograms.length === 0 && standaloneEssays.length === 0 && (
                     <div className="text-center py-8">
                       <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 mb-3">
                         {filterStatus !== "all"
                           ? `No ${filterStatus.replace("-", " ")} essays`
-                          : "No programs available"}
+                          : "No essays available"}
                       </p>
+                      <button
+                        onClick={() => setShowStandaloneEssayModal(true)}
+                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        Create your first custom essay →
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1845,6 +2405,42 @@ export default function IndependentWorkspacePage() {
           </div>
         </div>
       </div>
+
+      {/* Standalone Essay Modal */}
+      <StandaloneEssayModal
+        isOpen={showStandaloneEssayModal}
+        onClose={() => setShowStandaloneEssayModal(false)}
+        onCreateEssay={handleCreateStandaloneEssay}
+        savedUniversities={workspaceData?.universities}
+        isCreating={isCreatingStandaloneEssay}
+      />
+
+      {/* Animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        .animate-slideUp {
+          animation: slideUp 0.25s ease-out;
+        }
+      `}</style>
 
       {/* Footer */}
       <footer className="bg-white/50 backdrop-blur-sm border-t border-gray-200/50">

@@ -62,6 +62,8 @@ import {
   TrendingDown,
   Flame,
   Star,
+  Lock,
+  BookmarkPlus,
 } from "lucide-react";
 
 // ============================================
@@ -79,6 +81,256 @@ const EssayAnalytics = lazy(() =>
 );
 
 // ============================================
+// CUSTOM ESSAY MODAL COMPONENT
+// ============================================
+
+const CustomEssayModal = ({ 
+  isOpen, 
+  onClose, 
+  onCreateEssay, 
+  universityName,
+  isCreating,
+  isUniversityAdded 
+}) => {
+  const [formData, setFormData] = useState({
+    customTitle: '',
+    customPrompt: '',
+    wordLimit: 500,
+    priority: 'medium',
+  });
+
+  const [errors, setErrors] = useState({});
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.customTitle.trim()) {
+      newErrors.customTitle = 'Essay title is required';
+    }
+    
+    if (!formData.customPrompt.trim()) {
+      newErrors.customPrompt = 'Essay prompt/question is required';
+    }
+    
+    if (formData.wordLimit < 100 || formData.wordLimit > 5000) {
+      newErrors.wordLimit = 'Word limit must be between 100 and 5000';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onCreateEssay(formData);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      customTitle: '',
+      customPrompt: '',
+      wordLimit: 500,
+      priority: 'medium',
+    });
+    setErrors({});
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-[#002147] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-slideUp border border-white/20">
+        {/* Header */}
+        <div className="p-6 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#002147] z-10">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Create Custom Essay</h2>
+              <p className="text-sm text-white/60">Add a custom essay for {universityName}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-white/60" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="p-6 space-y-6">
+          {/* University Info */}
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">University</p>
+                <p className="text-sm text-white/70">{universityName}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Essay Title */}
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Essay Title <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.customTitle}
+              onChange={(e) => setFormData({ ...formData, customTitle: e.target.value })}
+              className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white ${
+                errors.customTitle ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+              }`}
+              placeholder="e.g., Leadership Experience Essay"
+              disabled={!isUniversityAdded}
+            />
+            {errors.customTitle && (
+              <p className="mt-1 text-sm text-red-400 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-1" />
+                {errors.customTitle}
+              </p>
+            )}
+          </div>
+
+          {/* Essay Prompt */}
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Essay Prompt / Question <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              value={formData.customPrompt}
+              onChange={(e) => setFormData({ ...formData, customPrompt: e.target.value })}
+              className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-white ${
+                errors.customPrompt ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+              }`}
+              rows={4}
+              placeholder="Enter the essay question or topic you're writing about..."
+              disabled={!isUniversityAdded}
+            />
+            {errors.customPrompt && (
+              <p className="mt-1 text-sm text-red-400 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-1" />
+                {errors.customPrompt}
+              </p>
+            )}
+            <p className="mt-1.5 text-xs text-white/50">
+              This will be your essay prompt that guides your writing
+            </p>
+          </div>
+
+          {/* Word Limit & Priority - FIXED SELECT DROPDOWN */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Word Limit <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.wordLimit}
+                onChange={(e) => setFormData({ ...formData, wordLimit: parseInt(e.target.value) || 500 })}
+                className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white ${
+                  errors.wordLimit ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+                }`}
+                min={100}
+                max={5000}
+                disabled={!isUniversityAdded}
+              />
+              {errors.wordLimit && (
+                <p className="mt-1 text-sm text-red-400 text-xs">{errors.wordLimit}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Priority
+              </label>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white"
+                disabled={!isUniversityAdded}
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                  backgroundPosition: 'right 0.5rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1.5em 1.5em',
+                  paddingRight: '2.5rem',
+                }}
+              >
+                <option value="low" className="bg-[#002147] text-white">Low Priority</option>
+                <option value="medium" className="bg-[#002147] text-white">Medium Priority</option>
+                <option value="high" className="bg-[#002147] text-white">High Priority</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/30 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white mb-1">
+                  Your custom essay will have:
+                </p>
+                <ul className="text-xs text-white/70 space-y-1">
+                  <li>✓ Full version history with restore capabilities</li>
+                  <li>✓ AI-powered analysis and writing suggestions</li>
+                  <li>✓ Auto-save and manual save options</li>
+                  <li>✓ Progress tracking and completion analytics</li>
+                  <li>✓ Associated with {universityName}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-white/10 flex justify-end space-x-3 sticky bottom-0 bg-[#002147]">
+          <button
+            onClick={onClose}
+            disabled={isCreating}
+            className="px-6 py-2.5 text-sm font-medium text-white/70 bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isCreating || !isUniversityAdded}
+            className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center space-x-2"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                <span>Create Essay</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // HELPER COMPONENTS
 // ============================================
 
@@ -86,6 +338,74 @@ const PanelLoader = () => (
   <div className="flex items-center justify-center py-8">
     <Loader2 className="w-6 h-6 animate-spin text-white/50" />
     <span className="ml-3 text-sm text-white/60">Loading...</span>
+  </div>
+);
+
+// ============================================
+// LOCKED TAB CONTENT COMPONENT
+// ============================================
+const LockedTabContent = ({ tabName, universityName, onAddUniversity, isAddingUniversity }) => (
+  <div className="min-h-[400px] flex items-center justify-center">
+    <div className="text-center max-w-md mx-auto p-8">
+      {/* Lock Icon with Animation */}
+      <div className="relative inline-block mb-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-2xl rounded-full animate-pulse"></div>
+        <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border border-white/10">
+          <Lock className="w-16 h-16 text-white/60" />
+        </div>
+      </div>
+
+      {/* Heading */}
+      <h3 className="text-2xl font-bold text-white mb-3">
+        {tabName} Locked
+      </h3>
+
+      {/* Description */}
+      <p className="text-white/70 mb-6 leading-relaxed">
+        Add <span className="font-semibold text-white">{universityName}</span> to your dashboard to unlock {tabName.toLowerCase()} management and start working on your application.
+      </p>
+
+      {/* Features List */}
+      <div className="bg-white/5 rounded-xl p-4 mb-6 text-left">
+        <p className="text-sm font-semibold text-white/80 mb-3">Unlock access to:</p>
+        <ul className="space-y-2 text-sm text-white/60">
+          <li className="flex items-center">
+            <CheckCircle2 className="w-4 h-4 mr-2 text-blue-400" />
+            {tabName === "Essays" ? "Essay prompts and writing workspace" : "Deadline tracking and calendar"}
+          </li>
+          <li className="flex items-center">
+            <CheckCircle2 className="w-4 h-4 mr-2 text-blue-400" />
+            {tabName === "Essays" ? "AI-powered suggestions and analytics" : "Event reminders and notifications"}
+          </li>
+          <li className="flex items-center">
+            <CheckCircle2 className="w-4 h-4 mr-2 text-blue-400" />
+            {tabName === "Essays" ? "Version history and auto-save" : "Task completion tracking"}
+          </li>
+        </ul>
+      </div>
+
+      <Button
+        onClick={onAddUniversity}
+        disabled={isAddingUniversity}
+        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/30 px-8 py-6"
+      >
+        {isAddingUniversity ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Adding University...
+          </>
+        ) : (
+          <>
+            <BookmarkPlus className="w-4 h-4 mr-2" />
+            Add to Dashboard
+          </>
+        )}
+      </Button>
+
+      <p className="text-xs text-white/50 mt-4">
+        This will save the university to your application dashboard
+      </p>
+    </div>
   </div>
 );
 
@@ -108,10 +428,17 @@ const ApplicationTabs = ({ university }) => {
   
   const universityName = university?.name || universityNameFromUrl || '';
 
+  // ========== UNIVERSITY ADDED STATE ==========
+  const isUniversityAdded = university?.isAdded || false;
+  const [isAddingUniversity, setIsAddingUniversity] = useState(false);
+
+  // ========== CUSTOM ESSAY STATE ==========
+  const [showCustomEssayModal, setShowCustomEssayModal] = useState(false);
+  const [isCreatingCustomEssay, setIsCreatingCustomEssay] = useState(false);
+  const [customEssays, setCustomEssays] = useState([]);
+
   // ========== STATE MANAGEMENT ==========
   const [activeView, setActiveView] = useState('list');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addModalType, setAddModalType] = useState('task');
   const [workspaceData, setWorkspaceData] = useState(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState(null);
@@ -124,6 +451,15 @@ const ApplicationTabs = ({ university }) => {
   const [isCreatingEssay, setIsCreatingEssay] = useState(false);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
 
+  // ========== SELECTED ESSAY INFO - FOR IMMEDIATE DISPLAY ==========
+  const [selectedEssayInfo, setSelectedEssayInfo] = useState({
+    title: '',
+    programName: '',
+    isCustom: false,
+    promptText: '',
+    wordLimit: 500
+  });
+
   // ========== REFS FOR DEBOUNCING AND PERFORMANCE ==========
   const autoSaveTimerRef = useRef(null);
   const lastContentRef = useRef('');
@@ -133,6 +469,156 @@ const ApplicationTabs = ({ university }) => {
   const updateDebounceRef = useRef(null);
   const isEditorActiveRef = useRef(false);
   const saveVersionRef = useRef(null);
+  const customEssaysRef = useRef(customEssays);
+  const isFetchingRef = useRef(false);
+
+  // Keep ref in sync
+  useEffect(() => {
+    customEssaysRef.current = customEssays;
+  }, [customEssays]);
+
+  // ========== HANDLE ADD UNIVERSITY TO DASHBOARD ==========
+  const handleAddUniversity = async () => {
+    if (!userId || !university?.id) {
+      alert('Please sign in to add universities to your dashboard');
+      return;
+    }
+
+    try {
+      setIsAddingUniversity(true);
+
+      const response = await fetch('/api/user/toggle-add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          universityId: university.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.isAdded) {
+          alert(`${university.name || 'University'} has been added to your dashboard!`);
+          window.location.reload();
+        } else {
+          alert(`${university.name || 'University'} has been removed from your dashboard.`);
+          window.location.reload();
+        }
+      } else {
+        throw new Error(data.error || 'Failed to update university status');
+      }
+    } catch (error) {
+      console.error('Error toggling university:', error);
+      alert('Failed to update university. Please try again.');
+      setIsAddingUniversity(false);
+    }
+  };
+
+  // ========== HANDLE CREATE CUSTOM ESSAY (FIXED - NO DUPLICATION) ==========
+  const handleCreateCustomEssay = async (formData) => {
+    if (!userId || !university?.id || !isUniversityAdded) {
+      alert('Please add the university to your dashboard first');
+      return;
+    }
+
+    try {
+      setIsCreatingCustomEssay(true);
+
+      const response = await fetch(
+        `/api/essay/independent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create_standalone_essay",
+            customTitle: formData.customTitle,
+            customPrompt: formData.customPrompt,
+            wordLimit: formData.wordLimit,
+            priority: formData.priority,
+            taggedUniversityId: university.id,
+            userId: userId
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // Refresh workspace data to get updated custom essays
+          await fetchWorkspaceData();
+          
+          setShowCustomEssayModal(false);
+          alert('Custom essay created successfully!');
+          
+          // Navigate to the new custom essay
+          if (result.essay?.id) {
+            setActiveProgramId('custom');
+            setActiveEssayPromptId(result.essay.id);
+            setSelectedEssayInfo({
+              title: result.essay.title,
+              programName: 'Custom Essays',
+              isCustom: true,
+              promptText: result.essay.prompt,
+              wordLimit: result.essay.wordLimit
+            });
+            setActiveView('editor');
+          }
+        } else {
+          throw new Error(result.error || 'Failed to create custom essay');
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create custom essay');
+      }
+    } catch (error) {
+      console.error('Error creating custom essay:', error);
+      alert(error.message);
+    } finally {
+      setIsCreatingCustomEssay(false);
+    }
+  };
+
+  // ========== HANDLE DELETE CUSTOM ESSAY (FIXED) ==========
+  const handleDeleteCustomEssay = async (essayId) => {
+    if (!confirm('Are you sure you want to delete this custom essay? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/essay/independent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete_essay",
+            essayId,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        // Remove from local state
+        setCustomEssays(prev => prev.filter(essay => essay.id !== essayId));
+        
+        // If we're currently viewing this essay, navigate away
+        if (activeEssayPromptId === essayId) {
+          setActiveEssayPromptId(null);
+          setActiveView('list');
+        }
+        
+        alert('Custom essay deleted successfully!');
+      } else {
+        throw new Error('Failed to delete custom essay');
+      }
+    } catch (error) {
+      console.error('Error deleting custom essay:', error);
+      alert('Failed to delete custom essay');
+    }
+  };
 
   // ========== PANEL MANAGEMENT ==========
   const Panel = useCallback(({ name, title, icon: Icon, iconColor, children, isOpen, onClose }) => {
@@ -192,12 +678,27 @@ const ApplicationTabs = ({ university }) => {
   }, [workspaceData]);
 
   const currentProgram = useMemo(() => {
+    if (activeProgramId === 'custom') return null;
     return programsWithEssays.find(p => p.id === activeProgramId);
   }, [programsWithEssays, activeProgramId]);
 
   const currentEssayData = useMemo(() => {
+    if (activeProgramId === 'custom') {
+      const customEssay = customEssaysRef.current.find(e => e.id === activeEssayPromptId);
+      if (customEssay) {
+        return {
+          promptId: customEssay.id,
+          promptTitle: customEssay.title,
+          promptText: customEssay.prompt,
+          wordLimit: customEssay.wordLimit,
+          userEssay: customEssay,
+          isCustom: true
+        };
+      }
+      return null;
+    }
     return currentProgram?.essays?.find(e => e.promptId === activeEssayPromptId);
-  }, [currentProgram, activeEssayPromptId]);
+  }, [currentProgram, activeEssayPromptId, activeProgramId]);
 
   const currentEssay = useMemo(() => {
     return currentEssayData?.userEssay;
@@ -237,9 +738,16 @@ const ApplicationTabs = ({ university }) => {
     const calendarEvents = university.calendarEvents || [];
     const tasksEvents = university.tasksAndEvents || [];
 
-    const completedEssays = essayPrompts.filter(essay => 
+    // Include custom essays in total count (remove duplicates)
+    const uniqueCustomEssays = Array.from(
+      new Map(customEssays.map(essay => [essay.id, essay])).values()
+    );
+    const allEssays = [...essayPrompts, ...uniqueCustomEssays];
+    
+    const completedEssays = allEssays.filter(essay => 
       essay.status === 'COMPLETED' || essay.status === 'completed' || 
-      (essay.wordCount && essay.wordLimit && essay.wordCount >= essay.wordLimit * 0.98)
+      (essay.wordCount && essay.wordLimit && essay.wordCount >= essay.wordLimit * 0.98) ||
+      essay.isCompleted
     ).length;
 
     const allTasks = [...calendarEvents, ...tasksEvents];
@@ -247,23 +755,23 @@ const ApplicationTabs = ({ university }) => {
       event.completionStatus === 'completed' || event.status === 'completed'
     ).length;
 
-    const essayProgress = essayPrompts.length > 0 
-      ? Math.round((completedEssays / essayPrompts.length) * 100)
+    const essayProgress = allEssays.length > 0 
+      ? Math.round((completedEssays / allEssays.length) * 100)
       : 0;
 
     const taskProgress = allTasks.length > 0 
       ? Math.round((completedTasks / allTasks.length) * 100)
       : 0;
 
-    const overallProgress = essayPrompts.length > 0 && allTasks.length > 0
+    const overallProgress = allEssays.length > 0 && allTasks.length > 0
       ? Math.round((essayProgress * 0.7) + (taskProgress * 0.3))
-      : essayPrompts.length > 0 
+      : allEssays.length > 0 
       ? essayProgress 
       : taskProgress;
 
     let applicationStatus = 'not-started';
     if (completedEssays > 0 || completedTasks > 0) {
-      if (completedEssays === essayPrompts.length && completedTasks === allTasks.length && (essayPrompts.length > 0 || allTasks.length > 0)) {
+      if (completedEssays === allEssays.length && completedTasks === allTasks.length && (allEssays.length > 0 || allTasks.length > 0)) {
         applicationStatus = 'submitted';
       } else {
         applicationStatus = 'in-progress';
@@ -275,7 +783,7 @@ const ApplicationTabs = ({ university }) => {
       essayProgress,
       taskProgress,
       completedEssays,
-      totalEssays: essayPrompts.length,
+      totalEssays: allEssays.length,
       completedTasks,
       totalTasks: allTasks.length,
       applicationStatus,
@@ -293,14 +801,16 @@ const ApplicationTabs = ({ university }) => {
     university?.enhancedStats,
     university?.allEssayPrompts,
     university?.calendarEvents,
-    university?.tasksAndEvents
+    university?.tasksAndEvents,
+    customEssays
   ]);
 
   // ========== API FUNCTIONS ==========
   const fetchWorkspaceData = useCallback(async () => {
-    if (!universityName || !userId) return;
+    if (!universityName || !userId || !isUniversityAdded || isFetchingRef.current) return;
 
     try {
+      isFetchingRef.current = true;
       setWorkspaceLoading(true);
       setWorkspaceError(null);
 
@@ -320,6 +830,45 @@ const ApplicationTabs = ({ university }) => {
 
       const data = await response.json();
       setWorkspaceData(data);
+
+      // Fetch custom essays for this university (FIXED - NO DUPLICATION)
+      if (university?.id) {
+        try {
+          const customEssaysResponse = await fetch(
+            `/api/essay/independent?universityId=${encodeURIComponent(university.id)}`,
+            {
+              method: "GET",
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+
+          if (customEssaysResponse.ok) {
+            const customData = await customEssaysResponse.json();
+            // Filter custom essays for this specific university
+            const universityCustomEssays = customData.programs
+              ?.filter(p => p.degreeType === "STANDALONE" && p.universityId === university.id)
+              .flatMap(p => p.essays?.map(e => e.userEssay).filter(Boolean)) || [];
+            
+            // Remove duplicates by essay ID
+            const uniqueEssays = Array.from(
+              new Map(universityCustomEssays.map(essay => [essay.id, essay])).values()
+            );
+            
+            setCustomEssays(uniqueEssays);
+          } else {
+            console.warn('Failed to fetch custom essays');
+            setCustomEssays([]);
+          }
+        } catch (err) {
+          console.warn('Failed to fetch custom essays:', err);
+          setCustomEssays([]);
+        }
+      }
+
+      // Don't auto-select if we already have a selection
+      if (activeProgramId && activeEssayPromptId) {
+        return;
+      }
 
       // Filter and set default selections
       const programsWithContent = data.programs?.filter(p => p.essays && p.essays.length > 0) || [];
@@ -350,11 +899,12 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceError(err.message);
     } finally {
       setWorkspaceLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [universityName, userId, activeProgramId, activeEssayPromptId]);
+  }, [universityName, userId, activeProgramId, activeEssayPromptId, isUniversityAdded, university?.id]);
 
   const autoSaveEssay = useCallback(async () => {
-    if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current || !userId) {
+    if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current || !userId || !isUniversityAdded) {
       return false;
     }
 
@@ -370,6 +920,8 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
+      const isCustom = activeProgramId === 'custom';
+
       const response = await fetch(
         `/api/essay/${encodeURIComponent(universityName)}`,
         {
@@ -380,6 +932,7 @@ const ApplicationTabs = ({ university }) => {
             content: contentToSave,
             wordCount: wordCountToSave,
             isAutoSave: true,
+            isCustomEssay: isCustom,
             userId,
           }),
         }
@@ -388,8 +941,17 @@ const ApplicationTabs = ({ university }) => {
       if (response.ok) {
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
-        // Clear pending content after successful save
         pendingContentRef.current = null;
+
+        // Update custom essays state if it's a custom essay
+        if (isCustom) {
+          setCustomEssays(prev => prev.map(essay => 
+            essay.id === currentEssay.id 
+              ? { ...essay, content: contentToSave, wordCount: wordCountToSave, lastModified: new Date() }
+              : essay
+          ));
+        }
+
         return true;
       }
       return false;
@@ -400,10 +962,10 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(false);
       isUpdatingRef.current = false;
     }
-  }, [currentEssay, isSaving, hasUnsavedChanges, universityName, userId]);
+  }, [currentEssay, isSaving, hasUnsavedChanges, universityName, userId, isUniversityAdded, activeProgramId]);
 
   const createEssay = useCallback(async () => {
-    if (!activeProgramId || !activeEssayPromptId || isCreatingEssay || !userId) {
+    if (!activeProgramId || !activeEssayPromptId || isCreatingEssay || !userId || !isUniversityAdded) {
       return null;
     }
 
@@ -429,7 +991,6 @@ const ApplicationTabs = ({ university }) => {
       const responseData = await response.json();
 
       if (response.ok && responseData.essay) {
-        // Immediately update state
         setWorkspaceData((prev) => {
           if (!prev) return prev;
           return {
@@ -465,86 +1026,88 @@ const ApplicationTabs = ({ university }) => {
       setIsCreatingEssay(false);
       isUpdatingRef.current = false;
     }
-  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId]);
+  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded]);
 
   // ========== OPTIMIZED ESSAY CONTENT UPDATE ==========
   const updateEssayContent = useCallback((content, wordCount) => {
-    // Store the pending update
+    if (!isUniversityAdded) return;
+
     pendingContentRef.current = { content, wordCount };
-    
-    // Mark editor as active to prevent external sync
     isEditorActiveRef.current = true;
+    lastTypingTimeRef.current = Date.now();
     
-    // Clear existing debounce timer
     if (updateDebounceRef.current) {
       clearTimeout(updateDebounceRef.current);
     }
     
-    // Debounce state updates to prevent re-renders during typing
     updateDebounceRef.current = setTimeout(() => {
       if (!pendingContentRef.current) return;
       
       const { content: newContent, wordCount: newWordCount } = pendingContentRef.current;
       
-      // If no essay exists, create one
-      if (!currentEssay) {
+      if (!currentEssay && activeProgramId !== 'custom') {
         createEssay();
         return;
       }
 
-      // Batch the state update
-      setWorkspaceData((prev) => {
-        if (!prev) return prev;
-        
-        // Find the program
-        const programIndex = prev.programs.findIndex(p => p.id === activeProgramId);
-        if (programIndex === -1) return prev;
-        
-        const program = prev.programs[programIndex];
-        if (!program.essays) return prev;
-        
-        // Find the essay
-        const essayIndex = program.essays.findIndex(e => e.promptId === activeEssayPromptId);
-        if (essayIndex === -1) return prev;
-        
-        // Check if content actually changed
-        const currentContent = program.essays[essayIndex].userEssay?.content;
-        if (currentContent === newContent) return prev;
-        
-        // Create new state immutably with minimal object creation
-        const newPrograms = [...prev.programs];
-        const newProgram = { ...program };
-        const newEssays = [...program.essays];
-        const newEssayData = { ...newEssays[essayIndex] };
-        
-        newEssayData.userEssay = {
-          ...newEssayData.userEssay,
-          content: newContent,
-          wordCount: newWordCount,
-          lastModified: new Date(),
-        };
-        
-        newEssays[essayIndex] = newEssayData;
-        newProgram.essays = newEssays;
-        newPrograms[programIndex] = newProgram;
-        
-        return { ...prev, programs: newPrograms };
-      });
+      const isCustom = activeProgramId === 'custom';
+
+      if (isCustom) {
+        // Update custom essay
+        setCustomEssays(prev => prev.map(essay => 
+          essay.id === activeEssayPromptId 
+            ? { ...essay, content: newContent, wordCount: newWordCount, lastModified: new Date() }
+            : essay
+        ));
+      } else {
+        // Update regular essay
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+          
+          const programIndex = prev.programs.findIndex(p => p.id === activeProgramId);
+          if (programIndex === -1) return prev;
+          
+          const program = prev.programs[programIndex];
+          if (!program.essays) return prev;
+          
+          const essayIndex = program.essays.findIndex(e => e.promptId === activeEssayPromptId);
+          if (essayIndex === -1) return prev;
+          
+          const currentContent = program.essays[essayIndex].userEssay?.content;
+          if (currentContent === newContent) return prev;
+          
+          const newPrograms = [...prev.programs];
+          const newProgram = { ...program };
+          const newEssays = [...program.essays];
+          const newEssayData = { ...newEssays[essayIndex] };
+          
+          newEssayData.userEssay = {
+            ...newEssayData.userEssay,
+            content: newContent,
+            wordCount: newWordCount,
+            lastModified: new Date(),
+          };
+          
+          newEssays[essayIndex] = newEssayData;
+          newProgram.essays = newEssays;
+          newPrograms[programIndex] = newProgram;
+          
+          return { ...prev, programs: newPrograms };
+        });
+      }
       
       setHasUnsavedChanges(true);
       pendingContentRef.current = null;
       
-      // Keep editor active flag for a bit longer
       setTimeout(() => {
         isEditorActiveRef.current = false;
       }, 100);
-    }, 600); // 600ms debounce
-  }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay]);
+    }, 600);
+  }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay, isUniversityAdded]);
 
   const saveVersion = useCallback(async (label) => {
-    if (!currentEssay || isSaving || isSavingVersion || !userId) return false;
+    if (!currentEssay || isSaving || isSavingVersion || !userId || !isUniversityAdded) return false;
 
-    // Use pending content if available
     let contentToSave = currentEssay.content;
     let wordCountToSave = currentEssay.wordCount;
     if (pendingContentRef.current) {
@@ -563,6 +1126,8 @@ const ApplicationTabs = ({ university }) => {
         }
       }
 
+      const isCustom = activeProgramId === 'custom';
+
       const response = await fetch(
         `/api/essay/${encodeURIComponent(universityName)}`,
         {
@@ -574,6 +1139,7 @@ const ApplicationTabs = ({ university }) => {
             content: contentToSave,
             wordCount: wordCountToSave,
             label: label || `Version ${new Date().toLocaleString()}`,
+            isCustomEssay: isCustom,
             userId,
           }),
         }
@@ -581,34 +1147,51 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         const result = await response.json();
+        
         if (result.version) {
-          // Immediately update local state with new version
-          setWorkspaceData((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              programs: prev.programs.map(program =>
-                program.id === activeProgramId
-                  ? {
-                      ...program,
-                      essays: program.essays.map(essayData =>
-                        essayData.promptId === activeEssayPromptId
-                          ? {
-                              ...essayData,
-                              userEssay: {
-                                ...essayData.userEssay,
-                                versions: [result.version, ...(essayData.userEssay?.versions || [])],
-                                lastModified: new Date(),
-                              },
-                            }
-                          : essayData
-                      ),
-                    }
-                  : program
-              ),
-            };
-          });
+          if (isCustom) {
+            // Update custom essay versions
+            setCustomEssays(prev => prev.map(essay => 
+              essay.id === currentEssay.id 
+                ? { ...essay, versions: [result.version, ...(essay.versions || [])] }
+                : essay
+            ));
+          } else {
+            // Update regular essay versions
+            setWorkspaceData((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                programs: prev.programs.map(program =>
+                  program.id === activeProgramId
+                    ? {
+                        ...program,
+                        essays: program.essays.map(essayData =>
+                          essayData.promptId === activeEssayPromptId
+                            ? {
+                                ...essayData,
+                                userEssay: {
+                                  ...essayData.userEssay,
+                                  versions: [result.version, ...(essayData.userEssay?.versions || [])],
+                                  lastModified: new Date(),
+                                },
+                              }
+                            : essayData
+                        ),
+                      }
+                    : program
+                ),
+              };
+            });
+          }
         }
+
+        // Navigate back to list view after saving version
+        setTimeout(() => {
+          setActiveView('list');
+          setOpenPanels([]);
+        }, 500);
+
         return true;
       }
       return false;
@@ -618,10 +1201,12 @@ const ApplicationTabs = ({ university }) => {
     } finally {
       setIsSavingVersion(false);
     }
-  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId]);
+  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded]);
 
   const handleRestoreVersion = async (versionId) => {
-    if (!currentEssay || !userId) return;
+    if (!currentEssay || !userId || !isUniversityAdded) return;
+    
+    const isCustom = activeProgramId === 'custom';
     
     try {
       const response = await fetch(
@@ -633,6 +1218,7 @@ const ApplicationTabs = ({ university }) => {
             action: "restore_version",
             essayId: currentEssay.id,
             versionId,
+            isCustomEssay: isCustom,
             userId,
           }),
         }
@@ -641,7 +1227,79 @@ const ApplicationTabs = ({ university }) => {
       if (response.ok) {
         const result = await response.json();
         if (result.essay) {
-          // Immediately update local state with restored content
+          if (isCustom) {
+            setCustomEssays(prev => prev.map(essay => 
+              essay.id === currentEssay.id 
+                ? { ...essay, content: result.essay.content, wordCount: result.essay.wordCount, lastModified: new Date() }
+                : essay
+            ));
+          } else {
+            setWorkspaceData((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                programs: prev.programs.map(program =>
+                  program.id === activeProgramId
+                    ? {
+                        ...program,
+                        essays: program.essays.map(essayData =>
+                          essayData.promptId === activeEssayPromptId
+                            ? {
+                                ...essayData,
+                                userEssay: {
+                                  ...essayData.userEssay,
+                                  content: result.essay.content,
+                                  wordCount: result.essay.wordCount,
+                                  lastModified: new Date(),
+                                },
+                              }
+                            : essayData
+                        ),
+                      }
+                    : program
+                ),
+              };
+            });
+          }
+          lastContentRef.current = result.essay.content;
+          setHasUnsavedChanges(false);
+          setLastSaved(new Date());
+        }
+      }
+    } catch (error) {
+      console.error("Error restoring version:", error);
+    }
+  };
+
+  const handleDeleteVersion = async (versionId) => {
+    if (!currentEssay || !userId || !isUniversityAdded) return;
+    
+    const isCustom = activeProgramId === 'custom';
+    
+    try {
+      const response = await fetch(
+        `/api/essay/${encodeURIComponent(universityName)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete_version",
+            versionId,
+            essayId: currentEssay.id,
+            isCustomEssay: isCustom,
+            userId,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        if (isCustom) {
+          setCustomEssays(prev => prev.map(essay => 
+            essay.id === currentEssay.id 
+              ? { ...essay, versions: (essay.versions || []).filter(v => v.id !== versionId) }
+              : essay
+          ));
+        } else {
           setWorkspaceData((prev) => {
             if (!prev) return prev;
             return {
@@ -656,9 +1314,7 @@ const ApplicationTabs = ({ university }) => {
                               ...essayData,
                               userEssay: {
                                 ...essayData.userEssay,
-                                content: result.essay.content,
-                                wordCount: result.essay.wordCount,
-                                lastModified: new Date(),
+                                versions: (essayData.userEssay?.versions || []).filter(v => v.id !== versionId),
                               },
                             }
                           : essayData
@@ -668,60 +1324,7 @@ const ApplicationTabs = ({ university }) => {
               ),
             };
           });
-          lastContentRef.current = result.essay.content;
-          setHasUnsavedChanges(false);
-          setLastSaved(new Date());
         }
-      }
-    } catch (error) {
-      console.error("Error restoring version:", error);
-    }
-  };
-
-  const handleDeleteVersion = async (versionId) => {
-    if (!currentEssay || !userId) return;
-    
-    try {
-      const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "delete_version",
-            versionId,
-            essayId: currentEssay.id,
-            userId,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        // Immediately update local state to remove version
-        setWorkspaceData((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            programs: prev.programs.map(program =>
-              program.id === activeProgramId
-                ? {
-                    ...program,
-                    essays: program.essays.map(essayData =>
-                      essayData.promptId === activeEssayPromptId
-                        ? {
-                            ...essayData,
-                            userEssay: {
-                              ...essayData.userEssay,
-                              versions: (essayData.userEssay?.versions || []).filter(v => v.id !== versionId),
-                            },
-                          }
-                        : essayData
-                    ),
-                  }
-                : program
-            ),
-          };
-        });
       }
     } catch (error) {
       console.error("Error deleting version:", error);
@@ -730,9 +1333,8 @@ const ApplicationTabs = ({ university }) => {
 
   // ========== HANDLERS ==========
   const handleProgramSelect = useCallback((programId) => {
-    if (programId === activeProgramId) return;
+    if (programId === activeProgramId || !isUniversityAdded) return;
 
-    // Clear any pending updates
     if (updateDebounceRef.current) {
       clearTimeout(updateDebounceRef.current);
       updateDebounceRef.current = null;
@@ -745,24 +1347,47 @@ const ApplicationTabs = ({ university }) => {
     }
 
     setActiveProgramId(programId);
-    const program = programsWithEssays.find(p => p.id === programId);
     
-    if (program?.essays?.length > 0) {
-      setActiveEssayPromptId(program.essays[0].promptId);
+    if (programId === 'custom') {
+      // For custom essays, select the first one
+      if (customEssays.length > 0) {
+        const firstCustomEssay = customEssays[0];
+        setActiveEssayPromptId(firstCustomEssay.id);
+        setSelectedEssayInfo({
+          title: firstCustomEssay.title,
+          programName: 'Custom Essays',
+          isCustom: true,
+          promptText: firstCustomEssay.prompt,
+          wordLimit: firstCustomEssay.wordLimit
+        });
+      }
     } else {
-      setActiveEssayPromptId(null);
+      const program = programsWithEssays.find(p => p.id === programId);
+      
+      if (program?.essays?.length > 0) {
+        const firstEssay = program.essays[0];
+        setActiveEssayPromptId(firstEssay.promptId);
+        setSelectedEssayInfo({
+          title: firstEssay.promptTitle,
+          programName: program.name,
+          isCustom: false,
+          promptText: firstEssay.promptText,
+          wordLimit: firstEssay.wordLimit
+        });
+      } else {
+        setActiveEssayPromptId(null);
+      }
     }
 
     setHasUnsavedChanges(false);
     setLastSaved(null);
     lastContentRef.current = "";
     setOpenPanels([]);
-  }, [activeProgramId, programsWithEssays]);
+  }, [activeProgramId, programsWithEssays, customEssays, isUniversityAdded]);
 
-  const handleEssayPromptSelect = useCallback((promptId) => {
-    if (promptId === activeEssayPromptId) return;
+  const handleEssayPromptSelect = useCallback((promptId, essayInfo = null) => {
+    if (promptId === activeEssayPromptId || !isUniversityAdded) return;
 
-    // Clear any pending updates
     if (updateDebounceRef.current) {
       clearTimeout(updateDebounceRef.current);
       updateDebounceRef.current = null;
@@ -775,41 +1400,90 @@ const ApplicationTabs = ({ university }) => {
     }
 
     setActiveEssayPromptId(promptId);
+    
+    // Update selected essay info immediately
+    if (essayInfo) {
+      setSelectedEssayInfo(essayInfo);
+    }
+    
     setHasUnsavedChanges(false);
     setLastSaved(null);
     setOpenPanels([]);
 
-    const newEssayData = currentProgram?.essays?.find(e => e.promptId === promptId);
-    lastContentRef.current = newEssayData?.userEssay?.content || "";
-  }, [activeEssayPromptId, currentProgram]);
+    if (activeProgramId === 'custom') {
+      const customEssay = customEssays.find(e => e.id === promptId);
+      lastContentRef.current = customEssay?.content || "";
+    } else {
+      const newEssayData = currentProgram?.essays?.find(e => e.promptId === promptId);
+      lastContentRef.current = newEssayData?.userEssay?.content || "";
+    }
+  }, [activeEssayPromptId, currentProgram, customEssays, activeProgramId, isUniversityAdded]);
 
-  const handleOpenEditor = useCallback((essay) => {
-    setActiveView('editor');
+  const handleOpenEditor = useCallback((essay, isCustom = false) => {
+    if (!isUniversityAdded) return;
     
-    if (workspaceData) {
-      for (const program of workspaceData.programs) {
-        if (!program.essays || program.essays.length === 0) continue;
-        const essayData = program.essays.find(e => 
-          e.promptId === essay.id || 
-          e.userEssay?.id === essay.id ||
-          e.promptTitle === essay.title
-        );
-        if (essayData) {
-          setActiveProgramId(program.id);
-          setActiveEssayPromptId(essayData.promptId);
-          break;
+    // Set essay info immediately for display
+    setSelectedEssayInfo({
+      title: essay.title || essay.promptTitle || 'Essay',
+      programName: isCustom ? 'Custom Essays' : '',
+      isCustom: isCustom,
+      promptText: essay.text || essay.prompt || essay.promptText || '',
+      wordLimit: essay.wordLimit || 500
+    });
+    
+    if (isCustom) {
+      // Handle custom essay
+      setActiveProgramId('custom');
+      setActiveEssayPromptId(essay.id);
+      lastContentRef.current = essay.content || "";
+    } else {
+      // Find the essay in workspace data
+      if (workspaceData) {
+        for (const program of workspaceData.programs) {
+          if (!program.essays || program.essays.length === 0) continue;
+          const essayData = program.essays.find(e => 
+            e.promptId === essay.id || 
+            e.userEssay?.id === essay.id ||
+            e.promptTitle === essay.title
+          );
+          if (essayData) {
+            setActiveProgramId(program.id);
+            setActiveEssayPromptId(essayData.promptId);
+            setSelectedEssayInfo({
+              title: essayData.promptTitle,
+              programName: program.name,
+              isCustom: false,
+              promptText: essayData.promptText,
+              wordLimit: essayData.wordLimit
+            });
+            lastContentRef.current = essayData.userEssay?.content || "";
+            break;
+          }
         }
       }
     }
-  }, [workspaceData]);
+    
+    setActiveView('editor');
+    setHasUnsavedChanges(false);
+    setLastSaved(null);
+    setOpenPanels([]);
+  }, [workspaceData, isUniversityAdded]);
 
-  const handleBackToList = async () => {
-    if (hasUnsavedChanges) {
+  const handleBackToList = useCallback(async () => {
+    if (hasUnsavedChanges && isUniversityAdded) {
       await autoSaveEssay();
     }
     setActiveView('list');
     setOpenPanels([]);
-  };
+    // Clear selected info when going back
+    setSelectedEssayInfo({
+      title: '',
+      programName: '',
+      isCustom: false,
+      promptText: '',
+      wordLimit: 500
+    });
+  }, [hasUnsavedChanges, isUniversityAdded, autoSaveEssay]);
 
   // ========== MEMOIZED EDITOR PROPS ==========
   const editorKey = useMemo(() => {
@@ -817,50 +1491,252 @@ const ApplicationTabs = ({ university }) => {
   }, [currentEssay?.id, activeProgramId, activeEssayPromptId]);
 
   const editorContent = useMemo(() => {
-    // Only get content when essay changes, not during typing
     if (isEditorActiveRef.current) {
-      return undefined; // Let editor manage its own content
+      return undefined;
     }
     return currentEssay?.content || '';
-  }, [currentEssay?.id]); // Only depend on ID, not content
+  }, [currentEssay?.id, currentEssay?.content]);
 
-  // ========== EFFECTS ==========
-  // Optimized auto-save - triggers after 25s of inactivity
-  useEffect(() => {
-    if (!hasUnsavedChanges || !currentEssay || isSaving || activeView !== 'editor') {
-      return;
+  // ========== DISPLAY TITLE - Uses selectedEssayInfo for immediate display ==========
+  const displayTitle = useMemo(() => {
+    if (selectedEssayInfo.title) {
+      return selectedEssayInfo.title;
     }
-
-    const timerId = setTimeout(() => {
-      const timeSinceLastType = Date.now() - lastTypingTimeRef.current;
-      if (timeSinceLastType >= 20000) {
-        autoSaveEssay();
-      }
-    }, 25000);
-
-    return () => clearTimeout(timerId);
-  }, [hasUnsavedChanges, currentEssay?.id, isSaving, activeView, autoSaveEssay]);
-
-  useEffect(() => {
-    if (activeView === 'editor' && !workspaceData && universityName && userId) {
-      fetchWorkspaceData();
+    if (currentEssayData?.promptTitle) {
+      return currentEssayData.promptTitle;
     }
-  }, [activeView, workspaceData, universityName, userId, fetchWorkspaceData]);
+    if (activeProgramId === 'custom') {
+      const customEssay = customEssays.find(e => e.id === activeEssayPromptId);
+      return customEssay?.title || 'Custom Essay';
+    }
+    return 'Loading...';
+  }, [selectedEssayInfo.title, currentEssayData?.promptTitle, activeProgramId, activeEssayPromptId, customEssays]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-      if (updateDebounceRef.current) {
-        clearTimeout(updateDebounceRef.current);
-      }
-      if (saveVersionRef.current) {
-        clearTimeout(saveVersionRef.current);
-      }
+  const displayProgramName = useMemo(() => {
+    if (selectedEssayInfo.programName) {
+      return selectedEssayInfo.programName;
+    }
+    if (activeProgramId === 'custom') {
+      return 'Custom Essays';
+    }
+    return currentProgram?.name || '';
+  }, [selectedEssayInfo.programName, activeProgramId, currentProgram?.name]);
+
+  // ========== CUSTOM ESSAY CARD COMPONENT ==========
+  const CustomEssayCard = React.memo(({ essay, index, onEdit, onDelete }) => {
+    const progress = essay.wordLimit > 0 
+      ? (essay.wordCount / essay.wordLimit) * 100 
+      : 0;
+
+    const priorityColors = {
+      high: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-400/30', dot: 'bg-red-500' },
+      medium: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-400/30', dot: 'bg-amber-500' },
+      low: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-400/30', dot: 'bg-green-500' },
     };
-  }, []);
+
+    const priorityConfig = priorityColors[essay.priority] || priorityColors.medium;
+    const StatusIcon = essay.isCompleted ? CheckCircle2 : FileText;
+
+    return (
+      <div className="bg-gradient-to-r from-white/5 to-white/10 rounded-xl border border-white/20 hover:border-blue-400/30 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-bold text-white text-sm bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-3 py-1 rounded-lg">
+                    Custom Essay
+                  </span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`}></span>
+                    {essay.priority}
+                  </span>
+                </div>
+                <h4 className="font-semibold text-white text-base truncate">
+                  {essay.title}
+                </h4>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                essay.isCompleted 
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30' 
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+              }`}>
+                <StatusIcon className="h-3.5 w-3.5" />
+                {essay.isCompleted ? 'Completed' : 'In Progress'}
+              </div>
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(essay);
+                }}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30"
+              >
+                <Edit3 className="h-3.5 w-3.5 mr-1.5" />
+                Edit
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-white/10 to-white/5 rounded-lg p-4 mb-4 border-l-4 border-purple-400">
+            <p className="text-white/80 text-sm leading-relaxed line-clamp-2">
+              {essay.prompt}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-white/60">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-lg">
+                <FileText className="h-3.5 w-3.5 text-white/50" />
+                {essay.wordLimit} words max
+              </span>
+              {essay.wordCount > 0 && (
+                <span className="font-semibold text-white bg-purple-500/20 px-3 py-1 rounded-lg">
+                  {essay.wordCount} / {essay.wordLimit} words
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-28 bg-white/20 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    progress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
+                    progress > 0 ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-white/30'
+                  }`}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className={`font-bold w-12 text-right ${
+                progress === 100 ? 'text-emerald-400' :
+                progress > 0 ? 'text-purple-400' : 'text-white/40'
+              }`}>
+                {Math.round(progress)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Delete button */}
+          <div className="mt-4 pt-4 border-t border-white/10 flex justify-end">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(essay.id);
+              }}
+              className="text-xs text-white/50 hover:text-red-400 flex items-center gap-1 transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+              Delete Custom Essay
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  });
+
+  CustomEssayCard.displayName = 'CustomEssayCard';
+
+  // ========== ESSAY CARD COMPONENT ==========
+  const EssayCard = useCallback(({ essay, index }) => {
+    const actualProgress = getEssayProgress(essay);
+    const statusConfig = getEssayStatus(essay);
+    const EssayStatusIcon = statusConfig.icon;
+
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <span className="font-bold text-[#002147] text-sm whitespace-nowrap bg-blue-50 px-3 py-1 rounded-lg">
+                Essay {index + 1}
+              </span>
+              <h4 className="font-semibold text-gray-900 text-base truncate">
+                {essay.title}
+              </h4>
+              {essay.isMandatory && (
+                <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">
+                  Required
+                </span>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.shadow}`}>
+                <EssayStatusIcon className="h-3.5 w-3.5" />
+                {statusConfig.label}
+              </div>
+              {isUniversityAdded ? (
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEditor(essay, false);
+                  }}
+                  className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/30"
+                >
+                  <Edit3 className="h-3.5 w-3.5 mr-1.5" />
+                  Edit
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled
+                  className="bg-gray-300 text-gray-500 cursor-not-allowed"
+                >
+                  <Lock className="h-3.5 w-3.5 mr-1.5" />
+                  Locked
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50/50 rounded-lg p-4 mb-4 border-l-4 border-[#002147]">
+            <p className="text-gray-700 text-sm leading-relaxed line-clamp-2">
+              {essay.text}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-lg">
+                <FileText className="h-3.5 w-3.5 text-gray-500" />
+                {essay.wordLimit || 500} words max
+              </span>
+              {essay.wordCount > 0 && (
+                <span className="font-semibold text-[#002147] bg-blue-50 px-3 py-1 rounded-lg">
+                  {essay.wordCount} / {essay.wordLimit || 500} words
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    actualProgress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
+                    actualProgress > 0 ? 'bg-gradient-to-r from-blue-500 to-indigo-500' : 'bg-gray-300'
+                  }`}
+                  style={{ width: `${actualProgress}%` }}
+                />
+              </div>
+              <span className={`font-bold w-12 text-right ${
+                actualProgress === 100 ? 'text-emerald-600' :
+                actualProgress > 0 ? 'text-blue-600' : 'text-gray-400'
+              }`}>
+                {actualProgress}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }, [handleOpenEditor, isUniversityAdded]);
 
   // ========== HELPER FUNCTIONS ==========
   const getProgressBarColor = () => {
@@ -980,96 +1856,11 @@ const ApplicationTabs = ({ university }) => {
     };
   };
 
-  // Memoized EssayCard component
-  const EssayCard = useCallback(({ essay, index }) => {
-    const actualProgress = getEssayProgress(essay);
-    const statusConfig = getEssayStatus(essay);
-    const EssayStatusIcon = statusConfig.icon;
-
-    return (
-      <div
-        className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden"
-      >
-        <div className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="font-bold text-[#002147] text-sm whitespace-nowrap bg-blue-50 px-3 py-1 rounded-lg">
-                Essay {index + 1}
-              </span>
-              <h4 className="font-semibold text-gray-900 text-base truncate">
-                {essay.title}
-              </h4>
-              {essay.isMandatory && (
-                <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">
-                  Required
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.shadow}`}>
-                <EssayStatusIcon className="h-3.5 w-3.5" />
-                {statusConfig.label}
-              </div>
-              <Button
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenEditor(essay);
-                }}
-                className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/30"
-              >
-                <Edit3 className="h-3.5 w-3.5 mr-1.5" />
-                Edit
-              </Button>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50/50 rounded-lg p-4 mb-4 border-l-4 border-[#002147]">
-            <p className="text-gray-700 text-sm leading-relaxed line-clamp-2">
-              {essay.text}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-lg">
-                <FileText className="h-3.5 w-3.5 text-gray-500" />
-                {essay.wordLimit || 500} words max
-              </span>
-              {essay.wordCount > 0 && (
-                <span className="font-semibold text-[#002147] bg-blue-50 px-3 py-1 rounded-lg">
-                  {essay.wordCount} / {essay.wordLimit || 500} words
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div
-                  className={`h-2 rounded-full transition-all duration-500 ${
-                    actualProgress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
-                    actualProgress > 0 ? 'bg-gradient-to-r from-blue-500 to-indigo-500' : 'bg-gray-300'
-                  }`}
-                  style={{ width: `${actualProgress}%` }}
-                />
-              </div>
-              <span className={`font-bold w-12 text-right ${
-                actualProgress === 100 ? 'text-emerald-600' :
-                actualProgress > 0 ? 'text-blue-600' : 'text-gray-400'
-              }`}>
-                {actualProgress}%
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, [handleOpenEditor]);
-
   // ========== RENDER PANELS ==========
   const renderPanels = () => {
-    if (!currentEssay || openPanels.length === 0) return null;
+    if (!currentEssay || openPanels.length === 0 || !isUniversityAdded) return null;
+
+    const isCustom = activeProgramId === 'custom';
 
     return (
       <>
@@ -1106,10 +1897,13 @@ const ApplicationTabs = ({ university }) => {
             <EssayAnalytics
               essay={{
                 ...currentEssay,
-                wordLimit: currentEssayData.wordLimit,
-                priority: currentEssayData.priority
+                wordLimit: currentEssayData?.wordLimit || selectedEssayInfo.wordLimit,
+                priority: currentEssayData?.priority
               }}
-              allEssays={programsWithEssays.flatMap(p => p.essays.map(e => e.userEssay).filter(Boolean))}
+              allEssays={isCustom 
+                ? customEssays 
+                : programsWithEssays.flatMap(p => p.essays.map(e => e.userEssay).filter(Boolean))
+              }
               essayId={currentEssay.id}
               userId={userId}
               universityName={universityName}
@@ -1127,18 +1921,55 @@ const ApplicationTabs = ({ university }) => {
         >
           <AISuggestions
             content={currentEssay.content || ''}
-            prompt={currentEssayData.promptText}
+            prompt={currentEssayData?.promptText || selectedEssayInfo.promptText}
             wordCount={currentEssay.wordCount || 0}
-            wordLimit={currentEssayData.wordLimit}
+            wordLimit={currentEssayData?.wordLimit || selectedEssayInfo.wordLimit}
             essayId={currentEssay.id}
             universityName={universityName}
             currentVersionId={null}
             versions={currentEssay.versions || []}
+            isCustomEssay={isCustom}
           />
         </Panel>
       </>
     );
   };
+
+  // ========== EFFECTS ==========
+  useEffect(() => {
+    if (!hasUnsavedChanges || !currentEssay || isSaving || activeView !== 'editor' || !isUniversityAdded) {
+      return;
+    }
+
+    const timerId = setTimeout(() => {
+      const timeSinceLastType = Date.now() - lastTypingTimeRef.current;
+      if (timeSinceLastType >= 20000) {
+        autoSaveEssay();
+      }
+    }, 25000);
+
+    return () => clearTimeout(timerId);
+  }, [hasUnsavedChanges, currentEssay?.id, isSaving, activeView, autoSaveEssay, isUniversityAdded]);
+
+  useEffect(() => {
+    if (activeView === 'editor' && !workspaceData && universityName && userId && isUniversityAdded) {
+      fetchWorkspaceData();
+    }
+  }, [activeView, workspaceData, universityName, userId, fetchWorkspaceData, isUniversityAdded]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      if (updateDebounceRef.current) {
+        clearTimeout(updateDebounceRef.current);
+      }
+      if (saveVersionRef.current) {
+        clearTimeout(saveVersionRef.current);
+      }
+    };
+  }, []);
 
   // ========== RENDER ==========
   if (sessionStatus === 'loading') {
@@ -1147,7 +1978,7 @@ const ApplicationTabs = ({ university }) => {
         <Card className="bg-[#002147] shadow-xl border-0 overflow-hidden">
           <CardContent className="p-12 flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-white mr-3" />
-            <span className="text-white">Loading session...</span>
+            <span className="text-white">Loading...</span>
           </CardContent>
         </Card>
       </div>
@@ -1171,6 +2002,21 @@ const ApplicationTabs = ({ university }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(255, 255, 255, 0.3);
         }
+        
+        /* Fix for select dropdown visibility */
+        select {
+          color: white !important;
+        }
+        select option {
+          background-color: #002147 !important;
+          color: white !important;
+        }
+        select:focus option {
+          background-color: #003366 !important;
+        }
+        select::-ms-expand {
+          display: none;
+        }
       `}</style>
       
       <Card className="bg-[#002147] shadow-xl hover:shadow-2xl transition-all duration-500 border-0 overflow-hidden">
@@ -1192,81 +2038,88 @@ const ApplicationTabs = ({ university }) => {
                   <h2 className="text-2xl font-bold tracking-tight">
                     {activeView === 'editor' ? 'Essay Editor' : 'Application Workspace'}
                   </h2>
+                  {!isUniversityAdded && (
+                    <Lock className="w-5 h-5 ml-3 text-white/60" />
+                  )}
                 </div>
                 <p className="text-white/80 text-sm font-medium">
                   {activeView === 'editor' 
-                    ? `Editing: ${currentEssayData?.promptTitle || 'Essay'}`
+                    ? `Editing: ${displayTitle}`
                     : `Your personalized application center for ${universityName || 'this university'}`
                   }
                 </p>
               </div>
 
               {/* Progress Indicator */}
-              <div className="hidden md:flex items-center space-x-4">
-                <div className="text-right text-sm">
-                  <div className="text-white font-semibold">Application Progress</div>
-                  <div className="text-white/70">{progressData.overallProgress}% Complete</div>
+              {isUniversityAdded && (
+                <div className="hidden md:flex items-center space-x-4">
+                  <div className="text-right text-sm">
+                    <div className="text-white font-semibold">Application Progress</div>
+                    <div className="text-white/70">{progressData.overallProgress}% Complete</div>
+                  </div>
+                  <div className="w-16 h-16 relative">
+                    <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.2)"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="url(#progressGradient)"
+                        strokeWidth="3"
+                        strokeDasharray={`${progressData.overallProgress}, 100`}
+                        strokeLinecap="round"
+                      />
+                      <defs>
+                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#60A5FA" />
+                          <stop offset="100%" stopColor="#34D399" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">{progressData.overallProgress}%</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="w-16 h-16 relative">
-                  <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
-                    <path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="rgba(255,255,255,0.2)"
-                      strokeWidth="3"
-                    />
-                    <path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="url(#progressGradient)"
-                      strokeWidth="3"
-                      strokeDasharray={`${progressData.overallProgress}, 100`}
-                      strokeLinecap="round"
-                    />
-                    <defs>
-                      <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#60A5FA" />
-                        <stop offset="100%" stopColor="#34D399" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">{progressData.overallProgress}%</span>
+              )}
+            </div>
+
+            {/* Progress Info Card - Only show if added */}
+            {isUniversityAdded && (
+              <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <StatusIcon className="h-4 w-4 text-white" />
+                    <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/20 text-white">
+                      {statusInfo.text}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-white">{progressData.overallProgress}%</span>
+                </div>
+
+                <div className="w-full h-2.5 bg-white/20 rounded-full mb-3 overflow-hidden">
+                  <div 
+                    className={`h-2.5 rounded-full transition-all duration-500 ${getProgressBarColor()}`}
+                    style={{ width: `${progressData.overallProgress}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="text-center text-white p-2 bg-white/5 rounded-lg">
+                    <div className="font-semibold">Essays</div>
+                    <div className="text-white/70 text-lg font-bold">{progressData.completedEssays}/{progressData.totalEssays}</div>
+                  </div>
+                  <div className="text-center text-white p-2 bg-white/5 rounded-lg">
+                    <div className="font-semibold">Tasks</div>
+                    <div className="text-white/70 text-lg font-bold">{progressData.completedTasks}/{progressData.totalTasks}</div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Progress Info Card */}
-            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <StatusIcon className="h-4 w-4 text-white" />
-                  <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/20 text-white">
-                    {statusInfo.text}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-white">{progressData.overallProgress}%</span>
-              </div>
-
-              <div className="w-full h-2.5 bg-white/20 rounded-full mb-3 overflow-hidden">
-                <div 
-                  className={`h-2.5 rounded-full transition-all duration-500 ${getProgressBarColor()}`}
-                  style={{ width: `${progressData.overallProgress}%` }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div className="text-center text-white p-2 bg-white/5 rounded-lg">
-                  <div className="font-semibold">Essays</div>
-                  <div className="text-white/70 text-lg font-bold">{progressData.completedEssays}/{progressData.totalEssays}</div>
-                </div>
-                <div className="text-center text-white p-2 bg-white/5 rounded-lg">
-                  <div className="font-semibold">Tasks</div>
-                  <div className="text-white/70 text-lg font-bold">{progressData.completedTasks}/{progressData.totalTasks}</div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Main Content */}
@@ -1277,398 +2130,542 @@ const ApplicationTabs = ({ university }) => {
                 <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 h-14">
                   <TabsTrigger
                     value="essays"
-                    className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-11 font-semibold"
+                    className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-11 font-semibold relative"
                   >
                     <FileText className="h-5 w-5 mr-2" />
                     <span className="hidden sm:inline">Essay Workspace</span>
                     <span className="sm:hidden">Essays</span>
+                    {!isUniversityAdded && (
+                      <Lock className="w-4 h-4 ml-2 absolute right-2" />
+                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="deadlines"
-                    className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-11 font-semibold"
+                    className="data-[state=active]:bg-[#002147] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-300 h-11 font-semibold relative"
                   >
                     <Clock className="h-5 w-5 mr-2" />
                     <span className="hidden sm:inline">Tasks & Events</span>
                     <span className="sm:hidden">Tasks</span>
+                    {!isUniversityAdded && (
+                      <Lock className="w-4 h-4 ml-2 absolute right-2" />
+                    )}
                   </TabsTrigger>
                 </TabsList>
 
                 {/* Essays Tab */}
                 <TabsContent value="essays" className="mt-8">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-2xl font-bold text-white">Essay Requirements</h3>
-                        <p className="text-white/80 text-sm mt-1">
-                          {progressData.totalEssays} essays • {progressData.completedEssays} completed
-                        </p>
+                  {!isUniversityAdded ? (
+                    <LockedTabContent
+                      tabName="Essays"
+                      universityName={universityName}
+                      onAddUniversity={handleAddUniversity}
+                      isAddingUniversity={isAddingUniversity}
+                    />
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-2xl font-bold text-white">Essay Requirements</h3>
+                          <p className="text-white/80 text-sm mt-1">
+                            {progressData.totalEssays} essays • {progressData.completedEssays} completed
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => setShowCustomEssayModal(true)}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Custom Essay
+                        </Button>
+                      </div>
+
+                      {/* Custom Essays Section */}
+                      {customEssays.length > 0 && (
+                        <div className="space-y-4">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Sparkles className="h-5 w-5 text-purple-400" />
+                            <h4 className="text-lg font-semibold text-white">Custom Essays</h4>
+                            <span className="text-xs text-white/60 bg-purple-500/20 px-2 py-1 rounded-full">
+                              {customEssays.length} essay{customEssays.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {customEssays.map((essay, index) => (
+                            <CustomEssayCard
+                              key={`custom-${essay.id}-${essay.universityId || index}`}
+                              essay={essay}
+                              index={index}
+                              onEdit={(essay) => handleOpenEditor(essay, true)}
+                              onDelete={(essayId) => handleDeleteCustomEssay(essayId)}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Regular Essays Section */}
+                      <div className="space-y-4">
+                        {customEssays.length > 0 && (
+                          <div className="flex items-center space-x-2 mb-2">
+                            <BookOpen className="h-5 w-5 text-blue-400" />
+                            <h4 className="text-lg font-semibold text-white">University Essay Prompts</h4>
+                            <span className="text-xs text-white/60 bg-blue-500/20 px-2 py-1 rounded-full">
+                              {university?.allEssayPrompts?.length || 0} essay{(university?.allEssayPrompts?.length || 0) !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {university?.allEssayPrompts && university.allEssayPrompts.length > 0 ? (
+                          <div className="space-y-4">
+                            {university.allEssayPrompts.map((essay, index) => (
+                              <EssayCard
+                                key={essay.id || index}
+                                essay={essay}
+                                index={index}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12 bg-white/5 rounded-xl">
+                            <FileText className="h-12 w-12 text-white/40 mx-auto mb-3" />
+                            <h4 className="text-lg font-semibold text-white mb-1">No Essay Prompts</h4>
+                            <p className="text-white/60 text-sm">Essays will appear when available</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {university?.allEssayPrompts && university.allEssayPrompts.length > 0 ? (
-                      <div className="space-y-4">
-                        {university.allEssayPrompts.map((essay, index) => (
-                          <EssayCard
-                            key={essay.id || index}
-                            essay={essay}
-                            index={index}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 bg-white/5 rounded-xl">
-                        <FileText className="h-12 w-12 text-white/40 mx-auto mb-3" />
-                        <h4 className="text-lg font-semibold text-white mb-1">No Essay Prompts</h4>
-                        <p className="text-white/60 text-sm">Essays will appear when available</p>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </TabsContent>
 
                 {/* Tasks & Events Tab */}
                 <TabsContent value="deadlines" className="mt-8">
-                  <div className="space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-2xl font-bold text-white">Tasks & Events</h3>
-                        <p className="text-white text-sm mt-1">
-                          {progressData.completedTasks} of {progressData.totalTasks} tasks completed
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => router.push("/dashboard/calender")}
-                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30"
-                      >
-                        <CalendarDays className="h-4 w-4 mr-2" />
-                        Manage Calendar
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-4">
-                      {tasksAndEvents.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <h4 className="text-lg font-semibold text-white mb-2">No Tasks or Events</h4>
-                          <p className="text-gray-300 mb-6">
-                            Your application tasks and events will appear here.
+                  {!isUniversityAdded ? (
+                    <LockedTabContent
+                      tabName="Tasks & Events"
+                      universityName={universityName}
+                      onAddUniversity={handleAddUniversity}
+                      isAddingUniversity={isAddingUniversity}
+                    />
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-white">Tasks & Events</h3>
+                          <p className="text-white text-sm mt-1">
+                            {progressData.completedTasks} of {progressData.totalTasks} tasks completed
                           </p>
                         </div>
-                      ) : (
-                        tasksAndEvents.map((item, index) => (
-                          <div
-                            key={item.id || index}
-                            className="flex items-center justify-between p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50"
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className={`p-3 rounded-xl ${
-                                item.status === "completed" ? "bg-green-100"
-                                : item.type === "event" ? "bg-purple-100"
-                                : item.priority === "high" ? "bg-red-100"
-                                : item.priority === "medium" ? "bg-yellow-100"
-                                : "bg-blue-100"
-                              }`}>
-                                {getItemIcon(item)}
-                              </div>
+                        <Button
+                          onClick={() => router.push("/dashboard/calender")}
+                          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30"
+                        >
+                          <CalendarDays className="h-4 w-4 mr-2" />
+                          Manage Calendar
+                        </Button>
+                      </div>
 
-                              <div>
-                                <div className="font-bold text-[#002147] text-lg flex items-center space-x-2">
-                                  <span>{item.task}</span>
-                                  {item.type === "event" && (
-                                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">EVENT</span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-500 flex items-center space-x-4 flex-wrap gap-2">
-                                  <span>{formatDate(item.date)}</span>
-                                  {item.time && <span>• {item.time}</span>}
-                                  {item.daysLeft !== undefined && item.status !== "completed" && (
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      item.daysLeft <= 0 ? "bg-red-100 text-red-700"
-                                      : item.daysLeft <= 7 ? "bg-orange-100 text-orange-700"
-                                      : "bg-blue-100 text-blue-700"
-                                    }`}>
-                                      <Timer className="h-3 w-3 mr-1 inline" />
-                                      {item.daysLeft === 0 ? "Due today"
-                                        : item.daysLeft < 0 ? `${Math.abs(item.daysLeft)} days overdue`
-                                        : `${item.daysLeft} days left`}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <span className={`px-4 py-2 text-sm rounded-full font-medium ${getStatusColors(item.status, item.priority)}`}>
-                              {item.status === "completed" && <CheckCircle className="h-4 w-4 mr-1 inline" />}
-                              {item.status.replace("-", " ")}
-                            </span>
+                      <div className="grid gap-4">
+                        {tasksAndEvents.length === 0 ? (
+                          <div className="text-center py-12">
+                            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <h4 className="text-lg font-semibold text-white mb-2">No Tasks or Events</h4>
+                            <p className="text-gray-300 mb-6">
+                              Your application tasks and events will appear here.
+                            </p>
                           </div>
-                        ))
-                      )}
+                        ) : (
+                          tasksAndEvents.map((item, index) => (
+                            <div
+                              key={item.id || index}
+                              className="flex items-center justify-between p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50"
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className={`p-3 rounded-xl ${
+                                  item.status === "completed" ? "bg-green-100"
+                                  : item.type === "event" ? "bg-purple-100"
+                                  : item.priority === "high" ? "bg-red-100"
+                                  : item.priority === "medium" ? "bg-yellow-100"
+                                  : "bg-blue-100"
+                                }`}>
+                                  {getItemIcon(item)}
+                                </div>
+
+                                <div>
+                                  <div className="font-bold text-[#002147] text-lg flex items-center space-x-2">
+                                    <span>{item.task}</span>
+                                    {item.type === "event" && (
+                                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">EVENT</span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-500 flex items-center space-x-4 flex-wrap gap-2">
+                                    <span>{formatDate(item.date)}</span>
+                                    {item.time && <span>• {item.time}</span>}
+                                    {item.daysLeft !== undefined && item.status !== "completed" && (
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        item.daysLeft <= 0 ? "bg-red-100 text-red-700"
+                                        : item.daysLeft <= 7 ? "bg-orange-100 text-orange-700"
+                                        : "bg-blue-100 text-blue-700"
+                                      }`}>
+                                        <Timer className="h-3 w-3 mr-1 inline" />
+                                        {item.daysLeft === 0 ? "Due today"
+                                          : item.daysLeft < 0 ? `${Math.abs(item.daysLeft)} days overdue`
+                                          : `${item.daysLeft} days left`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <span className={`px-4 py-2 text-sm rounded-full font-medium ${getStatusColors(item.status, item.priority)}`}>
+                                {item.status === "completed" && <CheckCircle className="h-4 w-4 mr-1 inline" />}
+                                {item.status.replace("-", " ")}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </TabsContent>
               </Tabs>
             ) : (
               // ========== EDITOR VIEW ==========
               <div className="space-y-6">
-                {!userId && sessionStatus === 'authenticated' && (
-                  <div className="bg-amber-500/20 border border-amber-400/30 rounded-xl p-4 flex items-center">
-                    <AlertCircle className="w-5 h-5 text-amber-400 mr-3" />
-                    <div>
-                      <p className="text-amber-200 font-medium">Session issue detected</p>
-                      <p className="text-amber-300/70 text-sm">User ID not found. Try refreshing or signing out and back in.</p>
-                    </div>
-                  </div>
-                )}
-
-                {workspaceLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-white" />
-                    <span className="ml-3 text-white">Loading workspace...</span>
-                  </div>
-                ) : workspaceError ? (
-                  <div className="text-center py-12">
-                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <h4 className="text-lg font-semibold text-white mb-2">Error Loading Workspace</h4>
-                    <p className="text-white/60 mb-4">{workspaceError}</p>
-                    <Button onClick={fetchWorkspaceData} className="bg-blue-500 hover:bg-blue-600">
-                      Try Again
-                    </Button>
-                  </div>
-                ) : !userId ? (
-                  <div className="text-center py-12">
-                    <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-                    <h4 className="text-lg font-semibold text-white mb-2">Authentication Required</h4>
-                    <p className="text-white/60 mb-4">Please sign in to access the essay editor.</p>
-                  </div>
+                {!isUniversityAdded ? (
+                  <LockedTabContent
+                    tabName="Essay Editor"
+                    universityName={universityName}
+                    onAddUniversity={handleAddUniversity}
+                    isAddingUniversity={isAddingUniversity}
+                  />
                 ) : (
-                  <div className="grid grid-cols-12 gap-6">
-                    {/* Left Sidebar - Essay Selector */}
-                    <div className="col-span-12 lg:col-span-3">
-                      <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
-                        <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-white/10">
-                          <div className="p-2 bg-blue-500/20 rounded-lg">
-                            <BookOpen className="w-5 h-5 text-blue-400" />
-                          </div>
-                          <h3 className="font-bold text-white">Programs & Essays</h3>
+                  <>
+                    {!userId && sessionStatus === 'authenticated' && (
+                      <div className="bg-amber-500/20 border border-amber-400/30 rounded-xl p-4 flex items-center">
+                        <AlertCircle className="w-5 h-5 text-amber-400 mr-3" />
+                        <div>
+                          <p className="text-amber-200 font-medium">Session issue detected</p>
+                          <p className="text-amber-300/70 text-sm">User ID not found. Try refreshing or signing out and back in.</p>
                         </div>
+                      </div>
+                    )}
 
-                        <div className="space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-1">
-                          {programsWithEssays.length === 0 ? (
-                            <div className="text-center py-6">
-                              <FileText className="w-8 h-8 text-white/30 mx-auto mb-2" />
-                              <p className="text-sm text-white/50">No programs with essays</p>
+                    {workspaceLoading && !currentEssayData ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-white" />
+                        <span className="ml-3 text-white">Loading workspace...</span>
+                      </div>
+                    ) : workspaceError ? (
+                      <div className="text-center py-12">
+                        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                        <h4 className="text-lg font-semibold text-white mb-2">Error Loading Workspace</h4>
+                        <p className="text-white/60 mb-4">{workspaceError}</p>
+                        <Button onClick={fetchWorkspaceData} className="bg-blue-500 hover:bg-blue-600">
+                          Try Again
+                        </Button>
+                      </div>
+                    ) : !userId ? (
+                      <div className="text-center py-12">
+                        <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+                        <h4 className="text-lg font-semibold text-white mb-2">Authentication Required</h4>
+                        <p className="text-white/60 mb-4">Please sign in to access the essay editor.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-12 gap-6">
+                        {/* Left Sidebar - Essay Selector */}
+                        <div className="col-span-12 lg:col-span-3">
+                          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
+                            <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-white/10">
+                              <div className="p-2 bg-blue-500/20 rounded-lg">
+                                <BookOpen className="w-5 h-5 text-blue-400" />
+                              </div>
+                              <h3 className="font-bold text-white">Programs & Essays</h3>
                             </div>
-                          ) : (
-                            programsWithEssays.map((program) => (
-                              <div key={program.id} className="space-y-1">
-                                <div
-                                  onClick={() => handleProgramSelect(program.id)}
-                                  className={`p-3 rounded-xl cursor-pointer transition-all text-sm ${
-                                    activeProgramId === program.id
-                                      ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border-l-4 border-blue-400 shadow-lg'
-                                      : 'hover:bg-white/10 border-l-4 border-transparent'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-semibold text-white">{program.name}</span>
-                                    <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60">
-                                      {program.essays?.length || 0}
+
+                            <div className="space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-1">
+                              {/* Custom Essays Section */}
+                              {customEssays.length > 0 && (
+                                <div className="space-y-1 mb-3">
+                                  <div 
+                                    onClick={() => handleProgramSelect('custom')}
+                                    className={`px-2 py-2 flex items-center space-x-2 cursor-pointer rounded-lg transition-all ${
+                                      activeProgramId === 'custom' 
+                                        ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-purple-400' 
+                                        : 'hover:bg-white/10 border-l-4 border-transparent'
+                                    }`}
+                                  >
+                                    <Sparkles className="w-4 h-4 text-purple-400" />
+                                    <span className="text-sm font-semibold text-white">Custom Essays</span>
+                                    <span className="text-xs text-white/40 bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-auto">
+                                      {customEssays.length}
                                     </span>
                                   </div>
-                                </div>
-
-                                {activeProgramId === program.id && program.essays?.map((essayData) => {
-                                  const hasContent = essayData.userEssay?.wordCount > 0;
-                                  return (
+                                  {activeProgramId === 'custom' && customEssays.map((essay) => (
                                     <div
-                                      key={essayData.promptId}
-                                      onClick={() => handleEssayPromptSelect(essayData.promptId)}
+                                      key={`custom-essay-${essay.id}-${essay.programId || ''}`}
+                                      onClick={() => handleEssayPromptSelect(essay.id, {
+                                        title: essay.title,
+                                        programName: 'Custom Essays',
+                                        isCustom: true,
+                                        promptText: essay.prompt,
+                                        wordLimit: essay.wordLimit
+                                      })}
                                       className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
-                                        activeEssayPromptId === essayData.promptId
-                                          ? 'bg-gradient-to-r from-blue-500/50 to-cyan-500/30 border-l-2 border-cyan-400'
+                                        activeEssayPromptId === essay.id
+                                          ? 'bg-gradient-to-r from-purple-500/50 to-pink-500/30 border-l-2 border-pink-400'
                                           : 'hover:bg-white/10 border-l-2 border-white/10'
                                       }`}
                                     >
                                       <div className="flex items-center justify-between">
-                                        <span className="text-white/90 truncate flex-1">{essayData.promptTitle}</span>
-                                        {hasContent && (
-                                          <span className="text-emerald-400 text-[10px] ml-2 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
-                                            {Math.round((essayData.userEssay.wordCount / essayData.wordLimit) * 100)}%
+                                        <span className="text-white/90 truncate flex-1">{essay.title}</span>
+                                        {essay.wordCount > 0 && (
+                                          <span className="text-purple-400 text-[10px] ml-2 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">
+                                            {Math.round((essay.wordCount / essay.wordLimit) * 100)}%
                                           </span>
                                         )}
                                       </div>
                                     </div>
-                                  );
-                                })}
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Regular Programs */}
+                              {programsWithEssays.length === 0 && customEssays.length === 0 ? (
+                                <div className="text-center py-6">
+                                  <FileText className="w-8 h-8 text-white/30 mx-auto mb-2" />
+                                  <p className="text-sm text-white/50">No programs with essays</p>
+                                </div>
+                              ) : (
+                                programsWithEssays.map((program) => (
+                                  <div key={program.id} className="space-y-1">
+                                    <div
+                                      onClick={() => handleProgramSelect(program.id)}
+                                      className={`p-3 rounded-xl cursor-pointer transition-all text-sm ${
+                                        activeProgramId === program.id
+                                          ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border-l-4 border-blue-400 shadow-lg'
+                                          : 'hover:bg-white/10 border-l-4 border-transparent'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold text-white">{program.name}</span>
+                                        <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60">
+                                          {program.essays?.length || 0}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {activeProgramId === program.id && program.essays?.map((essayData) => {
+                                      const hasContent = essayData.userEssay?.wordCount > 0;
+                                      return (
+                                        <div
+                                          key={`regular-${essayData.promptId}-${program.id}`}
+                                          onClick={() => handleEssayPromptSelect(essayData.promptId, {
+                                            title: essayData.promptTitle,
+                                            programName: program.name,
+                                            isCustom: false,
+                                            promptText: essayData.promptText,
+                                            wordLimit: essayData.wordLimit
+                                          })}
+                                          className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
+                                            activeEssayPromptId === essayData.promptId
+                                              ? 'bg-gradient-to-r from-blue-500/50 to-cyan-500/30 border-l-2 border-cyan-400'
+                                              : 'hover:bg-white/10 border-l-2 border-white/10'
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-white/90 truncate flex-1">{essayData.promptTitle}</span>
+                                            {hasContent && (
+                                              <span className="text-emerald-400 text-[10px] ml-2 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                                                {Math.round((essayData.userEssay.wordCount / essayData.wordLimit) * 100)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Main Editor Area */}
+                        <div className="col-span-12 lg:col-span-9">
+                          {(currentEssayData || selectedEssayInfo.title) ? (
+                            <div className="space-y-5">
+                              {/* Essay Header with Panel Toggles */}
+                              <div className="flex items-center justify-between flex-wrap gap-3">
+                                <div>
+                                  <h3 className="text-xl font-bold text-white">{displayTitle}</h3>
+                                  <p className="text-sm text-white/60">
+                                    {displayProgramName}
+                                    {selectedEssayInfo.isCustom && (
+                                      <span className="ml-2 inline-flex items-center gap-1 text-purple-400">
+                                        <Sparkles className="w-3 h-3" /> Custom
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                                
+                                {/* Panel Toggle Buttons */}
+                                {currentEssay && (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => togglePanel('versions')}
+                                      className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
+                                        isPanelOpen('versions') 
+                                          ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' 
+                                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                      }`}
+                                    >
+                                      <Layers className="w-4 h-4 mr-2" />
+                                      Versions
+                                      {currentEssay.versions?.length > 0 && (
+                                        <span className="ml-2 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
+                                          {currentEssay.versions.length}
+                                        </span>
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => togglePanel('analytics')}
+                                      className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
+                                        isPanelOpen('analytics') 
+                                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30' 
+                                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                      }`}
+                                    >
+                                      <PieChart className="w-4 h-4 mr-2" />
+                                      Stats
+                                    </button>
+                                    <button
+                                      onClick={() => togglePanel('ai')}
+                                      className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
+                                        isPanelOpen('ai') 
+                                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
+                                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                      }`}
+                                    >
+                                      <Brain className="w-4 h-4 mr-2" />
+                                      AI
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                            ))
+
+                              {/* Prompt Display */}
+                              <div className={`p-4 rounded-xl border ${
+                                selectedEssayInfo.isCustom 
+                                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30' 
+                                  : 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border-blue-400/30'
+                              }`}>
+                                <p className={`text-xs font-semibold mb-2 uppercase tracking-wider ${
+                                  selectedEssayInfo.isCustom ? 'text-purple-300' : 'text-blue-300'
+                                }`}>Prompt</p>
+                                <p className="text-sm text-white/90 leading-relaxed whitespace-pre-wrap">
+                                  {currentEssayData?.promptText || selectedEssayInfo.promptText || 'Loading...'}
+                                </p>
+                                <p className={`text-xs mt-3 flex items-center ${
+                                  selectedEssayInfo.isCustom ? 'text-purple-300/70' : 'text-blue-300/70'
+                                }`}>
+                                  <FileText className="w-3 h-3 mr-1" />
+                                  Word limit: {currentEssayData?.wordLimit || selectedEssayInfo.wordLimit}
+                                </p>
+                              </div>
+
+                              {/* Stacked Panels */}
+                              {renderPanels()}
+
+                              {/* Editor or Create Button */}
+                              {currentEssay ? (
+                                <>
+                                  <EssayEditor
+                                    key={editorKey}
+                                    content={editorContent}
+                                    onChange={updateEssayContent}
+                                    wordLimit={currentEssayData?.wordLimit || selectedEssayInfo.wordLimit}
+                                    essayId={currentEssay.id}
+                                    onSave={autoSaveEssay}
+                                    lastSaved={lastSaved}
+                                  />
+
+                                  <div className="flex justify-between items-center text-xs text-white/50 pt-2">
+                                    <span className="flex items-center">
+                                      <Clock className="w-3 h-3 mr-1" />
+                                      Last modified: {currentEssay.lastModified ? new Date(currentEssay.lastModified).toLocaleString() : 'Never'}
+                                      <span className="ml-3 text-white/30">• Auto-saves every 15 seconds</span>
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => saveVersion()}
+                                        disabled={isSaving || isSavingVersion}
+                                        className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
+                                      >
+                                        {isSavingVersion ? (
+                                          <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                                        ) : (
+                                          <Save className="w-3 h-3 mr-1.5" />
+                                        )}
+                                        Save Version & Exit
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-center py-16 bg-gradient-to-b from-white/10 to-white/5 rounded-2xl border border-white/20">
+                                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
+                                    <BookOpen className="w-8 h-8 text-blue-400" />
+                                  </div>
+                                  <h4 className="text-xl font-bold text-white mb-2">Start Writing</h4>
+                                  <p className="text-white/60 mb-6">Create your essay for this prompt</p>
+                                  <Button
+                                    onClick={createEssay}
+                                    disabled={isCreatingEssay || !userId}
+                                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/30 px-8"
+                                  >
+                                    {isCreatingEssay ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Creating...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Edit3 className="w-4 h-4 mr-2" />
+                                        Start Essay
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-16">
+                              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
+                                <Target className="w-8 h-8 text-white/40" />
+                              </div>
+                              <h4 className="text-lg font-semibold text-white mb-2">Select an Essay</h4>
+                              <p className="text-white/60">Choose a program and essay from the left sidebar</p>
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
-
-                    {/* Main Editor Area */}
-                    <div className="col-span-12 lg:col-span-9">
-                      {currentEssayData ? (
-                        <div className="space-y-5">
-                          {/* Essay Header with Panel Toggles */}
-                          <div className="flex items-center justify-between flex-wrap gap-3">
-                            <div>
-                              <h3 className="text-xl font-bold text-white">{currentEssayData.promptTitle}</h3>
-                              <p className="text-sm text-white/60">{currentProgram?.name}</p>
-                            </div>
-                            
-                            {/* Panel Toggle Buttons */}
-                            {currentEssay && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => togglePanel('versions')}
-                                  className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
-                                    isPanelOpen('versions') 
-                                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' 
-                                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
-                                  }`}
-                                >
-                                  <Layers className="w-4 h-4 mr-2" />
-                                  Versions
-                                  {currentEssay.versions?.length > 0 && (
-                                    <span className="ml-2 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
-                                      {currentEssay.versions.length}
-                                    </span>
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() => togglePanel('analytics')}
-                                  className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
-                                    isPanelOpen('analytics') 
-                                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30' 
-                                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
-                                  }`}
-                                >
-                                  <PieChart className="w-4 h-4 mr-2" />
-                                  Stats
-                                </button>
-                                <button
-                                  onClick={() => togglePanel('ai')}
-                                  className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
-                                    isPanelOpen('ai') 
-                                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
-                                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
-                                  }`}
-                                >
-                                  <Brain className="w-4 h-4 mr-2" />
-                                  AI
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Prompt Display */}
-                          <div className="p-4 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl border border-blue-400/30">
-                            <p className="text-xs text-blue-300 font-semibold mb-2 uppercase tracking-wider">Prompt</p>
-                            <p className="text-sm text-white/90 leading-relaxed whitespace-pre-wrap">
-                              {currentEssayData.promptText}
-                            </p>
-                            <p className="text-xs text-blue-300/70 mt-3 flex items-center">
-                              <FileText className="w-3 h-3 mr-1" />
-                              Word limit: {currentEssayData.wordLimit}
-                            </p>
-                          </div>
-
-                          {/* Stacked Panels */}
-                          {renderPanels()}
-
-                          {/* Editor or Create Button */}
-                          {currentEssay ? (
-                            <>
-                              <EssayEditor
-                                key={editorKey}
-                                content={editorContent}
-                                onChange={updateEssayContent}
-                                wordLimit={currentEssayData.wordLimit}
-                                essayId={currentEssay.id}
-                                onSave={() => autoSaveEssay()}
-                                lastSaved={lastSaved}
-                                hasUnsavedChanges={hasUnsavedChanges}
-                                isSaving={isSaving}
-                              />
-
-                              <div className="flex justify-between items-center text-xs text-white/50 pt-2">
-                                <span className="flex items-center">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  Last modified: {currentEssay.lastModified ? new Date(currentEssay.lastModified).toLocaleString() : 'Never'}
-                                  <span className="ml-3 text-white/30">• Auto-saves after 25s of inactivity</span>
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => autoSaveEssay()}
-                                    disabled={isSaving || !hasUnsavedChanges}
-                                    className="bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-300 hover:from-blue-500/30 hover:to-indigo-500/30 border border-blue-400/30 disabled:opacity-50"
-                                  >
-                                    {isSaving ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1.5" />}
-                                    Save Now
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => saveVersion()}
-                                    disabled={isSaving || isSavingVersion}
-                                    className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
-                                  >
-                                    {isSavingVersion ? (
-                                      <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                                    ) : (
-                                      <Save className="w-3 h-3 mr-1.5" />
-                                    )}
-                                    Save Version
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-center py-16 bg-gradient-to-b from-white/10 to-white/5 rounded-2xl border border-white/20">
-                              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
-                                <BookOpen className="w-8 h-8 text-blue-400" />
-                              </div>
-                              <h4 className="text-xl font-bold text-white mb-2">Start Writing</h4>
-                              <p className="text-white/60 mb-6">Create your essay for this prompt</p>
-                              <Button
-                                onClick={createEssay}
-                                disabled={isCreatingEssay || !userId}
-                                className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/30 px-8"
-                              >
-                                {isCreatingEssay ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Creating...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Edit3 className="w-4 h-4 mr-2" />
-                                    Start Essay
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center py-16">
-                          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
-                            <Target className="w-8 h-8 text-white/40" />
-                          </div>
-                          <h4 className="text-lg font-semibold text-white mb-2">Select an Essay</h4>
-                          <p className="text-white/60">Choose a program and essay from the left sidebar</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Custom Essay Modal */}
+      <CustomEssayModal
+        isOpen={showCustomEssayModal}
+        onClose={() => setShowCustomEssayModal(false)}
+        onCreateEssay={handleCreateCustomEssay}
+        universityName={universityName}
+        isCreating={isCreatingCustomEssay}
+        isUniversityAdded={isUniversityAdded}
+      />
     </div>
   );
 };

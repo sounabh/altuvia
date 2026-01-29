@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ArrowLeft, Bell, Settings, Plus, Check, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -8,14 +8,16 @@ import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 
 const Header = ({ university }) => {
-  const [isAdded, setIsAdded] = useState(false);
+  // Get isAdded directly from university prop (backend already provides this)
+  const isAddedFromProp = university?.isAdded || false;
+  const [isAdded, setIsAdded] = useState(isAddedFromProp);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  // Enhanced progress calculation using university data
+  // Enhanced progress calculation using university data (ONLY if university is added)
   const getProgressData = () => {
-    if (!university) {
+    if (!university || !isAdded) {
       return {
         overallProgress: 0,
         essayProgress: 0,
@@ -96,27 +98,6 @@ const Header = ({ university }) => {
   const progressData = getProgressData();
 
   /**
-   * Initialize saved status from session
-   */
-  useEffect(() => {
-    // Wait for session to load
-    if (status === "loading" || !university) return;
-
-    // Check if user is authenticated
-    if (status === "authenticated" && session?.userId) {
-      const userId = session?.userId;
-
-      const isSaved =
-        Array.isArray(university.savedByUsers) &&
-        university.savedByUsers.some((user) => user.id === userId);
-
-      setIsAdded(isSaved);
-    } else {
-      setIsAdded(false);
-    }
-  }, [university, session, status]);
-
-  /**
    * Toggle university saved status with instant UI update
    */
   const toggleSaved = async (e) => {
@@ -180,6 +161,11 @@ const Header = ({ university }) => {
       if (response.ok) {
         const data = await response.json();
         setIsAdded(data.isAdded);
+        
+        // Reload page to get fresh data with updated isAdded status
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         // Revert on failure
         setIsAdded(previousState);
@@ -193,16 +179,6 @@ const Header = ({ university }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Helper function to get progress bar color
-  const getProgressBarColor = () => {
-    if (progressData.applicationStatus === 'submitted') {
-      return 'bg-green-500';
-    } else if (progressData.applicationStatus === 'in-progress') {
-      return 'bg-blue-500';
-    }
-    return 'bg-gray-400';
   };
 
   // Helper function to get status text and color
@@ -290,44 +266,27 @@ const Header = ({ university }) => {
             </div>
           </div>
 
-          {/* Right Section: Enhanced Progress Info */}
+          {/* Right Section: Progress Info (ONLY SHOWN IF UNIVERSITY IS ADDED) */}
           <div className="flex items-center space-x-3">
-            {/* Progress Card */}
-            <div className="bg-gray-50 rounded-lg p-3 min-w-[200px] border">
-              {/* Status Row */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-1">
-                  <StatusIcon className="h-3 w-3" />
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusInfo.color}`}>
-                    {statusInfo.text}
+            {/* Progress Card - ONLY SHOW IF ADDED */}
+            {isAdded && (
+              <div className="bg-gray-50 rounded-lg p-3 min-w-[200px] border">
+                {/* Status Row */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-1">
+                    <StatusIcon className="h-3 w-3" />
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusInfo.color}`}>
+                      {statusInfo.text}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {progressData.overallProgress}%
                   </span>
                 </div>
-                <span className="text-sm font-semibold text-gray-900">
-                  {progressData.overallProgress}%
-                </span>
               </div>
-            </div>
+            )}
 
-            {/* Action Buttons */}
-            <div className="flex space-x-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="opacity-50 cursor-not-allowed" 
-                disabled
-              >
-                <Bell className="h-4 w-4" />
-              </Button>
-
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="opacity-50 cursor-not-allowed" 
-                disabled
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
+           
           </div>
         </div>
       </div>

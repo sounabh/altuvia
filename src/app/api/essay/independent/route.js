@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FIXED VERSION WITH NULL DEPARTMENT HANDLING AND OPENROUTER MIGRATION
+// src/app/api/essay/independent/route.js - COMPLETE FILE WITH FIXES
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -6,11 +6,11 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // ============================================================
-// OPENROUTER CONFIGURATION - REPLACED GOOGLE GENERATIVE AI
+// OPENROUTER CONFIGURATION
 // ============================================================
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const GEMINI_MODEL = "google/gemini-2.5-flash-lite"; // Flash Lite model
+const GEMINI_MODEL = "google/gemini-2.5-flash-lite";
 
 // ==========================================
 // AUTHENTICATION HELPER
@@ -136,6 +136,73 @@ async function fetchSavedUniversitiesFromExternalAPI(token) {
 }
 
 // ==========================================
+// STANDALONE ESSAY HELPERS
+// ==========================================
+
+// Get or create "My Custom Essays" program for a university
+async function getOrCreateStandaloneProgram(universityId) {
+  try {
+    // Try to find existing standalone program
+    let standaloneProgram = await prisma.program.findFirst({
+      where: {
+        universityId,
+        degreeType: "STANDALONE",
+      }
+    });
+
+    // If not found, create one
+    if (!standaloneProgram) {
+      standaloneProgram = await prisma.program.create({
+        data: {
+          universityId,
+          programName: "My Custom Essays",
+          programSlug: `${universityId}-custom-essays-${Date.now()}`,
+          degreeType: "STANDALONE",
+          isActive: true,
+          programDescription: "Custom standalone essays for this university",
+        }
+      });
+      console.log(`✅ Created standalone program for university ${universityId}`);
+    }
+
+    return standaloneProgram;
+  } catch (error) {
+    console.error("Error getting/creating standalone program:", error);
+    throw error;
+  }
+}
+
+// Get or create "My Essays" virtual university for untagged essays
+async function getOrCreateVirtualUniversity() {
+  try {
+    // Try to find existing virtual university
+    let virtualUni = await prisma.university.findFirst({
+      where: { slug: "my-custom-essays" }
+    });
+
+    // If not found, create one
+    if (!virtualUni) {
+      virtualUni = await prisma.university.create({
+        data: {
+          universityName: "My Essays",
+          slug: "my-custom-essays",
+          city: "Personal",
+          country: "Personal",
+          isActive: true,
+          shortDescription: "Your personal custom essays",
+        }
+      });
+      console.log(`✅ Created virtual university for custom essays`);
+    }
+
+    return virtualUni;
+  } catch (error) {
+    console.error("Error getting/creating virtual university:", error);
+    throw error;
+  }
+}
+
+// ==========================================
 // GET: Fetch user's essays from saved universities
 // ==========================================
 export async function GET(request) {
@@ -145,79 +212,45 @@ export async function GET(request) {
       return auth.error;
     }
 
+    const { searchParams } = new URL(request.url);
+    const universityId = searchParams.get("universityId");
     const userId = auth.userId;
-    console.log("✅ Fetching essays for authenticated user:", userId);
-
-    // Step 1: Fetch saved universities from external API
-    const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
     
-    if (!savedUnisResult.success || savedUnisResult.universities.length === 0) {
-      return NextResponse.json({
-        message: "No saved universities found. Please save universities to see their essays.",
-        universities: [],
-        programs: [],
-        stats: {
-          totalPrograms: 0,
-          totalEssayPrompts: 0,
-          completedEssays: 0,
-          totalWords: 0,
-          averageProgress: 0,
-          savedUniversitiesCount: 0,
-        },
-      });
-    }
+    console.log(`✅ Fetching essays for user ${userId}, universityId: ${universityId}`);
 
-    const savedUniversities = savedUnisResult.universities;
-    
-    // Step 2: Extract university identifiers
-    const universityIdentifiers = savedUniversities.map(uni => ({
-      id: uni.id || uni.universityId || uni.university?.id,
-      name: uni.universityName || uni.name || uni.university?.universityName || uni.university?.name,
-      slug: uni.slug || uni.university?.slug,
-    })).filter(u => u.id || u.name || u.slug);
-
-    console.log("University identifiers:", universityIdentifiers);
-
-    // Step 3: Get user's study level preference
-    let userStudyLevel = null;
-    try {
-      const userProfile = await prisma.userProfile.findUnique({
-        where: { userId },
-        select: { studyLevel: true },
-      });
-      userStudyLevel = userProfile?.studyLevel?.toLowerCase();
-    } catch (profileError) {
-      console.warn("Could not fetch user profile:", profileError.message);
-    }
-
-    // Step 4: Build query conditions
+    // Build query conditions
     const whereConditions = [];
     
-    const ids = universityIdentifiers.map(u => u.id).filter(Boolean);
-    const names = universityIdentifiers.map(u => u.name).filter(Boolean);
-    const slugs = universityIdentifiers.map(u => u.slug).filter(Boolean);
+    // If universityId is provided, only fetch for that university
+    if (universityId) {
+      console.log(`🔍 Filtering for specific university: ${universityId}`);
+      whereConditions.push({ id: universityId });
+    } else {
+      // If no universityId, fetch all saved universities
+      const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
+      const savedUniversities = savedUnisResult.universities || [];
+      
+      const universityIdentifiers = savedUniversities.map(uni => ({
+        id: uni.id || uni.universityId || uni.university?.id,
+        name: uni.universityName || uni.name || uni.university?.universityName || uni.university?.name,
+        slug: uni.slug || uni.university?.slug,
+      })).filter(u => u.id || u.name || u.slug);
 
-    if (ids.length > 0) whereConditions.push({ id: { in: ids } });
-    if (names.length > 0) whereConditions.push({ universityName: { in: names } });
-    if (slugs.length > 0) whereConditions.push({ slug: { in: slugs } });
+      const ids = universityIdentifiers.map(u => u.id).filter(Boolean);
+      const names = universityIdentifiers.map(u => u.name).filter(Boolean);
+      const slugs = universityIdentifiers.map(u => u.slug).filter(Boolean);
 
-    if (whereConditions.length === 0) {
-      return NextResponse.json({
-        message: "Could not identify saved universities. Please try again.",
-        universities: [],
-        programs: [],
-        stats: {
-          totalPrograms: 0,
-          totalEssayPrompts: 0,
-          completedEssays: 0,
-          totalWords: 0,
-          averageProgress: 0,
-          savedUniversitiesCount: savedUniversities.length,
-        },
-      });
+      if (ids.length > 0) whereConditions.push({ id: { in: ids } });
+      if (names.length > 0) whereConditions.push({ universityName: { in: names } });
+      if (slugs.length > 0) whereConditions.push({ slug: { in: slugs } });
+
+      // Always include the virtual university for custom essays
+      whereConditions.push({ slug: "my-custom-essays" });
     }
 
-    // Step 5: Fetch universities with programs - NO DEPARTMENT RELATION NEEDED
+    console.log(`📋 Where conditions:`, JSON.stringify(whereConditions));
+
+    // Step 5: Fetch universities with programs
     const universities = await prisma.university.findMany({
       where: {
         OR: whereConditions
@@ -279,11 +312,33 @@ export async function GET(request) {
     const universitiesData = [];
 
     for (const university of universities) {
-      // Filter programs by user's study level if available
-      const filteredPrograms = university.programs.filter(program => {
-        if (userStudyLevel) {
-          return program.degreeType?.toLowerCase() === userStudyLevel;
+      // For GET requests with universityId, include ALL programs (including STANDALONE)
+      // For general requests, filter by study level except for STANDALONE
+      const filteredPrograms = university.programs.filter(async program => {
+        // Always include STANDALONE programs (custom essays)
+        if (program.degreeType === "STANDALONE") {
+          return true;
         }
+        
+        // For regular programs when no universityId specified, filter by study level
+        if (!universityId) {
+          // Get user's study level preference
+          let userStudyLevel = null;
+          try {
+            const userProfile = await prisma.userProfile.findUnique({
+              where: { userId },
+              select: { studyLevel: true },
+            });
+            userStudyLevel = userProfile?.studyLevel?.toLowerCase();
+            
+            if (userStudyLevel) {
+              return program.degreeType?.toLowerCase() === userStudyLevel;
+            }
+          } catch (profileError) {
+            console.warn("Could not fetch user profile:", profileError.message);
+          }
+        }
+        
         return true;
       });
 
@@ -311,7 +366,7 @@ export async function GET(request) {
       allPrograms.push(...programsWithUniversity);
     }
 
-    // Step 7: Format programs data - NO DEPARTMENT NEEDED
+    // Step 7: Format programs data
     const formattedPrograms = allPrograms.map(program => {
       return {
         id: program.id,
@@ -379,7 +434,7 @@ export async function GET(request) {
     // Step 8: Calculate statistics
     const stats = {
       totalPrograms: allPrograms.length,
-      savedUniversitiesCount: savedUniversities.length,
+      savedUniversitiesCount: universitiesData.length,
       totalEssayPrompts: allPrograms.reduce(
         (acc, p) => acc + (p.essayPrompts?.length || 0),
         0
@@ -434,7 +489,7 @@ export async function GET(request) {
       universities: universitiesData,
       programs: formattedPrograms,
       stats,
-      studyLevel: userStudyLevel,
+      query: { universityId },
     };
 
     return NextResponse.json(workspaceData);
@@ -473,6 +528,8 @@ export async function POST(request) {
     switch (action) {
       case "create_essay":
         return await createEssay(operationData);
+      case "create_standalone_essay":
+        return await createStandaloneEssay(operationData);
       case "update_essay":
         return await updateEssay(operationData);
       case "save_version":
@@ -516,7 +573,7 @@ export async function PUT(request) {
 
     const userId = auth.userId;
     const body = await request.json();
-    const { essayId, content, wordCount, title, priority, isAutoSave = false } = body;
+    const { essayId, content, wordCount, title, priority, isAutoSave = false, isCompleted } = body;
 
     if (!essayId) {
       return NextResponse.json(
@@ -540,65 +597,54 @@ export async function PUT(request) {
       );
     }
 
-    const completionResult = await checkEssayCompletion(
-      essayId,
-      wordCount || 0,
-      content
-    );
+    // Build update data
+    const updateData = {
+      lastModified: new Date(),
+    };
 
-    let updatedEssay;
-
-    if (completionResult.success) {
-      const additionalUpdates = {};
-      if (title !== undefined) additionalUpdates.title = title;
-      if (priority !== undefined) additionalUpdates.priority = priority;
-      if (isAutoSave) additionalUpdates.lastAutoSaved = new Date();
-
-      if (Object.keys(additionalUpdates).length > 0) {
-        updatedEssay = await prisma.essay.update({
-          where: { id: essayId },
-          data: additionalUpdates,
-          include: {
-            versions: { orderBy: { timestamp: "desc" }, take: 10 },
-            aiResults: {
-              where: { essayVersionId: null },
-              orderBy: { createdAt: "desc" },
-              take: 3,
-            },
-            essayPrompt: true,
-          },
-        });
-      } else {
-        updatedEssay = completionResult.essay;
-      }
-    } else {
-      const updateData = {
-        lastModified: new Date(),
-      };
-
-      if (content !== undefined) updateData.content = content;
-      if (wordCount !== undefined) updateData.wordCount = wordCount;
-      if (title !== undefined) updateData.title = title;
-      if (priority !== undefined) updateData.priority = priority;
-
-      if (isAutoSave) {
-        updateData.lastAutoSaved = new Date();
-      }
-
-      updatedEssay = await prisma.essay.update({
-        where: { id: essayId },
-        data: updateData,
-        include: {
-          versions: { orderBy: { timestamp: "desc" }, take: 10 },
-          aiResults: {
-            where: { essayVersionId: null },
-            orderBy: { createdAt: "desc" },
-            take: 3,
-          },
-          essayPrompt: true,
-        },
-      });
+    if (content !== undefined) updateData.content = content;
+    if (wordCount !== undefined) updateData.wordCount = wordCount;
+    if (title !== undefined) updateData.title = title;
+    if (priority !== undefined) updateData.priority = priority;
+    if (isCompleted !== undefined) {
+      updateData.isCompleted = isCompleted;
+      updateData.completedAt = isCompleted ? new Date() : null;
     }
+
+    if (isAutoSave) {
+      updateData.lastAutoSaved = new Date();
+    }
+
+    // Check for auto-completion
+    if (wordCount !== undefined && content !== undefined) {
+      const completionResult = await checkEssayCompletion(
+        essayId,
+        wordCount,
+        content
+      );
+
+      if (completionResult.success && completionResult.completionChanged) {
+        Object.assign(updateData, {
+          isCompleted: completionResult.isCompleted,
+          completedAt: completionResult.isCompleted ? new Date() : null,
+          status: completionResult.isCompleted ? 'COMPLETED' : (wordCount > 0 ? 'IN_PROGRESS' : 'DRAFT'),
+        });
+      }
+    }
+
+    const updatedEssay = await prisma.essay.update({
+      where: { id: essayId },
+      data: updateData,
+      include: {
+        versions: { orderBy: { timestamp: "desc" }, take: 10 },
+        aiResults: {
+          where: { essayVersionId: null },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        },
+        essayPrompt: true,
+      },
+    });
 
     // Auto-save version if significant changes
     if (isAutoSave && content && wordCount > 0) {
@@ -641,7 +687,144 @@ export async function PUT(request) {
 }
 
 // ==========================================
-// Create essay
+// CREATE STANDALONE ESSAY - FIXED WITH LOGGING
+// ==========================================
+async function createStandaloneEssay(data) {
+  const { 
+    userId, 
+    customTitle, 
+    customPrompt, 
+    wordLimit, 
+    taggedUniversityId, 
+    priority = 'medium' 
+  } = data;
+
+  console.log("🚀 Creating standalone essay:", { 
+    userId, 
+    customTitle, 
+    taggedUniversityId,
+    wordLimit 
+  });
+
+  // Validation
+  if (!userId || !customTitle || !customPrompt) {
+    return NextResponse.json(
+      { error: 'Missing required fields: userId, customTitle, customPrompt' },
+      { status: 400 }
+    );
+  }
+
+  if (!wordLimit || wordLimit < 100 || wordLimit > 5000) {
+    return NextResponse.json(
+      { error: 'Word limit must be between 100 and 5000' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Step 1: Determine which university to use
+    let targetUniversityId;
+    
+    if (taggedUniversityId && taggedUniversityId.trim() !== '') {
+      // User selected a specific university
+      targetUniversityId = taggedUniversityId;
+    } else {
+      // No university selected - use virtual university
+      const virtualUni = await getOrCreateVirtualUniversity();
+      targetUniversityId = virtualUni.id;
+    }
+
+    console.log(`🎯 Target university ID: ${targetUniversityId}`);
+
+    // Step 2: Get or create standalone program for this university
+    const standaloneProgram = await getOrCreateStandaloneProgram(targetUniversityId);
+    console.log(`📝 Standalone program ID: ${standaloneProgram.id}`);
+
+    // Step 3: Create custom essay prompt
+    const essayPrompt = await prisma.essayPrompt.create({
+      data: {
+        programId: standaloneProgram.id,
+        promptTitle: customTitle,
+        promptText: customPrompt,
+        wordLimit: wordLimit,
+        minWordCount: 0,
+        isMandatory: false,
+        isActive: true,
+      }
+    });
+
+    console.log(`✅ Created essay prompt: ${essayPrompt.id}`);
+
+    // Step 4: Create the essay
+    const essay = await prisma.essay.create({
+      data: {
+        userId,
+        programId: standaloneProgram.id,
+        essayPromptId: essayPrompt.id,
+        title: customTitle,
+        content: '',
+        wordCount: 0,
+        wordLimit: wordLimit,
+        priority: priority,
+        status: 'DRAFT',
+        autoSaveEnabled: true,
+      },
+      include: {
+        program: {
+          include: { 
+            university: {
+              select: {
+                id: true,
+                universityName: true,
+                slug: true
+              }
+            }
+          }
+        },
+        essayPrompt: true,
+        versions: true,
+        aiResults: true,
+      },
+    });
+
+    console.log('✅ Created standalone essay:', {
+      essayId: essay.id,
+      programId: standaloneProgram.id,
+      universityId: targetUniversityId,
+      title: customTitle,
+      universityName: essay.program?.university?.universityName
+    });
+
+    // Format the response to match what the frontend expects
+    const formattedEssay = {
+      ...essay,
+      programId: standaloneProgram.id,
+      universityId: targetUniversityId,
+      universityName: essay.program?.university?.universityName,
+      universitySlug: essay.program?.university?.slug,
+      prompt: customPrompt,
+      isCustom: true
+    };
+
+    return NextResponse.json({ 
+      success: true,
+      essay: formattedEssay,
+      essayPromptId: essayPrompt.id,
+      programId: standaloneProgram.id,
+      universityId: targetUniversityId,
+      message: 'Custom essay created successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error creating standalone essay:', error);
+    return NextResponse.json(
+      { error: 'Failed to create custom essay', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// ==========================================
+// Create essay (EXISTING - unchanged)
 // ==========================================
 async function createEssay(data) {
   const { userId, programId, essayPromptId, applicationId } = data;
@@ -725,8 +908,9 @@ async function createEssay(data) {
 }
 
 // ==========================================
-// Update essay
+// REST OF THE FUNCTIONS (unchanged except for minor improvements)
 // ==========================================
+
 async function updateEssay(data) {
   const { essayId, content, wordCount, title, priority, status, userId } = data;
 
@@ -737,7 +921,6 @@ async function updateEssay(data) {
     );
   }
 
-  // Verify ownership
   const essay = await prisma.essay.findFirst({
     where: {
       id: essayId,
@@ -811,9 +994,6 @@ async function updateEssay(data) {
   return NextResponse.json({ essay: updatedEssay });
 }
 
-// ==========================================
-// Auto save
-// ==========================================
 async function autoSave(data) {
   const { essayId, content, wordCount, userId } = data;
 
@@ -824,7 +1004,6 @@ async function autoSave(data) {
     );
   }
 
-  // Verify ownership
   const essay = await prisma.essay.findFirst({
     where: {
       id: essayId,
@@ -891,9 +1070,6 @@ async function autoSave(data) {
   return NextResponse.json({ success: true, essay: updatedEssay });
 }
 
-// ==========================================
-// Delete essay
-// ==========================================
 async function deleteEssay(data) {
   const { essayId, userId } = data;
 
@@ -905,11 +1081,17 @@ async function deleteEssay(data) {
   }
 
   try {
-    // Verify ownership
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
         userId: userId
+      },
+      include: {
+        essayPrompt: {
+          include: {
+            program: true
+          }
+        },
       }
     });
 
@@ -920,6 +1102,11 @@ async function deleteEssay(data) {
       );
     }
 
+    // Check if this is a standalone essay
+    const isStandalone = essay.essayPrompt?.program?.degreeType === "STANDALONE";
+
+    console.log(`🗑️ Deleting essay ${essayId}, isStandalone: ${isStandalone}`);
+
     // Delete related records
     await prisma.aIResult.deleteMany({
       where: { essayId },
@@ -929,7 +1116,6 @@ async function deleteEssay(data) {
       where: { essayId },
     });
 
-    // Try to delete completion logs if the model exists
     try {
       await prisma.essayCompletionLog.deleteMany({
         where: { essayId },
@@ -938,11 +1124,49 @@ async function deleteEssay(data) {
       // EssayCompletionLog might not exist
     }
 
+    // Store prompt info before deletion
+    const promptId = essay.essayPromptId;
+    const programId = essay.essayPrompt?.programId;
+
+    // Delete the essay
     await prisma.essay.delete({
       where: { id: essayId },
     });
 
-    console.log("✅ Essay deleted by user:", userId);
+    // If standalone, also delete the custom prompt and check program
+    if (isStandalone && promptId) {
+      console.log(`🗑️ Deleting standalone prompt ${promptId}`);
+      
+      // Delete the prompt
+      await prisma.essayPrompt.delete({
+        where: { id: promptId }
+      });
+
+      // Check if the program has any other prompts
+      if (programId) {
+        const remainingPrompts = await prisma.essayPrompt.count({
+          where: { programId }
+        });
+
+        console.log(`📊 Remaining prompts in program ${programId}: ${remainingPrompts}`);
+
+        // If no other prompts and it's a standalone program, delete the program
+        if (remainingPrompts === 0) {
+          const program = await prisma.program.findUnique({
+            where: { id: programId }
+          });
+          
+          if (program?.degreeType === "STANDALONE") {
+            console.log(`🗑️ Deleting empty standalone program ${programId}`);
+            await prisma.program.delete({
+              where: { id: programId }
+            });
+          }
+        }
+      }
+    }
+
+    console.log("✅ Essay deleted successfully");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting essay:", error);
@@ -956,9 +1180,6 @@ async function deleteEssay(data) {
   }
 }
 
-// ==========================================
-// Save version
-// ==========================================
 async function saveVersion(data) {
   const {
     essayId,
@@ -979,7 +1200,6 @@ async function saveVersion(data) {
     );
   }
 
-  // Verify ownership
   const essay = await prisma.essay.findFirst({
     where: {
       id: essayId,
@@ -1054,9 +1274,6 @@ async function saveVersion(data) {
   });
 }
 
-// ==========================================
-// Restore version
-// ==========================================
 async function restoreVersion(data) {
   const { essayId, versionId, userId } = data;
 
@@ -1068,7 +1285,6 @@ async function restoreVersion(data) {
   }
 
   try {
-    // Verify ownership
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1142,9 +1358,6 @@ async function restoreVersion(data) {
   }
 }
 
-// ==========================================
-// Delete version
-// ==========================================
 async function deleteVersion(data) {
   const { versionId, essayId, userId } = data;
 
@@ -1156,7 +1369,6 @@ async function deleteVersion(data) {
   }
 
   try {
-    // Verify ownership
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1200,14 +1412,10 @@ async function deleteVersion(data) {
   }
 }
 
-// ==========================================
-// Get analytics
-// ==========================================
 async function getEssayAnalytics(data) {
   const { essayId, userId } = data;
 
   try {
-    // Verify ownership
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1347,9 +1555,6 @@ async function getEssayAnalytics(data) {
   }
 }
 
-// ==========================================
-// AI Analysis
-// ==========================================
 async function performAIAnalysis(data) {
   const {
     essayId,
@@ -1376,7 +1581,6 @@ async function performAIAnalysis(data) {
   const startTime = Date.now();
 
   try {
-    // Verify ownership and get essay context
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1397,7 +1601,6 @@ async function performAIAnalysis(data) {
       );
     }
 
-    // Check for recent analysis
     const recentAnalysis = await prisma.aIResult.findFirst({
       where: {
         essayId,
@@ -1428,9 +1631,6 @@ async function performAIAnalysis(data) {
       ? wordCount / (essay.essayPrompt?.wordLimit || essay.wordLimit) 
       : 0;
 
-    // ============================================================
-    // UPDATED: CHECK OPENROUTER API KEY INSTEAD OF GOOGLE GEMINI
-    // ============================================================
     if (!OPENROUTER_API_KEY) {
       console.error("OPENROUTER_API_KEY not configured");
       const fallbackAnalysis = generateRealisticFallbackAnalysis(
@@ -1514,9 +1714,6 @@ REQUIREMENTS:
 - Include 6-10 suggestions minimum
 - Mix of critical, warning, improvement, and strength suggestions`;
 
-    // ============================================================
-    // UPDATED: CALL OPENROUTER INSTEAD OF GOOGLE GEMINI DIRECTLY
-    // ============================================================
     let result;
     try {
       result = await callGeminiViaOpenRouter(analysisPrompt, 4096);
@@ -1549,7 +1746,7 @@ REQUIREMENTS:
     }
 
     const processingTime = Date.now() - startTime;
-    const responseText = result.text; // Changed from result.response.text()
+    const responseText = result.text;
 
     let analysisData;
     try {
@@ -1600,9 +1797,6 @@ REQUIREMENTS:
   }
 }
 
-// ==========================================
-// Essay completion check
-// ==========================================
 async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
   try {
     const essay = await prisma.essay.findUnique({
@@ -1823,9 +2017,6 @@ async function saveAnalysisToDatabase(
         strengths: JSON.stringify(analysisData.suggestions.filter((s) => s.type === "strength")),
         improvements: JSON.stringify(analysisData.suggestions.filter((s) => s.type === "improvement")),
         warnings: JSON.stringify(analysisData.suggestions.filter((s) => ["critical", "warning"].includes(s.type))),
-        // ============================================================
-        // UPDATED: MODIFIED MODEL NAME TO INDICATE OPENROUTER USAGE
-        // ============================================================
         aiProvider: provider,
         modelUsed:
           provider === "gemini" ? "gemini-2.5-flash-lite (via OpenRouter)" : "local-analysis",
