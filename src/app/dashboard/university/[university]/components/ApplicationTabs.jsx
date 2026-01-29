@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner"; // CHANGED: Import sonner toast
+import { toast } from "sonner";
 import {
   FileText,
   Clock,
@@ -78,7 +78,7 @@ const VersionManager = lazy(() =>
   import('@/app/workspace/components/VersionManager').then(m => ({ default: m.VersionManager }))
 );
 const EssayAnalytics = lazy(() => 
-  import('@/app/workspace/components/EssayAnalytics').then(m => ({ default: m.EssayAnalytics }))
+  import('@/workspace/components/EssayAnalytics').then(m => ({ default: m.EssayAnalytics }))
 );
 
 // ============================================
@@ -179,7 +179,6 @@ const CustomEssayModal = ({
   isCreating,
   isUniversityAdded 
 }) => {
-  // REMOVED: Toast hook
   const [formData, setFormData] = useState({
     customTitle: '',
     customPrompt: '',
@@ -190,7 +189,6 @@ const CustomEssayModal = ({
   const [errors, setErrors] = useState({});
   const [wordLimitError, setWordLimitError] = useState('');
 
-  // ADDED: Word limit validation function
   const handleWordLimitChange = (value) => {
     const numValue = parseInt(value) || 0;
     
@@ -212,7 +210,6 @@ const CustomEssayModal = ({
     }
   };
 
-  // ADDED: Handle blur for word limit
   const handleWordLimitBlur = () => {
     const numValue = parseInt(formData.wordLimit) || 0;
     
@@ -549,7 +546,6 @@ const ApplicationTabs = ({ university }) => {
   const router = useRouter();
   const params = useParams();
   const { data: session, status: sessionStatus } = useSession();
-  // CHANGED: Using sonner toast directly
 
   // ========== EXTRACT USER ID AND UNIVERSITY NAME ==========
   const userId = session?.userId || session?.user?.id || null;
@@ -568,8 +564,24 @@ const ApplicationTabs = ({ university }) => {
   // ========== CUSTOM ESSAY STATE ==========
   const [showCustomEssayModal, setShowCustomEssayModal] = useState(false);
   const [isCreatingCustomEssay, setIsCreatingCustomEssay] = useState(false);
-  const [customEssays, setCustomEssays] = useState([]);
   
+  // FIX 1: Remove separate customEssays state and compute from workspaceData
+  const customEssays = useMemo(() => {
+    if (!workspaceData?.programs) return [];
+    
+    return workspaceData.programs
+      .filter(p => p.degreeType === "STANDALONE" || p.isCustom)
+      .flatMap(p => p.essays?.map(e => ({
+        ...e.userEssay,
+        promptId: e.promptId,
+        promptTitle: e.promptTitle,
+        prompt: e.promptText,
+        wordLimit: e.wordLimit,
+        programId: p.id,
+        universityId: p.universityId,
+      })).filter(Boolean) || []);
+  }, [workspaceData]);
+
   // ADDED: Delete modal state
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
@@ -610,17 +622,11 @@ const ApplicationTabs = ({ university }) => {
   const updateDebounceRef = useRef(null);
   const isEditorActiveRef = useRef(false);
   const saveVersionRef = useRef(null);
-  const customEssaysRef = useRef(customEssays);
   const isFetchingRef = useRef(false);
-
-  useEffect(() => {
-    customEssaysRef.current = customEssays;
-  }, [customEssays]);
 
   // ========== HANDLE ADD UNIVERSITY TO DASHBOARD ==========
   const handleAddUniversity = async () => {
     if (!userId || !university?.id) {
-      // CHANGED: Using sonner toast
       toast.error("Please sign in to add universities to your dashboard");
       return;
     }
@@ -642,11 +648,9 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         if (data.isAdded) {
-          // CHANGED: Using sonner toast
           toast.success(`${university.name || 'University'} has been added to your dashboard!`);
           window.location.reload();
         } else {
-          // CHANGED: Using sonner toast
           toast.success(`${university.name || 'University'} has been removed from your dashboard.`);
           window.location.reload();
         }
@@ -655,16 +659,14 @@ const ApplicationTabs = ({ university }) => {
       }
     } catch (error) {
       console.error('Error toggling university:', error);
-      // CHANGED: Using sonner toast
       toast.error('Failed to update university. Please try again.');
       setIsAddingUniversity(false);
     }
   };
 
-  // ========== HANDLE CREATE CUSTOM ESSAY (FIXED) ==========
+  // ========== FIX 2: HANDLE CREATE CUSTOM ESSAY (UPDATED) ==========
   const handleCreateCustomEssay = async (formData) => {
     if (!userId || !university?.id || !isUniversityAdded) {
-      // CHANGED: Using sonner toast
       toast.error("Please add the university to your dashboard first");
       return;
     }
@@ -672,130 +674,140 @@ const ApplicationTabs = ({ university }) => {
     try {
       setIsCreatingCustomEssay(true);
 
-      // Optimistic UI update - add to custom essays immediately
-      const optimisticEssay = {
-        id: `temp-${Date.now()}`,
-        title: formData.customTitle,
-        prompt: formData.customPrompt,
-        wordLimit: formData.wordLimit,
-        wordCount: 0,
-        priority: formData.priority,
-        isCompleted: false,
-        status: 'not-started',
-        lastModified: new Date(),
-        isCustom: true,
-        universityId: university.id,
-        userId: userId
-      };
-
-      setCustomEssays(prev => [optimisticEssay, ...prev]);
-
-      const response = await fetch(
-        `/api/essay/independent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "create_standalone_essay",
-            customTitle: formData.customTitle,
-            customPrompt: formData.customPrompt,
-            wordLimit: formData.wordLimit,
-            priority: formData.priority,
-            taggedUniversityId: university.id,
-            userId: userId
-          }),
-        }
-      );
+      const response = await fetch(`/api/essay/independent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_standalone_essay",
+          customTitle: formData.customTitle,
+          customPrompt: formData.customPrompt,
+          wordLimit: formData.wordLimit,
+          priority: formData.priority,
+          taggedUniversityId: university.id,
+          userId: userId
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
+        
         if (result.success && result.essay) {
-          // Replace optimistic essay with real one
-          setCustomEssays(prev => 
-            prev.map(essay => 
-              essay.id === optimisticEssay.id ? result.essay : essay
-            )
-          );
+          // FIX 2A: Update workspace data immediately
+          setWorkspaceData(prev => {
+            if (!prev) return prev;
+            
+            // Find or create STANDALONE program
+            let standaloneProgram = prev.programs.find(p => 
+              p.universityId === university.id && p.degreeType === "STANDALONE"
+            );
+            
+            if (!standaloneProgram) {
+              // Create new standalone program in state
+              standaloneProgram = {
+                id: result.programId,
+                universityId: university.id,
+                programName: "My Custom Essays",
+                degreeType: "STANDALONE",
+                universityName: university.name || universityName,
+                universityColor: university.brandColor || "#002147",
+                essays: []
+              };
+            }
+            
+            // Add new essay to program
+            const newEssayData = {
+              promptId: result.essayPromptId,
+              promptTitle: result.essay.title,
+              promptText: result.essay.prompt,
+              wordLimit: result.essay.wordLimit,
+              userEssay: result.essay
+            };
+            
+            // Update or add program
+            const updatedPrograms = prev.programs.some(p => p.id === standaloneProgram.id)
+              ? prev.programs.map(p => 
+                  p.id === standaloneProgram.id
+                    ? { ...p, essays: [...(p.essays || []), newEssayData] }
+                    : p
+                )
+              : [...prev.programs, { ...standaloneProgram, essays: [newEssayData] }];
+            
+            return { ...prev, programs: updatedPrograms };
+          });
 
-          // Set selected essay info
+          setShowCustomEssayModal(false);
+          toast.success("Custom essay created successfully");
+
+          // Navigate to the new custom essay immediately
+          setActiveProgramId(result.programId);
+          setActiveEssayPromptId(result.essayPromptId);
           setSelectedEssayInfo({
             title: result.essay.title,
-            programName: 'My Custom Essays', // CHANGED: Standardized label
+            programName: 'My Custom Essays',
             isCustom: true,
             promptText: result.essay.prompt,
             wordLimit: result.essay.wordLimit
           });
-
-          setShowCustomEssayModal(false);
-          
-          // CHANGED: Using sonner toast
-          toast.success("Custom essay created successfully");
-
-          // Navigate to the new custom essay
-          if (result.essay?.id) {
-            setActiveProgramId('custom');
-            setActiveEssayPromptId(result.essay.id);
-            setActiveView('editor');
-          }
-
-          // Refresh workspace data in background
-          fetchWorkspaceData();
+          setActiveView('editor');
         } else {
-          // Remove optimistic essay on error
-          setCustomEssays(prev => prev.filter(essay => essay.id !== optimisticEssay.id));
           throw new Error(result.error || 'Failed to create custom essay');
         }
       } else {
         const errorData = await response.json();
-        setCustomEssays(prev => prev.filter(essay => essay.id !== optimisticEssay.id));
         throw new Error(errorData.error || 'Failed to create custom essay');
       }
     } catch (error) {
       console.error('Error creating custom essay:', error);
-      // CHANGED: Using sonner toast
       toast.error(error.message);
     } finally {
       setIsCreatingCustomEssay(false);
     }
   };
 
-  // ========== HANDLE DELETE CUSTOM ESSAY (IMPROVED) ==========
+  // ========== FIX 3: HANDLE DELETE CUSTOM ESSAY (UPDATED) ==========
   const handleDeleteCustomEssay = async (essayId) => {
     if (!essayId) return;
 
     try {
       setIsDeletingEssay(true);
 
-      const essayToDelete = customEssays.find(e => e.id === essayId);
-      if (!essayToDelete) {
-        throw new Error('Essay not found');
-      }
-
-      const response = await fetch(
-        `/api/essay/independent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "delete_essay",
-            essayId,
-          }),
-        }
-      );
+      const response = await fetch(`/api/essay/independent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_essay",
+          essayId,
+        }),
+      });
 
       if (response.ok) {
-        // Remove from local state
-        setCustomEssays(prev => prev.filter(essay => essay.id !== essayId));
+        // FIX 3A: Remove from workspace data immediately
+        setWorkspaceData(prev => {
+          if (!prev) return prev;
+          
+          return {
+            ...prev,
+            programs: prev.programs.map(program => 
+              (program.degreeType === "STANDALONE" || program.isCustom)
+                ? {
+                    ...program,
+                    essays: program.essays.filter(e => e.userEssay?.id !== essayId)
+                  }
+                : program
+            ).filter(p => 
+              (p.degreeType !== "STANDALONE" && !p.isCustom) || (p.essays && p.essays.length > 0)
+            )
+          };
+        });
         
-        // If we're currently viewing this essay, navigate away
-        if (activeEssayPromptId === essayId) {
+        // If viewing deleted essay, navigate away
+        if (activeEssayPromptId && currentEssay?.id === essayId) {
           setActiveEssayPromptId(null);
+          setActiveProgramId(null);
           setActiveView('list');
         }
         
-        // CHANGED: Using sonner toast
         toast.success("Custom essay deleted successfully");
-        
         setDeleteModal({ isOpen: false, essayId: null, essayTitle: '' });
       } else {
         const errorData = await response.json();
@@ -803,7 +815,6 @@ const ApplicationTabs = ({ university }) => {
       }
     } catch (error) {
       console.error('Error deleting custom essay:', error);
-      // CHANGED: Using sonner toast
       toast.error(error.message || 'Failed to delete custom essay');
     } finally {
       setIsDeletingEssay(false);
@@ -872,43 +883,21 @@ const ApplicationTabs = ({ university }) => {
   const programsWithEssays = useMemo(() => {
     if (!workspaceData?.programs) return [];
     return workspaceData.programs.filter(program => 
-      program.essays && program.essays.length > 0
+      program.essays && program.essays.length > 0 && 
+      program.degreeType !== "STANDALONE" && !program.isCustom
     );
   }, [workspaceData]);
 
   const currentProgram = useMemo(() => {
-    if (activeProgramId === 'custom') return null;
-    return programsWithEssays.find(p => p.id === activeProgramId);
-  }, [programsWithEssays, activeProgramId]);
+    if (!activeProgramId) return null;
+    return workspaceData?.programs?.find(p => p.id === activeProgramId);
+  }, [workspaceData, activeProgramId]);
 
   const currentEssayData = useMemo(() => {
-    if (activeProgramId === 'custom') {
-      const customEssay = customEssays.find(e => e.id === activeEssayPromptId);
-      if (customEssay) {
-        return {
-          promptId: customEssay.id,
-          promptTitle: customEssay.title,
-          promptText: customEssay.prompt,
-          wordLimit: customEssay.wordLimit,
-          userEssay: customEssay,
-          isCustom: true
-        };
-      }
-      // Fallback to selectedEssayInfo
-      if (selectedEssayInfo.isCustom && selectedEssayInfo.title) {
-        return {
-          promptId: activeEssayPromptId,
-          promptTitle: selectedEssayInfo.title,
-          promptText: selectedEssayInfo.promptText,
-          wordLimit: selectedEssayInfo.wordLimit,
-          userEssay: null,
-          isCustom: true
-        };
-      }
-      return null;
-    }
-    return currentProgram?.essays?.find(e => e.promptId === activeEssayPromptId);
-  }, [currentProgram, activeEssayPromptId, activeProgramId, customEssays, selectedEssayInfo]);
+    if (!currentProgram || !activeEssayPromptId) return null;
+    
+    return currentProgram.essays?.find(e => e.promptId === activeEssayPromptId);
+  }, [currentProgram, activeEssayPromptId]);
 
   const currentEssay = useMemo(() => {
     return currentEssayData?.userEssay;
@@ -1008,7 +997,7 @@ const ApplicationTabs = ({ university }) => {
     };
   }, [university, customEssays]);
 
-  // ========== API FUNCTIONS ==========
+  // ========== FIX 4: API FUNCTIONS (UPDATED) ==========
   const fetchWorkspaceData = useCallback(async () => {
     if (!universityName || !userId || !isUniversityAdded || isFetchingRef.current) return;
 
@@ -1018,7 +1007,7 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceError(null);
 
       const response = await fetch(
-        `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}`,
+        `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}&userId=${encodeURIComponent(userId)}`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -1032,41 +1021,9 @@ const ApplicationTabs = ({ university }) => {
       }
 
       const data = await response.json();
+      
+      // FIX 4A: Set workspace data - custom essays are already included
       setWorkspaceData(data);
-
-      // Fetch custom essays for this university
-      if (university?.id) {
-        try {
-          const customEssaysResponse = await fetch(
-            `/api/essay/independent?universityId=${encodeURIComponent(university.id)}&type=custom`,
-            {
-              method: "GET",
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-
-          if (customEssaysResponse.ok) {
-            const customData = await customEssaysResponse.json();
-            // Filter custom essays for this specific university
-            const universityCustomEssays = customData.programs
-              ?.filter(p => (p.degreeType === "STANDALONE" || p.isCustom) && p.universityId === university.id)
-              .flatMap(p => p.essays?.map(e => e.userEssay).filter(Boolean)) || [];
-            
-            // Remove duplicates by essay ID
-            const uniqueEssays = Array.from(
-              new Map(universityCustomEssays.map(essay => [essay.id, essay])).values()
-            );
-            
-            setCustomEssays(uniqueEssays);
-          } else {
-            console.warn('Failed to fetch custom essays');
-            setCustomEssays([]);
-          }
-        } catch (err) {
-          console.warn('Failed to fetch custom essays:', err);
-          setCustomEssays([]);
-        }
-      }
 
       // Don't auto-select if we already have a selection
       if (activeProgramId && activeEssayPromptId) {
@@ -1100,7 +1057,6 @@ const ApplicationTabs = ({ university }) => {
     } catch (err) {
       console.error("Error fetching workspace data:", err);
       setWorkspaceError(err.message);
-      // CHANGED: Using sonner toast
       toast.error("Failed to load workspace data");
     } finally {
       setWorkspaceLoading(false);
@@ -1125,38 +1081,54 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      const isCustom = activeProgramId === 'custom';
+      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+      
+      // FIX 4B: Use correct route based on essay type
+      const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
 
-      const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            essayId: currentEssay.id,
-            content: contentToSave,
-            wordCount: wordCountToSave,
-            isAutoSave: true,
-            isCustomEssay: isCustom,
-            userId,
-          }),
-        }
-      );
+      const response = await fetch(apiRoute, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          essayId: currentEssay.id,
+          content: contentToSave,
+          wordCount: wordCountToSave,
+          isAutoSave: true,
+          isCustomEssay: isCustom,
+          userId,
+        }),
+      });
 
       if (response.ok) {
+        const result = await response.json();
+        
+        // FIX 4C: Update state immediately with response
+        setWorkspaceData(prev => {
+          if (!prev) return prev;
+          
+          return {
+            ...prev,
+            programs: prev.programs.map(program => 
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map(essayData => 
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: result.essay
+                          }
+                        : essayData
+                    )
+                  }
+                : program
+            )
+          };
+        });
+        
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
         pendingContentRef.current = null;
-
-        // Update custom essays state if it's a custom essay
-        if (isCustom) {
-          setCustomEssays(prev => prev.map(essay => 
-            essay.id === currentEssay.id 
-              ? { ...essay, content: contentToSave, wordCount: wordCountToSave, lastModified: new Date() }
-              : essay
-          ));
-        }
-
         return true;
       }
       return false;
@@ -1167,7 +1139,7 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(false);
       isUpdatingRef.current = false;
     }
-  }, [currentEssay, isSaving, hasUnsavedChanges, universityName, userId, isUniversityAdded, activeProgramId]);
+  }, [currentEssay, isSaving, hasUnsavedChanges, universityName, userId, isUniversityAdded, activeProgramId, activeEssayPromptId, currentProgram]);
 
   const createEssay = useCallback(async () => {
     if (!activeProgramId || !activeEssayPromptId || isCreatingEssay || !userId || !isUniversityAdded) {
@@ -1179,19 +1151,20 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceError(null);
       isUpdatingRef.current = true;
 
-      const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "create_essay",
-            programId: activeProgramId,
-            essayPromptId: activeEssayPromptId,
-            userId,
-          }),
-        }
-      );
+      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+      const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
+
+      const response = await fetch(apiRoute, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_essay",
+          programId: activeProgramId,
+          essayPromptId: activeEssayPromptId,
+          userId,
+          isCustomEssay: isCustom,
+        }),
+      });
 
       const responseData = await response.json();
 
@@ -1219,28 +1192,26 @@ const ApplicationTabs = ({ university }) => {
         setLastSaved(new Date());
         lastContentRef.current = responseData.essay.content || "";
         
-        // CHANGED: Using sonner toast
         toast.success("Essay created successfully");
         
         return responseData.essay;
       } else {
         setWorkspaceError(responseData.error || "Failed to create essay");
-        // CHANGED: Using sonner toast
         toast.error(responseData.error || "Failed to create essay");
         return null;
       }
     } catch (error) {
       console.error("Error creating essay:", error);
       setWorkspaceError("Network error while creating essay");
-      // CHANGED: Using sonner toast
       toast.error("Network error while creating essay");
       return null;
     } finally {
       setIsCreatingEssay(false);
       isUpdatingRef.current = false;
     }
-  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded]);
+  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded, currentProgram]);
 
+  // ========== FIX 5: UPDATE ESSAY CONTENT (UPDATED) ==========
   const updateEssayContent = useCallback((content, wordCount) => {
     if (!isUniversityAdded) return;
 
@@ -1257,61 +1228,45 @@ const ApplicationTabs = ({ university }) => {
       
       const { content: newContent, wordCount: newWordCount } = pendingContentRef.current;
       
-      if (!currentEssay && activeProgramId !== 'custom') {
+      if (!currentEssay && currentProgram?.degreeType !== "STANDALONE" && !currentProgram?.isCustom) {
         createEssay();
         return;
       }
 
-      const isCustom = activeProgramId === 'custom';
-
-      if (isCustom) {
-        // Update custom essay
-        setCustomEssays(prev => prev.map(essay => 
-          essay.id === activeEssayPromptId 
-            ? { 
-                ...essay,
-                content: newContent, 
-                wordCount: newWordCount, 
-                lastModified: new Date() 
-              }
-            : essay
-        ));
-      } else {
-        // Update regular essay
-        setWorkspaceData((prev) => {
-          if (!prev) return prev;
-          
-          const programIndex = prev.programs.findIndex(p => p.id === activeProgramId);
-          if (programIndex === -1) return prev;
-          
-          const program = prev.programs[programIndex];
-          if (!program.essays) return prev;
-          
-          const essayIndex = program.essays.findIndex(e => e.promptId === activeEssayPromptId);
-          if (essayIndex === -1) return prev;
-          
-          const currentContent = program.essays[essayIndex].userEssay?.content;
-          if (currentContent === newContent) return prev;
-          
-          const newPrograms = [...prev.programs];
-          const newProgram = { ...program };
-          const newEssays = [...program.essays];
-          const newEssayData = { ...newEssays[essayIndex] };
-          
-          newEssayData.userEssay = {
-            ...newEssayData.userEssay,
-            content: newContent,
-            wordCount: newWordCount,
-            lastModified: new Date(),
-          };
-          
-          newEssays[essayIndex] = newEssayData;
-          newProgram.essays = newEssays;
-          newPrograms[programIndex] = newProgram;
-          
-          return { ...prev, programs: newPrograms };
-        });
-      }
+      // FIX 5A: Update workspace data correctly
+      setWorkspaceData((prev) => {
+        if (!prev) return prev;
+        
+        const programIndex = prev.programs.findIndex(p => p.id === activeProgramId);
+        if (programIndex === -1) return prev;
+        
+        const program = prev.programs[programIndex];
+        if (!program.essays) return prev;
+        
+        const essayIndex = program.essays.findIndex(e => e.promptId === activeEssayPromptId);
+        if (essayIndex === -1) return prev;
+        
+        const currentContent = program.essays[essayIndex].userEssay?.content;
+        if (currentContent === newContent) return prev;
+        
+        const newPrograms = [...prev.programs];
+        const newProgram = { ...program };
+        const newEssays = [...program.essays];
+        const newEssayData = { ...newEssays[essayIndex] };
+        
+        newEssayData.userEssay = {
+          ...newEssayData.userEssay,
+          content: newContent,
+          wordCount: newWordCount,
+          lastModified: new Date(),
+        };
+        
+        newEssays[essayIndex] = newEssayData;
+        newProgram.essays = newEssays;
+        newPrograms[programIndex] = newProgram;
+        
+        return { ...prev, programs: newPrograms };
+      });
       
       setHasUnsavedChanges(true);
       pendingContentRef.current = null;
@@ -1320,8 +1275,9 @@ const ApplicationTabs = ({ university }) => {
         isEditorActiveRef.current = false;
       }, 100);
     }, 600);
-  }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay, isUniversityAdded]);
+  }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay, isUniversityAdded, currentProgram]);
 
+  // ========== FIX 6: SAVE VERSION (UPDATED) ==========
   const saveVersion = useCallback(async (label) => {
     if (!currentEssay || isSaving || isSavingVersion || !userId || !isUniversityAdded) return false;
 
@@ -1338,74 +1294,61 @@ const ApplicationTabs = ({ university }) => {
       if (hasUnsavedChanges) {
         const autoSaved = await autoSaveEssay();
         if (!autoSaved) {
-          setWorkspaceError("Failed to save current changes");
-          // CHANGED: Using sonner toast
           toast.error("Failed to save current changes");
           return false;
         }
       }
 
-      const isCustom = activeProgramId === 'custom';
+      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+      const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
 
-      const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "save_version",
-            essayId: currentEssay.id,
-            content: contentToSave,
-            wordCount: wordCountToSave,
-            label: label || `Version ${new Date().toLocaleString()}`,
-            isCustomEssay: isCustom,
-            userId,
-          }),
-        }
-      );
+      const response = await fetch(apiRoute, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_version",
+          essayId: currentEssay.id,
+          content: contentToSave,
+          wordCount: wordCountToSave,
+          label: label || `Version ${new Date().toLocaleString()}`,
+          isCustomEssay: isCustom,
+          userId,
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
         
         if (result.version) {
-          if (isCustom) {
-            // Update custom essay versions
-            setCustomEssays(prev => prev.map(essay => 
-              essay.id === currentEssay.id 
-                ? { ...essay, versions: [result.version, ...(essay.versions || [])] }
-                : essay
-            ));
-          } else {
-            // Update regular essay versions
-            setWorkspaceData((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                programs: prev.programs.map(program =>
-                  program.id === activeProgramId
-                    ? {
-                        ...program,
-                        essays: program.essays.map(essayData =>
-                          essayData.promptId === activeEssayPromptId
-                            ? {
-                                ...essayData,
-                                userEssay: {
-                                  ...essayData.userEssay,
-                                  versions: [result.version, ...(essayData.userEssay?.versions || [])],
-                                  lastModified: new Date(),
-                                },
-                              }
-                            : essayData
-                        ),
-                      }
-                    : program
-                ),
-              };
-            });
-          }
+          // FIX 6A: Update workspace data with new version
+          setWorkspaceData((prev) => {
+            if (!prev) return prev;
+            
+            return {
+              ...prev,
+              programs: prev.programs.map(program =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map(essayData =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: {
+                                ...essayData.userEssay,
+                                versions: [result.version, ...(essayData.userEssay?.versions || [])],
+                                lastModified: new Date(),
+                              },
+                            }
+                          : essayData
+                      ),
+                    }
+                  : program
+              ),
+            };
+          });
         }
 
-        // CHANGED: Using sonner toast
         toast.success("Version saved successfully");
 
         // Navigate back to list view after saving version
@@ -1419,116 +1362,35 @@ const ApplicationTabs = ({ university }) => {
       return false;
     } catch (error) {
       console.error("Error saving version:", error);
-      // CHANGED: Using sonner toast
       toast.error("Failed to save version");
       return false;
     } finally {
       setIsSavingVersion(false);
     }
-  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded]);
+  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded, currentProgram]);
 
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
     
-    const isCustom = activeProgramId === 'custom';
+    const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+    const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
     
     try {
-      const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "restore_version",
-            essayId: currentEssay.id,
-            versionId,
-            isCustomEssay: isCustom,
-            userId,
-          }),
-        }
-      );
+      const response = await fetch(apiRoute, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "restore_version",
+          essayId: currentEssay.id,
+          versionId,
+          isCustomEssay: isCustom,
+          userId,
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
         if (result.essay) {
-          if (isCustom) {
-            setCustomEssays(prev => prev.map(essay => 
-              essay.id === currentEssay.id 
-                ? { ...essay, content: result.essay.content, wordCount: result.essay.wordCount, lastModified: new Date() }
-                : essay
-            ));
-          } else {
-            setWorkspaceData((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                programs: prev.programs.map(program =>
-                  program.id === activeProgramId
-                    ? {
-                        ...program,
-                        essays: program.essays.map(essayData =>
-                          essayData.promptId === activeEssayPromptId
-                            ? {
-                                ...essayData,
-                                userEssay: {
-                                  ...essayData.userEssay,
-                                  content: result.essay.content,
-                                  wordCount: result.essay.wordCount,
-                                  lastModified: new Date(),
-                                },
-                              }
-                            : essayData
-                        ),
-                      }
-                    : program
-                ),
-              };
-            });
-          }
-          lastContentRef.current = result.essay.content;
-          setHasUnsavedChanges(false);
-          setLastSaved(new Date());
-          
-          // CHANGED: Using sonner toast
-          toast.success("Version restored successfully");
-        }
-      }
-    } catch (error) {
-      console.error("Error restoring version:", error);
-      // CHANGED: Using sonner toast
-      toast.error("Failed to restore version");
-    }
-  };
-
-  const handleDeleteVersion = async (versionId) => {
-    if (!currentEssay || !userId || !isUniversityAdded) return;
-    
-    const isCustom = activeProgramId === 'custom';
-    
-    try {
-      const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "delete_version",
-            versionId,
-            essayId: currentEssay.id,
-            isCustomEssay: isCustom,
-            userId,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        if (isCustom) {
-          setCustomEssays(prev => prev.map(essay => 
-            essay.id === currentEssay.id 
-              ? { ...essay, versions: (essay.versions || []).filter(v => v.id !== versionId) }
-              : essay
-          ));
-        } else {
           setWorkspaceData((prev) => {
             if (!prev) return prev;
             return {
@@ -1543,7 +1405,9 @@ const ApplicationTabs = ({ university }) => {
                               ...essayData,
                               userEssay: {
                                 ...essayData.userEssay,
-                                versions: (essayData.userEssay?.versions || []).filter(v => v.id !== versionId),
+                                content: result.essay.content,
+                                wordCount: result.essay.wordCount,
+                                lastModified: new Date(),
                               },
                             }
                           : essayData
@@ -1553,14 +1417,68 @@ const ApplicationTabs = ({ university }) => {
               ),
             };
           });
+          lastContentRef.current = result.essay.content;
+          setHasUnsavedChanges(false);
+          setLastSaved(new Date());
+          
+          toast.success("Version restored successfully");
         }
+      }
+    } catch (error) {
+      console.error("Error restoring version:", error);
+      toast.error("Failed to restore version");
+    }
+  };
+
+  const handleDeleteVersion = async (versionId) => {
+    if (!currentEssay || !userId || !isUniversityAdded) return;
+    
+    const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+    const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
+    
+    try {
+      const response = await fetch(apiRoute, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_version",
+          versionId,
+          essayId: currentEssay.id,
+          isCustomEssay: isCustom,
+          userId,
+        }),
+      });
+
+      if (response.ok) {
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            programs: prev.programs.map(program =>
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map(essayData =>
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: {
+                              ...essayData.userEssay,
+                              versions: (essayData.userEssay?.versions || []).filter(v => v.id !== versionId),
+                            },
+                          }
+                        : essayData
+                    ),
+                  }
+                : program
+            ),
+          };
+        });
         
-        // CHANGED: Using sonner toast
         toast.success("Version deleted successfully");
       }
     } catch (error) {
       console.error("Error deleting version:", error);
-      // CHANGED: Using sonner toast
       toast.error("Failed to delete version");
     }
   };
@@ -1582,42 +1500,27 @@ const ApplicationTabs = ({ university }) => {
 
     setActiveProgramId(programId);
     
-    if (programId === 'custom') {
-      // For custom essays, select the first one
-      if (customEssays.length > 0) {
-        const firstCustomEssay = customEssays[0];
-        setActiveEssayPromptId(firstCustomEssay.id);
-        setSelectedEssayInfo({
-          title: firstCustomEssay.title,
-          programName: 'My Custom Essays', // CHANGED: Standardized label
-          isCustom: true,
-          promptText: firstCustomEssay.prompt,
-          wordLimit: firstCustomEssay.wordLimit
-        });
-      }
+    const program = workspaceData?.programs?.find(p => p.id === programId);
+    
+    if (program?.essays?.length > 0) {
+      const firstEssay = program.essays[0];
+      setActiveEssayPromptId(firstEssay.promptId);
+      setSelectedEssayInfo({
+        title: firstEssay.promptTitle,
+        programName: program.programName || program.name,
+        isCustom: program.degreeType === "STANDALONE" || program.isCustom,
+        promptText: firstEssay.promptText,
+        wordLimit: firstEssay.wordLimit
+      });
     } else {
-      const program = programsWithEssays.find(p => p.id === programId);
-      
-      if (program?.essays?.length > 0) {
-        const firstEssay = program.essays[0];
-        setActiveEssayPromptId(firstEssay.promptId);
-        setSelectedEssayInfo({
-          title: firstEssay.promptTitle,
-          programName: program.name,
-          isCustom: false,
-          promptText: firstEssay.promptText,
-          wordLimit: firstEssay.wordLimit
-        });
-      } else {
-        setActiveEssayPromptId(null);
-      }
+      setActiveEssayPromptId(null);
     }
 
     setHasUnsavedChanges(false);
     setLastSaved(null);
     lastContentRef.current = "";
     setOpenPanels([]);
-  }, [activeProgramId, programsWithEssays, customEssays, isUniversityAdded]);
+  }, [activeProgramId, workspaceData, isUniversityAdded]);
 
   const handleEssayPromptSelect = useCallback((promptId, essayInfo = null) => {
     if (promptId === activeEssayPromptId || !isUniversityAdded) return;
@@ -1637,10 +1540,6 @@ const ApplicationTabs = ({ university }) => {
     
     // Update selected essay info immediately
     if (essayInfo) {
-      // CHANGED: Standardize custom essay label
-      if (essayInfo.isCustom) {
-        essayInfo.programName = 'My Custom Essays';
-      }
       setSelectedEssayInfo(essayInfo);
     }
     
@@ -1648,56 +1547,62 @@ const ApplicationTabs = ({ university }) => {
     setLastSaved(null);
     setOpenPanels([]);
 
-    if (activeProgramId === 'custom') {
-      const customEssay = customEssays.find(e => e.id === promptId);
-      lastContentRef.current = customEssay?.content || "";
-    } else {
-      const newEssayData = currentProgram?.essays?.find(e => e.promptId === promptId);
-      lastContentRef.current = newEssayData?.userEssay?.content || "";
-    }
-  }, [activeEssayPromptId, currentProgram, customEssays, activeProgramId, isUniversityAdded]);
+    const essayData = currentProgram?.essays?.find(e => e.promptId === promptId);
+    lastContentRef.current = essayData?.userEssay?.content || "";
+  }, [activeEssayPromptId, currentProgram, activeProgramId, isUniversityAdded]);
 
   const handleOpenEditor = useCallback((essay, isCustom = false) => {
     if (!isUniversityAdded) return;
     
-    // Set essay info immediately for display
+    // Find the essay in workspace data
+    if (workspaceData) {
+      for (const program of workspaceData.programs) {
+        if (!program.essays || program.essays.length === 0) continue;
+        const essayData = program.essays.find(e => 
+          e.userEssay?.id === essay.id ||
+          e.promptTitle === essay.title ||
+          e.promptId === essay.id
+        );
+        if (essayData) {
+          setActiveProgramId(program.id);
+          setActiveEssayPromptId(essayData.promptId);
+          setSelectedEssayInfo({
+            title: essayData.promptTitle,
+            programName: program.programName || program.name,
+            isCustom: program.degreeType === "STANDALONE" || program.isCustom,
+            promptText: essayData.promptText,
+            wordLimit: essayData.wordLimit
+          });
+          lastContentRef.current = essayData.userEssay?.content || "";
+          setActiveView('editor');
+          setHasUnsavedChanges(false);
+          setLastSaved(null);
+          setOpenPanels([]);
+          return;
+        }
+      }
+    }
+    
+    // If not found, create new selection
     setSelectedEssayInfo({
       title: essay.title || essay.promptTitle || 'Essay',
-      // CHANGED: Standardize custom essay label
       programName: isCustom ? 'My Custom Essays' : '',
       isCustom: isCustom,
       promptText: essay.text || essay.prompt || essay.promptText || '',
       wordLimit: essay.wordLimit || 500
     });
     
-    if (isCustom) {
-      // Handle custom essay
-      setActiveProgramId('custom');
-      setActiveEssayPromptId(essay.id);
-      lastContentRef.current = essay.content || "";
-    } else {
-      // Find the essay in workspace data
-      if (workspaceData) {
-        for (const program of workspaceData.programs) {
-          if (!program.essays || program.essays.length === 0) continue;
-          const essayData = program.essays.find(e => 
-            e.promptId === essay.id || 
-            e.userEssay?.id === essay.id ||
-            e.promptTitle === essay.title
-          );
-          if (essayData) {
-            setActiveProgramId(program.id);
-            setActiveEssayPromptId(essayData.promptId);
-            setSelectedEssayInfo({
-              title: essayData.promptTitle,
-              programName: program.name,
-              isCustom: false,
-              promptText: essayData.promptText,
-              wordLimit: essayData.wordLimit
-            });
-            lastContentRef.current = essayData.userEssay?.content || "";
-            break;
-          }
+    // For custom essays, try to find the standalone program
+    if (isCustom && workspaceData) {
+      const standaloneProgram = workspaceData.programs.find(p => 
+        p.degreeType === "STANDALONE" || p.isCustom
+      );
+      if (standaloneProgram) {
+        setActiveProgramId(standaloneProgram.id);
+        const customEssay = standaloneProgram.essays?.find(e => e.userEssay?.id === essay.id);
+        if (customEssay) {
+          setActiveEssayPromptId(customEssay.promptId);
+          lastContentRef.current = customEssay.userEssay?.content || "";
         }
       }
     }
@@ -1744,25 +1649,23 @@ const ApplicationTabs = ({ university }) => {
     if (currentEssayData?.promptTitle) {
       return currentEssayData.promptTitle;
     }
-    if (activeProgramId === 'custom') {
-      const customEssay = customEssays.find(e => e.id === activeEssayPromptId);
-      return customEssay?.title || 'Custom Essay';
+    if (currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom) {
+      return 'Custom Essay';
     }
     return 'Loading...';
-  }, [selectedEssayInfo.title, currentEssayData?.promptTitle, activeProgramId, activeEssayPromptId, customEssays]);
+  }, [selectedEssayInfo.title, currentEssayData?.promptTitle, currentProgram]);
 
   const displayProgramName = useMemo(() => {
     if (selectedEssayInfo.programName) {
       return selectedEssayInfo.programName;
     }
-    if (activeProgramId === 'custom') {
-      // CHANGED: Standardized label
+    if (currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom) {
       return 'My Custom Essays';
     }
-    return currentProgram?.name || '';
-  }, [selectedEssayInfo.programName, activeProgramId, currentProgram?.name]);
+    return currentProgram?.programName || currentProgram?.name || '';
+  }, [selectedEssayInfo.programName, currentProgram]);
 
-  // ========== CUSTOM ESSAY CARD COMPONENT (IMPROVED UX) ==========
+  // ========== FIX 7: CUSTOM ESSAY CARD COMPONENT (UPDATED) ==========
   const CustomEssayCard = React.memo(({ essay, index, onEdit, onDelete }) => {
     const progress = essay.wordLimit > 0 
       ? (essay.wordCount / essay.wordLimit) * 100 
@@ -2122,7 +2025,7 @@ const ApplicationTabs = ({ university }) => {
   const renderPanels = () => {
     if (!currentEssay || openPanels.length === 0 || !isUniversityAdded) return null;
 
-    const isCustom = activeProgramId === 'custom';
+    const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
 
     return (
       <>
@@ -2232,6 +2135,13 @@ const ApplicationTabs = ({ university }) => {
       }
     };
   }, []);
+
+  // ========== FIX 8: RENDER CUSTOM ESSAYS WITHOUT DUPLICATES ==========
+  const uniqueCustomEssays = useMemo(() => {
+    return Array.from(
+      new Map(customEssays.map(essay => [essay.id, essay])).values()
+    );
+  }, [customEssays]);
 
   // ========== RENDER ==========
   if (sessionStatus === 'loading') {
@@ -2443,19 +2353,18 @@ const ApplicationTabs = ({ university }) => {
                       </div>
 
                       {/* Custom Essays Section */}
-                      {customEssays.length > 0 && (
+                      {uniqueCustomEssays.length > 0 && (
                         <div className="space-y-4">
                           <div className="flex items-center space-x-2 mb-2">
                             <Sparkles className="h-5 w-5 text-purple-400" />
-                            {/* CHANGED: Standardized label */}
                             <h4 className="text-lg font-semibold text-white">My Custom Essays</h4>
                             <span className="text-xs text-white/60 bg-purple-500/20 px-2 py-1 rounded-full">
-                              {customEssays.length} essay{customEssays.length !== 1 ? 's' : ''}
+                              {uniqueCustomEssays.length} essay{uniqueCustomEssays.length !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          {customEssays.map((essay, index) => (
+                          {uniqueCustomEssays.map((essay, index) => (
                             <CustomEssayCard
-                              key={`custom-${essay.id}-${essay.universityId || index}`}
+                              key={`custom-${essay.id}-${index}`}
                               essay={essay}
                               index={index}
                               onEdit={(essay) => handleOpenEditor(essay, true)}
@@ -2467,7 +2376,7 @@ const ApplicationTabs = ({ university }) => {
 
                       {/* Regular Essays Section */}
                       <div className="space-y-4">
-                        {customEssays.length > 0 && (
+                        {uniqueCustomEssays.length > 0 && (
                           <div className="flex items-center space-x-2 mb-2">
                             <BookOpen className="h-5 w-5 text-blue-400" />
                             <h4 className="text-lg font-semibold text-white">University Essay Prompts</h4>
@@ -2518,7 +2427,7 @@ const ApplicationTabs = ({ university }) => {
                           </p>
                         </div>
                         <Button
-                          onClick={() => router.push("/dashboard/calender")}
+                          onClick={() => router.push("/dashboard/calendar")}
                           className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30"
                         >
                           <CalendarDays className="h-4 w-4 mr-2" />
@@ -2646,44 +2555,50 @@ const ApplicationTabs = ({ university }) => {
 
                             <div className="space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-1">
                               {/* Custom Essays Section */}
-                              {customEssays.length > 0 && (
+                              {uniqueCustomEssays.length > 0 && (
                                 <div className="space-y-1 mb-3">
                                   <div 
-                                    onClick={() => handleProgramSelect('custom')}
+                                    onClick={() => {
+                                      const standaloneProgram = workspaceData?.programs?.find(p => 
+                                        p.degreeType === "STANDALONE" || p.isCustom
+                                      );
+                                      if (standaloneProgram) {
+                                        handleProgramSelect(standaloneProgram.id);
+                                      }
+                                    }}
                                     className={`px-2 py-2 flex items-center space-x-2 cursor-pointer rounded-lg transition-all ${
-                                      activeProgramId === 'custom' 
+                                      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom
                                         ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-purple-400' 
                                         : 'hover:bg-white/10 border-l-4 border-transparent'
                                     }`}
                                   >
                                     <Sparkles className="w-4 h-4 text-purple-400" />
-                                    {/* CHANGED: Standardized label */}
                                     <span className="text-sm font-semibold text-white">My Custom Essays</span>
                                     <span className="text-xs text-white/40 bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-auto">
-                                      {customEssays.length}
+                                      {uniqueCustomEssays.length}
                                     </span>
                                   </div>
-                                  {activeProgramId === 'custom' && customEssays.map((essay) => (
+                                  {(currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom) && workspaceData?.programs?.find(p => p.id === activeProgramId)?.essays?.map((essay) => (
                                     <div
-                                      key={`custom-essay-${essay.id}-${essay.programId || ''}`}
-                                      onClick={() => handleEssayPromptSelect(essay.id, {
-                                        title: essay.title,
-                                        programName: 'My Custom Essays', // CHANGED: Standardized label
+                                      key={`custom-essay-${essay.promptId}-${essay.programId || ''}`}
+                                      onClick={() => handleEssayPromptSelect(essay.promptId, {
+                                        title: essay.promptTitle,
+                                        programName: 'My Custom Essays',
                                         isCustom: true,
-                                        promptText: essay.prompt,
+                                        promptText: essay.promptText,
                                         wordLimit: essay.wordLimit
                                       })}
                                       className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
-                                        activeEssayPromptId === essay.id
+                                        activeEssayPromptId === essay.promptId
                                           ? 'bg-gradient-to-r from-purple-500/50 to-pink-500/30 border-l-2 border-pink-400'
                                           : 'hover:bg-white/10 border-l-2 border-white/10'
                                       }`}
                                     >
                                       <div className="flex items-center justify-between">
-                                        <span className="text-white/90 truncate flex-1">{essay.title}</span>
-                                        {essay.wordCount > 0 && (
+                                        <span className="text-white/90 truncate flex-1">{essay.promptTitle}</span>
+                                        {essay.userEssay?.wordCount > 0 && (
                                           <span className="text-purple-400 text-[10px] ml-2 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">
-                                            {Math.round((essay.wordCount / essay.wordLimit) * 100)}%
+                                            {Math.round((essay.userEssay.wordCount / essay.wordLimit) * 100)}%
                                           </span>
                                         )}
                                       </div>
@@ -2693,7 +2608,7 @@ const ApplicationTabs = ({ university }) => {
                               )}
 
                               {/* Regular Programs */}
-                              {programsWithEssays.length === 0 && customEssays.length === 0 ? (
+                              {programsWithEssays.length === 0 && uniqueCustomEssays.length === 0 ? (
                                 <div className="text-center py-6">
                                   <FileText className="w-8 h-8 text-white/30 mx-auto mb-2" />
                                   <p className="text-sm text-white/50">No programs with essays</p>
@@ -2704,13 +2619,13 @@ const ApplicationTabs = ({ university }) => {
                                     <div
                                       onClick={() => handleProgramSelect(program.id)}
                                       className={`p-3 rounded-xl cursor-pointer transition-all text-sm ${
-                                        activeProgramId === program.id
+                                        activeProgramId === program.id && program.degreeType !== "STANDALONE"
                                           ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border-l-4 border-blue-400 shadow-lg'
                                           : 'hover:bg-white/10 border-l-4 border-transparent'
                                       }`}
                                     >
                                       <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-white">{program.name}</span>
+                                        <span className="font-semibold text-white">{program.programName || program.name}</span>
                                         <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60">
                                           {program.essays?.length || 0}
                                         </span>
@@ -2724,7 +2639,7 @@ const ApplicationTabs = ({ university }) => {
                                           key={`regular-${essayData.promptId}-${program.id}`}
                                           onClick={() => handleEssayPromptSelect(essayData.promptId, {
                                             title: essayData.promptTitle,
-                                            programName: program.name,
+                                            programName: program.programName || program.name,
                                             isCustom: false,
                                             promptText: essayData.promptText,
                                             wordLimit: essayData.wordLimit
