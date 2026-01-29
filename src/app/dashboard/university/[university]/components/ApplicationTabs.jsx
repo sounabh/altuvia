@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast"; // ADDED: Import toast
 import {
   FileText,
   Clock,
@@ -81,6 +82,92 @@ const EssayAnalytics = lazy(() =>
 );
 
 // ============================================
+// DELETE CONFIRMATION MODAL COMPONENT
+// ============================================
+
+const DeleteConfirmationModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  essayTitle,
+  isLoading
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-[#002147] rounded-2xl shadow-2xl max-w-md w-full animate-slideUp border border-white/20">
+        {/* Header */}
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Delete Essay</h2>
+              <p className="text-sm text-white/60">This action cannot be undone</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-white mb-1">
+                  You are about to delete:
+                </p>
+                <p className="text-sm font-bold text-white">{essayTitle}</p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-white/70 text-sm">
+            This will permanently delete the essay and all associated data including:
+          </p>
+          <ul className="text-sm text-white/50 space-y-1 mt-2 ml-4">
+            <li>• All saved content and drafts</li>
+            <li>• Version history</li>
+            <li>• AI suggestions and analytics</li>
+            <li>• Progress tracking data</li>
+          </ul>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-white/10 flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-6 py-2.5 text-sm font-medium text-white/70 bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-orange-500 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center space-x-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Deleting...</span>
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Essay</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // CUSTOM ESSAY MODAL COMPONENT
 // ============================================
 
@@ -92,6 +179,7 @@ const CustomEssayModal = ({
   isCreating,
   isUniversityAdded 
 }) => {
+  const { toast } = useToast(); // ADDED: Toast hook
   const [formData, setFormData] = useState({
     customTitle: '',
     customPrompt: '',
@@ -100,6 +188,42 @@ const CustomEssayModal = ({
   });
 
   const [errors, setErrors] = useState({});
+  const [wordLimitError, setWordLimitError] = useState('');
+
+  // ADDED: Word limit validation function
+  const handleWordLimitChange = (value) => {
+    const numValue = parseInt(value) || 0;
+    
+    if (value === '') {
+      setFormData({ ...formData, wordLimit: 500 });
+      setWordLimitError('');
+      return;
+    }
+    
+    if (numValue < 100) {
+      setWordLimitError('Minimum 100 words required');
+      setFormData({ ...formData, wordLimit: numValue });
+    } else if (numValue > 5000) {
+      setWordLimitError('Maximum 5000 words allowed');
+      setFormData({ ...formData, wordLimit: numValue });
+    } else {
+      setWordLimitError('');
+      setFormData({ ...formData, wordLimit: numValue });
+    }
+  };
+
+  // ADDED: Handle blur for word limit
+  const handleWordLimitBlur = () => {
+    const numValue = parseInt(formData.wordLimit) || 0;
+    
+    if (numValue < 100) {
+      setWordLimitError('Minimum 100 words required');
+      setFormData({ ...formData, wordLimit: 100 });
+    } else if (numValue > 5000) {
+      setWordLimitError('Maximum 5000 words allowed');
+      setFormData({ ...formData, wordLimit: 5000 });
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -112,7 +236,8 @@ const CustomEssayModal = ({
       newErrors.customPrompt = 'Essay prompt/question is required';
     }
     
-    if (formData.wordLimit < 100 || formData.wordLimit > 5000) {
+    const wordLimit = parseInt(formData.wordLimit);
+    if (isNaN(wordLimit) || wordLimit < 100 || wordLimit > 5000) {
       newErrors.wordLimit = 'Word limit must be between 100 and 5000';
     }
     
@@ -134,6 +259,7 @@ const CustomEssayModal = ({
       priority: 'medium',
     });
     setErrors({});
+    setWordLimitError('');
   };
 
   useEffect(() => {
@@ -230,7 +356,7 @@ const CustomEssayModal = ({
             </p>
           </div>
 
-          {/* Word Limit & Priority - FIXED SELECT DROPDOWN */}
+          {/* Word Limit & Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-white mb-2">
@@ -239,17 +365,24 @@ const CustomEssayModal = ({
               <input
                 type="number"
                 value={formData.wordLimit}
-                onChange={(e) => setFormData({ ...formData, wordLimit: parseInt(e.target.value) || 500 })}
+                onChange={(e) => handleWordLimitChange(e.target.value)}
+                onBlur={handleWordLimitBlur}
                 className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white ${
-                  errors.wordLimit ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+                  wordLimitError ? 'border-red-400 bg-red-500/10' : 'border-white/20'
                 }`}
                 min={100}
                 max={5000}
                 disabled={!isUniversityAdded}
               />
-              {errors.wordLimit && (
-                <p className="mt-1 text-sm text-red-400 text-xs">{errors.wordLimit}</p>
+              {wordLimitError && (
+                <p className="mt-1 text-sm text-red-400 text-xs flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  {wordLimitError}
+                </p>
               )}
+              <p className="mt-1.5 text-xs text-white/50">
+                Valid range: 100 - 5000 words
+              </p>
             </div>
 
             <div>
@@ -267,6 +400,9 @@ const CustomEssayModal = ({
                   backgroundRepeat: 'no-repeat',
                   backgroundSize: '1.5em 1.5em',
                   paddingRight: '2.5rem',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
                 }}
               >
                 <option value="low" className="bg-[#002147] text-white">Low Priority</option>
@@ -347,7 +483,6 @@ const PanelLoader = () => (
 const LockedTabContent = ({ tabName, universityName, onAddUniversity, isAddingUniversity }) => (
   <div className="min-h-[400px] flex items-center justify-center">
     <div className="text-center max-w-md mx-auto p-8">
-      {/* Lock Icon with Animation */}
       <div className="relative inline-block mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-2xl rounded-full animate-pulse"></div>
         <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border border-white/10">
@@ -355,17 +490,14 @@ const LockedTabContent = ({ tabName, universityName, onAddUniversity, isAddingUn
         </div>
       </div>
 
-      {/* Heading */}
       <h3 className="text-2xl font-bold text-white mb-3">
         {tabName} Locked
       </h3>
 
-      {/* Description */}
       <p className="text-white/70 mb-6 leading-relaxed">
         Add <span className="font-semibold text-white">{universityName}</span> to your dashboard to unlock {tabName.toLowerCase()} management and start working on your application.
       </p>
 
-      {/* Features List */}
       <div className="bg-white/5 rounded-xl p-4 mb-6 text-left">
         <p className="text-sm font-semibold text-white/80 mb-3">Unlock access to:</p>
         <ul className="space-y-2 text-sm text-white/60">
@@ -417,6 +549,7 @@ const ApplicationTabs = ({ university }) => {
   const router = useRouter();
   const params = useParams();
   const { data: session, status: sessionStatus } = useSession();
+  const { toast } = useToast(); // ADDED: Toast hook
 
   // ========== EXTRACT USER ID AND UNIVERSITY NAME ==========
   const userId = session?.userId || session?.user?.id || null;
@@ -436,6 +569,14 @@ const ApplicationTabs = ({ university }) => {
   const [showCustomEssayModal, setShowCustomEssayModal] = useState(false);
   const [isCreatingCustomEssay, setIsCreatingCustomEssay] = useState(false);
   const [customEssays, setCustomEssays] = useState([]);
+  
+  // ADDED: Delete modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    essayId: null,
+    essayTitle: '',
+  });
+  const [isDeletingEssay, setIsDeletingEssay] = useState(false);
 
   // ========== STATE MANAGEMENT ==========
   const [activeView, setActiveView] = useState('list');
@@ -451,7 +592,7 @@ const ApplicationTabs = ({ university }) => {
   const [isCreatingEssay, setIsCreatingEssay] = useState(false);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
 
-  // ========== SELECTED ESSAY INFO - FOR IMMEDIATE DISPLAY ==========
+  // ========== SELECTED ESSAY INFO ==========
   const [selectedEssayInfo, setSelectedEssayInfo] = useState({
     title: '',
     programName: '',
@@ -460,7 +601,7 @@ const ApplicationTabs = ({ university }) => {
     wordLimit: 500
   });
 
-  // ========== REFS FOR DEBOUNCING AND PERFORMANCE ==========
+  // ========== REFS ==========
   const autoSaveTimerRef = useRef(null);
   const lastContentRef = useRef('');
   const isUpdatingRef = useRef(false);
@@ -472,7 +613,6 @@ const ApplicationTabs = ({ university }) => {
   const customEssaysRef = useRef(customEssays);
   const isFetchingRef = useRef(false);
 
-  // Keep ref in sync
   useEffect(() => {
     customEssaysRef.current = customEssays;
   }, [customEssays]);
@@ -480,7 +620,11 @@ const ApplicationTabs = ({ university }) => {
   // ========== HANDLE ADD UNIVERSITY TO DASHBOARD ==========
   const handleAddUniversity = async () => {
     if (!userId || !university?.id) {
-      alert('Please sign in to add universities to your dashboard');
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to add universities to your dashboard",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -501,10 +645,16 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         if (data.isAdded) {
-          alert(`${university.name || 'University'} has been added to your dashboard!`);
+          toast({
+            title: "Success!",
+            description: `${university.name || 'University'} has been added to your dashboard!`,
+          });
           window.location.reload();
         } else {
-          alert(`${university.name || 'University'} has been removed from your dashboard.`);
+          toast({
+            title: "University Removed",
+            description: `${university.name || 'University'} has been removed from your dashboard.`,
+          });
           window.location.reload();
         }
       } else {
@@ -512,29 +662,46 @@ const ApplicationTabs = ({ university }) => {
       }
     } catch (error) {
       console.error('Error toggling university:', error);
-      alert('Failed to update university. Please try again.');
+      toast({
+        title: "Error",
+        description: 'Failed to update university. Please try again.',
+        variant: "destructive",
+      });
       setIsAddingUniversity(false);
     }
   };
 
-  // ========== HANDLE CREATE CUSTOM ESSAY (FIXED - NO DUPLICATION) ==========
+  // ========== HANDLE CREATE CUSTOM ESSAY (FIXED) ==========
   const handleCreateCustomEssay = async (formData) => {
     if (!userId || !university?.id || !isUniversityAdded) {
-      alert('Please add the university to your dashboard first');
+      toast({
+        title: "Action Required",
+        description: "Please add the university to your dashboard first",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
       setIsCreatingCustomEssay(true);
 
-      // Set selectedEssayInfo FIRST with complete data (FIX 2)
-      setSelectedEssayInfo({
+      // Optimistic UI update - add to custom essays immediately
+      const optimisticEssay = {
+        id: `temp-${Date.now()}`,
         title: formData.customTitle,
-        programName: 'Custom Essays',
+        prompt: formData.customPrompt,
+        wordLimit: formData.wordLimit,
+        wordCount: 0,
+        priority: formData.priority,
+        isCompleted: false,
+        status: 'not-started',
+        lastModified: new Date(),
         isCustom: true,
-        promptText: formData.customPrompt,
-        wordLimit: formData.wordLimit
-      });
+        universityId: university.id,
+        userId: userId
+      };
+
+      setCustomEssays(prev => [optimisticEssay, ...prev]);
 
       const response = await fetch(
         `/api/essay/independent`,
@@ -555,41 +722,73 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         const result = await response.json();
-        if (result.success) {
-          // Refresh workspace data to get updated custom essays
-          await fetchWorkspaceData();
-          
+        if (result.success && result.essay) {
+          // Replace optimistic essay with real one
+          setCustomEssays(prev => 
+            prev.map(essay => 
+              essay.id === optimisticEssay.id ? result.essay : essay
+            )
+          );
+
+          // Set selected essay info
+          setSelectedEssayInfo({
+            title: result.essay.title,
+            programName: 'My Custom Essays', // CHANGED: Standardized label
+            isCustom: true,
+            promptText: result.essay.prompt,
+            wordLimit: result.essay.wordLimit
+          });
+
           setShowCustomEssayModal(false);
-          alert('Custom essay created successfully!');
           
+          toast({
+            title: "Success!",
+            description: "Custom essay created successfully",
+          });
+
           // Navigate to the new custom essay
           if (result.essay?.id) {
             setActiveProgramId('custom');
             setActiveEssayPromptId(result.essay.id);
             setActiveView('editor');
           }
+
+          // Refresh workspace data in background
+          fetchWorkspaceData();
         } else {
+          // Remove optimistic essay on error
+          setCustomEssays(prev => prev.filter(essay => essay.id !== optimisticEssay.id));
           throw new Error(result.error || 'Failed to create custom essay');
         }
       } else {
         const errorData = await response.json();
+        setCustomEssays(prev => prev.filter(essay => essay.id !== optimisticEssay.id));
         throw new Error(errorData.error || 'Failed to create custom essay');
       }
     } catch (error) {
       console.error('Error creating custom essay:', error);
-      alert(error.message);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setIsCreatingCustomEssay(false);
     }
   };
 
-  // ========== HANDLE DELETE CUSTOM ESSAY (FIXED) ==========
+  // ========== HANDLE DELETE CUSTOM ESSAY (IMPROVED) ==========
   const handleDeleteCustomEssay = async (essayId) => {
-    if (!confirm('Are you sure you want to delete this custom essay? This action cannot be undone.')) {
-      return;
-    }
+    if (!essayId) return;
 
     try {
+      setIsDeletingEssay(true);
+
+      const essayToDelete = customEssays.find(e => e.id === essayId);
+      if (!essayToDelete) {
+        throw new Error('Essay not found');
+      }
+
       const response = await fetch(
         `/api/essay/independent`,
         {
@@ -612,14 +811,35 @@ const ApplicationTabs = ({ university }) => {
           setActiveView('list');
         }
         
-        alert('Custom essay deleted successfully!');
+        toast({
+          title: "Success!",
+          description: "Custom essay deleted successfully",
+        });
+        
+        setDeleteModal({ isOpen: false, essayId: null, essayTitle: '' });
       } else {
-        throw new Error('Failed to delete custom essay');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete custom essay');
       }
     } catch (error) {
       console.error('Error deleting custom essay:', error);
-      alert('Failed to delete custom essay');
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to delete custom essay',
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingEssay(false);
     }
+  };
+
+  // ADDED: Open delete confirmation
+  const openDeleteConfirmation = (essayId, essayTitle) => {
+    setDeleteModal({
+      isOpen: true,
+      essayId,
+      essayTitle
+    });
   };
 
   // ========== PANEL MANAGEMENT ==========
@@ -667,7 +887,7 @@ const ApplicationTabs = ({ university }) => {
     return openPanels.includes(panelName);
   }, [openPanels]);
 
-  // ========== DERIVED DATA - MEMOIZED ==========
+  // ========== DERIVED DATA ==========
   const tasksAndEvents = useMemo(() => 
     university?.tasksAndEvents || []
   , [university?.tasksAndEvents]);
@@ -684,10 +904,9 @@ const ApplicationTabs = ({ university }) => {
     return programsWithEssays.find(p => p.id === activeProgramId);
   }, [programsWithEssays, activeProgramId]);
 
-  // ========== FIX 1: Updated currentEssayData useMemo with fallback ==========
   const currentEssayData = useMemo(() => {
     if (activeProgramId === 'custom') {
-      const customEssay = customEssaysRef.current.find(e => e.id === activeEssayPromptId);
+      const customEssay = customEssays.find(e => e.id === activeEssayPromptId);
       if (customEssay) {
         return {
           promptId: customEssay.id,
@@ -698,7 +917,7 @@ const ApplicationTabs = ({ university }) => {
           isCustom: true
         };
       }
-      // FALLBACK to selectedEssayInfo if custom essay not found yet
+      // Fallback to selectedEssayInfo
       if (selectedEssayInfo.isCustom && selectedEssayInfo.title) {
         return {
           promptId: activeEssayPromptId,
@@ -712,7 +931,7 @@ const ApplicationTabs = ({ university }) => {
       return null;
     }
     return currentProgram?.essays?.find(e => e.promptId === activeEssayPromptId);
-  }, [currentProgram, activeEssayPromptId, activeProgramId, selectedEssayInfo]);
+  }, [currentProgram, activeEssayPromptId, activeProgramId, customEssays, selectedEssayInfo]);
 
   const currentEssay = useMemo(() => {
     return currentEssayData?.userEssay;
@@ -752,7 +971,7 @@ const ApplicationTabs = ({ university }) => {
     const calendarEvents = university.calendarEvents || [];
     const tasksEvents = university.tasksAndEvents || [];
 
-    // Include custom essays in total count (remove duplicates)
+    // Include custom essays in total count
     const uniqueCustomEssays = Array.from(
       new Map(customEssays.map(essay => [essay.id, essay])).values()
     );
@@ -810,14 +1029,7 @@ const ApplicationTabs = ({ university }) => {
         (task.status !== 'completed' && task.completionStatus !== 'completed')
       ).length
     };
-  }, [
-    university,
-    university?.enhancedStats,
-    university?.allEssayPrompts,
-    university?.calendarEvents,
-    university?.tasksAndEvents,
-    customEssays
-  ]);
+  }, [university, customEssays]);
 
   // ========== API FUNCTIONS ==========
   const fetchWorkspaceData = useCallback(async () => {
@@ -829,7 +1041,7 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceError(null);
 
       const response = await fetch(
-         `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}`,
+        `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -845,11 +1057,11 @@ const ApplicationTabs = ({ university }) => {
       const data = await response.json();
       setWorkspaceData(data);
 
-      // Fetch custom essays for this university (FIXED - NO DUPLICATION)
+      // Fetch custom essays for this university
       if (university?.id) {
         try {
           const customEssaysResponse = await fetch(
-            `/api/essay/independent?universityId=${encodeURIComponent(university.id)}`,
+            `/api/essay/independent?universityId=${encodeURIComponent(university.id)}&type=custom`,
             {
               method: "GET",
               headers: { "Content-Type": "application/json" },
@@ -860,7 +1072,7 @@ const ApplicationTabs = ({ university }) => {
             const customData = await customEssaysResponse.json();
             // Filter custom essays for this specific university
             const universityCustomEssays = customData.programs
-              ?.filter(p => p.degreeType === "STANDALONE" && p.universityId === university.id)
+              ?.filter(p => (p.degreeType === "STANDALONE" || p.isCustom) && p.universityId === university.id)
               .flatMap(p => p.essays?.map(e => e.userEssay).filter(Boolean)) || [];
             
             // Remove duplicates by essay ID
@@ -911,11 +1123,16 @@ const ApplicationTabs = ({ university }) => {
     } catch (err) {
       console.error("Error fetching workspace data:", err);
       setWorkspaceError(err.message);
+      toast({
+        title: "Error",
+        description: "Failed to load workspace data",
+        variant: "destructive",
+      });
     } finally {
       setWorkspaceLoading(false);
       isFetchingRef.current = false;
     }
-  }, [universityName, userId, activeProgramId, activeEssayPromptId, isUniversityAdded, university?.id]);
+  }, [universityName, userId, activeProgramId, activeEssayPromptId, isUniversityAdded, university?.id, toast]);
 
   const autoSaveEssay = useCallback(async () => {
     if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current || !userId || !isUniversityAdded) {
@@ -1027,22 +1244,37 @@ const ApplicationTabs = ({ university }) => {
         setHasUnsavedChanges(false);
         setLastSaved(new Date());
         lastContentRef.current = responseData.essay.content || "";
+        
+        toast({
+          title: "Success!",
+          description: "Essay created successfully",
+        });
+        
         return responseData.essay;
       } else {
         setWorkspaceError(responseData.error || "Failed to create essay");
+        toast({
+          title: "Error",
+          description: responseData.error || "Failed to create essay",
+          variant: "destructive",
+        });
         return null;
       }
     } catch (error) {
       console.error("Error creating essay:", error);
       setWorkspaceError("Network error while creating essay");
+      toast({
+        title: "Error",
+        description: "Network error while creating essay",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsCreatingEssay(false);
       isUpdatingRef.current = false;
     }
-  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded]);
+  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded, toast]);
 
-  // ========== FIX 3: Optimized essay content update with wordLimit preservation ==========
   const updateEssayContent = useCallback((content, wordCount) => {
     if (!isUniversityAdded) return;
 
@@ -1067,11 +1299,11 @@ const ApplicationTabs = ({ university }) => {
       const isCustom = activeProgramId === 'custom';
 
       if (isCustom) {
-        // Update custom essay - PRESERVE ALL FIELDS INCLUDING WORDLIMIT
+        // Update custom essay
         setCustomEssays(prev => prev.map(essay => 
           essay.id === activeEssayPromptId 
             ? { 
-                ...essay,  // Spread to preserve all fields
+                ...essay,
                 content: newContent, 
                 wordCount: newWordCount, 
                 lastModified: new Date() 
@@ -1141,6 +1373,11 @@ const ApplicationTabs = ({ university }) => {
         const autoSaved = await autoSaveEssay();
         if (!autoSaved) {
           setWorkspaceError("Failed to save current changes");
+          toast({
+            title: "Error",
+            description: "Failed to save current changes",
+            variant: "destructive",
+          });
           return false;
         }
       }
@@ -1205,6 +1442,11 @@ const ApplicationTabs = ({ university }) => {
           }
         }
 
+        toast({
+          title: "Success!",
+          description: "Version saved successfully",
+        });
+
         // Navigate back to list view after saving version
         setTimeout(() => {
           setActiveView('list');
@@ -1216,11 +1458,16 @@ const ApplicationTabs = ({ university }) => {
       return false;
     } catch (error) {
       console.error("Error saving version:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save version",
+        variant: "destructive",
+      });
       return false;
     } finally {
       setIsSavingVersion(false);
     }
-  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded]);
+  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded, toast]);
 
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
@@ -1283,10 +1530,20 @@ const ApplicationTabs = ({ university }) => {
           lastContentRef.current = result.essay.content;
           setHasUnsavedChanges(false);
           setLastSaved(new Date());
+          
+          toast({
+            title: "Success!",
+            description: "Version restored successfully",
+          });
         }
       }
     } catch (error) {
       console.error("Error restoring version:", error);
+      toast({
+        title: "Error",
+        description: "Failed to restore version",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1344,9 +1601,19 @@ const ApplicationTabs = ({ university }) => {
             };
           });
         }
+        
+        toast({
+          title: "Success!",
+          description: "Version deleted successfully",
+        });
       }
     } catch (error) {
       console.error("Error deleting version:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete version",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1374,7 +1641,7 @@ const ApplicationTabs = ({ university }) => {
         setActiveEssayPromptId(firstCustomEssay.id);
         setSelectedEssayInfo({
           title: firstCustomEssay.title,
-          programName: 'Custom Essays',
+          programName: 'My Custom Essays', // CHANGED: Standardized label
           isCustom: true,
           promptText: firstCustomEssay.prompt,
           wordLimit: firstCustomEssay.wordLimit
@@ -1422,6 +1689,10 @@ const ApplicationTabs = ({ university }) => {
     
     // Update selected essay info immediately
     if (essayInfo) {
+      // CHANGED: Standardize custom essay label
+      if (essayInfo.isCustom) {
+        essayInfo.programName = 'My Custom Essays';
+      }
       setSelectedEssayInfo(essayInfo);
     }
     
@@ -1444,7 +1715,8 @@ const ApplicationTabs = ({ university }) => {
     // Set essay info immediately for display
     setSelectedEssayInfo({
       title: essay.title || essay.promptTitle || 'Essay',
-      programName: isCustom ? 'Custom Essays' : '',
+      // CHANGED: Standardize custom essay label
+      programName: isCustom ? 'My Custom Essays' : '',
       isCustom: isCustom,
       promptText: essay.text || essay.prompt || essay.promptText || '',
       wordLimit: essay.wordLimit || 500
@@ -1516,7 +1788,7 @@ const ApplicationTabs = ({ university }) => {
     return currentEssay?.content || '';
   }, [currentEssay?.id, currentEssay?.content]);
 
-  // ========== DISPLAY TITLE - Uses selectedEssayInfo for immediate display ==========
+  // ========== DISPLAY TITLE ==========
   const displayTitle = useMemo(() => {
     if (selectedEssayInfo.title) {
       return selectedEssayInfo.title;
@@ -1536,45 +1808,68 @@ const ApplicationTabs = ({ university }) => {
       return selectedEssayInfo.programName;
     }
     if (activeProgramId === 'custom') {
-      return 'Custom Essays';
+      // CHANGED: Standardized label
+      return 'My Custom Essays';
     }
     return currentProgram?.name || '';
   }, [selectedEssayInfo.programName, activeProgramId, currentProgram?.name]);
 
-  // ========== CUSTOM ESSAY CARD COMPONENT ==========
+  // ========== CUSTOM ESSAY CARD COMPONENT (IMPROVED UX) ==========
   const CustomEssayCard = React.memo(({ essay, index, onEdit, onDelete }) => {
     const progress = essay.wordLimit > 0 
       ? (essay.wordCount / essay.wordLimit) * 100 
       : 0;
 
     const priorityColors = {
-      high: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-400/30', dot: 'bg-red-500' },
-      medium: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-400/30', dot: 'bg-amber-500' },
-      low: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-400/30', dot: 'bg-green-500' },
+      high: { 
+        bg: 'bg-red-500/20', 
+        text: 'text-red-400', 
+        border: 'border-red-400/30', 
+        dot: 'bg-red-500',
+        icon: Flame
+      },
+      medium: { 
+        bg: 'bg-amber-500/20', 
+        text: 'text-amber-400', 
+        border: 'border-amber-400/30', 
+        dot: 'bg-amber-500',
+        icon: TrendingUp
+      },
+      low: { 
+        bg: 'bg-green-500/20', 
+        text: 'text-green-400', 
+        border: 'border-green-400/30', 
+        dot: 'bg-green-500',
+        icon: TrendingDown
+      },
     };
 
     const priorityConfig = priorityColors[essay.priority] || priorityColors.medium;
+    const PriorityIcon = priorityConfig.icon;
     const StatusIcon = essay.isCompleted ? CheckCircle2 : FileText;
 
     return (
-      <div className="bg-gradient-to-r from-white/5 to-white/10 rounded-xl border border-white/20 hover:border-blue-400/30 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden">
+      <div 
+        className="bg-gradient-to-r from-white/5 to-white/10 rounded-xl border border-white/20 hover:border-purple-400/50 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden"
+        onClick={() => onEdit(essay)}
+      >
         <div className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-purple-400" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <Sparkles className="w-5 h-5 text-purple-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-white text-sm bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-3 py-1 rounded-lg">
-                    Custom Essay
+                  <span className="font-bold text-white text-sm bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1 rounded-lg shadow-lg shadow-purple-500/30">
+                    My Custom Essay
                   </span>
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`}></span>
-                    {essay.priority}
+                    <PriorityIcon className="w-3 h-3" />
+                    {essay.priority.charAt(0).toUpperCase() + essay.priority.slice(1)} Priority
                   </span>
                 </div>
-                <h4 className="font-semibold text-white text-base truncate">
+                <h4 className="font-semibold text-white text-lg truncate group-hover:text-purple-200 transition-colors">
                   {essay.title}
                 </h4>
               </div>
@@ -1589,17 +1884,6 @@ const ApplicationTabs = ({ university }) => {
                 <StatusIcon className="h-3.5 w-3.5" />
                 {essay.isCompleted ? 'Completed' : 'In Progress'}
               </div>
-              <Button
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(essay);
-                }}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30"
-              >
-                <Edit3 className="h-3.5 w-3.5 mr-1.5" />
-                Edit
-              </Button>
             </div>
           </div>
 
@@ -1629,7 +1913,7 @@ const ApplicationTabs = ({ university }) => {
                     progress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
                     progress > 0 ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-white/30'
                   }`}
-                  style={{ width: `${progress}%` }}
+                  style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
               <span className={`font-bold w-12 text-right ${
@@ -1641,17 +1925,28 @@ const ApplicationTabs = ({ university }) => {
             </div>
           </div>
 
-          {/* Delete button */}
-          <div className="mt-4 pt-4 border-t border-white/10 flex justify-end">
+          {/* Action Buttons */}
+          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(essay);
+              }}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30 text-sm px-4 py-2"
+            >
+              <Edit3 className="h-3.5 w-3.5 mr-1.5" />
+              Open Editor
+            </Button>
+            
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete(essay.id);
+                openDeleteConfirmation(essay.id, essay.title);
               }}
-              className="text-xs text-white/50 hover:text-red-400 flex items-center gap-1 transition-colors"
+              className="text-xs text-white/50 hover:text-red-400 flex items-center gap-1 transition-colors px-3 py-1.5 hover:bg-red-500/10 rounded-lg"
             >
               <Trash2 className="w-3 h-3" />
-              Delete Custom Essay
+              Delete
             </button>
           </div>
         </div>
@@ -2025,6 +2320,7 @@ const ApplicationTabs = ({ university }) => {
         /* Fix for select dropdown visibility */
         select {
           color: white !important;
+          background-color: #002147 !important;
         }
         select option {
           background-color: #002147 !important;
@@ -2107,7 +2403,7 @@ const ApplicationTabs = ({ university }) => {
               )}
             </div>
 
-            {/* Progress Info Card - Only show if added */}
+            {/* Progress Info Card */}
             {isUniversityAdded && (
               <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                 <div className="flex items-center justify-between mb-3">
@@ -2203,7 +2499,8 @@ const ApplicationTabs = ({ university }) => {
                         <div className="space-y-4">
                           <div className="flex items-center space-x-2 mb-2">
                             <Sparkles className="h-5 w-5 text-purple-400" />
-                            <h4 className="text-lg font-semibold text-white">Custom Essays</h4>
+                            {/* CHANGED: Standardized label */}
+                            <h4 className="text-lg font-semibold text-white">My Custom Essays</h4>
                             <span className="text-xs text-white/60 bg-purple-500/20 px-2 py-1 rounded-full">
                               {customEssays.length} essay{customEssays.length !== 1 ? 's' : ''}
                             </span>
@@ -2412,7 +2709,8 @@ const ApplicationTabs = ({ university }) => {
                                     }`}
                                   >
                                     <Sparkles className="w-4 h-4 text-purple-400" />
-                                    <span className="text-sm font-semibold text-white">Custom Essays</span>
+                                    {/* CHANGED: Standardized label */}
+                                    <span className="text-sm font-semibold text-white">My Custom Essays</span>
                                     <span className="text-xs text-white/40 bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-auto">
                                       {customEssays.length}
                                     </span>
@@ -2422,7 +2720,7 @@ const ApplicationTabs = ({ university }) => {
                                       key={`custom-essay-${essay.id}-${essay.programId || ''}`}
                                       onClick={() => handleEssayPromptSelect(essay.id, {
                                         title: essay.title,
-                                        programName: 'Custom Essays',
+                                        programName: 'My Custom Essays', // CHANGED: Standardized label
                                         isCustom: true,
                                         promptText: essay.prompt,
                                         wordLimit: essay.wordLimit
@@ -2519,7 +2817,7 @@ const ApplicationTabs = ({ university }) => {
                                     {displayProgramName}
                                     {selectedEssayInfo.isCustom && (
                                       <span className="ml-2 inline-flex items-center gap-1 text-purple-400">
-                                        <Sparkles className="w-3 h-3" /> Custom
+                                        <Sparkles className="w-3 h-3" /> My Custom Essay
                                       </span>
                                     )}
                                   </p>
@@ -2570,7 +2868,7 @@ const ApplicationTabs = ({ university }) => {
                                 )}
                               </div>
 
-                              {/* ========== FIX 4: Prompt Display with fallback chain ========== */}
+                              {/* Prompt Display */}
                               <div className={`p-4 rounded-xl border ${
                                 selectedEssayInfo.isCustom 
                                   ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30' 
@@ -2596,7 +2894,6 @@ const ApplicationTabs = ({ university }) => {
                               {/* Editor or Create Button */}
                               {currentEssay ? (
                                 <>
-                                  {/* ========== FIX 5: EssayEditor with correct wordLimit ========== */}
                                   <EssayEditor
                                     key={editorKey}
                                     content={editorContent}
@@ -2685,6 +2982,15 @@ const ApplicationTabs = ({ university }) => {
         universityName={universityName}
         isCreating={isCreatingCustomEssay}
         isUniversityAdded={isUniversityAdded}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, essayId: null, essayTitle: '' })}
+        onConfirm={() => handleDeleteCustomEssay(deleteModal.essayId)}
+        essayTitle={deleteModal.essayTitle}
+        isLoading={isDeletingEssay}
       />
     </div>
   );
