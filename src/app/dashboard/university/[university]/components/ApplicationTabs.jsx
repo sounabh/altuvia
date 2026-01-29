@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast"; // ADDED: Import toast
+import { toast } from "sonner"; // CHANGED: Import sonner toast
 import {
   FileText,
   Clock,
@@ -179,7 +179,7 @@ const CustomEssayModal = ({
   isCreating,
   isUniversityAdded 
 }) => {
-  const { toast } = useToast(); // ADDED: Toast hook
+  // REMOVED: Toast hook
   const [formData, setFormData] = useState({
     customTitle: '',
     customPrompt: '',
@@ -549,7 +549,7 @@ const ApplicationTabs = ({ university }) => {
   const router = useRouter();
   const params = useParams();
   const { data: session, status: sessionStatus } = useSession();
-  const { toast } = useToast(); // ADDED: Toast hook
+  // CHANGED: Using sonner toast directly
 
   // ========== EXTRACT USER ID AND UNIVERSITY NAME ==========
   const userId = session?.userId || session?.user?.id || null;
@@ -620,11 +620,8 @@ const ApplicationTabs = ({ university }) => {
   // ========== HANDLE ADD UNIVERSITY TO DASHBOARD ==========
   const handleAddUniversity = async () => {
     if (!userId || !university?.id) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to add universities to your dashboard",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Please sign in to add universities to your dashboard");
       return;
     }
 
@@ -645,16 +642,12 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         if (data.isAdded) {
-          toast({
-            title: "Success!",
-            description: `${university.name || 'University'} has been added to your dashboard!`,
-          });
+          // CHANGED: Using sonner toast
+          toast.success(`${university.name || 'University'} has been added to your dashboard!`);
           window.location.reload();
         } else {
-          toast({
-            title: "University Removed",
-            description: `${university.name || 'University'} has been removed from your dashboard.`,
-          });
+          // CHANGED: Using sonner toast
+          toast.success(`${university.name || 'University'} has been removed from your dashboard.`);
           window.location.reload();
         }
       } else {
@@ -662,11 +655,8 @@ const ApplicationTabs = ({ university }) => {
       }
     } catch (error) {
       console.error('Error toggling university:', error);
-      toast({
-        title: "Error",
-        description: 'Failed to update university. Please try again.',
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error('Failed to update university. Please try again.');
       setIsAddingUniversity(false);
     }
   };
@@ -674,11 +664,8 @@ const ApplicationTabs = ({ university }) => {
   // ========== HANDLE CREATE CUSTOM ESSAY (FIXED) ==========
   const handleCreateCustomEssay = async (formData) => {
     if (!userId || !university?.id || !isUniversityAdded) {
-      toast({
-        title: "Action Required",
-        description: "Please add the university to your dashboard first",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Please add the university to your dashboard first");
       return;
     }
 
@@ -741,10 +728,8 @@ const ApplicationTabs = ({ university }) => {
 
           setShowCustomEssayModal(false);
           
-          toast({
-            title: "Success!",
-            description: "Custom essay created successfully",
-          });
+          // CHANGED: Using sonner toast
+          toast.success("Custom essay created successfully");
 
           // Navigate to the new custom essay
           if (result.essay?.id) {
@@ -767,11 +752,8 @@ const ApplicationTabs = ({ university }) => {
       }
     } catch (error) {
       console.error('Error creating custom essay:', error);
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error(error.message);
     } finally {
       setIsCreatingCustomEssay(false);
     }
@@ -811,10 +793,8 @@ const ApplicationTabs = ({ university }) => {
           setActiveView('list');
         }
         
-        toast({
-          title: "Success!",
-          description: "Custom essay deleted successfully",
-        });
+        // CHANGED: Using sonner toast
+        toast.success("Custom essay deleted successfully");
         
         setDeleteModal({ isOpen: false, essayId: null, essayTitle: '' });
       } else {
@@ -823,11 +803,8 @@ const ApplicationTabs = ({ university }) => {
       }
     } catch (error) {
       console.error('Error deleting custom essay:', error);
-      toast({
-        title: "Error",
-        description: error.message || 'Failed to delete custom essay',
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error(error.message || 'Failed to delete custom essay');
     } finally {
       setIsDeletingEssay(false);
     }
@@ -1123,16 +1100,13 @@ const ApplicationTabs = ({ university }) => {
     } catch (err) {
       console.error("Error fetching workspace data:", err);
       setWorkspaceError(err.message);
-      toast({
-        title: "Error",
-        description: "Failed to load workspace data",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Failed to load workspace data");
     } finally {
       setWorkspaceLoading(false);
       isFetchingRef.current = false;
     }
-  }, [universityName, userId, activeProgramId, activeEssayPromptId, isUniversityAdded, university?.id, toast]);
+  }, [universityName, userId, activeProgramId, activeEssayPromptId, isUniversityAdded, university?.id]);
 
   const autoSaveEssay = useCallback(async () => {
     if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current || !userId || !isUniversityAdded) {
@@ -1245,35 +1219,27 @@ const ApplicationTabs = ({ university }) => {
         setLastSaved(new Date());
         lastContentRef.current = responseData.essay.content || "";
         
-        toast({
-          title: "Success!",
-          description: "Essay created successfully",
-        });
+        // CHANGED: Using sonner toast
+        toast.success("Essay created successfully");
         
         return responseData.essay;
       } else {
         setWorkspaceError(responseData.error || "Failed to create essay");
-        toast({
-          title: "Error",
-          description: responseData.error || "Failed to create essay",
-          variant: "destructive",
-        });
+        // CHANGED: Using sonner toast
+        toast.error(responseData.error || "Failed to create essay");
         return null;
       }
     } catch (error) {
       console.error("Error creating essay:", error);
       setWorkspaceError("Network error while creating essay");
-      toast({
-        title: "Error",
-        description: "Network error while creating essay",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Network error while creating essay");
       return null;
     } finally {
       setIsCreatingEssay(false);
       isUpdatingRef.current = false;
     }
-  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded, toast]);
+  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded]);
 
   const updateEssayContent = useCallback((content, wordCount) => {
     if (!isUniversityAdded) return;
@@ -1373,11 +1339,8 @@ const ApplicationTabs = ({ university }) => {
         const autoSaved = await autoSaveEssay();
         if (!autoSaved) {
           setWorkspaceError("Failed to save current changes");
-          toast({
-            title: "Error",
-            description: "Failed to save current changes",
-            variant: "destructive",
-          });
+          // CHANGED: Using sonner toast
+          toast.error("Failed to save current changes");
           return false;
         }
       }
@@ -1442,10 +1405,8 @@ const ApplicationTabs = ({ university }) => {
           }
         }
 
-        toast({
-          title: "Success!",
-          description: "Version saved successfully",
-        });
+        // CHANGED: Using sonner toast
+        toast.success("Version saved successfully");
 
         // Navigate back to list view after saving version
         setTimeout(() => {
@@ -1458,16 +1419,13 @@ const ApplicationTabs = ({ university }) => {
       return false;
     } catch (error) {
       console.error("Error saving version:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save version",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Failed to save version");
       return false;
     } finally {
       setIsSavingVersion(false);
     }
-  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded, toast]);
+  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded]);
 
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
@@ -1531,19 +1489,14 @@ const ApplicationTabs = ({ university }) => {
           setHasUnsavedChanges(false);
           setLastSaved(new Date());
           
-          toast({
-            title: "Success!",
-            description: "Version restored successfully",
-          });
+          // CHANGED: Using sonner toast
+          toast.success("Version restored successfully");
         }
       }
     } catch (error) {
       console.error("Error restoring version:", error);
-      toast({
-        title: "Error",
-        description: "Failed to restore version",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Failed to restore version");
     }
   };
 
@@ -1602,18 +1555,13 @@ const ApplicationTabs = ({ university }) => {
           });
         }
         
-        toast({
-          title: "Success!",
-          description: "Version deleted successfully",
-        });
+        // CHANGED: Using sonner toast
+        toast.success("Version deleted successfully");
       }
     } catch (error) {
       console.error("Error deleting version:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete version",
-        variant: "destructive",
-      });
+      // CHANGED: Using sonner toast
+      toast.error("Failed to delete version");
     }
   };
 
