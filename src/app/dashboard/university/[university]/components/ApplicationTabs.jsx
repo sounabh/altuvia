@@ -78,7 +78,7 @@ const VersionManager = lazy(() =>
   import('@/app/workspace/components/VersionManager').then(m => ({ default: m.VersionManager }))
 );
 const EssayAnalytics = lazy(() => 
-  import('@/workspace/components/EssayAnalytics').then(m => ({ default: m.EssayAnalytics }))
+  import('@/app/workspace/components/EssayAnalytics').then(m => ({ default: m.EssayAnalytics }))
 );
 
 // ============================================
