@@ -366,8 +366,10 @@ export async function GET(request) {
       allPrograms.push(...programsWithUniversity);
     }
 
-    // Step 7: Format programs data
+    // Format programs data - FIXED VERSION
     const formattedPrograms = allPrograms.map(program => {
+      const isStandalone = program.degreeType === "STANDALONE" || program.isCustom;
+      
       return {
         id: program.id,
         name: program.programName,
@@ -378,6 +380,7 @@ export async function GET(request) {
         universityColor: program.universityColor,
         degreeType: program.degreeType,
         description: program.programDescription,
+        
         deadlines: program.admissions?.flatMap(
           admission =>
             admission.deadlines?.map(deadline => ({
@@ -388,8 +391,11 @@ export async function GET(request) {
               priority: deadline.priority,
             })) || []
         ) || [],
+        
         essays: program.essayPrompts?.map(prompt => {
           const userEssay = prompt.essays?.[0] || null;
+          
+          // ✅ STANDARDIZED STRUCTURE FOR ALL ESSAYS (custom and regular)
           return {
             promptId: prompt.id,
             promptTitle: prompt.promptTitle,
@@ -400,16 +406,18 @@ export async function GET(request) {
             programId: program.id,
             programName: program.programName,
             universityName: program.universityName,
+            
+            // ✅ CRITICAL: userEssay must ALWAYS be present (null or object)
             userEssay: userEssay
               ? {
                   id: userEssay.id,
-                  content: userEssay.content,
-                  wordCount: userEssay.wordCount,
+                  content: userEssay.content || "",           // ← Never null
+                  wordCount: userEssay.wordCount || 0,        // ← Never null
                   title: userEssay.title,
                   priority: userEssay.priority,
                   status: userEssay.status,
-                  isCompleted: userEssay.isCompleted,
-                  completionPercentage: userEssay.completionPercentage,
+                  isCompleted: userEssay.isCompleted || false,
+                  completionPercentage: userEssay.completionPercentage || 0,
                   lastModified: userEssay.lastModified,
                   lastAutoSaved: userEssay.lastAutoSaved,
                   createdAt: userEssay.createdAt,
@@ -422,58 +430,61 @@ export async function GET(request) {
                     isAutoSave: v.isAutoSave,
                     changesSinceLastVersion: v.changesSinceLastVersion,
                     aiAnalysis: v.aiResults?.[0] || null,
-                  })) || [],
-                  aiResults: userEssay.aiResults || [],
+                  })) || [],                                  // ← Never null, always array
+                  aiResults: userEssay.aiResults || [],       // ← Never null, always array
                 }
-              : null,
+              : null,  // ← Can be null if user hasn't started this essay yet
           };
         }) || [],
       };
     });
 
-    // Step 8: Calculate statistics
+    // Filter programs: keep only those that have essays or are STANDALONE
+    const filteredFormattedPrograms = formattedPrograms.filter(p => 
+      (p.essays && p.essays.length > 0) || 
+      p.degreeType === "STANDALONE"
+    );
+
+    // Step 8: Calculate statistics from filteredFormattedPrograms
     const stats = {
-      totalPrograms: allPrograms.length,
+      totalPrograms: filteredFormattedPrograms.length,
       savedUniversitiesCount: universitiesData.length,
-      totalEssayPrompts: allPrograms.reduce(
-        (acc, p) => acc + (p.essayPrompts?.length || 0),
+      totalEssayPrompts: filteredFormattedPrograms.reduce(
+        (acc, p) => acc + (p.essays?.length || 0),
         0
       ),
-      completedEssays: allPrograms.reduce(
+      completedEssays: filteredFormattedPrograms.reduce(
         (acc, p) =>
           acc +
-          (p.essayPrompts?.filter(prompt => {
-            const essay = prompt.essays?.[0];
-            return essay && essay.isCompleted;
-          }).length || 0),
+          (p.essays?.filter(essay => essay.userEssay && essay.userEssay.isCompleted).length || 0),
         0
       ),
-      totalWords: allPrograms.reduce(
+      totalWords: filteredFormattedPrograms.reduce(
         (acc, p) =>
           acc +
-          (p.essayPrompts?.reduce(
-            (promptAcc, prompt) =>
-              promptAcc + (prompt.essays?.[0]?.wordCount || 0),
+          (p.essays?.reduce(
+            (essayAcc, essay) =>
+              essayAcc + (essay.userEssay?.wordCount || 0),
             0
           ) || 0),
         0
       ),
       averageProgress: (() => {
-        const totalPrompts = allPrograms.reduce(
-          (acc, p) => acc + (p.essayPrompts?.length || 0),
+        const totalPrompts = filteredFormattedPrograms.reduce(
+          (acc, p) => acc + (p.essays?.length || 0),
           0
         );
         if (totalPrompts === 0) return 0;
 
-        const totalProgress = allPrograms.reduce((acc, p) => {
+        const totalProgress = filteredFormattedPrograms.reduce((acc, p) => {
           return (
             acc +
-            (p.essayPrompts?.reduce((essayAcc, prompt) => {
-              const essay = prompt.essays?.[0];
+            (p.essays?.reduce((essayAcc, essay) => {
+              const userEssay = essay.userEssay;
               return (
                 essayAcc +
-                (essay
-                  ? Math.min(100, (essay.wordCount / prompt.wordLimit) * 100)
+                (userEssay
+                  ? Math.min(100, (userEssay.wordCount / essay.wordLimit) * 100)
                   : 0)
               );
             }, 0) || 0)
@@ -487,7 +498,7 @@ export async function GET(request) {
     // Step 9: Return formatted response
     const workspaceData = {
       universities: universitiesData,
-      programs: formattedPrograms,
+      programs: filteredFormattedPrograms,  // Use the filtered list
       stats,
       query: { universityId },
     };
@@ -808,7 +819,7 @@ async function createStandaloneEssay(data) {
       universityName: essay.program?.university?.universityName
     });
 
-    // Format the response to match what the frontend expects - COMPLETE DATA
+    // ✅ Format response with STANDARDIZED structure
     const formattedEssay = {
       id: essay.id,
       programId: standaloneProgram.id,
@@ -817,8 +828,8 @@ async function createStandaloneEssay(data) {
       universitySlug: essay.program?.university?.slug || 'my-custom-essays',
       title: customTitle,
       prompt: customPrompt,
-      content: essay.content || '',
-      wordCount: essay.wordCount || 0,
+      content: essay.content || '',           // ← Empty string, not null
+      wordCount: essay.wordCount || 0,        // ← Zero, not null
       wordLimit: wordLimit,
       priority: priority,
       status: essay.status || 'DRAFT',
@@ -829,8 +840,8 @@ async function createStandaloneEssay(data) {
       lastAutoSaved: essay.lastAutoSaved || essay.createdAt,
       createdAt: essay.createdAt,
       updatedAt: essay.updatedAt,
-      versions: essay.versions || [],
-      aiResults: essay.aiResults || [],
+      versions: essay.versions || [],         // ← Empty array, not null
+      aiResults: essay.aiResults || [],       // ← Empty array, not null
       isCustom: true,
       essayPromptId: essayPrompt.id
     };
@@ -937,7 +948,7 @@ async function createEssay(data) {
 }
 
 // ==========================================
-// REST OF THE FUNCTIONS (keeping all existing functions)
+// REST OF THE FUNCTIONS
 // ==========================================
 
 async function updateEssay(data) {
@@ -1258,6 +1269,7 @@ async function saveVersion(data) {
     ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${wordCount - lastVersion.wordCount} words`
     : "Initial version";
 
+  // Create version
   const version = await prisma.essayVersion.create({
     data: {
       essayId,
@@ -1269,9 +1281,14 @@ async function saveVersion(data) {
     },
   });
 
+  // ✅ FIXED: Update main essay with version content
   await prisma.essay.update({
     where: { id: essayId },
-    data: { lastModified: new Date() },
+    data: { 
+      content: content || "",           // ← UPDATE MAIN ESSAY CONTENT
+      wordCount: wordCount || 0,        // ← UPDATE MAIN ESSAY WORD COUNT
+      lastModified: new Date() 
+    },
   });
 
   let aiAnalysis = null;

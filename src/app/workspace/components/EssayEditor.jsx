@@ -285,6 +285,8 @@ export const EssayEditor = memo(function EssayEditor({
 
     // Debounce the onChange callback to prevent parent re-renders
     debounceRef.current = setTimeout(() => {
+      isUserTypingRef.current = false
+      
       if (onChangeRef.current && editorRef.current) {
         const currentContent = editorRef.current.innerHTML
         // Only call onChange if content actually changed
@@ -293,7 +295,6 @@ export const EssayEditor = memo(function EssayEditor({
           onChangeRef.current(currentContent, countWords(currentContent))
         }
       }
-      isUserTypingRef.current = false
     }, 400)
   }, [updateStats, updateActiveFormats, countWords])
 
@@ -464,41 +465,83 @@ export const EssayEditor = memo(function EssayEditor({
     }
   }, [])
 
-  // Sync external content changes - but only when not typing
+  // Sync external content changes - but only when not typing (FIXED VERSION)
   useEffect(() => {
-    if (!isInitialized || !editorRef.current) return
-    if (isUserTypingRef.current) return
+    if (!isInitialized || !editorRef.current) return;
+    
+    // Don't sync if user is currently typing
+    if (isUserTypingRef.current) {
+      // But we should reset the typing flag after a delay
+      setTimeout(() => {
+        isUserTypingRef.current = false;
+      }, 100);
+      return;
+    }
+    
+    // Don't sync if we should skip this sync (used for internal changes)
     if (skipNextSyncRef.current) {
-      skipNextSyncRef.current = false
-      return
+      skipNextSyncRef.current = false;
+      return;
     }
 
-    const currentContent = editorRef.current.innerHTML
-    const externalContent = content || ''
+    const currentContent = editorRef.current.innerHTML;
+    const externalContent = content || '';
     
-    // Only sync if this is truly an external change (like version restore)
-    if (externalContent !== lastSyncedContentRef.current && 
-        externalContent !== currentContent) {
+    // Only sync if this is truly an external change that's different from what we have
+    if (externalContent !== lastSyncedContentRef.current) {
       
-      const hadFocus = document.activeElement === editorRef.current
-
-      editorRef.current.innerHTML = externalContent
-      lastSyncedContentRef.current = externalContent
-      lastAutoSavedContentRef.current = externalContent
-      updateStats(externalContent)
-
-      if (hadFocus) {
-        editorRef.current.focus()
-        // Move cursor to end
-        const range = document.createRange()
-        range.selectNodeContents(editorRef.current)
-        range.collapse(false)
-        const selection = window.getSelection()
-        selection.removeAllRanges()
-        selection.addRange(range)
+      // Check if the external content is actually different from what's in the editor
+      // This prevents unnecessary DOM updates
+      if (externalContent !== currentContent) {
+        // Preserve cursor position
+        const selection = window.getSelection();
+        let range = null;
+        if (selection.rangeCount > 0) {
+          range = selection.getRangeAt(0).cloneRange();
+        }
+        
+        // Store if editor had focus
+        const hadFocus = document.activeElement === editorRef.current;
+        
+        // Update the editor content
+        editorRef.current.innerHTML = externalContent;
+        lastSyncedContentRef.current = externalContent;
+        lastAutoSavedContentRef.current = externalContent;
+        updateStats(externalContent);
+        
+        // Restore cursor position if editor had focus
+        if (hadFocus && editorRef.current) {
+          editorRef.current.focus();
+          
+          // Try to restore the exact cursor position
+          if (range) {
+            try {
+              selection.removeAllRanges();
+              selection.addRange(range);
+            } catch (e) {
+              // If we can't restore the exact position, put cursor at end
+              const newRange = document.createRange();
+              newRange.selectNodeContents(editorRef.current);
+              newRange.collapse(false);
+              selection.removeAllRanges();
+              selection.addRange(newRange);
+            }
+          } else {
+            // Otherwise move cursor to end
+            const newRange = document.createRange();
+            newRange.selectNodeContents(editorRef.current);
+            newRange.collapse(false);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
+        }
+      } else {
+        // Even if content is the same, update the sync reference
+        lastSyncedContentRef.current = externalContent;
       }
     }
-  }, [content, isInitialized, updateStats])
+  }, [content, isInitialized, updateStats]);
 
   // Word limit status
   const limitStatus = useMemo(() => {

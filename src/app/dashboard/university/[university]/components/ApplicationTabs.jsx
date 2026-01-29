@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+  lazy,
+  Suspense,
+} from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,27 +78,31 @@ import {
 // ============================================
 // LAZY LOADED COMPONENTS FOR PERFORMANCE
 // ============================================
-import { EssayEditor } from '@/app/workspace/components/EssayEditor';
-import { AISuggestions } from '@/app/workspace/components/AiSuggestion';
+import { EssayEditor } from "@/app/workspace/components/EssayEditor";
+import { AISuggestions } from "@/app/workspace/components/AiSuggestion";
 
 // Lazy load heavy components
-const VersionManager = lazy(() => 
-  import('@/app/workspace/components/VersionManager').then(m => ({ default: m.VersionManager }))
+const VersionManager = lazy(() =>
+  import("@/app/workspace/components/VersionManager").then((m) => ({
+    default: m.VersionManager,
+  })),
 );
-const EssayAnalytics = lazy(() => 
-  import('@/app/workspace/components/EssayAnalytics').then(m => ({ default: m.EssayAnalytics }))
+const EssayAnalytics = lazy(() =>
+  import("@/app/workspace/components/EssayAnalytics").then((m) => ({
+    default: m.EssayAnalytics,
+  })),
 );
 
 // ============================================
 // DELETE CONFIRMATION MODAL COMPONENT
 // ============================================
 
-const DeleteConfirmationModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
+const DeleteConfirmationModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
   essayTitle,
-  isLoading
+  isLoading,
 }) => {
   if (!isOpen) return null;
 
@@ -105,7 +117,9 @@ const DeleteConfirmationModal = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Delete Essay</h2>
-              <p className="text-sm text-white/60">This action cannot be undone</p>
+              <p className="text-sm text-white/60">
+                This action cannot be undone
+              </p>
             </div>
           </div>
         </div>
@@ -125,7 +139,8 @@ const DeleteConfirmationModal = ({
           </div>
 
           <p className="text-white/70 text-sm">
-            This will permanently delete the essay and all associated data including:
+            This will permanently delete the essay and all associated data
+            including:
           </p>
           <ul className="text-sm text-white/50 space-y-1 mt-2 ml-4">
             <li>• All saved content and drafts</li>
@@ -171,73 +186,73 @@ const DeleteConfirmationModal = ({
 // CUSTOM ESSAY MODAL COMPONENT
 // ============================================
 
-const CustomEssayModal = ({ 
-  isOpen, 
-  onClose, 
-  onCreateEssay, 
+const CustomEssayModal = ({
+  isOpen,
+  onClose,
+  onCreateEssay,
   universityName,
   isCreating,
-  isUniversityAdded 
+  isUniversityAdded,
 }) => {
   const [formData, setFormData] = useState({
-    customTitle: '',
-    customPrompt: '',
+    customTitle: "",
+    customPrompt: "",
     wordLimit: 500,
-    priority: 'medium',
+    priority: "medium",
   });
 
   const [errors, setErrors] = useState({});
-  const [wordLimitError, setWordLimitError] = useState('');
+  const [wordLimitError, setWordLimitError] = useState("");
 
   const handleWordLimitChange = (value) => {
     const numValue = parseInt(value) || 0;
-    
-    if (value === '') {
+
+    if (value === "") {
       setFormData({ ...formData, wordLimit: 500 });
-      setWordLimitError('');
+      setWordLimitError("");
       return;
     }
-    
+
     if (numValue < 100) {
-      setWordLimitError('Minimum 100 words required');
+      setWordLimitError("Minimum 100 words required");
       setFormData({ ...formData, wordLimit: numValue });
     } else if (numValue > 5000) {
-      setWordLimitError('Maximum 5000 words allowed');
+      setWordLimitError("Maximum 5000 words allowed");
       setFormData({ ...formData, wordLimit: numValue });
     } else {
-      setWordLimitError('');
+      setWordLimitError("");
       setFormData({ ...formData, wordLimit: numValue });
     }
   };
 
   const handleWordLimitBlur = () => {
     const numValue = parseInt(formData.wordLimit) || 0;
-    
+
     if (numValue < 100) {
-      setWordLimitError('Minimum 100 words required');
+      setWordLimitError("Minimum 100 words required");
       setFormData({ ...formData, wordLimit: 100 });
     } else if (numValue > 5000) {
-      setWordLimitError('Maximum 5000 words allowed');
+      setWordLimitError("Maximum 5000 words allowed");
       setFormData({ ...formData, wordLimit: 5000 });
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.customTitle.trim()) {
-      newErrors.customTitle = 'Essay title is required';
+      newErrors.customTitle = "Essay title is required";
     }
-    
+
     if (!formData.customPrompt.trim()) {
-      newErrors.customPrompt = 'Essay prompt/question is required';
+      newErrors.customPrompt = "Essay prompt/question is required";
     }
-    
+
     const wordLimit = parseInt(formData.wordLimit);
     if (isNaN(wordLimit) || wordLimit < 100 || wordLimit > 5000) {
-      newErrors.wordLimit = 'Word limit must be between 100 and 5000';
+      newErrors.wordLimit = "Word limit must be between 100 and 5000";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -250,13 +265,13 @@ const CustomEssayModal = ({
 
   const resetForm = () => {
     setFormData({
-      customTitle: '',
-      customPrompt: '',
+      customTitle: "",
+      customPrompt: "",
       wordLimit: 500,
-      priority: 'medium',
+      priority: "medium",
     });
     setErrors({});
-    setWordLimitError('');
+    setWordLimitError("");
   };
 
   useEffect(() => {
@@ -277,8 +292,12 @@ const CustomEssayModal = ({
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Create Custom Essay</h2>
-              <p className="text-sm text-white/60">Add a custom essay for {universityName}</p>
+              <h2 className="text-xl font-bold text-white">
+                Create Custom Essay
+              </h2>
+              <p className="text-sm text-white/60">
+                Add a custom essay for {universityName}
+              </p>
             </div>
           </div>
           <button
@@ -312,9 +331,13 @@ const CustomEssayModal = ({
             <input
               type="text"
               value={formData.customTitle}
-              onChange={(e) => setFormData({ ...formData, customTitle: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, customTitle: e.target.value })
+              }
               className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white ${
-                errors.customTitle ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+                errors.customTitle
+                  ? "border-red-400 bg-red-500/10"
+                  : "border-white/20"
               }`}
               placeholder="e.g., Leadership Experience Essay"
               disabled={!isUniversityAdded}
@@ -334,9 +357,13 @@ const CustomEssayModal = ({
             </label>
             <textarea
               value={formData.customPrompt}
-              onChange={(e) => setFormData({ ...formData, customPrompt: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, customPrompt: e.target.value })
+              }
               className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-white ${
-                errors.customPrompt ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+                errors.customPrompt
+                  ? "border-red-400 bg-red-500/10"
+                  : "border-white/20"
               }`}
               rows={4}
               placeholder="Enter the essay question or topic you're writing about..."
@@ -365,7 +392,9 @@ const CustomEssayModal = ({
                 onChange={(e) => handleWordLimitChange(e.target.value)}
                 onBlur={handleWordLimitBlur}
                 className={`w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white ${
-                  wordLimitError ? 'border-red-400 bg-red-500/10' : 'border-white/20'
+                  wordLimitError
+                    ? "border-red-400 bg-red-500/10"
+                    : "border-white/20"
                 }`}
                 min={100}
                 max={5000}
@@ -388,23 +417,31 @@ const CustomEssayModal = ({
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, priority: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-white"
                 disabled={!isUniversityAdded}
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: 'right 0.5rem center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: '1.5em 1.5em',
-                  paddingRight: '2.5rem',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
+                  backgroundPosition: "right 0.5rem center",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "1.5em 1.5em",
+                  paddingRight: "2.5rem",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  MozAppearance: "none",
                 }}
               >
-                <option value="low" className="bg-[#002147] text-white">Low Priority</option>
-                <option value="medium" className="bg-[#002147] text-white">Medium Priority</option>
-                <option value="high" className="bg-[#002147] text-white">High Priority</option>
+                <option value="low" className="bg-[#002147] text-white">
+                  Low Priority
+                </option>
+                <option value="medium" className="bg-[#002147] text-white">
+                  Medium Priority
+                </option>
+                <option value="high" className="bg-[#002147] text-white">
+                  High Priority
+                </option>
               </select>
             </div>
           </div>
@@ -477,7 +514,12 @@ const PanelLoader = () => (
 // ============================================
 // LOCKED TAB CONTENT COMPONENT
 // ============================================
-const LockedTabContent = ({ tabName, universityName, onAddUniversity, isAddingUniversity }) => (
+const LockedTabContent = ({
+  tabName,
+  universityName,
+  onAddUniversity,
+  isAddingUniversity,
+}) => (
   <div className="min-h-[400px] flex items-center justify-center">
     <div className="text-center max-w-md mx-auto p-8">
       <div className="relative inline-block mb-6">
@@ -487,28 +529,36 @@ const LockedTabContent = ({ tabName, universityName, onAddUniversity, isAddingUn
         </div>
       </div>
 
-      <h3 className="text-2xl font-bold text-white mb-3">
-        {tabName} Locked
-      </h3>
+      <h3 className="text-2xl font-bold text-white mb-3">{tabName} Locked</h3>
 
       <p className="text-white/70 mb-6 leading-relaxed">
-        Add <span className="font-semibold text-white">{universityName}</span> to your dashboard to unlock {tabName.toLowerCase()} management and start working on your application.
+        Add <span className="font-semibold text-white">{universityName}</span>{" "}
+        to your dashboard to unlock {tabName.toLowerCase()} management and start
+        working on your application.
       </p>
 
       <div className="bg-white/5 rounded-xl p-4 mb-6 text-left">
-        <p className="text-sm font-semibold text-white/80 mb-3">Unlock access to:</p>
+        <p className="text-sm font-semibold text-white/80 mb-3">
+          Unlock access to:
+        </p>
         <ul className="space-y-2 text-sm text-white/60">
           <li className="flex items-center">
             <CheckCircle2 className="w-4 h-4 mr-2 text-blue-400" />
-            {tabName === "Essays" ? "Essay prompts and writing workspace" : "Deadline tracking and calendar"}
+            {tabName === "Essays"
+              ? "Essay prompts and writing workspace"
+              : "Deadline tracking and calendar"}
           </li>
           <li className="flex items-center">
             <CheckCircle2 className="w-4 h-4 mr-2 text-blue-400" />
-            {tabName === "Essays" ? "AI-powered suggestions and analytics" : "Event reminders and notifications"}
+            {tabName === "Essays"
+              ? "AI-powered suggestions and analytics"
+              : "Event reminders and notifications"}
           </li>
           <li className="flex items-center">
             <CheckCircle2 className="w-4 h-4 mr-2 text-blue-400" />
-            {tabName === "Essays" ? "Version history and auto-save" : "Task completion tracking"}
+            {tabName === "Essays"
+              ? "Version history and auto-save"
+              : "Task completion tracking"}
           </li>
         </ul>
       </div>
@@ -547,15 +597,47 @@ const ApplicationTabs = ({ university }) => {
   const params = useParams();
   const { data: session, status: sessionStatus } = useSession();
 
-  // ========== EXTRACT USER ID AND UNIVERSITY NAME ==========
-  const userId = session?.userId || session?.user?.id || null;
-  const userEmail = session?.user?.email || null;
-  
-  const universityNameFromUrl = params?.university 
-    ? decodeURIComponent(params.university).replace(/-/g, ' ')
+  // ========== IMPROVED USER ID EXTRACTION ==========
+  const getUserId = () => {
+    if (!session) return null;
+
+    // Try different possible locations for user ID
+    return (
+      session.userId || // Direct property
+      session.user?.id || // Nested in user object
+      session.user?.userId || // Alternative user property
+      session.user?.sub || // OAuth provider's sub
+      session.id || // Direct session ID
+      null
+    );
+  };
+
+  const userId = getUserId();
+  const userEmail = session?.user?.email || session?.email || null;
+
+  const universityNameFromUrl = params?.university
+    ? decodeURIComponent(params.university).replace(/-/g, " ")
     : null;
-  
-  const universityName = university?.name || universityNameFromUrl || '';
+
+  const universityName = university?.name || universityNameFromUrl || "";
+
+  // ========== SESSION VALIDATION AND DEBUGGING ==========
+  useEffect(() => {
+    if (sessionStatus === "authenticated") {
+      console.log("Session debug:", {
+        hasSession: !!session,
+        sessionStructure: session ? Object.keys(session) : "no session",
+        userObject: session?.user ? Object.keys(session.user) : "no user",
+        extractedUserId: userId,
+        userEmail: userEmail,
+      });
+
+      if (!userId) {
+        console.warn("User ID not found in session. Available data:", session);
+        toast.error("Authentication issue. Please sign out and sign in again.");
+      }
+    }
+  }, [sessionStatus, session, userId, userEmail]);
 
   // ========== UNIVERSITY ADDED STATE ==========
   const isUniversityAdded = university?.isAdded || false;
@@ -564,9 +646,9 @@ const ApplicationTabs = ({ university }) => {
   // ========== CUSTOM ESSAY STATE ==========
   const [showCustomEssayModal, setShowCustomEssayModal] = useState(false);
   const [isCreatingCustomEssay, setIsCreatingCustomEssay] = useState(false);
-  
+
   // ========== STATE MANAGEMENT ==========
-  const [activeView, setActiveView] = useState('list');
+  const [activeView, setActiveView] = useState("list");
   const [workspaceData, setWorkspaceData] = useState(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState(null);
@@ -581,41 +663,63 @@ const ApplicationTabs = ({ university }) => {
 
   // ========== SELECTED ESSAY INFO ==========
   const [selectedEssayInfo, setSelectedEssayInfo] = useState({
-    title: '',
-    programName: '',
+    title: "",
+    programName: "",
     isCustom: false,
-    promptText: '',
-    wordLimit: 500
+    promptText: "",
+    wordLimit: 500,
   });
+
+  // ========== ENHANCED VALIDATION FUNCTION ==========
+  const validateUserAndUniversity = (action = "general") => {
+    const errors = [];
+
+    if (!userId) {
+      errors.push("Please sign in to continue");
+      return { isValid: false, error: errors[0] };
+    }
+
+    if (!isUniversityAdded && action !== "addUniversity") {
+      errors.push("Please add this university to your dashboard first");
+      return { isValid: false, error: errors[0] };
+    }
+
+    return { isValid: true };
+  };
 
   // ========== FIXED: CUSTOM ESSAYS CALCULATION ==========
   const customEssays = useMemo(() => {
     if (!workspaceData?.programs) return [];
-    
+
     return workspaceData.programs
-      .filter(p => p.degreeType === "STANDALONE" || p.isCustom)
-      .flatMap(p => p.essays?.map(e => ({
-        ...e.userEssay,
-        promptId: e.promptId,
-        promptTitle: e.promptTitle,
-        prompt: e.promptText,
-        wordLimit: e.wordLimit,
-        programId: p.id,
-        universityId: p.universityId,
-      })).filter(Boolean) || []);
+      .filter((p) => p.degreeType === "STANDALONE" || p.isCustom)
+      .flatMap(
+        (p) =>
+          p.essays
+            ?.map((e) => ({
+              ...e.userEssay,
+              promptId: e.promptId,
+              promptTitle: e.promptTitle,
+              prompt: e.promptText,
+              wordLimit: e.wordLimit,
+              programId: p.id,
+              universityId: p.universityId,
+            }))
+            .filter(Boolean) || [],
+      );
   }, [workspaceData]);
 
   // ADDED: Delete modal state
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
     essayId: null,
-    essayTitle: '',
+    essayTitle: "",
   });
   const [isDeletingEssay, setIsDeletingEssay] = useState(false);
 
   // ========== REFS ==========
   const autoSaveTimerRef = useRef(null);
-  const lastContentRef = useRef('');
+  const lastContentRef = useRef("");
   const isUpdatingRef = useRef(false);
   const lastTypingTimeRef = useRef(Date.now());
   const pendingContentRef = useRef(null);
@@ -626,21 +730,29 @@ const ApplicationTabs = ({ university }) => {
 
   // ========== HANDLE ADD UNIVERSITY TO DASHBOARD ==========
   const handleAddUniversity = async () => {
-    if (!userId || !university?.id) {
-      toast.error("Please sign in to add universities to your dashboard");
+    const validation = validateUserAndUniversity("addUniversity");
+    if (!validation.isValid) {
+      toast.error(validation.error);
+      return;
+    }
+
+    if (!university?.id) {
+      toast.error("University information not found");
       return;
     }
 
     try {
       setIsAddingUniversity(true);
 
-      const response = await fetch('/api/user/toggle-add', {
-        method: 'POST',
+      const response = await fetch("/api/user/toggle-add", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           universityId: university.id,
+          userId,
+          userEmail,
         }),
       });
 
@@ -648,26 +760,47 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         if (data.isAdded) {
-          toast.success(`${university.name || 'University'} has been added to your dashboard!`);
+          toast.success(
+            `${university.name || "University"} has been added to your dashboard!`,
+          );
           window.location.reload();
         } else {
-          toast.success(`${university.name || 'University'} has been removed from your dashboard.`);
+          toast.success(
+            `${university.name || "University"} has been removed from your dashboard.`,
+          );
           window.location.reload();
         }
       } else {
-        throw new Error(data.error || 'Failed to update university status');
+        throw new Error(data.error || "Failed to update university status");
       }
     } catch (error) {
-      console.error('Error toggling university:', error);
-      toast.error('Failed to update university. Please try again.');
+      console.error("Error toggling university:", error);
+      toast.error("Failed to update university. Please try again.");
       setIsAddingUniversity(false);
     }
   };
 
-  // ========== HANDLE CREATE CUSTOM ESSAY (UPDATED) ==========
+  // ========== IMPROVED: HANDLE CREATE CUSTOM ESSAY ==========
   const handleCreateCustomEssay = async (formData) => {
-    if (!userId || !university?.id || !isUniversityAdded) {
-      toast.error("Please add the university to your dashboard first");
+    const validation = validateUserAndUniversity("createCustomEssay");
+    if (!validation.isValid) {
+      toast.error(validation.error);
+      return;
+    }
+
+    // Validate form data
+    if (!formData.customTitle?.trim()) {
+      toast.error("Essay title is required");
+      return;
+    }
+
+    if (!formData.customPrompt?.trim()) {
+      toast.error("Essay prompt is required");
+      return;
+    }
+
+    if (!university?.id) {
+      toast.error("University information not found");
       return;
     }
 
@@ -684,23 +817,26 @@ const ApplicationTabs = ({ university }) => {
           wordLimit: formData.wordLimit,
           priority: formData.priority,
           taggedUniversityId: university.id,
-          userId: userId
+          userId: userId,
+          userEmail: userEmail,
         }),
       });
 
       if (response.ok) {
         const result = await response.json();
-        
+
         if (result.success && result.essay) {
           // Update workspace data immediately
-          setWorkspaceData(prev => {
+          setWorkspaceData((prev) => {
             if (!prev) return prev;
-            
+
             // Find or create STANDALONE program
-            let standaloneProgram = prev.programs.find(p => 
-              p.universityId === university.id && p.degreeType === "STANDALONE"
+            let standaloneProgram = prev.programs.find(
+              (p) =>
+                p.universityId === university.id &&
+                p.degreeType === "STANDALONE",
             );
-            
+
             if (!standaloneProgram) {
               // Create new standalone program in state
               standaloneProgram = {
@@ -710,28 +846,33 @@ const ApplicationTabs = ({ university }) => {
                 degreeType: "STANDALONE",
                 universityName: university.name || universityName,
                 universityColor: university.brandColor || "#002147",
-                essays: []
+                essays: [],
               };
             }
-            
+
             // Add new essay to program
             const newEssayData = {
               promptId: result.essayPromptId,
               promptTitle: result.essay.title,
               promptText: result.essay.prompt,
               wordLimit: result.essay.wordLimit,
-              userEssay: result.essay
+              userEssay: result.essay,
             };
-            
+
             // Update or add program
-            const updatedPrograms = prev.programs.some(p => p.id === standaloneProgram.id)
-              ? prev.programs.map(p => 
+            const updatedPrograms = prev.programs.some(
+              (p) => p.id === standaloneProgram.id,
+            )
+              ? prev.programs.map((p) =>
                   p.id === standaloneProgram.id
                     ? { ...p, essays: [...(p.essays || []), newEssayData] }
-                    : p
+                    : p,
                 )
-              : [...prev.programs, { ...standaloneProgram, essays: [newEssayData] }];
-            
+              : [
+                  ...prev.programs,
+                  { ...standaloneProgram, essays: [newEssayData] },
+                ];
+
             return { ...prev, programs: updatedPrograms };
           });
 
@@ -743,30 +884,36 @@ const ApplicationTabs = ({ university }) => {
           setActiveEssayPromptId(result.essayPromptId);
           setSelectedEssayInfo({
             title: result.essay.title,
-            programName: 'My Custom Essays',
+            programName: "My Custom Essays",
             isCustom: true,
             promptText: result.essay.prompt,
-            wordLimit: result.essay.wordLimit
+            wordLimit: result.essay.wordLimit,
           });
-          setActiveView('editor');
+          setActiveView("editor");
         } else {
-          throw new Error(result.error || 'Failed to create custom essay');
+          throw new Error(result.error || "Failed to create custom essay");
         }
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create custom essay');
+        throw new Error(errorData.error || "Failed to create custom essay");
       }
     } catch (error) {
-      console.error('Error creating custom essay:', error);
+      console.error("Error creating custom essay:", error);
       toast.error(error.message);
     } finally {
       setIsCreatingCustomEssay(false);
     }
   };
 
-  // ========== HANDLE DELETE CUSTOM ESSAY (UPDATED) ==========
+  // ========== HANDLE DELETE CUSTOM ESSAY ==========
   const handleDeleteCustomEssay = async (essayId) => {
     if (!essayId) return;
+
+    const validation = validateUserAndUniversity("deleteEssay");
+    if (!validation.isValid) {
+      toast.error(validation.error);
+      return;
+    }
 
     try {
       setIsDeletingEssay(true);
@@ -777,45 +924,53 @@ const ApplicationTabs = ({ university }) => {
         body: JSON.stringify({
           action: "delete_essay",
           essayId,
+          userId,
+          userEmail,
         }),
       });
 
       if (response.ok) {
         // Remove from workspace data immediately
-        setWorkspaceData(prev => {
+        setWorkspaceData((prev) => {
           if (!prev) return prev;
-          
+
           return {
             ...prev,
-            programs: prev.programs.map(program => 
-              (program.degreeType === "STANDALONE" || program.isCustom)
-                ? {
-                    ...program,
-                    essays: program.essays.filter(e => e.userEssay?.id !== essayId)
-                  }
-                : program
-            ).filter(p => 
-              (p.degreeType !== "STANDALONE" && !p.isCustom) || (p.essays && p.essays.length > 0)
-            )
+            programs: prev.programs
+              .map((program) =>
+                program.degreeType === "STANDALONE" || program.isCustom
+                  ? {
+                      ...program,
+                      essays: program.essays.filter(
+                        (e) => e.userEssay?.id !== essayId,
+                      ),
+                    }
+                  : program,
+              )
+              .filter(
+                (p) =>
+                  (p.degreeType !== "STANDALONE" && !p.isCustom) ||
+                  (p.essays && p.essays.length > 0),
+              ),
           };
         });
-        
+
         // If viewing deleted essay, navigate away
         if (activeEssayPromptId && currentEssay?.id === essayId) {
           setActiveEssayPromptId(null);
           setActiveProgramId(null);
-          setActiveView('list');
+          setActiveView("list");
         }
-        
+
         toast.success("Custom essay deleted successfully");
-        setDeleteModal({ isOpen: false, essayId: null, essayTitle: '' });
+        setDeleteModal({ isOpen: false, essayId: null, essayTitle: "" });
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete custom essay');
+        throw new Error(errorData.error || "Failed to delete custom essay");
       }
     } catch (error) {
-      console.error('Error deleting custom essay:', error);
-      toast.error(error.message || 'Failed to delete custom essay');
+      console.error("Error deleting custom essay:", error);
+      toast.error(error.message || "Failed to delete custom essay");
     } finally {
       setIsDeletingEssay(false);
     }
@@ -826,41 +981,48 @@ const ApplicationTabs = ({ university }) => {
     setDeleteModal({
       isOpen: true,
       essayId,
-      essayTitle
+      essayTitle,
     });
   };
 
   // ========== PANEL MANAGEMENT ==========
-  const Panel = useCallback(({ name, title, icon: Icon, iconColor, children, isOpen, onClose }) => {
-    if (!isOpen) return null;
-    
-    return (
-      <div className="mb-4 animate-in slide-in-from-top-4 duration-300">
-        <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-            <div className="flex items-center space-x-2">
-              <div className={`p-1.5 bg-gradient-to-br ${iconColor} rounded-lg`}>
-                <Icon className="w-4 h-4 text-white" />
+  const Panel = useCallback(
+    ({ name, title, icon: Icon, iconColor, children, isOpen, onClose }) => {
+      if (!isOpen) return null;
+
+      return (
+        <div className="mb-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-2xl">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <div
+                  className={`p-1.5 bg-gradient-to-br ${iconColor} rounded-lg`}
+                >
+                  <Icon className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-sm font-semibold text-white">
+                  {title}
+                </span>
               </div>
-              <span className="text-sm font-semibold text-white">{title}</span>
+              <button
+                onClick={onClose}
+                className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {children}
           </div>
-          {children}
         </div>
-      </div>
-    );
-  }, []);
+      );
+    },
+    [],
+  );
 
   const togglePanel = useCallback((panelName) => {
-    setOpenPanels(prev => {
+    setOpenPanels((prev) => {
       if (prev.includes(panelName)) {
-        return prev.filter(p => p !== panelName);
+        return prev.filter((p) => p !== panelName);
       } else {
         return [...prev, panelName];
       }
@@ -868,35 +1030,44 @@ const ApplicationTabs = ({ university }) => {
   }, []);
 
   const closePanel = useCallback((panelName) => {
-    setOpenPanels(prev => prev.filter(p => p !== panelName));
+    setOpenPanels((prev) => prev.filter((p) => p !== panelName));
   }, []);
 
-  const isPanelOpen = useCallback((panelName) => {
-    return openPanels.includes(panelName);
-  }, [openPanels]);
+  const isPanelOpen = useCallback(
+    (panelName) => {
+      return openPanels.includes(panelName);
+    },
+    [openPanels],
+  );
 
   // ========== DERIVED DATA ==========
-  const tasksAndEvents = useMemo(() => 
-    university?.tasksAndEvents || []
-  , [university?.tasksAndEvents]);
+  const tasksAndEvents = useMemo(
+    () => university?.tasksAndEvents || [],
+    [university?.tasksAndEvents],
+  );
 
   const programsWithEssays = useMemo(() => {
     if (!workspaceData?.programs) return [];
-    return workspaceData.programs.filter(program => 
-      program.essays && program.essays.length > 0 && 
-      program.degreeType !== "STANDALONE" && !program.isCustom
+    return workspaceData.programs.filter(
+      (program) =>
+        program.essays &&
+        program.essays.length > 0 &&
+        program.degreeType !== "STANDALONE" &&
+        !program.isCustom,
     );
   }, [workspaceData]);
 
   const currentProgram = useMemo(() => {
     if (!activeProgramId) return null;
-    return workspaceData?.programs?.find(p => p.id === activeProgramId);
+    return workspaceData?.programs?.find((p) => p.id === activeProgramId);
   }, [workspaceData, activeProgramId]);
 
   const currentEssayData = useMemo(() => {
     if (!currentProgram || !activeEssayPromptId) return null;
-    
-    return currentProgram.essays?.find(e => e.promptId === activeEssayPromptId);
+
+    return currentProgram.essays?.find(
+      (e) => e.promptId === activeEssayPromptId,
+    );
   }, [currentProgram, activeEssayPromptId]);
 
   const currentEssay = useMemo(() => {
@@ -914,7 +1085,7 @@ const ApplicationTabs = ({ university }) => {
         totalEssays: 0,
         completedTasks: 0,
         totalTasks: 0,
-        applicationStatus: 'not-started'
+        applicationStatus: "not-started",
       };
     }
 
@@ -927,9 +1098,9 @@ const ApplicationTabs = ({ university }) => {
         totalEssays: university.enhancedStats.essays?.total || 0,
         completedTasks: university.enhancedStats.tasks?.completed || 0,
         totalTasks: university.enhancedStats.tasks?.total || 0,
-        applicationStatus: university.status || 'not-started',
+        applicationStatus: university.status || "not-started",
         upcomingDeadlines: university.upcomingDeadlines || 0,
-        overdueEvents: university.overdueEvents || 0
+        overdueEvents: university.overdueEvents || 0,
       };
     }
 
@@ -939,38 +1110,50 @@ const ApplicationTabs = ({ university }) => {
 
     // Include custom essays in total count
     const allEssays = [...essayPrompts, ...customEssays];
-    
-    const completedEssays = allEssays.filter(essay => 
-      essay.status === 'COMPLETED' || essay.status === 'completed' || 
-      (essay.wordCount && essay.wordLimit && essay.wordCount >= essay.wordLimit * 0.98) ||
-      essay.isCompleted
+
+    const completedEssays = allEssays.filter(
+      (essay) =>
+        essay.status === "COMPLETED" ||
+        essay.status === "completed" ||
+        (essay.wordCount &&
+          essay.wordLimit &&
+          essay.wordCount >= essay.wordLimit * 0.98) ||
+        essay.isCompleted,
     ).length;
 
     const allTasks = [...calendarEvents, ...tasksEvents];
-    const completedTasks = allTasks.filter(event => 
-      event.completionStatus === 'completed' || event.status === 'completed'
+    const completedTasks = allTasks.filter(
+      (event) =>
+        event.completionStatus === "completed" || event.status === "completed",
     ).length;
 
-    const essayProgress = allEssays.length > 0 
-      ? Math.round((completedEssays / allEssays.length) * 100)
-      : 0;
+    const essayProgress =
+      allEssays.length > 0
+        ? Math.round((completedEssays / allEssays.length) * 100)
+        : 0;
 
-    const taskProgress = allTasks.length > 0 
-      ? Math.round((completedTasks / allTasks.length) * 100)
-      : 0;
+    const taskProgress =
+      allTasks.length > 0
+        ? Math.round((completedTasks / allTasks.length) * 100)
+        : 0;
 
-    const overallProgress = allEssays.length > 0 && allTasks.length > 0
-      ? Math.round((essayProgress * 0.7) + (taskProgress * 0.3))
-      : allEssays.length > 0 
-      ? essayProgress 
-      : taskProgress;
+    const overallProgress =
+      allEssays.length > 0 && allTasks.length > 0
+        ? Math.round(essayProgress * 0.7 + taskProgress * 0.3)
+        : allEssays.length > 0
+          ? essayProgress
+          : taskProgress;
 
-    let applicationStatus = 'not-started';
+    let applicationStatus = "not-started";
     if (completedEssays > 0 || completedTasks > 0) {
-      if (completedEssays === allEssays.length && completedTasks === allTasks.length && (allEssays.length > 0 || allTasks.length > 0)) {
-        applicationStatus = 'submitted';
+      if (
+        completedEssays === allEssays.length &&
+        completedTasks === allTasks.length &&
+        (allEssays.length > 0 || allTasks.length > 0)
+      ) {
+        applicationStatus = "submitted";
       } else {
-        applicationStatus = 'in-progress';
+        applicationStatus = "in-progress";
       }
     }
 
@@ -983,20 +1166,30 @@ const ApplicationTabs = ({ university }) => {
       completedTasks,
       totalTasks: allTasks.length,
       applicationStatus,
-      upcomingDeadlines: allTasks.filter(task => 
-        new Date(task.date) > new Date() && 
-        (task.status !== 'completed' && task.completionStatus !== 'completed')
+      upcomingDeadlines: allTasks.filter(
+        (task) =>
+          new Date(task.date) > new Date() &&
+          task.status !== "completed" &&
+          task.completionStatus !== "completed",
       ).length,
-      overdueEvents: allTasks.filter(task => 
-        new Date(task.date) < new Date() && 
-        (task.status !== 'completed' && task.completionStatus !== 'completed')
-      ).length
+      overdueEvents: allTasks.filter(
+        (task) =>
+          new Date(task.date) < new Date() &&
+          task.status !== "completed" &&
+          task.completionStatus !== "completed",
+      ).length,
     };
   }, [university, customEssays]);
 
   // ========== API FUNCTIONS ==========
   const fetchWorkspaceData = useCallback(async () => {
-    if (!universityName || !userId || !isUniversityAdded || isFetchingRef.current) return;
+    if (
+      !universityName ||
+      !userId ||
+      !isUniversityAdded ||
+      isFetchingRef.current
+    )
+      return;
 
     try {
       isFetchingRef.current = true;
@@ -1009,16 +1202,18 @@ const ApplicationTabs = ({ university }) => {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           cache: "no-cache",
-        }
+        },
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: response.statusText }));
         throw new Error(errorData.error || `Failed to fetch data`);
       }
 
       const data = await response.json();
-      
+
       // Set workspace data - custom essays are already included
       setWorkspaceData(data);
 
@@ -1028,11 +1223,12 @@ const ApplicationTabs = ({ university }) => {
       }
 
       // Filter and set default selections
-      const programsWithContent = data.programs?.filter(p => p.essays && p.essays.length > 0) || [];
-      
+      const programsWithContent =
+        data.programs?.filter((p) => p.essays && p.essays.length > 0) || [];
+
       if (programsWithContent.length > 0) {
         let programToSelect = activeProgramId
-          ? programsWithContent.find(p => p.id === activeProgramId)
+          ? programsWithContent.find((p) => p.id === activeProgramId)
           : null;
 
         if (!programToSelect) {
@@ -1042,7 +1238,9 @@ const ApplicationTabs = ({ university }) => {
 
         if (programToSelect.essays && programToSelect.essays.length > 0) {
           let essayToSelect = activeEssayPromptId
-            ? programToSelect.essays.find(e => e.promptId === activeEssayPromptId)
+            ? programToSelect.essays.find(
+                (e) => e.promptId === activeEssayPromptId,
+              )
             : null;
 
           if (!essayToSelect) {
@@ -1059,10 +1257,24 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceLoading(false);
       isFetchingRef.current = false;
     }
-  }, [universityName, userId, activeProgramId, activeEssayPromptId, isUniversityAdded, university?.id]);
+  }, [
+    universityName,
+    userId,
+    activeProgramId,
+    activeEssayPromptId,
+    isUniversityAdded,
+    university?.id,
+  ]);
 
   const autoSaveEssay = useCallback(async () => {
-    if (!currentEssay || isSaving || !hasUnsavedChanges || isUpdatingRef.current || !userId || !isUniversityAdded) {
+    if (
+      !currentEssay ||
+      isSaving ||
+      !hasUnsavedChanges ||
+      isUpdatingRef.current ||
+      !userId ||
+      !isUniversityAdded
+    ) {
       return false;
     }
 
@@ -1078,10 +1290,13 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-      
+      const isCustom =
+        currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+
       // Use correct route based on essay type
-      const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
+      const apiRoute = isCustom
+        ? "/api/essay/independent"
+        : `/api/essay/${encodeURIComponent(universityName)}`;
 
       const response = await fetch(apiRoute, {
         method: "PUT",
@@ -1093,36 +1308,37 @@ const ApplicationTabs = ({ university }) => {
           isAutoSave: true,
           isCustomEssay: isCustom,
           userId,
+          userEmail,
         }),
       });
 
       if (response.ok) {
         const result = await response.json();
-        
+
         // Update state immediately with response
-        setWorkspaceData(prev => {
+        setWorkspaceData((prev) => {
           if (!prev) return prev;
-          
+
           return {
             ...prev,
-            programs: prev.programs.map(program => 
+            programs: prev.programs.map((program) =>
               program.id === activeProgramId
                 ? {
                     ...program,
-                    essays: program.essays.map(essayData => 
+                    essays: program.essays.map((essayData) =>
                       essayData.promptId === activeEssayPromptId
                         ? {
                             ...essayData,
-                            userEssay: result.essay
+                            userEssay: result.essay,
                           }
-                        : essayData
-                    )
+                        : essayData,
+                    ),
                   }
-                : program
-            )
+                : program,
+            ),
           };
         });
-        
+
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
         pendingContentRef.current = null;
@@ -1136,10 +1352,28 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(false);
       isUpdatingRef.current = false;
     }
-  }, [currentEssay, isSaving, hasUnsavedChanges, universityName, userId, isUniversityAdded, activeProgramId, activeEssayPromptId, currentProgram]);
+  }, [
+    currentEssay,
+    isSaving,
+    hasUnsavedChanges,
+    universityName,
+    userId,
+    userEmail,
+    isUniversityAdded,
+    activeProgramId,
+    activeEssayPromptId,
+    currentProgram,
+  ]);
 
+  // ========== IMPROVED: CREATE ESSAY FUNCTION ==========
   const createEssay = useCallback(async () => {
-    if (!activeProgramId || !activeEssayPromptId || isCreatingEssay || !userId || !isUniversityAdded) {
+    const validation = validateUserAndUniversity("createEssay");
+    if (!validation.isValid) {
+      toast.error(validation.error);
+      return null;
+    }
+
+    if (!activeProgramId || !activeEssayPromptId || isCreatingEssay) {
       return null;
     }
 
@@ -1148,8 +1382,20 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceError(null);
       isUpdatingRef.current = true;
 
-      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-      const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
+      // Log for debugging
+      console.log("Creating essay with:", {
+        userId,
+        userEmail,
+        activeProgramId,
+        activeEssayPromptId,
+        isUniversityAdded,
+      });
+
+      const isCustom =
+        currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+      const apiRoute = isCustom
+        ? "/api/essay/independent"
+        : `/api/essay/${encodeURIComponent(universityName)}`;
 
       const response = await fetch(apiRoute, {
         method: "POST",
@@ -1159,6 +1405,7 @@ const ApplicationTabs = ({ university }) => {
           programId: activeProgramId,
           essayPromptId: activeEssayPromptId,
           userId,
+          userEmail,
           isCustomEssay: isCustom,
         }),
       });
@@ -1170,17 +1417,17 @@ const ApplicationTabs = ({ university }) => {
           if (!prev) return prev;
           return {
             ...prev,
-            programs: prev.programs.map(program =>
+            programs: prev.programs.map((program) =>
               program.id === activeProgramId
                 ? {
                     ...program,
-                    essays: program.essays.map(essayData =>
+                    essays: program.essays.map((essayData) =>
                       essayData.promptId === activeEssayPromptId
                         ? { ...essayData, userEssay: responseData.essay }
-                        : essayData
+                        : essayData,
                     ),
                   }
-                : program
+                : program,
             ),
           };
         });
@@ -1188,11 +1435,12 @@ const ApplicationTabs = ({ university }) => {
         setHasUnsavedChanges(false);
         setLastSaved(new Date());
         lastContentRef.current = responseData.essay.content || "";
-        
+
         toast.success("Essay created successfully");
-        
+
         return responseData.essay;
       } else {
+        console.error("Failed to create essay:", responseData);
         setWorkspaceError(responseData.error || "Failed to create essay");
         toast.error(responseData.error || "Failed to create essay");
         return null;
@@ -1206,172 +1454,234 @@ const ApplicationTabs = ({ university }) => {
       setIsCreatingEssay(false);
       isUpdatingRef.current = false;
     }
-  }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded, currentProgram]);
+  }, [
+    activeProgramId,
+    activeEssayPromptId,
+    universityName,
+    isCreatingEssay,
+    userId,
+    userEmail,
+    isUniversityAdded,
+    currentProgram,
+  ]);
 
   // ========== UPDATE ESSAY CONTENT ==========
-  const updateEssayContent = useCallback((content, wordCount) => {
-    if (!isUniversityAdded) return;
+  const updateEssayContent = useCallback(
+    (content, wordCount) => {
+      if (!isUniversityAdded) return;
 
-    pendingContentRef.current = { content, wordCount };
-    isEditorActiveRef.current = true;
-    lastTypingTimeRef.current = Date.now();
-    
-    if (updateDebounceRef.current) {
-      clearTimeout(updateDebounceRef.current);
-    }
-    
-    updateDebounceRef.current = setTimeout(() => {
-      if (!pendingContentRef.current) return;
-      
-      const { content: newContent, wordCount: newWordCount } = pendingContentRef.current;
-      
-      if (!currentEssay && currentProgram?.degreeType !== "STANDALONE" && !currentProgram?.isCustom) {
-        createEssay();
-        return;
+      pendingContentRef.current = { content, wordCount };
+      isEditorActiveRef.current = true;
+      lastTypingTimeRef.current = Date.now();
+
+      if (updateDebounceRef.current) {
+        clearTimeout(updateDebounceRef.current);
       }
 
-      // Update workspace data correctly
-      setWorkspaceData((prev) => {
-        if (!prev) return prev;
-        
-        const programIndex = prev.programs.findIndex(p => p.id === activeProgramId);
-        if (programIndex === -1) return prev;
-        
-        const program = prev.programs[programIndex];
-        if (!program.essays) return prev;
-        
-        const essayIndex = program.essays.findIndex(e => e.promptId === activeEssayPromptId);
-        if (essayIndex === -1) return prev;
-        
-        const currentContent = program.essays[essayIndex].userEssay?.content;
-        if (currentContent === newContent) return prev;
-        
-        const newPrograms = [...prev.programs];
-        const newProgram = { ...program };
-        const newEssays = [...program.essays];
-        const newEssayData = { ...newEssays[essayIndex] };
-        
-        newEssayData.userEssay = {
-          ...newEssayData.userEssay,
-          content: newContent,
-          wordCount: newWordCount,
-          lastModified: new Date(),
-        };
-        
-        newEssays[essayIndex] = newEssayData;
-        newProgram.essays = newEssays;
-        newPrograms[programIndex] = newProgram;
-        
-        return { ...prev, programs: newPrograms };
-      });
-      
-      setHasUnsavedChanges(true);
-      pendingContentRef.current = null;
-      
-      setTimeout(() => {
-        isEditorActiveRef.current = false;
-      }, 100);
-    }, 600);
-  }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay, isUniversityAdded, currentProgram]);
+      updateDebounceRef.current = setTimeout(() => {
+        if (!pendingContentRef.current) return;
+
+        const { content: newContent, wordCount: newWordCount } =
+          pendingContentRef.current;
+
+        if (
+          !currentEssay &&
+          currentProgram?.degreeType !== "STANDALONE" &&
+          !currentProgram?.isCustom
+        ) {
+          createEssay();
+          return;
+        }
+
+        // Update workspace data correctly
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+
+          const programIndex = prev.programs.findIndex(
+            (p) => p.id === activeProgramId,
+          );
+          if (programIndex === -1) return prev;
+
+          const program = prev.programs[programIndex];
+          if (!program.essays) return prev;
+
+          const essayIndex = program.essays.findIndex(
+            (e) => e.promptId === activeEssayPromptId,
+          );
+          if (essayIndex === -1) return prev;
+
+          const currentContent = program.essays[essayIndex].userEssay?.content;
+          if (currentContent === newContent) return prev;
+
+          const newPrograms = [...prev.programs];
+          const newProgram = { ...program };
+          const newEssays = [...program.essays];
+          const newEssayData = { ...newEssays[essayIndex] };
+
+          newEssayData.userEssay = {
+            ...newEssayData.userEssay,
+            content: newContent,
+            wordCount: newWordCount,
+            lastModified: new Date(),
+          };
+
+          newEssays[essayIndex] = newEssayData;
+          newProgram.essays = newEssays;
+          newPrograms[programIndex] = newProgram;
+
+          return { ...prev, programs: newPrograms };
+        });
+
+        setHasUnsavedChanges(true);
+        pendingContentRef.current = null;
+
+        setTimeout(() => {
+          isEditorActiveRef.current = false;
+        }, 100);
+      }, 600);
+    },
+    [
+      currentEssay,
+      activeProgramId,
+      activeEssayPromptId,
+      createEssay,
+      isUniversityAdded,
+      currentProgram,
+    ],
+  );
 
   // ========== SAVE VERSION ==========
-  const saveVersion = useCallback(async (label) => {
-    if (!currentEssay || isSaving || isSavingVersion || !userId || !isUniversityAdded) return false;
+  const saveVersion = useCallback(
+    async (label) => {
+      if (
+        !currentEssay ||
+        isSaving ||
+        isSavingVersion ||
+        !userId ||
+        !isUniversityAdded
+      )
+        return false;
 
-    let contentToSave = currentEssay.content;
-    let wordCountToSave = currentEssay.wordCount;
-    if (pendingContentRef.current) {
-      contentToSave = pendingContentRef.current.content;
-      wordCountToSave = pendingContentRef.current.wordCount;
-    }
-
-    try {
-      setIsSavingVersion(true);
-
-      if (hasUnsavedChanges) {
-        const autoSaved = await autoSaveEssay();
-        if (!autoSaved) {
-          toast.error("Failed to save current changes");
-          return false;
-        }
+      let contentToSave = currentEssay.content;
+      let wordCountToSave = currentEssay.wordCount;
+      if (pendingContentRef.current) {
+        contentToSave = pendingContentRef.current.content;
+        wordCountToSave = pendingContentRef.current.wordCount;
       }
 
-      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-      const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
+      try {
+        setIsSavingVersion(true);
 
-      const response = await fetch(apiRoute, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "save_version",
-          essayId: currentEssay.id,
-          content: contentToSave,
-          wordCount: wordCountToSave,
-          label: label || `Version ${new Date().toLocaleString()}`,
-          isCustomEssay: isCustom,
-          userId,
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        
-        if (result.version) {
-          // Update workspace data with new version
-          setWorkspaceData((prev) => {
-            if (!prev) return prev;
-            
-            return {
-              ...prev,
-              programs: prev.programs.map(program =>
-                program.id === activeProgramId
-                  ? {
-                      ...program,
-                      essays: program.essays.map(essayData =>
-                        essayData.promptId === activeEssayPromptId
-                          ? {
-                              ...essayData,
-                              userEssay: {
-                                ...essayData.userEssay,
-                                versions: [result.version, ...(essayData.userEssay?.versions || [])],
-                                lastModified: new Date(),
-                              },
-                            }
-                          : essayData
-                      ),
-                    }
-                  : program
-              ),
-            };
-          });
+        if (hasUnsavedChanges) {
+          const autoSaved = await autoSaveEssay();
+          if (!autoSaved) {
+            toast.error("Failed to save current changes");
+            return false;
+          }
         }
 
-        toast.success("Version saved successfully");
+        const isCustom =
+          currentProgram?.degreeType === "STANDALONE" ||
+          currentProgram?.isCustom;
+        const apiRoute = isCustom
+          ? "/api/essay/independent"
+          : `/api/essay/${encodeURIComponent(universityName)}`;
 
-        // Navigate back to list view after saving version
-        setTimeout(() => {
-          setActiveView('list');
-          setOpenPanels([]);
-        }, 500);
+        const response = await fetch(apiRoute, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save_version",
+            essayId: currentEssay.id,
+            content: contentToSave,
+            wordCount: wordCountToSave,
+            label: label || `Version ${new Date().toLocaleString()}`,
+            isCustomEssay: isCustom,
+            userId,
+            userEmail,
+          }),
+        });
 
-        return true;
+        if (response.ok) {
+          const result = await response.json();
+
+          if (result.version) {
+            // Update workspace data with new version
+            setWorkspaceData((prev) => {
+              if (!prev) return prev;
+
+              return {
+                ...prev,
+                programs: prev.programs.map((program) =>
+                  program.id === activeProgramId
+                    ? {
+                        ...program,
+                        essays: program.essays.map((essayData) =>
+                          essayData.promptId === activeEssayPromptId
+                            ? {
+                                ...essayData,
+                                userEssay: {
+                                  ...essayData.userEssay,
+                                  versions: [
+                                    result.version,
+                                    ...(essayData.userEssay?.versions || []),
+                                  ],
+                                  lastModified: new Date(),
+                                },
+                              }
+                            : essayData,
+                        ),
+                      }
+                    : program,
+                ),
+              };
+            });
+          }
+
+          toast.success("Version saved successfully");
+
+          // Navigate back to list view after saving version
+          setTimeout(() => {
+            setActiveView("list");
+            setOpenPanels([]);
+          }, 500);
+
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error("Error saving version:", error);
+        toast.error("Failed to save version");
+        return false;
+      } finally {
+        setIsSavingVersion(false);
       }
-      return false;
-    } catch (error) {
-      console.error("Error saving version:", error);
-      toast.error("Failed to save version");
-      return false;
-    } finally {
-      setIsSavingVersion(false);
-    }
-  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, universityName, activeProgramId, activeEssayPromptId, userId, isUniversityAdded, currentProgram]);
+    },
+    [
+      currentEssay,
+      isSaving,
+      isSavingVersion,
+      hasUnsavedChanges,
+      autoSaveEssay,
+      universityName,
+      activeProgramId,
+      activeEssayPromptId,
+      userId,
+      userEmail,
+      isUniversityAdded,
+      currentProgram,
+    ],
+  );
 
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
-    
-    const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-    const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
-    
+
+    const isCustom =
+      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+    const apiRoute = isCustom
+      ? "/api/essay/independent"
+      : `/api/essay/${encodeURIComponent(universityName)}`;
+
     try {
       const response = await fetch(apiRoute, {
         method: "POST",
@@ -1382,6 +1692,7 @@ const ApplicationTabs = ({ university }) => {
           versionId,
           isCustomEssay: isCustom,
           userId,
+          userEmail,
         }),
       });
 
@@ -1392,11 +1703,11 @@ const ApplicationTabs = ({ university }) => {
             if (!prev) return prev;
             return {
               ...prev,
-              programs: prev.programs.map(program =>
+              programs: prev.programs.map((program) =>
                 program.id === activeProgramId
                   ? {
                       ...program,
-                      essays: program.essays.map(essayData =>
+                      essays: program.essays.map((essayData) =>
                         essayData.promptId === activeEssayPromptId
                           ? {
                               ...essayData,
@@ -1407,17 +1718,17 @@ const ApplicationTabs = ({ university }) => {
                                 lastModified: new Date(),
                               },
                             }
-                          : essayData
+                          : essayData,
                       ),
                     }
-                  : program
+                  : program,
               ),
             };
           });
           lastContentRef.current = result.essay.content;
           setHasUnsavedChanges(false);
           setLastSaved(new Date());
-          
+
           toast.success("Version restored successfully");
         }
       }
@@ -1429,10 +1740,13 @@ const ApplicationTabs = ({ university }) => {
 
   const handleDeleteVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
-    
-    const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-    const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
-    
+
+    const isCustom =
+      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+    const apiRoute = isCustom
+      ? "/api/essay/independent"
+      : `/api/essay/${encodeURIComponent(universityName)}`;
+
     try {
       const response = await fetch(apiRoute, {
         method: "POST",
@@ -1443,6 +1757,7 @@ const ApplicationTabs = ({ university }) => {
           essayId: currentEssay.id,
           isCustomEssay: isCustom,
           userId,
+          userEmail,
         }),
       });
 
@@ -1451,27 +1766,29 @@ const ApplicationTabs = ({ university }) => {
           if (!prev) return prev;
           return {
             ...prev,
-            programs: prev.programs.map(program =>
+            programs: prev.programs.map((program) =>
               program.id === activeProgramId
                 ? {
                     ...program,
-                    essays: program.essays.map(essayData =>
+                    essays: program.essays.map((essayData) =>
                       essayData.promptId === activeEssayPromptId
                         ? {
                             ...essayData,
                             userEssay: {
                               ...essayData.userEssay,
-                              versions: (essayData.userEssay?.versions || []).filter(v => v.id !== versionId),
+                              versions: (
+                                essayData.userEssay?.versions || []
+                              ).filter((v) => v.id !== versionId),
                             },
                           }
-                        : essayData
+                        : essayData,
                     ),
                   }
-                : program
+                : program,
             ),
           };
         });
-        
+
         toast.success("Version deleted successfully");
       }
     } catch (error) {
@@ -1481,161 +1798,177 @@ const ApplicationTabs = ({ university }) => {
   };
 
   // ========== HANDLERS ==========
-  const handleProgramSelect = useCallback((programId) => {
-    if (programId === activeProgramId || !isUniversityAdded) return;
+  const handleProgramSelect = useCallback(
+    (programId) => {
+      if (programId === activeProgramId || !isUniversityAdded) return;
 
-    if (updateDebounceRef.current) {
-      clearTimeout(updateDebounceRef.current);
-      updateDebounceRef.current = null;
-    }
-    pendingContentRef.current = null;
-    isEditorActiveRef.current = false;
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    setActiveProgramId(programId);
-    
-    const program = workspaceData?.programs?.find(p => p.id === programId);
-    
-    if (program?.essays?.length > 0) {
-      const firstEssay = program.essays[0];
-      setActiveEssayPromptId(firstEssay.promptId);
-      setSelectedEssayInfo({
-        title: firstEssay.promptTitle,
-        programName: program.programName || program.name,
-        isCustom: program.degreeType === "STANDALONE" || program.isCustom,
-        promptText: firstEssay.promptText,
-        wordLimit: firstEssay.wordLimit
-      });
-    } else {
-      setActiveEssayPromptId(null);
-    }
-
-    setHasUnsavedChanges(false);
-    setLastSaved(null);
-    lastContentRef.current = "";
-    setOpenPanels([]);
-  }, [activeProgramId, workspaceData, isUniversityAdded]);
-
-  const handleEssayPromptSelect = useCallback((promptId, essayInfo = null) => {
-    if (promptId === activeEssayPromptId || !isUniversityAdded) return;
-
-    if (updateDebounceRef.current) {
-      clearTimeout(updateDebounceRef.current);
-      updateDebounceRef.current = null;
-    }
-    pendingContentRef.current = null;
-    isEditorActiveRef.current = false;
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    setActiveEssayPromptId(promptId);
-    
-    // Update selected essay info immediately
-    if (essayInfo) {
-      setSelectedEssayInfo(essayInfo);
-    }
-    
-    setHasUnsavedChanges(false);
-    setLastSaved(null);
-    setOpenPanels([]);
-
-    const essayData = currentProgram?.essays?.find(e => e.promptId === promptId);
-    lastContentRef.current = essayData?.userEssay?.content || "";
-  }, [activeEssayPromptId, currentProgram, activeProgramId, isUniversityAdded]);
-
-  const handleOpenEditor = useCallback((essay, isCustom = false) => {
-    if (!isUniversityAdded) return;
-    
-    // Find the essay in workspace data
-    if (workspaceData) {
-      for (const program of workspaceData.programs) {
-        if (!program.essays || program.essays.length === 0) continue;
-        const essayData = program.essays.find(e => 
-          e.userEssay?.id === essay.id ||
-          e.promptTitle === essay.title ||
-          e.promptId === essay.id
-        );
-        if (essayData) {
-          setActiveProgramId(program.id);
-          setActiveEssayPromptId(essayData.promptId);
-          setSelectedEssayInfo({
-            title: essayData.promptTitle,
-            programName: program.programName || program.name,
-            isCustom: program.degreeType === "STANDALONE" || program.isCustom,
-            promptText: essayData.promptText,
-            wordLimit: essayData.wordLimit
-          });
-          lastContentRef.current = essayData.userEssay?.content || "";
-          setActiveView('editor');
-          setHasUnsavedChanges(false);
-          setLastSaved(null);
-          setOpenPanels([]);
-          return;
-        }
+      if (updateDebounceRef.current) {
+        clearTimeout(updateDebounceRef.current);
+        updateDebounceRef.current = null;
       }
-    }
-    
-    // If not found, create new selection
-    setSelectedEssayInfo({
-      title: essay.title || essay.promptTitle || 'Essay',
-      programName: isCustom ? 'My Custom Essays' : '',
-      isCustom: isCustom,
-      promptText: essay.text || essay.prompt || essay.promptText || '',
-      wordLimit: essay.wordLimit || 500
-    });
-    
-    // For custom essays, try to find the standalone program
-    if (isCustom && workspaceData) {
-      const standaloneProgram = workspaceData.programs.find(p => 
-        p.degreeType === "STANDALONE" || p.isCustom
+      pendingContentRef.current = null;
+      isEditorActiveRef.current = false;
+
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+
+      setActiveProgramId(programId);
+
+      const program = workspaceData?.programs?.find((p) => p.id === programId);
+
+      if (program?.essays?.length > 0) {
+        const firstEssay = program.essays[0];
+        setActiveEssayPromptId(firstEssay.promptId);
+        setSelectedEssayInfo({
+          title: firstEssay.promptTitle,
+          programName: program.programName || program.name,
+          isCustom: program.degreeType === "STANDALONE" || program.isCustom,
+          promptText: firstEssay.promptText,
+          wordLimit: firstEssay.wordLimit,
+        });
+      } else {
+        setActiveEssayPromptId(null);
+      }
+
+      setHasUnsavedChanges(false);
+      setLastSaved(null);
+      lastContentRef.current = "";
+      setOpenPanels([]);
+    },
+    [activeProgramId, workspaceData, isUniversityAdded],
+  );
+
+  const handleEssayPromptSelect = useCallback(
+    (promptId, essayInfo = null) => {
+      if (promptId === activeEssayPromptId || !isUniversityAdded) return;
+
+      if (updateDebounceRef.current) {
+        clearTimeout(updateDebounceRef.current);
+        updateDebounceRef.current = null;
+      }
+      pendingContentRef.current = null;
+      isEditorActiveRef.current = false;
+
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+
+      setActiveEssayPromptId(promptId);
+
+      // Update selected essay info immediately
+      if (essayInfo) {
+        setSelectedEssayInfo(essayInfo);
+      }
+
+      setHasUnsavedChanges(false);
+      setLastSaved(null);
+      setOpenPanels([]);
+
+      const essayData = currentProgram?.essays?.find(
+        (e) => e.promptId === promptId,
       );
-      if (standaloneProgram) {
-        setActiveProgramId(standaloneProgram.id);
-        const customEssay = standaloneProgram.essays?.find(e => e.userEssay?.id === essay.id);
-        if (customEssay) {
-          setActiveEssayPromptId(customEssay.promptId);
-          lastContentRef.current = customEssay.userEssay?.content || "";
+      lastContentRef.current = essayData?.userEssay?.content || "";
+    },
+    [activeEssayPromptId, currentProgram, activeProgramId, isUniversityAdded],
+  );
+
+  const handleOpenEditor = useCallback(
+    (essay, isCustom = false) => {
+      if (!isUniversityAdded) return;
+
+      // Find the essay in workspace data
+      if (workspaceData) {
+        for (const program of workspaceData.programs) {
+          if (!program.essays || program.essays.length === 0) continue;
+          const essayData = program.essays.find(
+            (e) =>
+              e.userEssay?.id === essay.id ||
+              e.promptTitle === essay.title ||
+              e.promptId === essay.id,
+          );
+          if (essayData) {
+            setActiveProgramId(program.id);
+            setActiveEssayPromptId(essayData.promptId);
+            setSelectedEssayInfo({
+              title: essayData.promptTitle,
+              programName: program.programName || program.name,
+              isCustom: program.degreeType === "STANDALONE" || program.isCustom,
+              promptText: essayData.promptText,
+              wordLimit: essayData.wordLimit,
+            });
+            lastContentRef.current = essayData.userEssay?.content || "";
+            setActiveView("editor");
+            setHasUnsavedChanges(false);
+            setLastSaved(null);
+            setOpenPanels([]);
+            return;
+          }
         }
       }
-    }
-    
-    setActiveView('editor');
-    setHasUnsavedChanges(false);
-    setLastSaved(null);
-    setOpenPanels([]);
-  }, [workspaceData, isUniversityAdded]);
+
+      // If not found, create new selection
+      setSelectedEssayInfo({
+        title: essay.title || essay.promptTitle || "Essay",
+        programName: isCustom ? "My Custom Essays" : "",
+        isCustom: isCustom,
+        promptText: essay.text || essay.prompt || essay.promptText || "",
+        wordLimit: essay.wordLimit || 500,
+      });
+
+      // For custom essays, try to find the standalone program
+      if (isCustom && workspaceData) {
+        const standaloneProgram = workspaceData.programs.find(
+          (p) => p.degreeType === "STANDALONE" || p.isCustom,
+        );
+        if (standaloneProgram) {
+          setActiveProgramId(standaloneProgram.id);
+          const customEssay = standaloneProgram.essays?.find(
+            (e) => e.userEssay?.id === essay.id,
+          );
+          if (customEssay) {
+            setActiveEssayPromptId(customEssay.promptId);
+            lastContentRef.current = customEssay.userEssay?.content || "";
+          }
+        }
+      }
+
+      setActiveView("editor");
+      setHasUnsavedChanges(false);
+      setLastSaved(null);
+      setOpenPanels([]);
+    },
+    [workspaceData, isUniversityAdded],
+  );
 
   const handleBackToList = useCallback(async () => {
     if (hasUnsavedChanges && isUniversityAdded) {
       await autoSaveEssay();
     }
-    setActiveView('list');
+    setActiveView("list");
     setOpenPanels([]);
     // Clear selected info when going back
     setSelectedEssayInfo({
-      title: '',
-      programName: '',
+      title: "",
+      programName: "",
       isCustom: false,
-      promptText: '',
-      wordLimit: 500
+      promptText: "",
+      wordLimit: 500,
     });
   }, [hasUnsavedChanges, isUniversityAdded, autoSaveEssay]);
 
   // ========== MEMOIZED EDITOR PROPS ==========
   const editorKey = useMemo(() => {
-    return `editor-${currentEssay?.id || 'new'}-${activeProgramId}-${activeEssayPromptId}`;
+    return `editor-${currentEssay?.id || "new"}-${activeProgramId}-${activeEssayPromptId}`;
   }, [currentEssay?.id, activeProgramId, activeEssayPromptId]);
 
+  // In ApplicationTabs, ensure content is passed correctly:
   const editorContent = useMemo(() => {
+    // Don't pass undefined - causes sync issues
     if (isEditorActiveRef.current) {
-      return undefined;
+      return currentEssay?.content || ""; // ← Use current essay content
     }
-    return currentEssay?.content || '';
+    return currentEssay?.content || "";
   }, [currentEssay?.id, currentEssay?.content]);
 
   // ========== DISPLAY TITLE ==========
@@ -1646,58 +1979,64 @@ const ApplicationTabs = ({ university }) => {
     if (currentEssayData?.promptTitle) {
       return currentEssayData.promptTitle;
     }
-    if (currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom) {
-      return 'Custom Essay';
+    if (
+      currentProgram?.degreeType === "STANDALONE" ||
+      currentProgram?.isCustom
+    ) {
+      return "Custom Essay";
     }
-    return 'Loading...';
+    return "Loading...";
   }, [selectedEssayInfo.title, currentEssayData?.promptTitle, currentProgram]);
 
   const displayProgramName = useMemo(() => {
     if (selectedEssayInfo.programName) {
       return selectedEssayInfo.programName;
     }
-    if (currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom) {
-      return 'My Custom Essays';
+    if (
+      currentProgram?.degreeType === "STANDALONE" ||
+      currentProgram?.isCustom
+    ) {
+      return "My Custom Essays";
     }
-    return currentProgram?.programName || currentProgram?.name || '';
+    return currentProgram?.programName || currentProgram?.name || "";
   }, [selectedEssayInfo.programName, currentProgram]);
 
   // ========== CUSTOM ESSAY CARD COMPONENT ==========
   const CustomEssayCard = React.memo(({ essay, index, onEdit, onDelete }) => {
-    const progress = essay.wordLimit > 0 
-      ? (essay.wordCount / essay.wordLimit) * 100 
-      : 0;
+    const progress =
+      essay.wordLimit > 0 ? (essay.wordCount / essay.wordLimit) * 100 : 0;
 
     const priorityColors = {
-      high: { 
-        bg: 'bg-red-500/20', 
-        text: 'text-red-400', 
-        border: 'border-red-400/30', 
-        dot: 'bg-red-500',
-        icon: Flame
+      high: {
+        bg: "bg-red-500/20",
+        text: "text-red-400",
+        border: "border-red-400/30",
+        dot: "bg-red-500",
+        icon: Flame,
       },
-      medium: { 
-        bg: 'bg-amber-500/20', 
-        text: 'text-amber-400', 
-        border: 'border-amber-400/30', 
-        dot: 'bg-amber-500',
-        icon: TrendingUp
+      medium: {
+        bg: "bg-amber-500/20",
+        text: "text-amber-400",
+        border: "border-amber-400/30",
+        dot: "bg-amber-500",
+        icon: TrendingUp,
       },
-      low: { 
-        bg: 'bg-green-500/20', 
-        text: 'text-green-400', 
-        border: 'border-green-400/30', 
-        dot: 'bg-green-500',
-        icon: TrendingDown
+      low: {
+        bg: "bg-green-500/20",
+        text: "text-green-400",
+        border: "border-green-400/30",
+        dot: "bg-green-500",
+        icon: TrendingDown,
       },
     };
 
-    const priorityConfig = priorityColors[essay.priority] || priorityColors.medium;
+    const priorityConfig =
+      priorityColors[essay.priority] || priorityColors.medium;
     const PriorityIcon = priorityConfig.icon;
     const StatusIcon = essay.isCompleted ? CheckCircle2 : FileText;
 
     return (
-      <div 
+      <div
         className="bg-gradient-to-r from-white/5 to-white/10 rounded-xl border border-white/20 hover:border-purple-400/50 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden"
         onClick={() => onEdit(essay)}
       >
@@ -1712,9 +2051,13 @@ const ApplicationTabs = ({ university }) => {
                   <span className="font-bold text-white text-sm bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1 rounded-lg shadow-lg shadow-purple-500/30">
                     My Custom Essay
                   </span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}
+                  >
                     <PriorityIcon className="w-3 h-3" />
-                    {essay.priority.charAt(0).toUpperCase() + essay.priority.slice(1)} Priority
+                    {essay.priority.charAt(0).toUpperCase() +
+                      essay.priority.slice(1)}{" "}
+                    Priority
                   </span>
                 </div>
                 <h4 className="font-semibold text-white text-lg truncate group-hover:text-purple-200 transition-colors">
@@ -1722,15 +2065,17 @@ const ApplicationTabs = ({ university }) => {
                 </h4>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
-                essay.isCompleted 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30' 
-                  : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
-              }`}>
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                  essay.isCompleted
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30"
+                    : "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30"
+                }`}
+              >
                 <StatusIcon className="h-3.5 w-3.5" />
-                {essay.isCompleted ? 'Completed' : 'In Progress'}
+                {essay.isCompleted ? "Completed" : "In Progress"}
               </div>
             </div>
           </div>
@@ -1758,16 +2103,24 @@ const ApplicationTabs = ({ university }) => {
               <div className="w-28 bg-white/20 rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-2 rounded-full transition-all duration-500 ${
-                    progress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
-                    progress > 0 ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-white/30'
+                    progress === 100
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                      : progress > 0
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500"
+                        : "bg-white/30"
                   }`}
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
-              <span className={`font-bold w-12 text-right ${
-                progress === 100 ? 'text-emerald-400' :
-                progress > 0 ? 'text-purple-400' : 'text-white/40'
-              }`}>
+              <span
+                className={`font-bold w-12 text-right ${
+                  progress === 100
+                    ? "text-emerald-400"
+                    : progress > 0
+                      ? "text-purple-400"
+                      : "text-white/40"
+                }`}
+              >
                 {Math.round(progress)}%
               </span>
             </div>
@@ -1785,7 +2138,7 @@ const ApplicationTabs = ({ university }) => {
               <Edit3 className="h-3.5 w-3.5 mr-1.5" />
               Open Editor
             </Button>
-            
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1802,119 +2155,144 @@ const ApplicationTabs = ({ university }) => {
     );
   });
 
-  CustomEssayCard.displayName = 'CustomEssayCard';
+  CustomEssayCard.displayName = "CustomEssayCard";
 
   // ========== ESSAY CARD COMPONENT ==========
-  const EssayCard = useCallback(({ essay, index }) => {
-    const actualProgress = getEssayProgress(essay);
-    const statusConfig = getEssayStatus(essay);
-    const EssayStatusIcon = statusConfig.icon;
+  const EssayCard = useCallback(
+    ({ essay, index }) => {
+      const actualProgress = getEssayProgress(essay);
+      const statusConfig = getEssayStatus(essay);
+      const EssayStatusIcon = statusConfig.icon;
 
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden">
-        <div className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="font-bold text-[#002147] text-sm whitespace-nowrap bg-blue-50 px-3 py-1 rounded-lg">
-                Essay {index + 1}
-              </span>
-              <h4 className="font-semibold text-gray-900 text-base truncate">
-                {essay.title}
-              </h4>
-              {essay.isMandatory && (
-                <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">
-                  Required
+      return (
+        <div className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <span className="font-bold text-[#002147] text-sm whitespace-nowrap bg-blue-50 px-3 py-1 rounded-lg">
+                  Essay {index + 1}
                 </span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.shadow}`}>
-                <EssayStatusIcon className="h-3.5 w-3.5" />
-                {statusConfig.label}
+                <h4 className="font-semibold text-gray-900 text-base truncate">
+                  {essay.title}
+                </h4>
+                {essay.isMandatory && (
+                  <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">
+                    Required
+                  </span>
+                )}
               </div>
-              {isUniversityAdded ? (
-                <Button
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenEditor(essay, false);
-                  }}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/30"
-                >
-                  <Edit3 className="h-3.5 w-3.5 mr-1.5" />
-                  Edit
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  disabled
-                  className="bg-gray-300 text-gray-500 cursor-not-allowed"
-                >
-                  <Lock className="h-3.5 w-3.5 mr-1.5" />
-                  Locked
-                </Button>
-              )}
-            </div>
-          </div>
 
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50/50 rounded-lg p-4 mb-4 border-l-4 border-[#002147]">
-            <p className="text-gray-700 text-sm leading-relaxed line-clamp-2">
-              {essay.text}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-lg">
-                <FileText className="h-3.5 w-3.5 text-gray-500" />
-                {essay.wordLimit || 500} words max
-              </span>
-              {essay.wordCount > 0 && (
-                <span className="font-semibold text-[#002147] bg-blue-50 px-3 py-1 rounded-lg">
-                  {essay.wordCount} / {essay.wordLimit || 500} words
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div className="flex items-center gap-3">
                 <div
-                  className={`h-2 rounded-full transition-all duration-500 ${
-                    actualProgress === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
-                    actualProgress > 0 ? 'bg-gradient-to-r from-blue-500 to-indigo-500' : 'bg-gray-300'
-                  }`}
-                  style={{ width: `${actualProgress}%` }}
-                />
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.shadow}`}
+                >
+                  <EssayStatusIcon className="h-3.5 w-3.5" />
+                  {statusConfig.label}
+                </div>
+                {isUniversityAdded ? (
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditor(essay, false);
+                    }}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/30"
+                  >
+                    <Edit3 className="h-3.5 w-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled
+                    className="bg-gray-300 text-gray-500 cursor-not-allowed"
+                  >
+                    <Lock className="h-3.5 w-3.5 mr-1.5" />
+                    Locked
+                  </Button>
+                )}
               </div>
-              <span className={`font-bold w-12 text-right ${
-                actualProgress === 100 ? 'text-emerald-600' :
-                actualProgress > 0 ? 'text-blue-600' : 'text-gray-400'
-              }`}>
-                {actualProgress}%
-              </span>
+            </div>
+
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50/50 rounded-lg p-4 mb-4 border-l-4 border-[#002147]">
+              <p className="text-gray-700 text-sm leading-relaxed line-clamp-2">
+                {essay.text}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-lg">
+                  <FileText className="h-3.5 w-3.5 text-gray-500" />
+                  {essay.wordLimit || 500} words max
+                </span>
+                {essay.wordCount > 0 && (
+                  <span className="font-semibold text-[#002147] bg-blue-50 px-3 py-1 rounded-lg">
+                    {essay.wordCount} / {essay.wordLimit || 500} words
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${
+                      actualProgress === 100
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                        : actualProgress > 0
+                          ? "bg-gradient-to-r from-blue-500 to-indigo-500"
+                          : "bg-gray-300"
+                    }`}
+                    style={{ width: `${actualProgress}%` }}
+                  />
+                </div>
+                <span
+                  className={`font-bold w-12 text-right ${
+                    actualProgress === 100
+                      ? "text-emerald-600"
+                      : actualProgress > 0
+                        ? "text-blue-600"
+                        : "text-gray-400"
+                  }`}
+                >
+                  {actualProgress}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }, [handleOpenEditor, isUniversityAdded]);
+      );
+    },
+    [handleOpenEditor, isUniversityAdded],
+  );
 
   // ========== HELPER FUNCTIONS ==========
   const getProgressBarColor = () => {
-    if (progressData.applicationStatus === 'submitted') return 'bg-green-500';
-    if (progressData.applicationStatus === 'in-progress') return 'bg-blue-500';
-    return 'bg-gray-400';
+    if (progressData.applicationStatus === "submitted") return "bg-green-500";
+    if (progressData.applicationStatus === "in-progress") return "bg-blue-500";
+    return "bg-gray-400";
   };
 
   const getStatusInfo = () => {
     switch (progressData.applicationStatus) {
-      case 'submitted':
-        return { text: 'Application Complete', color: 'text-green-600 bg-green-50', icon: CheckCircle2 };
-      case 'in-progress':
-        return { text: 'In Progress', color: 'text-blue-600 bg-blue-50', icon: ClockIcon };
+      case "submitted":
+        return {
+          text: "Application Complete",
+          color: "text-green-600 bg-green-50",
+          icon: CheckCircle2,
+        };
+      case "in-progress":
+        return {
+          text: "In Progress",
+          color: "text-blue-600 bg-blue-50",
+          icon: ClockIcon,
+        };
       default:
-        return { text: 'Not Started', color: 'text-gray-500 bg-gray-50', icon: CalendarIcon };
+        return {
+          text: "Not Started",
+          color: "text-gray-500 bg-gray-50",
+          icon: CalendarIcon,
+        };
     }
   };
 
@@ -1924,120 +2302,153 @@ const ApplicationTabs = ({ university }) => {
   const formatDate = (dateString) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
     } catch {
       return dateString;
     }
   };
 
-  const getStatusColors = (status, priority = 'medium') => {
+  const getStatusColors = (status, priority = "medium") => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-700';
-      case 'overdue':
-      case 'missed': return 'bg-red-100 text-red-700';
-      case 'due-today':
-      case 'today': return 'bg-orange-100 text-orange-700';
-      case 'in-progress': return 'bg-blue-100 text-blue-700';
+      case "completed":
+        return "bg-green-100 text-green-700";
+      case "overdue":
+      case "missed":
+        return "bg-red-100 text-red-700";
+      case "due-today":
+      case "today":
+        return "bg-orange-100 text-orange-700";
+      case "in-progress":
+        return "bg-blue-100 text-blue-700";
       default:
-        return priority === 'high' ? 'bg-red-100 text-red-700'
-          : priority === 'medium' ? 'bg-yellow-100 text-yellow-700'
-          : 'bg-gray-100 text-gray-700';
+        return priority === "high"
+          ? "bg-red-100 text-red-700"
+          : priority === "medium"
+            ? "bg-yellow-100 text-yellow-700"
+            : "bg-gray-100 text-gray-700";
     }
   };
 
   const getItemIcon = (item) => {
-    if (item.status === 'completed') return <CheckCircle className="h-5 w-5 text-green-600" />;
-    if (item.type === 'event') return <CalendarDays className="h-5 w-5 text-purple-600" />;
+    if (item.status === "completed")
+      return <CheckCircle className="h-5 w-5 text-green-600" />;
+    if (item.type === "event")
+      return <CalendarDays className="h-5 w-5 text-purple-600" />;
     return (
-      <Calendar className={`h-5 w-5 ${
-        item.priority === "high" ? "text-red-600"
-        : item.priority === "medium" ? "text-yellow-600"
-        : "text-blue-600"
-      }`} />
+      <Calendar
+        className={`h-5 w-5 ${
+          item.priority === "high"
+            ? "text-red-600"
+            : item.priority === "medium"
+              ? "text-yellow-600"
+              : "text-blue-600"
+        }`}
+      />
     );
   };
 
   const getEssayProgress = (essay) => {
     const hasContent = essay.wordCount && essay.wordCount > 0;
     const hasUserEssay = essay.userEssayId || essay.hasUserContent;
-    
+
     if (!hasContent && !hasUserEssay) {
       return 0;
     }
-    
-    if (essay.status === 'COMPLETED' || essay.status === 'completed' || essay.isComplete) {
+
+    if (
+      essay.status === "COMPLETED" ||
+      essay.status === "completed" ||
+      essay.isComplete
+    ) {
       return 100;
     }
-    
+
     if (essay.wordCount > 0 && essay.wordLimit > 0) {
-      return Math.min(Math.round((essay.wordCount / essay.wordLimit) * 100), 100);
+      return Math.min(
+        Math.round((essay.wordCount / essay.wordLimit) * 100),
+        100,
+      );
     }
-    
+
     return 0;
   };
 
   const getEssayStatus = (essay) => {
     const hasContent = essay.wordCount && essay.wordCount > 0;
-    
-    if (essay.status === 'COMPLETED' || essay.status === 'completed' || essay.isComplete) {
-      return { 
-        bg: "bg-gradient-to-r from-emerald-500 to-teal-500", 
-        text: "text-white", 
-        label: "Completed", 
+
+    if (
+      essay.status === "COMPLETED" ||
+      essay.status === "completed" ||
+      essay.isComplete
+    ) {
+      return {
+        bg: "bg-gradient-to-r from-emerald-500 to-teal-500",
+        text: "text-white",
+        label: "Completed",
         icon: CheckCircle,
-        shadow: "shadow-lg shadow-emerald-500/30"
+        shadow: "shadow-lg shadow-emerald-500/30",
       };
     }
-    
-    if (essay.status === 'IN_PROGRESS' || essay.status === 'in-progress' || hasContent) {
-      return { 
-        bg: "bg-gradient-to-r from-blue-500 to-indigo-500", 
-        text: "text-white", 
-        label: "In Progress", 
+
+    if (
+      essay.status === "IN_PROGRESS" ||
+      essay.status === "in-progress" ||
+      hasContent
+    ) {
+      return {
+        bg: "bg-gradient-to-r from-blue-500 to-indigo-500",
+        text: "text-white",
+        label: "In Progress",
         icon: Clock,
-        shadow: "shadow-lg shadow-blue-500/30"
+        shadow: "shadow-lg shadow-blue-500/30",
       };
     }
-    
-    if (essay.status === 'DRAFT') {
-      return { 
-        bg: "bg-gradient-to-r from-amber-500 to-orange-500", 
-        text: "text-white", 
-        label: "Draft", 
+
+    if (essay.status === "DRAFT") {
+      return {
+        bg: "bg-gradient-to-r from-amber-500 to-orange-500",
+        text: "text-white",
+        label: "Draft",
         icon: FileText,
-        shadow: "shadow-lg shadow-amber-500/30"
+        shadow: "shadow-lg shadow-amber-500/30",
       };
     }
-    
-    return { 
-      bg: "bg-gradient-to-r from-slate-600 to-slate-700", 
-      text: "text-white", 
-      label: "Not Started", 
+
+    return {
+      bg: "bg-gradient-to-r from-slate-600 to-slate-700",
+      text: "text-white",
+      label: "Not Started",
       icon: FileText,
-      shadow: "shadow-lg shadow-slate-500/30"
+      shadow: "shadow-lg shadow-slate-500/30",
     };
   };
 
   // ========== RENDER PANELS ==========
   const renderPanels = () => {
-    if (!currentEssay || openPanels.length === 0 || !isUniversityAdded) return null;
+    if (!currentEssay || openPanels.length === 0 || !isUniversityAdded)
+      return null;
 
-    const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+    const isCustom =
+      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
 
     return (
       <>
-        <Panel 
-          name="versions" 
-          title="Version History" 
+        <Panel
+          name="versions"
+          title="Version History"
           icon={Layers}
           iconColor="from-blue-500/20 to-cyan-500/20"
-          isOpen={isPanelOpen('versions')}
-          onClose={() => closePanel('versions')}
+          isOpen={isPanelOpen("versions")}
+          onClose={() => closePanel("versions")}
         >
           <Suspense fallback={<PanelLoader />}>
             <VersionManager
               versions={currentEssay.versions || []}
-              currentContent={currentEssay.content || ''}
+              currentContent={currentEssay.content || ""}
               onRestoreVersion={handleRestoreVersion}
               onDeleteVersion={handleDeleteVersion}
               essayId={currentEssay.id}
@@ -2047,24 +2458,28 @@ const ApplicationTabs = ({ university }) => {
           </Suspense>
         </Panel>
 
-        <Panel 
-          name="analytics" 
-          title="Essay Analytics" 
+        <Panel
+          name="analytics"
+          title="Essay Analytics"
           icon={PieChart}
           iconColor="from-purple-500/20 to-pink-500/20"
-          isOpen={isPanelOpen('analytics')}
-          onClose={() => closePanel('analytics')}
+          isOpen={isPanelOpen("analytics")}
+          onClose={() => closePanel("analytics")}
         >
           <Suspense fallback={<PanelLoader />}>
             <EssayAnalytics
               essay={{
                 ...currentEssay,
-                wordLimit: currentEssayData?.wordLimit || selectedEssayInfo.wordLimit,
-                priority: currentEssayData?.priority
+                wordLimit:
+                  currentEssayData?.wordLimit || selectedEssayInfo.wordLimit,
+                priority: currentEssayData?.priority,
               }}
-              allEssays={isCustom 
-                ? customEssays 
-                : programsWithEssays.flatMap(p => p.essays.map(e => e.userEssay).filter(Boolean))
+              allEssays={
+                isCustom
+                  ? customEssays
+                  : programsWithEssays.flatMap((p) =>
+                      p.essays.map((e) => e.userEssay).filter(Boolean),
+                    )
               }
               essayId={currentEssay.id}
               userId={userId}
@@ -2073,19 +2488,23 @@ const ApplicationTabs = ({ university }) => {
           </Suspense>
         </Panel>
 
-        <Panel 
-          name="ai" 
-          title="AI Assistant" 
+        <Panel
+          name="ai"
+          title="AI Assistant"
           icon={Brain}
           iconColor="from-amber-500/20 to-orange-500/20"
-          isOpen={isPanelOpen('ai')}
-          onClose={() => closePanel('ai')}
+          isOpen={isPanelOpen("ai")}
+          onClose={() => closePanel("ai")}
         >
           <AISuggestions
-            content={currentEssay.content || ''}
-            prompt={currentEssayData?.promptText || selectedEssayInfo.promptText}
+            content={currentEssay.content || ""}
+            prompt={
+              currentEssayData?.promptText || selectedEssayInfo.promptText
+            }
             wordCount={currentEssay.wordCount || 0}
-            wordLimit={currentEssayData?.wordLimit || selectedEssayInfo.wordLimit}
+            wordLimit={
+              currentEssayData?.wordLimit || selectedEssayInfo.wordLimit
+            }
             essayId={currentEssay.id}
             universityName={universityName}
             currentVersionId={null}
@@ -2100,13 +2519,19 @@ const ApplicationTabs = ({ university }) => {
   // ========== UNIQUE CUSTOM ESSAYS ==========
   const uniqueCustomEssays = useMemo(() => {
     return Array.from(
-      new Map(customEssays.map(essay => [essay.id, essay])).values()
+      new Map(customEssays.map((essay) => [essay.id, essay])).values(),
     );
   }, [customEssays]);
 
   // ========== EFFECTS ==========
   useEffect(() => {
-    if (!hasUnsavedChanges || !currentEssay || isSaving || activeView !== 'editor' || !isUniversityAdded) {
+    if (
+      !hasUnsavedChanges ||
+      !currentEssay ||
+      isSaving ||
+      activeView !== "editor" ||
+      !isUniversityAdded
+    ) {
       return;
     }
 
@@ -2118,13 +2543,33 @@ const ApplicationTabs = ({ university }) => {
     }, 25000);
 
     return () => clearTimeout(timerId);
-  }, [hasUnsavedChanges, currentEssay?.id, isSaving, activeView, autoSaveEssay, isUniversityAdded]);
+  }, [
+    hasUnsavedChanges,
+    currentEssay?.id,
+    isSaving,
+    activeView,
+    autoSaveEssay,
+    isUniversityAdded,
+  ]);
 
   useEffect(() => {
-    if (activeView === 'editor' && !workspaceData && universityName && userId && isUniversityAdded) {
+    if (
+      activeView === "editor" &&
+      !workspaceData &&
+      universityName &&
+      userId &&
+      isUniversityAdded
+    ) {
       fetchWorkspaceData();
     }
-  }, [activeView, workspaceData, universityName, userId, fetchWorkspaceData, isUniversityAdded]);
+  }, [
+    activeView,
+    workspaceData,
+    universityName,
+    userId,
+    fetchWorkspaceData,
+    isUniversityAdded,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -2141,7 +2586,7 @@ const ApplicationTabs = ({ university }) => {
   }, []);
 
   // ========== RENDER ==========
-  if (sessionStatus === 'loading') {
+  if (sessionStatus === "loading") {
     return (
       <div className="my-20">
         <Card className="bg-[#002147] shadow-xl border-0 overflow-hidden">
@@ -2171,7 +2616,7 @@ const ApplicationTabs = ({ university }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(255, 255, 255, 0.3);
         }
-        
+
         /* Fix for select dropdown visibility */
         select {
           color: white !important;
@@ -2188,7 +2633,17 @@ const ApplicationTabs = ({ university }) => {
           display: none;
         }
       `}</style>
-      
+
+      {/* Debug Panel (Development Only) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="fixed bottom-4 right-4 bg-black/80 text-xs text-white p-2 rounded-lg z-50 opacity-50 hover:opacity-100 transition-opacity">
+          <div>Session: {sessionStatus}</div>
+          <div>User ID: {userId ? "✓" : "✗"}</div>
+          <div>User Email: {userEmail ? "✓" : "✗"}</div>
+          <div>University Added: {isUniversityAdded ? "✓" : "✗"}</div>
+        </div>
+      )}
+
       <Card className="bg-[#002147] shadow-xl hover:shadow-2xl transition-all duration-500 border-0 overflow-hidden">
         <CardContent className="p-0">
           {/* Header Section */}
@@ -2196,7 +2651,7 @@ const ApplicationTabs = ({ university }) => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center mb-3">
-                  {activeView === 'editor' && (
+                  {activeView === "editor" && (
                     <button
                       onClick={handleBackToList}
                       className="mr-3 p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -2206,17 +2661,18 @@ const ApplicationTabs = ({ university }) => {
                   )}
                   <div className="w-1 h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-4"></div>
                   <h2 className="text-2xl font-bold tracking-tight text-white">
-                    {activeView === 'editor' ? 'Essay Editor' : 'Application Workspace'}
+                    {activeView === "editor"
+                      ? "Essay Editor"
+                      : "Application Workspace"}
                   </h2>
                   {!isUniversityAdded && (
                     <Lock className="w-5 h-5 ml-3 text-white/60" />
                   )}
                 </div>
                 <p className="text-white/80 text-sm font-medium">
-                  {activeView === 'editor' 
+                  {activeView === "editor"
                     ? `Editing: ${displayTitle}`
-                    : `Your personalized application center for ${universityName || 'this university'}`
-                  }
+                    : `Your personalized application center for ${universityName || "this university"}`}
                 </p>
               </div>
 
@@ -2224,11 +2680,18 @@ const ApplicationTabs = ({ university }) => {
               {isUniversityAdded && (
                 <div className="hidden md:flex items-center space-x-4">
                   <div className="text-right text-sm">
-                    <div className="text-white font-semibold">Application Progress</div>
-                    <div className="text-white/70">{progressData.overallProgress}% Complete</div>
+                    <div className="text-white font-semibold">
+                      Application Progress
+                    </div>
+                    <div className="text-white/70">
+                      {progressData.overallProgress}% Complete
+                    </div>
                   </div>
                   <div className="w-16 h-16 relative">
-                    <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+                    <svg
+                      className="w-16 h-16 transform -rotate-90"
+                      viewBox="0 0 36 36"
+                    >
                       <path
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
@@ -2244,14 +2707,22 @@ const ApplicationTabs = ({ university }) => {
                         strokeLinecap="round"
                       />
                       <defs>
-                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <linearGradient
+                          id="progressGradient"
+                          x1="0%"
+                          y1="0%"
+                          x2="100%"
+                          y2="0%"
+                        >
                           <stop offset="0%" stopColor="#60A5FA" />
                           <stop offset="100%" stopColor="#34D399" />
                         </linearGradient>
                       </defs>
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">{progressData.overallProgress}%</span>
+                      <span className="text-white font-bold text-sm">
+                        {progressData.overallProgress}%
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2268,11 +2739,13 @@ const ApplicationTabs = ({ university }) => {
                       {statusInfo.text}
                     </span>
                   </div>
-                  <span className="text-sm font-bold text-white">{progressData.overallProgress}%</span>
+                  <span className="text-sm font-bold text-white">
+                    {progressData.overallProgress}%
+                  </span>
                 </div>
 
                 <div className="w-full h-2.5 bg-white/20 rounded-full mb-3 overflow-hidden">
-                  <div 
+                  <div
                     className={`h-2.5 rounded-full transition-all duration-500 ${getProgressBarColor()}`}
                     style={{ width: `${progressData.overallProgress}%` }}
                   />
@@ -2281,11 +2754,15 @@ const ApplicationTabs = ({ university }) => {
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div className="text-center text-white p-2 bg-white/5 rounded-lg">
                     <div className="font-semibold">Essays</div>
-                    <div className="text-white/70 text-lg font-bold">{progressData.completedEssays}/{progressData.totalEssays}</div>
+                    <div className="text-white/70 text-lg font-bold">
+                      {progressData.completedEssays}/{progressData.totalEssays}
+                    </div>
                   </div>
                   <div className="text-center text-white p-2 bg-white/5 rounded-lg">
                     <div className="font-semibold">Tasks</div>
-                    <div className="text-white/70 text-lg font-bold">{progressData.completedTasks}/{progressData.totalTasks}</div>
+                    <div className="text-white/70 text-lg font-bold">
+                      {progressData.completedTasks}/{progressData.totalTasks}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2294,7 +2771,7 @@ const ApplicationTabs = ({ university }) => {
 
           {/* Main Content */}
           <div className="p-6 space-y-8">
-            {activeView === 'list' ? (
+            {activeView === "list" ? (
               // ========== LIST VIEW ==========
               <Tabs defaultValue="essays" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 h-14">
@@ -2335,9 +2812,12 @@ const ApplicationTabs = ({ university }) => {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="text-2xl font-bold text-white">Essay Requirements</h3>
+                          <h3 className="text-2xl font-bold text-white">
+                            Essay Requirements
+                          </h3>
                           <p className="text-white/80 text-sm mt-1">
-                            {progressData.totalEssays} essays • {progressData.completedEssays} completed
+                            {progressData.totalEssays} essays •{" "}
+                            {progressData.completedEssays} completed
                           </p>
                         </div>
                         <Button
@@ -2354,9 +2834,12 @@ const ApplicationTabs = ({ university }) => {
                         <div className="space-y-4">
                           <div className="flex items-center space-x-2 mb-2">
                             <Sparkles className="h-5 w-5 text-purple-400" />
-                            <h4 className="text-lg font-semibold text-white">My Custom Essays</h4>
+                            <h4 className="text-lg font-semibold text-white">
+                              My Custom Essays
+                            </h4>
                             <span className="text-xs text-white/60 bg-purple-500/20 px-2 py-1 rounded-full">
-                              {uniqueCustomEssays.length} essay{uniqueCustomEssays.length !== 1 ? 's' : ''}
+                              {uniqueCustomEssays.length} essay
+                              {uniqueCustomEssays.length !== 1 ? "s" : ""}
                             </span>
                           </div>
                           {uniqueCustomEssays.map((essay, index) => (
@@ -2365,7 +2848,9 @@ const ApplicationTabs = ({ university }) => {
                               essay={essay}
                               index={index}
                               onEdit={(essay) => handleOpenEditor(essay, true)}
-                              onDelete={(essayId) => handleDeleteCustomEssay(essayId)}
+                              onDelete={(essayId) =>
+                                handleDeleteCustomEssay(essayId)
+                              }
                             />
                           ))}
                         </div>
@@ -2376,14 +2861,20 @@ const ApplicationTabs = ({ university }) => {
                         {uniqueCustomEssays.length > 0 && (
                           <div className="flex items-center space-x-2 mb-2">
                             <BookOpen className="h-5 w-5 text-blue-400" />
-                            <h4 className="text-lg font-semibold text-white">University Essay Prompts</h4>
+                            <h4 className="text-lg font-semibold text-white">
+                              University Essay Prompts
+                            </h4>
                             <span className="text-xs text-white/60 bg-blue-500/20 px-2 py-1 rounded-full">
-                              {university?.allEssayPrompts?.length || 0} essay{(university?.allEssayPrompts?.length || 0) !== 1 ? 's' : ''}
+                              {university?.allEssayPrompts?.length || 0} essay
+                              {(university?.allEssayPrompts?.length || 0) !== 1
+                                ? "s"
+                                : ""}
                             </span>
                           </div>
                         )}
-                        
-                        {university?.allEssayPrompts && university.allEssayPrompts.length > 0 ? (
+
+                        {university?.allEssayPrompts &&
+                        university.allEssayPrompts.length > 0 ? (
                           <div className="space-y-4">
                             {university.allEssayPrompts.map((essay, index) => (
                               <EssayCard
@@ -2396,8 +2887,12 @@ const ApplicationTabs = ({ university }) => {
                         ) : (
                           <div className="text-center py-12 bg-white/5 rounded-xl">
                             <FileText className="h-12 w-12 text-white/40 mx-auto mb-3" />
-                            <h4 className="text-lg font-semibold text-white mb-1">No Essay Prompts</h4>
-                            <p className="text-white/60 text-sm">Essays will appear when available</p>
+                            <h4 className="text-lg font-semibold text-white mb-1">
+                              No Essay Prompts
+                            </h4>
+                            <p className="text-white/60 text-sm">
+                              Essays will appear when available
+                            </p>
                           </div>
                         )}
                       </div>
@@ -2418,9 +2913,12 @@ const ApplicationTabs = ({ university }) => {
                     <div className="space-y-6">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                          <h3 className="text-2xl font-bold text-white">Tasks & Events</h3>
+                          <h3 className="text-2xl font-bold text-white">
+                            Tasks & Events
+                          </h3>
                           <p className="text-white text-sm mt-1">
-                            {progressData.completedTasks} of {progressData.totalTasks} tasks completed
+                            {progressData.completedTasks} of{" "}
+                            {progressData.totalTasks} tasks completed
                           </p>
                         </div>
                         <Button
@@ -2436,9 +2934,12 @@ const ApplicationTabs = ({ university }) => {
                         {tasksAndEvents.length === 0 ? (
                           <div className="text-center py-12">
                             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <h4 className="text-lg font-semibold text-white mb-2">No Tasks or Events</h4>
+                            <h4 className="text-lg font-semibold text-white mb-2">
+                              No Tasks or Events
+                            </h4>
                             <p className="text-gray-300 mb-6">
-                              Your application tasks and events will appear here.
+                              Your application tasks and events will appear
+                              here.
                             </p>
                           </div>
                         ) : (
@@ -2448,13 +2949,19 @@ const ApplicationTabs = ({ university }) => {
                               className="flex items-center justify-between p-6 border-2 border-gray-100 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-gray-50"
                             >
                               <div className="flex items-center space-x-4">
-                                <div className={`p-3 rounded-xl ${
-                                  item.status === "completed" ? "bg-green-100"
-                                  : item.type === "event" ? "bg-purple-100"
-                                  : item.priority === "high" ? "bg-red-100"
-                                  : item.priority === "medium" ? "bg-yellow-100"
-                                  : "bg-blue-100"
-                                }`}>
+                                <div
+                                  className={`p-3 rounded-xl ${
+                                    item.status === "completed"
+                                      ? "bg-green-100"
+                                      : item.type === "event"
+                                        ? "bg-purple-100"
+                                        : item.priority === "high"
+                                          ? "bg-red-100"
+                                          : item.priority === "medium"
+                                            ? "bg-yellow-100"
+                                            : "bg-blue-100"
+                                  }`}
+                                >
                                   {getItemIcon(item)}
                                 </div>
 
@@ -2462,30 +2969,43 @@ const ApplicationTabs = ({ university }) => {
                                   <div className="font-bold text-[#002147] text-lg flex items-center space-x-2">
                                     <span>{item.task}</span>
                                     {item.type === "event" && (
-                                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">EVENT</span>
+                                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                                        EVENT
+                                      </span>
                                     )}
                                   </div>
                                   <div className="text-sm text-gray-500 flex items-center space-x-4 flex-wrap gap-2">
                                     <span>{formatDate(item.date)}</span>
                                     {item.time && <span>• {item.time}</span>}
-                                    {item.daysLeft !== undefined && item.status !== "completed" && (
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        item.daysLeft <= 0 ? "bg-red-100 text-red-700"
-                                        : item.daysLeft <= 7 ? "bg-orange-100 text-orange-700"
-                                        : "bg-blue-100 text-blue-700"
-                                      }`}>
-                                        <Timer className="h-3 w-3 mr-1 inline" />
-                                        {item.daysLeft === 0 ? "Due today"
-                                          : item.daysLeft < 0 ? `${Math.abs(item.daysLeft)} days overdue`
-                                          : `${item.daysLeft} days left`}
-                                      </span>
-                                    )}
+                                    {item.daysLeft !== undefined &&
+                                      item.status !== "completed" && (
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            item.daysLeft <= 0
+                                              ? "bg-red-100 text-red-700"
+                                              : item.daysLeft <= 7
+                                                ? "bg-orange-100 text-orange-700"
+                                                : "bg-blue-100 text-blue-700"
+                                          }`}
+                                        >
+                                          <Timer className="h-3 w-3 mr-1 inline" />
+                                          {item.daysLeft === 0
+                                            ? "Due today"
+                                            : item.daysLeft < 0
+                                              ? `${Math.abs(item.daysLeft)} days overdue`
+                                              : `${item.daysLeft} days left`}
+                                        </span>
+                                      )}
                                   </div>
                                 </div>
                               </div>
 
-                              <span className={`px-4 py-2 text-sm rounded-full font-medium ${getStatusColors(item.status, item.priority)}`}>
-                                {item.status === "completed" && <CheckCircle className="h-4 w-4 mr-1 inline" />}
+                              <span
+                                className={`px-4 py-2 text-sm rounded-full font-medium ${getStatusColors(item.status, item.priority)}`}
+                              >
+                                {item.status === "completed" && (
+                                  <CheckCircle className="h-4 w-4 mr-1 inline" />
+                                )}
                                 {item.status.replace("-", " ")}
                               </span>
                             </div>
@@ -2508,12 +3028,17 @@ const ApplicationTabs = ({ university }) => {
                   />
                 ) : (
                   <>
-                    {!userId && sessionStatus === 'authenticated' && (
+                    {!userId && sessionStatus === "authenticated" && (
                       <div className="bg-amber-500/20 border border-amber-400/30 rounded-xl p-4 flex items-center">
                         <AlertCircle className="w-5 h-5 text-amber-400 mr-3" />
                         <div>
-                          <p className="text-amber-200 font-medium">Session issue detected</p>
-                          <p className="text-amber-300/70 text-sm">User ID not found. Try refreshing or signing out and back in.</p>
+                          <p className="text-amber-200 font-medium">
+                            Session issue detected
+                          </p>
+                          <p className="text-amber-300/70 text-sm">
+                            User ID not found. Try refreshing or signing out and
+                            back in.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -2521,22 +3046,33 @@ const ApplicationTabs = ({ university }) => {
                     {workspaceLoading && !currentEssayData ? (
                       <div className="flex items-center justify-center py-12">
                         <Loader2 className="w-8 h-8 animate-spin text-white" />
-                        <span className="ml-3 text-white">Loading workspace...</span>
+                        <span className="ml-3 text-white">
+                          Loading workspace...
+                        </span>
                       </div>
                     ) : workspaceError ? (
                       <div className="text-center py-12">
                         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold text-white mb-2">Error Loading Workspace</h4>
+                        <h4 className="text-lg font-semibold text-white mb-2">
+                          Error Loading Workspace
+                        </h4>
                         <p className="text-white/60 mb-4">{workspaceError}</p>
-                        <Button onClick={fetchWorkspaceData} className="bg-blue-500 hover:bg-blue-600">
+                        <Button
+                          onClick={fetchWorkspaceData}
+                          className="bg-blue-500 hover:bg-blue-600"
+                        >
                           Try Again
                         </Button>
                       </div>
                     ) : !userId ? (
                       <div className="text-center py-12">
                         <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold text-white mb-2">Authentication Required</h4>
-                        <p className="text-white/60 mb-4">Please sign in to access the essay editor.</p>
+                        <h4 className="text-lg font-semibold text-white mb-2">
+                          Authentication Required
+                        </h4>
+                        <p className="text-white/60 mb-4">
+                          Please sign in to access the essay editor.
+                        </p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-12 gap-6">
@@ -2547,117 +3083,173 @@ const ApplicationTabs = ({ university }) => {
                               <div className="p-2 bg-blue-500/20 rounded-lg">
                                 <BookOpen className="w-5 h-5 text-blue-400" />
                               </div>
-                              <h3 className="font-bold text-white">Programs & Essays</h3>
+                              <h3 className="font-bold text-white">
+                                Programs & Essays
+                              </h3>
                             </div>
 
                             <div className="space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-1">
                               {/* Custom Essays Section */}
                               {uniqueCustomEssays.length > 0 && (
                                 <div className="space-y-1 mb-3">
-                                  <div 
+                                  <div
                                     onClick={() => {
-                                      const standaloneProgram = workspaceData?.programs?.find(p => 
-                                        p.degreeType === "STANDALONE" || p.isCustom
-                                      );
+                                      const standaloneProgram =
+                                        workspaceData?.programs?.find(
+                                          (p) =>
+                                            p.degreeType === "STANDALONE" ||
+                                            p.isCustom,
+                                        );
                                       if (standaloneProgram) {
-                                        handleProgramSelect(standaloneProgram.id);
+                                        handleProgramSelect(
+                                          standaloneProgram.id,
+                                        );
                                       }
                                     }}
                                     className={`px-2 py-2 flex items-center space-x-2 cursor-pointer rounded-lg transition-all ${
-                                      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom
-                                        ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-purple-400' 
-                                        : 'hover:bg-white/10 border-l-4 border-transparent'
+                                      currentProgram?.degreeType ===
+                                        "STANDALONE" || currentProgram?.isCustom
+                                        ? "bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-purple-400"
+                                        : "hover:bg-white/10 border-l-4 border-transparent"
                                     }`}
                                   >
                                     <Sparkles className="w-4 h-4 text-purple-400" />
-                                    <span className="text-sm font-semibold text-white">My Custom Essays</span>
+                                    <span className="text-sm font-semibold text-white">
+                                      My Custom Essays
+                                    </span>
                                     <span className="text-xs text-white/40 bg-purple-500/20 px-1.5 py-0.5 rounded-full ml-auto">
                                       {uniqueCustomEssays.length}
                                     </span>
                                   </div>
-                                  {(currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom) && workspaceData?.programs?.find(p => p.id === activeProgramId)?.essays?.map((essay) => (
-                                    <div
-                                      key={`custom-essay-${essay.promptId}-${essay.programId || ''}`}
-                                      onClick={() => handleEssayPromptSelect(essay.promptId, {
-                                        title: essay.promptTitle,
-                                        programName: 'My Custom Essays',
-                                        isCustom: true,
-                                        promptText: essay.promptText,
-                                        wordLimit: essay.wordLimit
-                                      })}
-                                      className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
-                                        activeEssayPromptId === essay.promptId
-                                          ? 'bg-gradient-to-r from-purple-500/50 to-pink-500/30 border-l-2 border-pink-400'
-                                          : 'hover:bg-white/10 border-l-2 border-white/10'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-white/90 truncate flex-1">{essay.promptTitle}</span>
-                                        {essay.userEssay?.wordCount > 0 && (
-                                          <span className="text-purple-400 text-[10px] ml-2 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">
-                                            {Math.round((essay.userEssay.wordCount / essay.wordLimit) * 100)}%
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
+                                  {(currentProgram?.degreeType ===
+                                    "STANDALONE" ||
+                                    currentProgram?.isCustom) &&
+                                    workspaceData?.programs
+                                      ?.find((p) => p.id === activeProgramId)
+                                      ?.essays?.map((essay) => (
+                                        <div
+                                          key={`custom-essay-${essay.promptId}-${essay.programId || ""}`}
+                                          onClick={() =>
+                                            handleEssayPromptSelect(
+                                              essay.promptId,
+                                              {
+                                                title: essay.promptTitle,
+                                                programName: "My Custom Essays",
+                                                isCustom: true,
+                                                promptText: essay.promptText,
+                                                wordLimit: essay.wordLimit,
+                                              },
+                                            )
+                                          }
+                                          className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
+                                            activeEssayPromptId ===
+                                            essay.promptId
+                                              ? "bg-gradient-to-r from-purple-500/50 to-pink-500/30 border-l-2 border-pink-400"
+                                              : "hover:bg-white/10 border-l-2 border-white/10"
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-white/90 truncate flex-1">
+                                              {essay.promptTitle}
+                                            </span>
+                                            {essay.userEssay?.wordCount > 0 && (
+                                              <span className="text-purple-400 text-[10px] ml-2 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">
+                                                {Math.round(
+                                                  (essay.userEssay.wordCount /
+                                                    essay.wordLimit) *
+                                                    100,
+                                                )}
+                                                %
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
                                 </div>
                               )}
 
                               {/* Regular Programs */}
-                              {programsWithEssays.length === 0 && uniqueCustomEssays.length === 0 ? (
+                              {programsWithEssays.length === 0 &&
+                              uniqueCustomEssays.length === 0 ? (
                                 <div className="text-center py-6">
                                   <FileText className="w-8 h-8 text-white/30 mx-auto mb-2" />
-                                  <p className="text-sm text-white/50">No programs with essays</p>
+                                  <p className="text-sm text-white/50">
+                                    No programs with essays
+                                  </p>
                                 </div>
                               ) : (
                                 programsWithEssays.map((program) => (
                                   <div key={program.id} className="space-y-1">
                                     <div
-                                      onClick={() => handleProgramSelect(program.id)}
+                                      onClick={() =>
+                                        handleProgramSelect(program.id)
+                                      }
                                       className={`p-3 rounded-xl cursor-pointer transition-all text-sm ${
-                                        activeProgramId === program.id && program.degreeType !== "STANDALONE"
-                                          ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border-l-4 border-blue-400 shadow-lg'
-                                          : 'hover:bg-white/10 border-l-4 border-transparent'
+                                        activeProgramId === program.id &&
+                                        program.degreeType !== "STANDALONE"
+                                          ? "bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border-l-4 border-blue-400 shadow-lg"
+                                          : "hover:bg-white/10 border-l-4 border-transparent"
                                       }`}
                                     >
                                       <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-white">{program.programName || program.name}</span>
+                                        <span className="font-semibold text-white">
+                                          {program.programName || program.name}
+                                        </span>
                                         <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60">
                                           {program.essays?.length || 0}
                                         </span>
                                       </div>
                                     </div>
 
-                                    {activeProgramId === program.id && program.essays?.map((essayData) => {
-                                      const hasContent = essayData.userEssay?.wordCount > 0;
-                                      return (
-                                        <div
-                                          key={`regular-${essayData.promptId}-${program.id}`}
-                                          onClick={() => handleEssayPromptSelect(essayData.promptId, {
-                                            title: essayData.promptTitle,
-                                            programName: program.programName || program.name,
-                                            isCustom: false,
-                                            promptText: essayData.promptText,
-                                            wordLimit: essayData.wordLimit
-                                          })}
-                                          className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
-                                            activeEssayPromptId === essayData.promptId
-                                              ? 'bg-gradient-to-r from-blue-500/50 to-cyan-500/30 border-l-2 border-cyan-400'
-                                              : 'hover:bg-white/10 border-l-2 border-white/10'
-                                          }`}
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-white/90 truncate flex-1">{essayData.promptTitle}</span>
-                                            {hasContent && (
-                                              <span className="text-emerald-400 text-[10px] ml-2 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
-                                                {Math.round((essayData.userEssay.wordCount / essayData.wordLimit) * 100)}%
+                                    {activeProgramId === program.id &&
+                                      program.essays?.map((essayData) => {
+                                        const hasContent =
+                                          essayData.userEssay?.wordCount > 0;
+                                        return (
+                                          <div
+                                            key={`regular-${essayData.promptId}-${program.id}`}
+                                            onClick={() =>
+                                              handleEssayPromptSelect(
+                                                essayData.promptId,
+                                                {
+                                                  title: essayData.promptTitle,
+                                                  programName:
+                                                    program.programName ||
+                                                    program.name,
+                                                  isCustom: false,
+                                                  promptText:
+                                                    essayData.promptText,
+                                                  wordLimit:
+                                                    essayData.wordLimit,
+                                                },
+                                              )
+                                            }
+                                            className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
+                                              activeEssayPromptId ===
+                                              essayData.promptId
+                                                ? "bg-gradient-to-r from-blue-500/50 to-cyan-500/30 border-l-2 border-cyan-400"
+                                                : "hover:bg-white/10 border-l-2 border-white/10"
+                                            }`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-white/90 truncate flex-1">
+                                                {essayData.promptTitle}
                                               </span>
-                                            )}
+                                              {hasContent && (
+                                                <span className="text-emerald-400 text-[10px] ml-2 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                                                  {Math.round(
+                                                    (essayData.userEssay
+                                                      .wordCount /
+                                                      essayData.wordLimit) *
+                                                      100,
+                                                  )}
+                                                  %
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      })}
                                   </div>
                                 ))
                               )}
@@ -2667,31 +3259,34 @@ const ApplicationTabs = ({ university }) => {
 
                         {/* Main Editor Area */}
                         <div className="col-span-12 lg:col-span-9">
-                          {(currentEssayData || selectedEssayInfo.title) ? (
+                          {currentEssayData || selectedEssayInfo.title ? (
                             <div className="space-y-5">
                               {/* Essay Header with Panel Toggles */}
                               <div className="flex items-center justify-between flex-wrap gap-3">
                                 <div>
-                                  <h3 className="text-xl font-bold text-white">{displayTitle}</h3>
+                                  <h3 className="text-xl font-bold text-white">
+                                    {displayTitle}
+                                  </h3>
                                   <p className="text-sm text-white/60">
                                     {displayProgramName}
                                     {selectedEssayInfo.isCustom && (
                                       <span className="ml-2 inline-flex items-center gap-1 text-purple-400">
-                                        <Sparkles className="w-3 h-3" /> My Custom Essay
+                                        <Sparkles className="w-3 h-3" /> My
+                                        Custom Essay
                                       </span>
                                     )}
                                   </p>
                                 </div>
-                                
+
                                 {/* Panel Toggle Buttons */}
                                 {currentEssay && (
                                   <div className="flex items-center gap-2">
                                     <button
-                                      onClick={() => togglePanel('versions')}
+                                      onClick={() => togglePanel("versions")}
                                       className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
-                                        isPanelOpen('versions') 
-                                          ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' 
-                                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                        isPanelOpen("versions")
+                                          ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30"
+                                          : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20"
                                       }`}
                                     >
                                       <Layers className="w-4 h-4 mr-2" />
@@ -2703,22 +3298,22 @@ const ApplicationTabs = ({ university }) => {
                                       )}
                                     </button>
                                     <button
-                                      onClick={() => togglePanel('analytics')}
+                                      onClick={() => togglePanel("analytics")}
                                       className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
-                                        isPanelOpen('analytics') 
-                                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30' 
-                                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                        isPanelOpen("analytics")
+                                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30"
+                                          : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20"
                                       }`}
                                     >
                                       <PieChart className="w-4 h-4 mr-2" />
                                       Stats
                                     </button>
                                     <button
-                                      onClick={() => togglePanel('ai')}
+                                      onClick={() => togglePanel("ai")}
                                       className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
-                                        isPanelOpen('ai') 
-                                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
-                                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                                        isPanelOpen("ai")
+                                          ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30"
+                                          : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20"
                                       }`}
                                     >
                                       <Brain className="w-4 h-4 mr-2" />
@@ -2729,22 +3324,39 @@ const ApplicationTabs = ({ university }) => {
                               </div>
 
                               {/* Prompt Display */}
-                              <div className={`p-4 rounded-xl border ${
-                                selectedEssayInfo.isCustom 
-                                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30' 
-                                  : 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border-blue-400/30'
-                              }`}>
-                                <p className={`text-xs font-semibold mb-2 uppercase tracking-wider ${
-                                  selectedEssayInfo.isCustom ? 'text-purple-300' : 'text-blue-300'
-                                }`}>Prompt</p>
-                                <p className="text-sm text-white/90 leading-relaxed whitespace-pre-wrap">
-                                  {currentEssayData?.promptText || selectedEssayInfo.promptText || 'Loading...'}
+                              <div
+                                className={`p-4 rounded-xl border ${
+                                  selectedEssayInfo.isCustom
+                                    ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30"
+                                    : "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border-blue-400/30"
+                                }`}
+                              >
+                                <p
+                                  className={`text-xs font-semibold mb-2 uppercase tracking-wider ${
+                                    selectedEssayInfo.isCustom
+                                      ? "text-purple-300"
+                                      : "text-blue-300"
+                                  }`}
+                                >
+                                  Prompt
                                 </p>
-                                <p className={`text-xs mt-3 flex items-center ${
-                                  selectedEssayInfo.isCustom ? 'text-purple-300/70' : 'text-blue-300/70'
-                                }`}>
+                                <p className="text-sm text-white/90 leading-relaxed whitespace-pre-wrap">
+                                  {currentEssayData?.promptText ||
+                                    selectedEssayInfo.promptText ||
+                                    "Loading..."}
+                                </p>
+                                <p
+                                  className={`text-xs mt-3 flex items-center ${
+                                    selectedEssayInfo.isCustom
+                                      ? "text-purple-300/70"
+                                      : "text-blue-300/70"
+                                  }`}
+                                >
                                   <FileText className="w-3 h-3 mr-1" />
-                                  Word limit: {currentEssayData?.wordLimit || selectedEssayInfo.wordLimit || 500}
+                                  Word limit:{" "}
+                                  {currentEssayData?.wordLimit ||
+                                    selectedEssayInfo.wordLimit ||
+                                    500}
                                 </p>
                               </div>
 
@@ -2756,9 +3368,13 @@ const ApplicationTabs = ({ university }) => {
                                 <>
                                   <EssayEditor
                                     key={editorKey}
-                                    content={editorContent}
+                                    content={editorContent} // ← Never undefined
                                     onChange={updateEssayContent}
-                                    wordLimit={currentEssayData?.wordLimit || selectedEssayInfo.wordLimit || 500}
+                                    wordLimit={
+                                      currentEssayData?.wordLimit ||
+                                      selectedEssayInfo.wordLimit ||
+                                      500
+                                    }
                                     essayId={currentEssay.id}
                                     onSave={autoSaveEssay}
                                     lastSaved={lastSaved}
@@ -2767,8 +3383,15 @@ const ApplicationTabs = ({ university }) => {
                                   <div className="flex justify-between items-center text-xs text-white/50 pt-2">
                                     <span className="flex items-center">
                                       <Clock className="w-3 h-3 mr-1" />
-                                      Last modified: {currentEssay.lastModified ? new Date(currentEssay.lastModified).toLocaleString() : 'Never'}
-                                      <span className="ml-3 text-white/30">• Auto-saves every 15 seconds</span>
+                                      Last modified:{" "}
+                                      {currentEssay.lastModified
+                                        ? new Date(
+                                            currentEssay.lastModified,
+                                          ).toLocaleString()
+                                        : "Never"}
+                                      <span className="ml-3 text-white/30">
+                                        • Auto-saves every 15 seconds
+                                      </span>
                                     </span>
                                     <div className="flex items-center gap-2">
                                       <Button
@@ -2792,8 +3415,12 @@ const ApplicationTabs = ({ university }) => {
                                   <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
                                     <BookOpen className="w-8 h-8 text-blue-400" />
                                   </div>
-                                  <h4 className="text-xl font-bold text-white mb-2">Start Writing</h4>
-                                  <p className="text-white/60 mb-6">Create your essay for this prompt</p>
+                                  <h4 className="text-xl font-bold text-white mb-2">
+                                    Start Writing
+                                  </h4>
+                                  <p className="text-white/60 mb-6">
+                                    Create your essay for this prompt
+                                  </p>
                                   <Button
                                     onClick={createEssay}
                                     disabled={isCreatingEssay || !userId}
@@ -2819,8 +3446,12 @@ const ApplicationTabs = ({ university }) => {
                               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
                                 <Target className="w-8 h-8 text-white/40" />
                               </div>
-                              <h4 className="text-lg font-semibold text-white mb-2">Select an Essay</h4>
-                              <p className="text-white/60">Choose a program and essay from the left sidebar</p>
+                              <h4 className="text-lg font-semibold text-white mb-2">
+                                Select an Essay
+                              </h4>
+                              <p className="text-white/60">
+                                Choose a program and essay from the left sidebar
+                              </p>
                             </div>
                           )}
                         </div>
@@ -2847,7 +3478,9 @@ const ApplicationTabs = ({ university }) => {
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, essayId: null, essayTitle: '' })}
+        onClose={() =>
+          setDeleteModal({ isOpen: false, essayId: null, essayTitle: "" })
+        }
         onConfirm={() => handleDeleteCustomEssay(deleteModal.essayId)}
         essayTitle={deleteModal.essayTitle}
         isLoading={isDeletingEssay}
