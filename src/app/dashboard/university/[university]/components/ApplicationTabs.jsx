@@ -527,6 +527,15 @@ const ApplicationTabs = ({ university }) => {
     try {
       setIsCreatingCustomEssay(true);
 
+      // Set selectedEssayInfo FIRST with complete data (FIX 2)
+      setSelectedEssayInfo({
+        title: formData.customTitle,
+        programName: 'Custom Essays',
+        isCustom: true,
+        promptText: formData.customPrompt,
+        wordLimit: formData.wordLimit
+      });
+
       const response = await fetch(
         `/api/essay/independent`,
         {
@@ -557,13 +566,6 @@ const ApplicationTabs = ({ university }) => {
           if (result.essay?.id) {
             setActiveProgramId('custom');
             setActiveEssayPromptId(result.essay.id);
-            setSelectedEssayInfo({
-              title: result.essay.title,
-              programName: 'Custom Essays',
-              isCustom: true,
-              promptText: result.essay.prompt,
-              wordLimit: result.essay.wordLimit
-            });
             setActiveView('editor');
           }
         } else {
@@ -682,6 +684,7 @@ const ApplicationTabs = ({ university }) => {
     return programsWithEssays.find(p => p.id === activeProgramId);
   }, [programsWithEssays, activeProgramId]);
 
+  // ========== FIX 1: Updated currentEssayData useMemo with fallback ==========
   const currentEssayData = useMemo(() => {
     if (activeProgramId === 'custom') {
       const customEssay = customEssaysRef.current.find(e => e.id === activeEssayPromptId);
@@ -695,10 +698,21 @@ const ApplicationTabs = ({ university }) => {
           isCustom: true
         };
       }
+      // FALLBACK to selectedEssayInfo if custom essay not found yet
+      if (selectedEssayInfo.isCustom && selectedEssayInfo.title) {
+        return {
+          promptId: activeEssayPromptId,
+          promptTitle: selectedEssayInfo.title,
+          promptText: selectedEssayInfo.promptText,
+          wordLimit: selectedEssayInfo.wordLimit,
+          userEssay: null,
+          isCustom: true
+        };
+      }
       return null;
     }
     return currentProgram?.essays?.find(e => e.promptId === activeEssayPromptId);
-  }, [currentProgram, activeEssayPromptId, activeProgramId]);
+  }, [currentProgram, activeEssayPromptId, activeProgramId, selectedEssayInfo]);
 
   const currentEssay = useMemo(() => {
     return currentEssayData?.userEssay;
@@ -1028,7 +1042,7 @@ const ApplicationTabs = ({ university }) => {
     }
   }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded]);
 
-  // ========== OPTIMIZED ESSAY CONTENT UPDATE ==========
+  // ========== FIX 3: Optimized essay content update with wordLimit preservation ==========
   const updateEssayContent = useCallback((content, wordCount) => {
     if (!isUniversityAdded) return;
 
@@ -1053,10 +1067,15 @@ const ApplicationTabs = ({ university }) => {
       const isCustom = activeProgramId === 'custom';
 
       if (isCustom) {
-        // Update custom essay
+        // Update custom essay - PRESERVE ALL FIELDS INCLUDING WORDLIMIT
         setCustomEssays(prev => prev.map(essay => 
           essay.id === activeEssayPromptId 
-            ? { ...essay, content: newContent, wordCount: newWordCount, lastModified: new Date() }
+            ? { 
+                ...essay,  // Spread to preserve all fields
+                content: newContent, 
+                wordCount: newWordCount, 
+                lastModified: new Date() 
+              }
             : essay
         ));
       } else {
@@ -2551,7 +2570,7 @@ const ApplicationTabs = ({ university }) => {
                                 )}
                               </div>
 
-                              {/* Prompt Display */}
+                              {/* ========== FIX 4: Prompt Display with fallback chain ========== */}
                               <div className={`p-4 rounded-xl border ${
                                 selectedEssayInfo.isCustom 
                                   ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30' 
@@ -2567,7 +2586,7 @@ const ApplicationTabs = ({ university }) => {
                                   selectedEssayInfo.isCustom ? 'text-purple-300/70' : 'text-blue-300/70'
                                 }`}>
                                   <FileText className="w-3 h-3 mr-1" />
-                                  Word limit: {currentEssayData?.wordLimit || selectedEssayInfo.wordLimit}
+                                  Word limit: {currentEssayData?.wordLimit || selectedEssayInfo.wordLimit || 500}
                                 </p>
                               </div>
 
@@ -2577,11 +2596,12 @@ const ApplicationTabs = ({ university }) => {
                               {/* Editor or Create Button */}
                               {currentEssay ? (
                                 <>
+                                  {/* ========== FIX 5: EssayEditor with correct wordLimit ========== */}
                                   <EssayEditor
                                     key={editorKey}
                                     content={editorContent}
                                     onChange={updateEssayContent}
-                                    wordLimit={currentEssayData?.wordLimit || selectedEssayInfo.wordLimit}
+                                    wordLimit={currentEssayData?.wordLimit || selectedEssayInfo.wordLimit || 500}
                                     essayId={currentEssay.id}
                                     onSave={autoSaveEssay}
                                     lastSaved={lastSaved}

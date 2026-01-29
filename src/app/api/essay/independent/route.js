@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - COMPLETE FILE WITH FIXES
+// src/app/api/essay/independent/route.js - FIXED VERSION
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -562,7 +562,7 @@ export async function POST(request) {
 }
 
 // ==========================================
-// PUT: Update essay content (auto-save)
+// PUT: Update essay content (auto-save) - FIXED FOR CUSTOM ESSAYS
 // ==========================================
 export async function PUT(request) {
   try {
@@ -582,11 +582,16 @@ export async function PUT(request) {
       );
     }
 
+    console.log(`📝 PUT request - Updating essay ${essayId}, wordCount: ${wordCount}, isAutoSave: ${isAutoSave}`);
+
     // Verify essay belongs to authenticated user
     const essayOwnership = await prisma.essay.findFirst({
       where: {
         id: essayId,
         userId: userId
+      },
+      include: {
+        essayPrompt: true
       }
     });
 
@@ -617,10 +622,12 @@ export async function PUT(request) {
 
     // Check for auto-completion
     if (wordCount !== undefined && content !== undefined) {
+      const wordLimit = essayOwnership.wordLimit;
       const completionResult = await checkEssayCompletion(
         essayId,
         wordCount,
-        content
+        content,
+        wordLimit
       );
 
       if (completionResult.success && completionResult.completionChanged) {
@@ -628,9 +635,12 @@ export async function PUT(request) {
           isCompleted: completionResult.isCompleted,
           completedAt: completionResult.isCompleted ? new Date() : null,
           status: completionResult.isCompleted ? 'COMPLETED' : (wordCount > 0 ? 'IN_PROGRESS' : 'DRAFT'),
+          completionPercentage: Math.min(100, (wordCount / wordLimit) * 100),
         });
       }
     }
+
+    console.log(`📊 Update data:`, JSON.stringify(updateData, null, 2));
 
     const updatedEssay = await prisma.essay.update({
       where: { id: essayId },
@@ -645,6 +655,8 @@ export async function PUT(request) {
         essayPrompt: true,
       },
     });
+
+    console.log(`✅ Essay updated - wordCount: ${updatedEssay.wordCount}, wordLimit: ${updatedEssay.wordLimit}`);
 
     // Auto-save version if significant changes
     if (isAutoSave && content && wordCount > 0) {
@@ -687,7 +699,7 @@ export async function PUT(request) {
 }
 
 // ==========================================
-// CREATE STANDALONE ESSAY - FIXED WITH LOGGING
+// CREATE STANDALONE ESSAY - FIXED WITH COMPLETE DATA
 // ==========================================
 async function createStandaloneEssay(data) {
   const { 
@@ -792,18 +804,35 @@ async function createStandaloneEssay(data) {
       programId: standaloneProgram.id,
       universityId: targetUniversityId,
       title: customTitle,
+      wordLimit: essay.wordLimit,
       universityName: essay.program?.university?.universityName
     });
 
-    // Format the response to match what the frontend expects
+    // Format the response to match what the frontend expects - COMPLETE DATA
     const formattedEssay = {
-      ...essay,
+      id: essay.id,
       programId: standaloneProgram.id,
       universityId: targetUniversityId,
-      universityName: essay.program?.university?.universityName,
-      universitySlug: essay.program?.university?.slug,
+      universityName: essay.program?.university?.universityName || 'My Essays',
+      universitySlug: essay.program?.university?.slug || 'my-custom-essays',
+      title: customTitle,
       prompt: customPrompt,
-      isCustom: true
+      content: essay.content || '',
+      wordCount: essay.wordCount || 0,
+      wordLimit: wordLimit,
+      priority: priority,
+      status: essay.status || 'DRAFT',
+      isCompleted: essay.isCompleted || false,
+      completedAt: essay.completedAt || null,
+      completionPercentage: essay.completionPercentage || 0,
+      lastModified: essay.lastModified || essay.createdAt,
+      lastAutoSaved: essay.lastAutoSaved || essay.createdAt,
+      createdAt: essay.createdAt,
+      updatedAt: essay.updatedAt,
+      versions: essay.versions || [],
+      aiResults: essay.aiResults || [],
+      isCustom: true,
+      essayPromptId: essayPrompt.id
     };
 
     return NextResponse.json({ 
@@ -908,7 +937,7 @@ async function createEssay(data) {
 }
 
 // ==========================================
-// REST OF THE FUNCTIONS (unchanged except for minor improvements)
+// REST OF THE FUNCTIONS (keeping all existing functions)
 // ==========================================
 
 async function updateEssay(data) {
@@ -935,7 +964,7 @@ async function updateEssay(data) {
     );
   }
 
-  const result = await checkEssayCompletion(essayId, wordCount || 0, content);
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content, essay.wordLimit);
 
   if (result.success) {
     const additionalUpdates = {};
@@ -1018,7 +1047,7 @@ async function autoSave(data) {
     );
   }
 
-  const result = await checkEssayCompletion(essayId, wordCount || 0, content);
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content, essay.wordLimit);
 
   if (result.success) {
     const finalEssay = await prisma.essay.update({
@@ -1797,7 +1826,7 @@ REQUIREMENTS:
   }
 }
 
-async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
+async function checkEssayCompletion(essayId, newWordCount, newContent = null, wordLimit = null) {
   try {
     const essay = await prisma.essay.findUnique({
       where: { id: essayId },
@@ -1812,11 +1841,11 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
 
     if (!essay) return { success: false };
 
-    const wordLimit = essay.essayPrompt?.wordLimit || essay.wordLimit;
-    const completionPercentage = (newWordCount / wordLimit) * 100;
+    const actualWordLimit = wordLimit || essay.essayPrompt?.wordLimit || essay.wordLimit;
+    const completionPercentage = (newWordCount / actualWordLimit) * 100;
 
     const COMPLETION_THRESHOLD = 0.90;
-    const shouldBeCompleted = newWordCount >= (wordLimit * COMPLETION_THRESHOLD);
+    const shouldBeCompleted = newWordCount >= (actualWordLimit * COMPLETION_THRESHOLD);
     const wasCompleted = essay.isCompleted;
 
     const updateData = {
@@ -1840,7 +1869,7 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null) {
             essayId,
             userId: essay.userId,
             wordCountAtCompletion: newWordCount,
-            wordLimit,
+            wordLimit: actualWordLimit,
             completionMethod: 'AUTO',
             programId: essay.programId,
             universityId: essay.program?.universityId,
