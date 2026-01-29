@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FIXED VERSION
+// src/app/api/essay/independent/route.js - FULLY FIXED VERSION
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -573,7 +573,7 @@ export async function POST(request) {
 }
 
 // ==========================================
-// PUT: Update essay content (auto-save) - FIXED FOR CUSTOM ESSAYS
+// PUT: Update essay content (auto-save) - FIXED VERSION
 // ==========================================
 export async function PUT(request) {
   try {
@@ -613,9 +613,10 @@ export async function PUT(request) {
       );
     }
 
-    // Build update data
+    // ✅ FIX 1: Build update data with wordLimit to prevent constraint violations
     const updateData = {
       lastModified: new Date(),
+      wordLimit: essayOwnership.essayPrompt?.wordLimit || essayOwnership.wordLimit || 500,
     };
 
     if (content !== undefined) updateData.content = content;
@@ -633,7 +634,7 @@ export async function PUT(request) {
 
     // Check for auto-completion
     if (wordCount !== undefined && content !== undefined) {
-      const wordLimit = essayOwnership.wordLimit;
+      const wordLimit = essayOwnership.essayPrompt?.wordLimit || essayOwnership.wordLimit || 500;
       const completionResult = await checkEssayCompletion(
         essayId,
         wordCount,
@@ -653,14 +654,14 @@ export async function PUT(request) {
 
     console.log(`📊 Update data:`, JSON.stringify(updateData, null, 2));
 
-    // ✅ FIX A: Updated include structure with program and university data
+    // ✅ FIX: Updated include structure with program and university data
     const updatedEssay = await prisma.essay.update({
       where: { id: essayId },
       data: updateData,
       include: {
         versions: { 
           orderBy: { timestamp: "desc" }, 
-          take: 20,  // ✅ FIX: Get more versions
+          take: 20,
           include: {
             aiResults: {
               orderBy: { createdAt: "desc" },
@@ -671,10 +672,10 @@ export async function PUT(request) {
         aiResults: {
           where: { essayVersionId: null },
           orderBy: { createdAt: "desc" },
-          take: 5,  // ✅ FIX: Get more AI results
+          take: 5,
         },
         essayPrompt: true,
-        program: {  // ✅ FIX: Include program data
+        program: {
           include: {
             university: {
               select: {
@@ -691,7 +692,7 @@ export async function PUT(request) {
 
     console.log(`✅ Essay updated - wordCount: ${updatedEssay.wordCount}, wordLimit: ${updatedEssay.wordLimit}`);
 
-    // Auto-save version if significant changes
+    // ✅ FIX 2: Enhanced auto-save version creation with better tracking and logging
     if (isAutoSave && content && wordCount > 0) {
       const lastVersion = updatedEssay.versions[0];
       const shouldCreateAutoSave =
@@ -701,7 +702,7 @@ export async function PUT(request) {
             new Date() - new Date(lastVersion.timestamp) > 15 * 60 * 1000));
 
       if (shouldCreateAutoSave) {
-        await prisma.essayVersion.create({
+        const newVersion = await prisma.essayVersion.create({
           data: {
             essayId,
             content: content || "",
@@ -715,10 +716,11 @@ export async function PUT(request) {
               : "Initial content",
           },
         });
+        console.log(`✅ Auto-save version created: ${newVersion.id}`);
       }
     }
 
-    // ✅ FIX A: Return formatted response with all needed data
+    // ✅ FIX: Return formatted response with all needed data
     return NextResponse.json({ 
       essay: updatedEssay,
       success: true,
@@ -1247,7 +1249,7 @@ async function deleteEssay(data) {
   }
 }
 
-// ✅ FIX B: Updated saveVersion function with complete essay data
+// ✅ FIX 3: saveVersion function with complete essay data
 async function saveVersion(data) {
   const {
     essayId,
@@ -1309,7 +1311,7 @@ async function saveVersion(data) {
     },
   });
 
-  // ✅ FIX B: Update main essay with version content AND return full essay data
+  // ✅ FIX: Update main essay with version content AND return full essay data
   const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
     data: { 
@@ -1372,13 +1374,14 @@ async function saveVersion(data) {
     }
   }
 
+  // ✅ FIX 3: Return complete essay data in response
   return NextResponse.json({
     success: true,
     version: {
       ...version,
       aiAnalysis,
     },
-    essay: updatedEssay,  // ✅ FIX B: Include full updated essay
+    essay: updatedEssay,  // ← CRITICAL: Include full essay data
     aiAnalysis,
   });
 }

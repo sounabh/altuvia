@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from "react"
-import { toast } from "sonner" // Added import
+import { toast } from "sonner"
 import { 
   Bold, 
   Italic, 
@@ -184,54 +184,60 @@ export const EssayEditor = memo(function EssayEditor({
     setReadingTime(reading)
   }, [countWords, countChars, countSentences, countParagraphs, calculateReadingTime])
 
-  // Silent auto-save function - uses DOM manipulation only, no state updates
-  const performAutoSave = useCallback(() => {
-    if (!editorRef.current || !onSaveRef.current || isSavingRef.current) return
+  // ✅ FIX A: Improved auto-save function with proper async handling
+  const performAutoSave = useCallback(async () => {
+    if (!editorRef.current || !onSaveRef.current || isSavingRef.current) return;
     
-    const currentContent = editorRef.current.innerHTML
+    const currentContent = editorRef.current.innerHTML;
     
-    // Only save if content has changed since last auto-save
-    if (currentContent === lastAutoSavedContentRef.current) return
+    // Only save if content has changed
+    if (currentContent === lastAutoSavedContentRef.current) return;
     
-    isSavingRef.current = true
+    isSavingRef.current = true;
+    hasUnsavedChangesRef.current = false; // Mark as saving
     
-    // Show subtle saving indicator using pure DOM manipulation
+    // Show subtle saving indicator
     if (saveIndicatorRef.current) {
-      saveIndicatorRef.current.style.opacity = '1'
-      saveIndicatorRef.current.classList.add('pulse-save')
+      saveIndicatorRef.current.style.opacity = '1';
+      saveIndicatorRef.current.classList.add('pulse-save');
     }
     
-    // Perform save
     try {
-      onSaveRef.current(currentContent, countWords(currentContent))
-      lastAutoSavedContentRef.current = currentContent
-      hasUnsavedChangesRef.current = false
+      // Call save with await to ensure it completes
+      const saveResult = await onSaveRef.current(currentContent, countWords(currentContent));
       
-      // Update indicator to show success after brief delay
-      setTimeout(() => {
-        if (saveIndicatorRef.current) {
-          saveIndicatorRef.current.classList.remove('pulse-save')
-          saveIndicatorRef.current.classList.add('saved-success')
-          
-          // Fade out after showing success
-          setTimeout(() => {
-            if (saveIndicatorRef.current) {
-              saveIndicatorRef.current.classList.remove('saved-success')
-              saveIndicatorRef.current.style.opacity = '0.6'
-            }
-            isSavingRef.current = false
-          }, 800)
-        }
-      }, 300)
-    } catch (error) {
-      console.error('Auto-save failed:', error)
-      isSavingRef.current = false
-      if (saveIndicatorRef.current) {
-        saveIndicatorRef.current.classList.remove('pulse-save')
-        saveIndicatorRef.current.style.opacity = '0.6'
+      if (saveResult !== false) {
+        lastAutoSavedContentRef.current = currentContent;
+        
+        // Show success indicator
+        setTimeout(() => {
+          if (saveIndicatorRef.current) {
+            saveIndicatorRef.current.classList.remove('pulse-save');
+            saveIndicatorRef.current.classList.add('saved-success');
+            
+            // Fade out after success
+            setTimeout(() => {
+              if (saveIndicatorRef.current) {
+                saveIndicatorRef.current.classList.remove('saved-success');
+                saveIndicatorRef.current.style.opacity = '0.6';
+              }
+            }, 800);
+          }
+        }, 300);
       }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      hasUnsavedChangesRef.current = true; // Mark as unsaved on error
+      
+      // Show error indicator
+      if (saveIndicatorRef.current) {
+        saveIndicatorRef.current.classList.remove('pulse-save');
+        saveIndicatorRef.current.style.opacity = '0.6';
+      }
+    } finally {
+      isSavingRef.current = false;
     }
-  }, [countWords])
+  }, [countWords]);
 
   // Initialize auto-save interval - runs completely in background
   useEffect(() => {
@@ -349,8 +355,8 @@ export const EssayEditor = memo(function EssayEditor({
     execCommand('removeFormat')
   }, [execCommand])
 
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((e) => {
+  // ✅ FIX B: Improved keyboard shortcuts handler
+  const handleKeyDown = useCallback(async (e) => {
     // Only handle shortcuts with modifier keys
     if (e.ctrlKey || e.metaKey) {
       switch (e.key.toLowerCase()) {
@@ -368,12 +374,41 @@ export const EssayEditor = memo(function EssayEditor({
           break
         case 's':
           e.preventDefault()
-          // ✅ FIX: Call onSave callback directly
           if (onSaveRef.current && editorRef.current) {
             const currentContent = editorRef.current.innerHTML
             const currentWordCount = countWords(currentContent)
-            onSaveRef.current(currentContent, currentWordCount)
-            toast.success('Changes saved')
+            
+            // Show saving state
+            if (saveIndicatorRef.current) {
+              saveIndicatorRef.current.classList.add('pulse-save')
+            }
+            
+            try {
+              // Await the save operation
+              await onSaveRef.current(currentContent, currentWordCount)
+              
+              // Update tracking refs
+              lastAutoSavedContentRef.current = currentContent
+              hasUnsavedChangesRef.current = false
+              
+              // Show success
+              toast.success('Changes saved')
+              
+              if (saveIndicatorRef.current) {
+                saveIndicatorRef.current.classList.remove('pulse-save')
+                saveIndicatorRef.current.classList.add('saved-success')
+                setTimeout(() => {
+                  saveIndicatorRef.current?.classList.remove('saved-success')
+                }, 800)
+              }
+            } catch (error) {
+              console.error('Manual save failed:', error)
+              toast.error('Failed to save changes')
+              
+              if (saveIndicatorRef.current) {
+                saveIndicatorRef.current.classList.remove('pulse-save')
+              }
+            }
           }
           break
         case 'z':
@@ -399,7 +434,7 @@ export const EssayEditor = memo(function EssayEditor({
     if (e.key === 'Escape' && isFullscreen) {
       setIsFullscreen(false)
     }
-  }, [execCommand, insertLink, isFullscreen])
+  }, [execCommand, insertLink, isFullscreen, countWords])
 
   // Handle paste - preserve some formatting
   const handlePaste = useCallback((e) => {
@@ -471,20 +506,16 @@ export const EssayEditor = memo(function EssayEditor({
     }
   }, [])
 
-  // Sync external content changes - but only when not typing (FIXED VERSION)
+  // ✅ FIX C: Improved content sync with better conflict resolution
   useEffect(() => {
     if (!isInitialized || !editorRef.current) return;
     
-    // Don't sync if user is currently typing
+    // Don't sync if user is actively typing
     if (isUserTypingRef.current) {
-      // But we should reset the typing flag after a delay
-      setTimeout(() => {
-        isUserTypingRef.current = false;
-      }, 100);
       return;
     }
     
-    // Don't sync if we should skip this sync (used for internal changes)
+    // Don't sync if we should skip (internal change)
     if (skipNextSyncRef.current) {
       skipNextSyncRef.current = false;
       return;
@@ -493,58 +524,26 @@ export const EssayEditor = memo(function EssayEditor({
     const currentContent = editorRef.current.innerHTML;
     const externalContent = content || '';
     
-    // Only sync if this is truly an external change that's different from what we have
-    if (externalContent !== lastSyncedContentRef.current) {
+    // Only sync if this is truly an external change
+    if (externalContent !== lastSyncedContentRef.current && 
+        externalContent !== currentContent) {
       
-      // Check if the external content is actually different from what's in the editor
-      // This prevents unnecessary DOM updates
-      if (externalContent !== currentContent) {
+      // Only sync if not currently saving
+      if (!isSavingRef.current && !hasUnsavedChangesRef.current) {
         // Preserve cursor position
         const selection = window.getSelection();
-        let range = null;
-        if (selection.rangeCount > 0) {
-          range = selection.getRangeAt(0).cloneRange();
-        }
-        
-        // Store if editor had focus
         const hadFocus = document.activeElement === editorRef.current;
         
-        // Update the editor content
+        // Update content
         editorRef.current.innerHTML = externalContent;
         lastSyncedContentRef.current = externalContent;
         lastAutoSavedContentRef.current = externalContent;
         updateStats(externalContent);
         
-        // Restore cursor position if editor had focus
-        if (hadFocus && editorRef.current) {
+        // Restore focus if needed
+        if (hadFocus) {
           editorRef.current.focus();
-          
-          // Try to restore the exact cursor position
-          if (range) {
-            try {
-              selection.removeAllRanges();
-              selection.addRange(range);
-            } catch (e) {
-              // If we can't restore the exact position, put cursor at end
-              const newRange = document.createRange();
-              newRange.selectNodeContents(editorRef.current);
-              newRange.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(newRange);
-            }
-          } else {
-            // Otherwise move cursor to end
-            const newRange = document.createRange();
-            newRange.selectNodeContents(editorRef.current);
-            newRange.collapse(false);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(newRange);
-          }
         }
-      } else {
-        // Even if content is the same, update the sync reference
-        lastSyncedContentRef.current = externalContent;
       }
     }
   }, [content, isInitialized, updateStats]);

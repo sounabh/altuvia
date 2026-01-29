@@ -1226,7 +1226,7 @@ const ApplicationTabs = ({ university }) => {
     });
   };
 
-  // ✅ FIX A: Auto-save function - removed hasUnsavedChanges check
+  // ✅ FIX A: UPDATED Auto-save function with full state update
   const autoSaveEssay = useCallback(async () => {
     if (
       !currentEssay ||
@@ -1276,7 +1276,7 @@ const ApplicationTabs = ({ university }) => {
       if (response.ok) {
         const result = await response.json();
 
-        // Update state immediately with response
+        // ✅ FIX: Update workspace data immediately with response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1290,7 +1290,7 @@ const ApplicationTabs = ({ university }) => {
                       essayData.promptId === activeEssayPromptId
                         ? {
                             ...essayData,
-                            userEssay: result.essay,
+                            userEssay: result.essay, // ← Use server response
                           }
                         : essayData,
                     ),
@@ -1510,7 +1510,7 @@ const ApplicationTabs = ({ university }) => {
     ],
   );
 
-  // ✅ FIX D: Update saveVersion to refresh data and update UI
+  // ✅ FIX D: UPDATED saveVersion function with immediate data refresh
   const saveVersion = useCallback(
     async (label) => {
       if (
@@ -1567,7 +1567,7 @@ const ApplicationTabs = ({ university }) => {
 
           toast.success("Version saved successfully");
           
-          // ✅ FIX: Force immediate refresh to get updated data
+          // ✅ FIX: Force immediate refresh from API
           await forceRefresh();
           
           // ✅ FIX: Update UI immediately with optimistic update
@@ -1586,7 +1586,7 @@ const ApplicationTabs = ({ university }) => {
                               ...essayData,
                               userEssay: {
                                 ...essayData.userEssay,
-                                ...result.essay, // Use latest from server
+                                ...result.essay, // ← Use latest from server
                                 versions: result.essay.versions || essayData.userEssay.versions,
                                 lastModified: new Date(),
                               },
@@ -1682,8 +1682,8 @@ const ApplicationTabs = ({ university }) => {
                       ),
                     }
                   : program,
-            
-              )}
+              ),
+            };
           });
           lastContentRef.current = result.essay.content;
           setHasUnsavedChanges(false);

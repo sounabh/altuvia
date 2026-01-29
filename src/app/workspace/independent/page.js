@@ -1076,7 +1076,7 @@ export default function IndependentWorkspacePage() {
   }, [fetchWorkspaceData]);
 
   // ==========================================
-  // AUTO-SAVE LOGIC
+  // AUTO-SAVE LOGIC (FIXED)
   // ==========================================
 
   const autoSaveEssay = useCallback(async () => {
@@ -1106,6 +1106,41 @@ export default function IndependentWorkspacePage() {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        
+        // ✅ FIX: Update workspace data with server response
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+
+          const updated = {
+            ...prev,
+            programs: prev.programs.map((program) =>
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map((essayData) =>
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: {
+                              ...essayData.userEssay,
+                              ...result.essay,
+                              lastModified: new Date(),
+                            },
+                          }
+                        : essayData
+                    ),
+                  }
+                : program
+            ),
+          };
+
+          // Recalculate stats
+          updated.stats = calculateStats(updated);
+          
+          return updated;
+        });
+        
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
         return true;
@@ -1118,7 +1153,7 @@ export default function IndependentWorkspacePage() {
       setIsSaving(false);
       isUpdatingRef.current = false;
     }
-  }, [currentEssay, isSaving, hasUnsavedChanges]);
+  }, [currentEssay, isSaving, hasUnsavedChanges, activeProgramId, activeEssayPromptId]);
 
   // Auto-save timer
   useEffect(() => {
@@ -1300,8 +1335,72 @@ export default function IndependentWorkspacePage() {
 
   const manualSave = useCallback(async () => {
     if (!currentEssay || isSaving) return false;
-    return await autoSaveEssay();
-  }, [currentEssay, isSaving, autoSaveEssay]);
+    
+    try {
+      setIsSaving(true);
+      
+      const response = await fetch(`/api/essay/independent`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          essayId: currentEssay.id,
+          content: currentEssay.content,
+          wordCount: currentEssay.wordCount,
+          isAutoSave: false,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update workspace data with server response
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+
+          const updated = {
+            ...prev,
+            programs: prev.programs.map((program) =>
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map((essayData) =>
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: {
+                              ...essayData.userEssay,
+                              ...result.essay,
+                              lastModified: new Date(),
+                            },
+                          }
+                        : essayData
+                    ),
+                  }
+                : program
+            ),
+          };
+
+          // Recalculate stats
+          updated.stats = calculateStats(updated);
+          
+          return updated;
+        });
+        
+        setLastSaved(new Date());
+        setHasUnsavedChanges(false);
+        toast.success('Changes saved successfully!');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Manual save error:", error);
+      toast.error("Failed to save changes");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentEssay, isSaving, activeProgramId, activeEssayPromptId]);
 
   const saveVersion = useCallback(
     async (label) => {
@@ -1310,6 +1409,7 @@ export default function IndependentWorkspacePage() {
       try {
         setIsSavingVersion(true);
 
+        // First, save any unsaved changes
         if (hasUnsavedChanges) {
           const autoSaved = await autoSaveEssay();
           if (!autoSaved) {
@@ -1334,7 +1434,8 @@ export default function IndependentWorkspacePage() {
         if (response.ok) {
           const result = await response.json();
 
-          if (result.version) {
+          // ✅ FIX: Update workspace data with server response
+          if (result.essay) {
             setWorkspaceData((prev) => {
               if (!prev) return prev;
 
@@ -1350,10 +1451,7 @@ export default function IndependentWorkspacePage() {
                                 ...essayData,
                                 userEssay: {
                                   ...essayData.userEssay,
-                                  versions: [
-                                    result.version,
-                                    ...(essayData.userEssay?.versions || []),
-                                  ],
+                                  ...result.essay,
                                   lastModified: new Date(),
                                 },
                               }
@@ -1364,12 +1462,14 @@ export default function IndependentWorkspacePage() {
                 ),
               };
 
+              // Recalculate stats
               updated.stats = calculateStats(updated);
               
               return updated;
             });
           }
 
+          toast.success("Version saved successfully");
           return true;
         } else {
           const errorData = await response.json().catch(() => ({}));
@@ -1441,6 +1541,7 @@ export default function IndependentWorkspacePage() {
             ),
           };
 
+          // Recalculate stats
           updated.stats = calculateStats(updated);
           
           return updated;
@@ -1547,6 +1648,7 @@ export default function IndependentWorkspacePage() {
           })),
         };
 
+        // Recalculate stats
         updated.stats = calculateStats(updated);
         
         return updated;
@@ -1554,6 +1656,7 @@ export default function IndependentWorkspacePage() {
 
       if (currentEssay?.id === essayId) {
         setActiveEssayPromptId(null);
+        setActiveProgramId(null);
         lastContentRef.current = "";
       }
 
@@ -1567,6 +1670,9 @@ export default function IndependentWorkspacePage() {
   const toggleEssayCompletion = useCallback(
     async (essayId, currentStatus) => {
       try {
+        // Optimistically update UI
+        const newStatus = !currentStatus;
+        
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1580,7 +1686,7 @@ export default function IndependentWorkspacePage() {
                       ...essayData,
                       userEssay: {
                         ...essayData.userEssay,
-                        isCompleted: !currentStatus,
+                        isCompleted: newStatus,
                       },
                     }
                   : essayData
@@ -1593,17 +1699,19 @@ export default function IndependentWorkspacePage() {
           return updated;
         });
 
+        // Send API request
         const response = await fetch(`/api/essay/independent`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
             essayId,
-            isCompleted: !currentStatus,
+            isCompleted: newStatus,
           }),
         });
 
         if (!response.ok) {
+          // Revert on error
           setWorkspaceData((prev) => {
             if (!prev) return prev;
 
@@ -1632,8 +1740,38 @@ export default function IndependentWorkspacePage() {
           throw new Error("Failed to update completion status");
         }
 
+        // Update with server data if available
+        try {
+          const result = await response.json();
+          if (result.essay) {
+            setWorkspaceData((prev) => {
+              if (!prev) return prev;
+
+              const updated = {
+                ...prev,
+                programs: prev.programs.map((program) => ({
+                  ...program,
+                  essays: program.essays.map((essayData) =>
+                    essayData.userEssay?.id === essayId
+                      ? {
+                          ...essayData,
+                          userEssay: result.essay,
+                        }
+                      : essayData
+                  ),
+                })),
+              };
+
+              updated.stats = calculateStats(updated);
+              return updated;
+            });
+          }
+        } catch (parseError) {
+          console.error("Error parsing response:", parseError);
+        }
+
         toast.success(
-          !currentStatus ? 'Essay marked as complete! 🎉' : 'Essay marked as incomplete'
+          newStatus ? 'Essay marked as complete! 🎉' : 'Essay marked as incomplete'
         );
       } catch (error) {
         console.error("Error toggling completion:", error);
@@ -2274,6 +2412,7 @@ export default function IndependentWorkspacePage() {
 
                           setHasUnsavedChanges(false);
                           setLastSaved(new Date());
+                          toast.success('Version restored successfully!');
                         } else {
                           const errorData = await response.json();
                           setError(errorData.error || "Failed to restore version");
@@ -2329,6 +2468,7 @@ export default function IndependentWorkspacePage() {
                             updated.stats = calculateStats(updated);
                             return updated;
                           });
+                          toast.success('Version deleted successfully');
                         } else {
                           const errorData = await response.json();
                           setError(errorData.error || "Failed to delete version");
