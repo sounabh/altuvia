@@ -829,7 +829,7 @@ const ApplicationTabs = ({ university }) => {
       setWorkspaceError(null);
 
       const response = await fetch(
-        `/api/essay/${encodeURIComponent(universityName)}?userId=${encodeURIComponent(userId)}`,
+         `/api/essay/independent?universityId=${encodeURIComponent(university?.id)}`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
