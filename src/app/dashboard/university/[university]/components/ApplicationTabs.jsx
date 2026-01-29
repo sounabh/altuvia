@@ -565,7 +565,30 @@ const ApplicationTabs = ({ university }) => {
   const [showCustomEssayModal, setShowCustomEssayModal] = useState(false);
   const [isCreatingCustomEssay, setIsCreatingCustomEssay] = useState(false);
   
-  // FIX 1: Remove separate customEssays state and compute from workspaceData
+  // ========== STATE MANAGEMENT ==========
+  const [activeView, setActiveView] = useState('list');
+  const [workspaceData, setWorkspaceData] = useState(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState(null);
+  const [activeProgramId, setActiveProgramId] = useState(null);
+  const [activeEssayPromptId, setActiveEssayPromptId] = useState(null);
+  const [openPanels, setOpenPanels] = useState([]);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isCreatingEssay, setIsCreatingEssay] = useState(false);
+  const [isSavingVersion, setIsSavingVersion] = useState(false);
+
+  // ========== SELECTED ESSAY INFO ==========
+  const [selectedEssayInfo, setSelectedEssayInfo] = useState({
+    title: '',
+    programName: '',
+    isCustom: false,
+    promptText: '',
+    wordLimit: 500
+  });
+
+  // ========== FIXED: CUSTOM ESSAYS CALCULATION ==========
   const customEssays = useMemo(() => {
     if (!workspaceData?.programs) return [];
     
@@ -589,29 +612,6 @@ const ApplicationTabs = ({ university }) => {
     essayTitle: '',
   });
   const [isDeletingEssay, setIsDeletingEssay] = useState(false);
-
-  // ========== STATE MANAGEMENT ==========
-  const [activeView, setActiveView] = useState('list');
-  const [workspaceData, setWorkspaceData] = useState(null);
-  const [workspaceLoading, setWorkspaceLoading] = useState(false);
-  const [workspaceError, setWorkspaceError] = useState(null);
-  const [activeProgramId, setActiveProgramId] = useState(null);
-  const [activeEssayPromptId, setActiveEssayPromptId] = useState(null);
-  const [openPanels, setOpenPanels] = useState([]);
-  const [lastSaved, setLastSaved] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isCreatingEssay, setIsCreatingEssay] = useState(false);
-  const [isSavingVersion, setIsSavingVersion] = useState(false);
-
-  // ========== SELECTED ESSAY INFO ==========
-  const [selectedEssayInfo, setSelectedEssayInfo] = useState({
-    title: '',
-    programName: '',
-    isCustom: false,
-    promptText: '',
-    wordLimit: 500
-  });
 
   // ========== REFS ==========
   const autoSaveTimerRef = useRef(null);
@@ -664,7 +664,7 @@ const ApplicationTabs = ({ university }) => {
     }
   };
 
-  // ========== FIX 2: HANDLE CREATE CUSTOM ESSAY (UPDATED) ==========
+  // ========== HANDLE CREATE CUSTOM ESSAY (UPDATED) ==========
   const handleCreateCustomEssay = async (formData) => {
     if (!userId || !university?.id || !isUniversityAdded) {
       toast.error("Please add the university to your dashboard first");
@@ -692,7 +692,7 @@ const ApplicationTabs = ({ university }) => {
         const result = await response.json();
         
         if (result.success && result.essay) {
-          // FIX 2A: Update workspace data immediately
+          // Update workspace data immediately
           setWorkspaceData(prev => {
             if (!prev) return prev;
             
@@ -764,7 +764,7 @@ const ApplicationTabs = ({ university }) => {
     }
   };
 
-  // ========== FIX 3: HANDLE DELETE CUSTOM ESSAY (UPDATED) ==========
+  // ========== HANDLE DELETE CUSTOM ESSAY (UPDATED) ==========
   const handleDeleteCustomEssay = async (essayId) => {
     if (!essayId) return;
 
@@ -781,7 +781,7 @@ const ApplicationTabs = ({ university }) => {
       });
 
       if (response.ok) {
-        // FIX 3A: Remove from workspace data immediately
+        // Remove from workspace data immediately
         setWorkspaceData(prev => {
           if (!prev) return prev;
           
@@ -938,10 +938,7 @@ const ApplicationTabs = ({ university }) => {
     const tasksEvents = university.tasksAndEvents || [];
 
     // Include custom essays in total count
-    const uniqueCustomEssays = Array.from(
-      new Map(customEssays.map(essay => [essay.id, essay])).values()
-    );
-    const allEssays = [...essayPrompts, ...uniqueCustomEssays];
+    const allEssays = [...essayPrompts, ...customEssays];
     
     const completedEssays = allEssays.filter(essay => 
       essay.status === 'COMPLETED' || essay.status === 'completed' || 
@@ -997,7 +994,7 @@ const ApplicationTabs = ({ university }) => {
     };
   }, [university, customEssays]);
 
-  // ========== FIX 4: API FUNCTIONS (UPDATED) ==========
+  // ========== API FUNCTIONS ==========
   const fetchWorkspaceData = useCallback(async () => {
     if (!universityName || !userId || !isUniversityAdded || isFetchingRef.current) return;
 
@@ -1022,7 +1019,7 @@ const ApplicationTabs = ({ university }) => {
 
       const data = await response.json();
       
-      // FIX 4A: Set workspace data - custom essays are already included
+      // Set workspace data - custom essays are already included
       setWorkspaceData(data);
 
       // Don't auto-select if we already have a selection
@@ -1083,7 +1080,7 @@ const ApplicationTabs = ({ university }) => {
 
       const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
       
-      // FIX 4B: Use correct route based on essay type
+      // Use correct route based on essay type
       const apiRoute = isCustom ? '/api/essay/independent' : `/api/essay/${encodeURIComponent(universityName)}`;
 
       const response = await fetch(apiRoute, {
@@ -1102,7 +1099,7 @@ const ApplicationTabs = ({ university }) => {
       if (response.ok) {
         const result = await response.json();
         
-        // FIX 4C: Update state immediately with response
+        // Update state immediately with response
         setWorkspaceData(prev => {
           if (!prev) return prev;
           
@@ -1211,7 +1208,7 @@ const ApplicationTabs = ({ university }) => {
     }
   }, [activeProgramId, activeEssayPromptId, universityName, isCreatingEssay, userId, isUniversityAdded, currentProgram]);
 
-  // ========== FIX 5: UPDATE ESSAY CONTENT (UPDATED) ==========
+  // ========== UPDATE ESSAY CONTENT ==========
   const updateEssayContent = useCallback((content, wordCount) => {
     if (!isUniversityAdded) return;
 
@@ -1233,7 +1230,7 @@ const ApplicationTabs = ({ university }) => {
         return;
       }
 
-      // FIX 5A: Update workspace data correctly
+      // Update workspace data correctly
       setWorkspaceData((prev) => {
         if (!prev) return prev;
         
@@ -1277,7 +1274,7 @@ const ApplicationTabs = ({ university }) => {
     }, 600);
   }, [currentEssay, activeProgramId, activeEssayPromptId, createEssay, isUniversityAdded, currentProgram]);
 
-  // ========== FIX 6: SAVE VERSION (UPDATED) ==========
+  // ========== SAVE VERSION ==========
   const saveVersion = useCallback(async (label) => {
     if (!currentEssay || isSaving || isSavingVersion || !userId || !isUniversityAdded) return false;
 
@@ -1320,7 +1317,7 @@ const ApplicationTabs = ({ university }) => {
         const result = await response.json();
         
         if (result.version) {
-          // FIX 6A: Update workspace data with new version
+          // Update workspace data with new version
           setWorkspaceData((prev) => {
             if (!prev) return prev;
             
@@ -1665,7 +1662,7 @@ const ApplicationTabs = ({ university }) => {
     return currentProgram?.programName || currentProgram?.name || '';
   }, [selectedEssayInfo.programName, currentProgram]);
 
-  // ========== FIX 7: CUSTOM ESSAY CARD COMPONENT (UPDATED) ==========
+  // ========== CUSTOM ESSAY CARD COMPONENT ==========
   const CustomEssayCard = React.memo(({ essay, index, onEdit, onDelete }) => {
     const progress = essay.wordLimit > 0 
       ? (essay.wordCount / essay.wordLimit) * 100 
@@ -2100,6 +2097,13 @@ const ApplicationTabs = ({ university }) => {
     );
   };
 
+  // ========== UNIQUE CUSTOM ESSAYS ==========
+  const uniqueCustomEssays = useMemo(() => {
+    return Array.from(
+      new Map(customEssays.map(essay => [essay.id, essay])).values()
+    );
+  }, [customEssays]);
+
   // ========== EFFECTS ==========
   useEffect(() => {
     if (!hasUnsavedChanges || !currentEssay || isSaving || activeView !== 'editor' || !isUniversityAdded) {
@@ -2135,13 +2139,6 @@ const ApplicationTabs = ({ university }) => {
       }
     };
   }, []);
-
-  // ========== FIX 8: RENDER CUSTOM ESSAYS WITHOUT DUPLICATES ==========
-  const uniqueCustomEssays = useMemo(() => {
-    return Array.from(
-      new Map(customEssays.map(essay => [essay.id, essay])).values()
-    );
-  }, [customEssays]);
 
   // ========== RENDER ==========
   if (sessionStatus === 'loading') {
@@ -2208,7 +2205,7 @@ const ApplicationTabs = ({ university }) => {
                     </button>
                   )}
                   <div className="w-1 h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-4"></div>
-                  <h2 className="text-2xl font-bold tracking-tight">
+                  <h2 className="text-2xl font-bold tracking-tight text-white">
                     {activeView === 'editor' ? 'Essay Editor' : 'Application Workspace'}
                   </h2>
                   {!isUniversityAdded && (
