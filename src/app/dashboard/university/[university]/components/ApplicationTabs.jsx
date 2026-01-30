@@ -925,7 +925,6 @@ const ApplicationTabs = ({ university }) => {
   }, [university, customEssays]);
 
   // ========== API FUNCTIONS ==========
-  // ✅ FIX: Define fetchWorkspaceData BEFORE forceRefresh
   const fetchWorkspaceData = useCallback(async () => {
     if (
       !universityName ||
@@ -1010,7 +1009,7 @@ const ApplicationTabs = ({ university }) => {
     university?.id,
   ]);
 
-  // ✅ FIX B: Force immediate refetch helper function - NOW DEFINED AFTER fetchWorkspaceData
+  // ✅ FIX B: Force immediate refetch helper function
   const forceRefresh = useCallback(async () => {
     isFetchingRef.current = false; // Reset fetch lock
     await fetchWorkspaceData();
@@ -1226,7 +1225,7 @@ const ApplicationTabs = ({ university }) => {
     });
   };
 
-  // ✅ FIX A: UPDATED Auto-save function with full state update
+  // ✅ FIXED: Auto-save function with consistent API route
   const autoSaveEssay = useCallback(async () => {
     if (
       !currentEssay ||
@@ -1238,7 +1237,6 @@ const ApplicationTabs = ({ university }) => {
       return false;
     }
     
-    // ✅ FIX: Don't check hasUnsavedChanges - always save when called
     // Use pending content if available
     let contentToSave = currentEssay.content;
     let wordCountToSave = currentEssay.wordCount;
@@ -1251,13 +1249,8 @@ const ApplicationTabs = ({ university }) => {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      const isCustom =
-        currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-
-      // Use correct route based on essay type
-      const apiRoute = isCustom
-        ? "/api/essay/independent"
-        : `/api/essay/${encodeURIComponent(universityName)}`;
+      // ✅ FIX: ALWAYS use /api/essay/independent route
+      const apiRoute = "/api/essay/independent";
 
       const response = await fetch(apiRoute, {
         method: "PUT",
@@ -1267,7 +1260,6 @@ const ApplicationTabs = ({ university }) => {
           content: contentToSave,
           wordCount: wordCountToSave,
           isAutoSave: true,
-          isCustomEssay: isCustom,
           userId,
           userEmail,
         }),
@@ -1276,7 +1268,7 @@ const ApplicationTabs = ({ university }) => {
       if (response.ok) {
         const result = await response.json();
         
-        // ✅ FIX: Update workspace data with server response
+        // ✅ Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
           return {
@@ -1289,7 +1281,7 @@ const ApplicationTabs = ({ university }) => {
                       essayData.promptId === activeEssayPromptId
                         ? {
                             ...essayData,
-                            userEssay: result.essay, // ← Use server response
+                            userEssay: result.essay,
                           }
                         : essayData,
                     ),
@@ -1315,13 +1307,11 @@ const ApplicationTabs = ({ university }) => {
   }, [
     currentEssay,
     isSaving,
-    universityName,
     userId,
     userEmail,
     isUniversityAdded,
     activeProgramId,
     activeEssayPromptId,
-    currentProgram,
   ]);
 
   // ========== IMPROVED: CREATE ESSAY FUNCTION ==========
@@ -1350,11 +1340,8 @@ const ApplicationTabs = ({ university }) => {
         isUniversityAdded,
       });
 
-      const isCustom =
-        currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-      const apiRoute = isCustom
-        ? "/api/essay/independent"
-        : `/api/essay/${encodeURIComponent(universityName)}`;
+      // ✅ FIX: ALWAYS use /api/essay/independent route
+      const apiRoute = "/api/essay/independent";
 
       const response = await fetch(apiRoute, {
         method: "POST",
@@ -1365,7 +1352,6 @@ const ApplicationTabs = ({ university }) => {
           essayPromptId: activeEssayPromptId,
           userId,
           userEmail,
-          isCustomEssay: isCustom,
         }),
       });
 
@@ -1416,15 +1402,13 @@ const ApplicationTabs = ({ university }) => {
   }, [
     activeProgramId,
     activeEssayPromptId,
-    universityName,
     isCreatingEssay,
     userId,
     userEmail,
     isUniversityAdded,
-    currentProgram,
   ]);
 
-  // ========== ✅ FIX B: UPDATED updateEssayContent function with race condition fix ==========
+  // ========== ✅ FIXED: updateEssayContent function ==========
   const updateEssayContent = useCallback(
     (content, wordCount) => {
       if (!isUniversityAdded) return;
@@ -1452,9 +1436,8 @@ const ApplicationTabs = ({ university }) => {
           return;
         }
 
-        // ✅ FIX B: Update with proper race condition handling
         try {
-          isUpdatingRef.current = true; // Set BEFORE operations
+          isUpdatingRef.current = true;
 
           // Update workspace data correctly
           setWorkspaceData((prev) => {
@@ -1502,7 +1485,7 @@ const ApplicationTabs = ({ university }) => {
         } finally {
           setTimeout(() => {
             isEditorActiveRef.current = false;
-            isUpdatingRef.current = false; // ✅ Always reset
+            isUpdatingRef.current = false;
           }, 100);
         }
       }, 600);
@@ -1517,149 +1500,137 @@ const ApplicationTabs = ({ university }) => {
     ],
   );
 
-// ✅ FIXED saveVersion in frontend ApplicationTabs
-const saveVersion = useCallback(
-  async (label) => {
-    if (
-      !currentEssay ||
-      isSaving ||
-      isSavingVersion ||
-      !userId ||
-      !isUniversityAdded
-    )
-      return false;
+  // ✅ FIXED: saveVersion with consistent API route
+  const saveVersion = useCallback(
+    async (label) => {
+      if (
+        !currentEssay ||
+        isSaving ||
+        isSavingVersion ||
+        !userId ||
+        !isUniversityAdded
+      )
+        return false;
 
-    // ✅ FIX 1: Capture current content state
-    let contentToSave = currentEssay.content;
-    let wordCountToSave = currentEssay.wordCount;
-    if (pendingContentRef.current) {
-      contentToSave = pendingContentRef.current.content;
-      wordCountToSave = pendingContentRef.current.wordCount;
-    }
+      // ✅ Capture current content state
+      let contentToSave = currentEssay.content;
+      let wordCountToSave = currentEssay.wordCount;
+      if (pendingContentRef.current) {
+        contentToSave = pendingContentRef.current.content;
+        wordCountToSave = pendingContentRef.current.wordCount;
+      }
 
-    try {
-      setIsSavingVersion(true);
-      isUpdatingRef.current = true;
+      try {
+        setIsSavingVersion(true);
+        isUpdatingRef.current = true;
 
-      // ✅ FIX 2: Save any pending changes FIRST
-      if (hasUnsavedChanges) {
-        const autoSaved = await autoSaveEssay();
-        if (!autoSaved) {
-          toast.error("Failed to save current changes");
-          return false;
+        // ✅ Save any pending changes FIRST
+        if (hasUnsavedChanges) {
+          const autoSaved = await autoSaveEssay();
+          if (!autoSaved) {
+            toast.error("Failed to save current changes");
+            return false;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-        // Wait for state to settle
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
 
-      // ✅ FIX 3: Determine correct API route
-      const isCustom =
-        currentProgram?.degreeType === "STANDALONE" ||
-        currentProgram?.isCustom;
-      
-      const apiRoute = isCustom
-        ? "/api/essay/independent"
-        : `/api/essay/${encodeURIComponent(universityName)}`;
+        // ✅ ALWAYS use /api/essay/independent route
+        const apiRoute = "/api/essay/independent";
 
-      console.log('💾 Saving version to:', apiRoute, {
-        essayId: currentEssay.id,
-        isCustom,
-        label: label || `Version ${new Date().toLocaleString()}`
-      });
-
-      const response = await fetch(apiRoute, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "save_version",
+        console.log('💾 Saving version to:', apiRoute, {
           essayId: currentEssay.id,
-          content: contentToSave,
-          wordCount: wordCountToSave,
-          label: label || `Version ${new Date().toLocaleString()}`,
-          isCustomEssay: isCustom,
-          userId,
-          userEmail,
-        }),
-      });
+          label: label || `Version ${new Date().toLocaleString()}`
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        const response = await fetch(apiRoute, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save_version",
+            essayId: currentEssay.id,
+            content: contentToSave,
+            wordCount: wordCountToSave,
+            label: label || `Version ${new Date().toLocaleString()}`,
+            userId,
+            userEmail,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success || !result.essay) {
+          throw new Error('Invalid response from server');
+        }
+
+        console.log('✅ Version saved successfully:', result);
+
+        // ✅ Update workspace data with complete essay data
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            programs: prev.programs.map((program) =>
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map((essayData) =>
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: result.essay,
+                          }
+                        : essayData,
+                    ),
+                  }
+                : program,
+            ),
+          };
+        });
+
+        toast.success("Version saved successfully");
+        
+        // ✅ Navigate back after successful save
+        setTimeout(() => {
+          setActiveView("list");
+          setOpenPanels([]);
+        }, 300);
+
+        return true;
+      } catch (error) {
+        console.error("❌ Error saving version:", error);
+        toast.error(error.message || "Failed to save version");
+        return false;
+      } finally {
+        setIsSavingVersion(false);
+        isUpdatingRef.current = false;
       }
+    },
+    [
+      currentEssay,
+      isSaving,
+      isSavingVersion,
+      hasUnsavedChanges,
+      autoSaveEssay,
+      activeProgramId,
+      activeEssayPromptId,
+      userId,
+      userEmail,
+      isUniversityAdded,
+    ],
+  );
 
-      const result = await response.json();
-
-      if (!result.success || !result.essay) {
-        throw new Error('Invalid response from server');
-      }
-
-      console.log('✅ Version saved successfully:', result);
-
-      // ✅ FIX 4: Update workspace data with complete essay data
-      setWorkspaceData((prev) => {
-        if (!prev) return prev;
-
-        return {
-          ...prev,
-          programs: prev.programs.map((program) =>
-            program.id === activeProgramId
-              ? {
-                  ...program,
-                  essays: program.essays.map((essayData) =>
-                    essayData.promptId === activeEssayPromptId
-                      ? {
-                          ...essayData,
-                          userEssay: result.essay, // ✅ Use complete essay from server
-                        }
-                      : essayData,
-                  ),
-                }
-              : program,
-          ),
-        };
-      });
-
-      toast.success("Version saved successfully");
-      
-      // ✅ FIX 5: Navigate back after successful save
-      setTimeout(() => {
-        setActiveView("list");
-        setOpenPanels([]);
-      }, 300);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Error saving version:", error);
-      toast.error(error.message || "Failed to save version");
-      return false;
-    } finally {
-      setIsSavingVersion(false);
-      isUpdatingRef.current = false;
-    }
-  },
-  [
-    currentEssay,
-    isSaving,
-    isSavingVersion,
-    hasUnsavedChanges,
-    autoSaveEssay,
-    universityName,
-    activeProgramId,
-    activeEssayPromptId,
-    userId,
-    userEmail,
-    isUniversityAdded,
-    currentProgram,
-  ],
-);
+  // ✅ FIXED: handleRestoreVersion with consistent API route
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
 
-    const isCustom =
-      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-    const apiRoute = isCustom
-      ? "/api/essay/independent"
-      : `/api/essay/${encodeURIComponent(universityName)}`;
+    // ✅ ALWAYS use /api/essay/independent route
+    const apiRoute = "/api/essay/independent";
 
     try {
       const response = await fetch(apiRoute, {
@@ -1669,7 +1640,6 @@ const saveVersion = useCallback(
           action: "restore_version",
           essayId: currentEssay.id,
           versionId,
-          isCustomEssay: isCustom,
           userId,
           userEmail,
         }),
@@ -1717,14 +1687,12 @@ const saveVersion = useCallback(
     }
   };
 
+  // ✅ FIXED: handleDeleteVersion with consistent API route
   const handleDeleteVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
 
-    const isCustom =
-      currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-    const apiRoute = isCustom
-      ? "/api/essay/independent"
-      : `/api/essay/${encodeURIComponent(universityName)}`;
+    // ✅ ALWAYS use /api/essay/independent route
+    const apiRoute = "/api/essay/independent";
 
     try {
       const response = await fetch(apiRoute, {
@@ -1734,7 +1702,6 @@ const saveVersion = useCallback(
           action: "delete_version",
           versionId,
           essayId: currentEssay.id,
-          isCustomEssay: isCustom,
           userId,
           userEmail,
         }),
@@ -1941,11 +1908,9 @@ const saveVersion = useCallback(
     return `editor-${currentEssay?.id || "new"}-${activeProgramId}-${activeEssayPromptId}`;
   }, [currentEssay?.id, activeProgramId, activeEssayPromptId]);
 
-  // In ApplicationTabs, ensure content is passed correctly:
   const editorContent = useMemo(() => {
-    // Don't pass undefined - causes sync issues
     if (isEditorActiveRef.current) {
-      return currentEssay?.content || ""; // ← Use current essay content
+      return currentEssay?.content || "";
     }
     return currentEssay?.content || "";
   }, [currentEssay?.id, currentEssay?.content]);
@@ -2531,14 +2496,12 @@ const saveVersion = useCallback(
     isUniversityAdded,
   ]);
 
-  // ✅ FIX E: Update effect to fetch on mount
   useEffect(() => {
     if (universityName && userId && isUniversityAdded) {
       fetchWorkspaceData();
     }
   }, [universityName, userId, isUniversityAdded, fetchWorkspaceData]);
   
-  // Separate effect for editor view
   useEffect(() => {
     if (activeView === "editor" && !workspaceData && universityName && userId && isUniversityAdded) {
       fetchWorkspaceData();
@@ -3342,7 +3305,7 @@ const saveVersion = useCallback(
                                 <>
                                   <EssayEditor
                                     key={editorKey}
-                                    content={editorContent} // ← Never undefined
+                                    content={editorContent}
                                     onChange={updateEssayContent}
                                     wordLimit={
                                       currentEssayData?.wordLimit ||
