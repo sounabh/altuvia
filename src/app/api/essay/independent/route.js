@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FULLY FIXED VERSION
+// src/app/api/essay/independent/route.js - FIXED brandColor ERROR
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +11,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const GEMINI_MODEL = "google/gemini-2.5-flash-lite";
+
+// Default color for universities without brandColor
+const DEFAULT_UNIVERSITY_COLOR = "#002147";
 
 // ==========================================
 // AUTHENTICATION HELPER
@@ -139,10 +142,8 @@ async function fetchSavedUniversitiesFromExternalAPI(token) {
 // STANDALONE ESSAY HELPERS
 // ==========================================
 
-// Get or create "My Custom Essays" program for a university
 async function getOrCreateStandaloneProgram(universityId) {
   try {
-    // Try to find existing standalone program
     let standaloneProgram = await prisma.program.findFirst({
       where: {
         universityId,
@@ -150,7 +151,6 @@ async function getOrCreateStandaloneProgram(universityId) {
       }
     });
 
-    // If not found, create one
     if (!standaloneProgram) {
       standaloneProgram = await prisma.program.create({
         data: {
@@ -172,15 +172,12 @@ async function getOrCreateStandaloneProgram(universityId) {
   }
 }
 
-// Get or create "My Essays" virtual university for untagged essays
 async function getOrCreateVirtualUniversity() {
   try {
-    // Try to find existing virtual university
     let virtualUni = await prisma.university.findFirst({
       where: { slug: "my-custom-essays" }
     });
 
-    // If not found, create one
     if (!virtualUni) {
       virtualUni = await prisma.university.create({
         data: {
@@ -218,15 +215,12 @@ export async function GET(request) {
     
     console.log(`✅ Fetching essays for user ${userId}, universityId: ${universityId}`);
 
-    // Build query conditions
     const whereConditions = [];
     
-    // If universityId is provided, only fetch for that university
     if (universityId) {
       console.log(`🔍 Filtering for specific university: ${universityId}`);
       whereConditions.push({ id: universityId });
     } else {
-      // If no universityId, fetch all saved universities
       const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
       const savedUniversities = savedUnisResult.universities || [];
       
@@ -244,13 +238,11 @@ export async function GET(request) {
       if (names.length > 0) whereConditions.push({ universityName: { in: names } });
       if (slugs.length > 0) whereConditions.push({ slug: { in: slugs } });
 
-      // Always include the virtual university for custom essays
       whereConditions.push({ slug: "my-custom-essays" });
     }
 
     console.log(`📋 Where conditions:`, JSON.stringify(whereConditions));
 
-    // Step 5: Fetch universities with programs
     const universities = await prisma.university.findMany({
       where: {
         OR: whereConditions
@@ -307,22 +299,16 @@ export async function GET(request) {
 
     console.log(`✅ Found ${universities.length} universities in database`);
 
-    // Step 6: Process and format the data
     const allPrograms = [];
     const universitiesData = [];
 
     for (const university of universities) {
-      // For GET requests with universityId, include ALL programs (including STANDALONE)
-      // For general requests, filter by study level except for STANDALONE
       const filteredPrograms = university.programs.filter(async program => {
-        // Always include STANDALONE programs (custom essays)
         if (program.degreeType === "STANDALONE") {
           return true;
         }
         
-        // For regular programs when no universityId specified, filter by study level
         if (!universityId) {
-          // Get user's study level preference
           let userStudyLevel = null;
           try {
             const userProfile = await prisma.userProfile.findUnique({
@@ -350,23 +336,23 @@ export async function GET(request) {
         website: university.websiteUrl,
         city: university.city,
         country: university.country,
-        color: university.brandColor || "#002147",
+        // ✅ FIX: Use default color since brandColor doesn't exist
+        color: DEFAULT_UNIVERSITY_COLOR,
         programCount: filteredPrograms.length,
       });
 
-      // Map programs with university context
       const programsWithUniversity = filteredPrograms.map(program => ({
         ...program,
         universityName: university.universityName,
         universityId: university.id,
         universitySlug: university.slug,
-        universityColor: university.brandColor || "#002147",
+        // ✅ FIX: Use default color
+        universityColor: DEFAULT_UNIVERSITY_COLOR,
       }));
 
       allPrograms.push(...programsWithUniversity);
     }
 
-    // Format programs data - FIXED VERSION
     const formattedPrograms = allPrograms.map(program => {
       const isStandalone = program.degreeType === "STANDALONE" || program.isCustom;
       
@@ -395,7 +381,6 @@ export async function GET(request) {
         essays: program.essayPrompts?.map(prompt => {
           const userEssay = prompt.essays?.[0] || null;
           
-          // ✅ STANDARDIZED STRUCTURE FOR ALL ESSAYS (custom and regular)
           return {
             promptId: prompt.id,
             promptTitle: prompt.promptTitle,
@@ -407,12 +392,11 @@ export async function GET(request) {
             programName: program.programName,
             universityName: program.universityName,
             
-            // ✅ CRITICAL: userEssay must ALWAYS be present (null or object)
             userEssay: userEssay
               ? {
                   id: userEssay.id,
-                  content: userEssay.content || "",           // ← Never null
-                  wordCount: userEssay.wordCount || 0,        // ← Never null
+                  content: userEssay.content || "",
+                  wordCount: userEssay.wordCount || 0,
                   title: userEssay.title,
                   priority: userEssay.priority,
                   status: userEssay.status,
@@ -430,22 +414,20 @@ export async function GET(request) {
                     isAutoSave: v.isAutoSave,
                     changesSinceLastVersion: v.changesSinceLastVersion,
                     aiAnalysis: v.aiResults?.[0] || null,
-                  })) || [],                                  // ← Never null, always array
-                  aiResults: userEssay.aiResults || [],       // ← Never null, always array
+                  })) || [],
+                  aiResults: userEssay.aiResults || [],
                 }
-              : null,  // ← Can be null if user hasn't started this essay yet
+              : null,
           };
         }) || [],
       };
     });
 
-    // Filter programs: keep only those that have essays or are STANDALONE
     const filteredFormattedPrograms = formattedPrograms.filter(p => 
       (p.essays && p.essays.length > 0) || 
       p.degreeType === "STANDALONE"
     );
 
-    // Step 8: Calculate statistics from filteredFormattedPrograms
     const stats = {
       totalPrograms: filteredFormattedPrograms.length,
       savedUniversitiesCount: universitiesData.length,
@@ -495,10 +477,9 @@ export async function GET(request) {
       })(),
     };
 
-    // Step 9: Return formatted response
     const workspaceData = {
       universities: universitiesData,
-      programs: filteredFormattedPrograms,  // Use the filtered list
+      programs: filteredFormattedPrograms,
       stats,
       query: { universityId },
     };
@@ -595,7 +576,6 @@ export async function PUT(request) {
 
     console.log(`📝 PUT request - Updating essay ${essayId}, wordCount: ${wordCount}, isAutoSave: ${isAutoSave}`);
 
-    // Verify essay belongs to authenticated user
     const essayOwnership = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -613,16 +593,13 @@ export async function PUT(request) {
       );
     }
 
-    // ✅ FIX 1: Build update data with wordLimit to prevent constraint violations
-    // ✅ FIXED CODE
-const updateData = {
-  lastModified: new Date(),
-  wordLimit: essayOwnership.essayPrompt?.wordLimit || essayOwnership.wordLimit || 500,
-};
+    const updateData = {
+      lastModified: new Date(),
+      wordLimit: essayOwnership.essayPrompt?.wordLimit || essayOwnership.wordLimit || 500,
+    };
 
-if (content !== undefined) updateData.content = content;
-if (wordCount !== undefined) updateData.wordCount = wordCount;
-
+    if (content !== undefined) updateData.content = content;
+    if (wordCount !== undefined) updateData.wordCount = wordCount;
     if (title !== undefined) updateData.title = title;
     if (priority !== undefined) updateData.priority = priority;
     if (isCompleted !== undefined) {
@@ -634,7 +611,6 @@ if (wordCount !== undefined) updateData.wordCount = wordCount;
       updateData.lastAutoSaved = new Date();
     }
 
-    // Check for auto-completion
     if (wordCount !== undefined && content !== undefined) {
       const wordLimit = essayOwnership.essayPrompt?.wordLimit || essayOwnership.wordLimit || 500;
       const completionResult = await checkEssayCompletion(
@@ -656,44 +632,44 @@ if (wordCount !== undefined) updateData.wordCount = wordCount;
 
     console.log(`📊 Update data:`, JSON.stringify(updateData, null, 2));
 
-    // ✅ FIX: Updated include structure with program and university data
-  const updatedEssay = await prisma.essay.update({
-  where: { id: essayId },
-  data: updateData,
-  include: {
-    versions: { 
-      orderBy: { timestamp: "desc" }, 
-      take: 20,
+    // ✅ FIX: Removed brandColor from select statement
+    const updatedEssay = await prisma.essay.update({
+      where: { id: essayId },
+      data: updateData,
       include: {
-        aiResults: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
+        versions: { 
+          orderBy: { timestamp: "desc" }, 
+          take: 20,
+          include: {
+            aiResults: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
         },
-      },
-    },
-    aiResults: {
-      where: { essayVersionId: null },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    },
-    essayPrompt: true,
-    program: {
-      include: {
-        university: {
-          select: {
-            id: true,
-            universityName: true,
-            slug: true,
-            brandColor: true,
+        aiResults: {
+          where: { essayVersionId: null },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
+        essayPrompt: true,
+        program: {
+          include: {
+            university: {
+              select: {
+                id: true,
+                universityName: true,
+                slug: true,
+                // ✅ REMOVED: brandColor - field doesn't exist
+              }
+            }
           }
         }
-      }
-    }
-  },
-});
+      },
+    });
+
     console.log(`✅ Essay updated - wordCount: ${updatedEssay.wordCount}, wordLimit: ${updatedEssay.wordLimit}`);
 
-    // ✅ FIX 2: Enhanced auto-save version creation with better tracking and logging
     if (isAutoSave && content && wordCount > 0) {
       const lastVersion = updatedEssay.versions[0];
       const shouldCreateAutoSave =
@@ -721,9 +697,20 @@ if (wordCount !== undefined) updateData.wordCount = wordCount;
       }
     }
 
-    // ✅ FIX: Return formatted response with all needed data
+    // ✅ Add universityColor to response manually
+    const responseEssay = {
+      ...updatedEssay,
+      program: updatedEssay.program ? {
+        ...updatedEssay.program,
+        university: updatedEssay.program.university ? {
+          ...updatedEssay.program.university,
+          brandColor: DEFAULT_UNIVERSITY_COLOR // Add default color
+        } : null
+      } : null
+    };
+
     return NextResponse.json({ 
-      essay: updatedEssay,
+      essay: responseEssay,
       success: true,
       message: isAutoSave ? 'Auto-saved' : 'Saved'
     });
@@ -759,7 +746,6 @@ async function createStandaloneEssay(data) {
     wordLimit 
   });
 
-  // Validation
   if (!userId || !customTitle || !customPrompt) {
     return NextResponse.json(
       { error: 'Missing required fields: userId, customTitle, customPrompt' },
@@ -775,25 +761,20 @@ async function createStandaloneEssay(data) {
   }
 
   try {
-    // Step 1: Determine which university to use
     let targetUniversityId;
     
     if (taggedUniversityId && taggedUniversityId.trim() !== '') {
-      // User selected a specific university
       targetUniversityId = taggedUniversityId;
     } else {
-      // No university selected - use virtual university
       const virtualUni = await getOrCreateVirtualUniversity();
       targetUniversityId = virtualUni.id;
     }
 
     console.log(`🎯 Target university ID: ${targetUniversityId}`);
 
-    // Step 2: Get or create standalone program for this university
     const standaloneProgram = await getOrCreateStandaloneProgram(targetUniversityId);
     console.log(`📝 Standalone program ID: ${standaloneProgram.id}`);
 
-    // Step 3: Create custom essay prompt
     const essayPrompt = await prisma.essayPrompt.create({
       data: {
         programId: standaloneProgram.id,
@@ -808,7 +789,6 @@ async function createStandaloneEssay(data) {
 
     console.log(`✅ Created essay prompt: ${essayPrompt.id}`);
 
-    // Step 4: Create the essay
     const essay = await prisma.essay.create({
       data: {
         userId,
@@ -830,6 +810,7 @@ async function createStandaloneEssay(data) {
                 id: true,
                 universityName: true,
                 slug: true
+                // ✅ REMOVED: brandColor
               }
             }
           }
@@ -849,17 +830,17 @@ async function createStandaloneEssay(data) {
       universityName: essay.program?.university?.universityName
     });
 
-    // ✅ Format response with STANDARDIZED structure
     const formattedEssay = {
       id: essay.id,
       programId: standaloneProgram.id,
       universityId: targetUniversityId,
       universityName: essay.program?.university?.universityName || 'My Essays',
       universitySlug: essay.program?.university?.slug || 'my-custom-essays',
+      universityColor: DEFAULT_UNIVERSITY_COLOR, // ✅ Use default color
       title: customTitle,
       prompt: customPrompt,
-      content: essay.content || '',           // ← Empty string, not null
-      wordCount: essay.wordCount || 0,        // ← Zero, not null
+      content: essay.content || '',
+      wordCount: essay.wordCount || 0,
       wordLimit: wordLimit,
       priority: priority,
       status: essay.status || 'DRAFT',
@@ -870,8 +851,8 @@ async function createStandaloneEssay(data) {
       lastAutoSaved: essay.lastAutoSaved || essay.createdAt,
       createdAt: essay.createdAt,
       updatedAt: essay.updatedAt,
-      versions: essay.versions || [],         // ← Empty array, not null
-      aiResults: essay.aiResults || [],       // ← Empty array, not null
+      versions: essay.versions || [],
+      aiResults: essay.aiResults || [],
       isCustom: true,
       essayPromptId: essayPrompt.id
     };
@@ -910,7 +891,6 @@ async function createEssay(data) {
     );
   }
 
-  // Check if essay already exists
   const existingEssay = await prisma.essay.findFirst({
     where: {
       userId,
@@ -927,7 +907,6 @@ async function createEssay(data) {
     });
   }
 
-  // Fetch essay prompt details
   const essayPrompt = await prisma.essayPrompt.findUnique({
     where: { id: essayPromptId },
     include: {
@@ -944,7 +923,6 @@ async function createEssay(data) {
     );
   }
 
-  // Create the essay
   const essay = await prisma.essay.create({
     data: {
       userId,
@@ -978,7 +956,7 @@ async function createEssay(data) {
 }
 
 // ==========================================
-// REST OF THE FUNCTIONS
+// REST OF THE FUNCTIONS - FIXED
 // ==========================================
 
 async function updateEssay(data) {
@@ -1172,12 +1150,10 @@ async function deleteEssay(data) {
       );
     }
 
-    // Check if this is a standalone essay
     const isStandalone = essay.essayPrompt?.program?.degreeType === "STANDALONE";
 
     console.log(`🗑️ Deleting essay ${essayId}, isStandalone: ${isStandalone}`);
 
-    // Delete related records
     await prisma.aIResult.deleteMany({
       where: { essayId },
     });
@@ -1194,25 +1170,20 @@ async function deleteEssay(data) {
       // EssayCompletionLog might not exist
     }
 
-    // Store prompt info before deletion
     const promptId = essay.essayPromptId;
     const programId = essay.essayPrompt?.programId;
 
-    // Delete the essay
     await prisma.essay.delete({
       where: { id: essayId },
     });
 
-    // If standalone, also delete the custom prompt and check program
     if (isStandalone && promptId) {
       console.log(`🗑️ Deleting standalone prompt ${promptId}`);
       
-      // Delete the prompt
       await prisma.essayPrompt.delete({
         where: { id: promptId }
       });
 
-      // Check if the program has any other prompts
       if (programId) {
         const remainingPrompts = await prisma.essayPrompt.count({
           where: { programId }
@@ -1220,7 +1191,6 @@ async function deleteEssay(data) {
 
         console.log(`📊 Remaining prompts in program ${programId}: ${remainingPrompts}`);
 
-        // If no other prompts and it's a standalone program, delete the program
         if (remainingPrompts === 0) {
           const program = await prisma.program.findUnique({
             where: { id: programId }
@@ -1250,8 +1220,7 @@ async function deleteEssay(data) {
   }
 }
 
-// ✅ FIX 3: saveVersion function with complete essay data
-// ✅ FIXED saveVersion function in /api/essay/independent/route.js
+// ✅ FIXED saveVersion function - removed brandColor
 async function saveVersion(data) {
   const {
     essayId,
@@ -1301,7 +1270,6 @@ async function saveVersion(data) {
     ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${wordCount - lastVersion.wordCount} words`
     : "Initial version";
 
-  // ✅ FIX 1: Create version FIRST
   const version = await prisma.essayVersion.create({
     data: {
       essayId,
@@ -1313,7 +1281,7 @@ async function saveVersion(data) {
     },
   });
 
-  // ✅ FIX 2: Update main essay with version content AND fetch complete data
+  // ✅ FIX: Removed brandColor from select
   const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
     data: { 
@@ -1348,7 +1316,7 @@ async function saveVersion(data) {
               id: true,
               universityName: true,
               slug: true,
-              brandColor: true,
+              // ✅ REMOVED: brandColor
             }
           }
         }
@@ -1376,14 +1344,13 @@ async function saveVersion(data) {
     }
   }
 
-  // ✅ FIX 3: Return COMPLETE essay data with all nested relations
   return NextResponse.json({
     success: true,
     version: {
       ...version,
       aiAnalysis,
     },
-    essay: updatedEssay,  // ✅ CRITICAL: Complete essay object with all relations
+    essay: updatedEssay,
     aiAnalysis,
   });
 }

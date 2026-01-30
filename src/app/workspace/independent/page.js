@@ -1,4 +1,4 @@
-// src/app/workspace/independent/page.jsx
+// src/app/workspace/independent/page.jsx - FULLY FIXED VERSION
 
 "use client";
 
@@ -60,7 +60,6 @@ const calculateStats = (workspaceData) => {
   };
 
   workspaceData.programs.forEach((program) => {
-    // Check if this is a standalone essay (no programId in essays or custom flag)
     const isStandaloneProgram =
       program.degreeType === "STANDALONE" ||
       program.programName === "My Custom Essays";
@@ -116,7 +115,7 @@ function StandaloneEssayModal({
     customTitle: "",
     customPrompt: "",
     wordLimit: 500,
-    taggedUniversityId: "", // Optional
+    taggedUniversityId: "",
     priority: "medium",
   });
 
@@ -449,7 +448,7 @@ function StandaloneEssayCard({
       </div>
 
       {/* Tagged University (if any) */}
-      {universityName && (
+      {universityName && universityName !== "My Essays" && (
         <div className="flex items-center space-x-1 text-xs text-gray-500 mb-2">
           <Building2 className="w-3 h-3" />
           <span className="truncate">{universityName}</span>
@@ -660,11 +659,6 @@ function ProgramCard({
   const totalEssays = program.essays?.length || 0;
   const progress = totalEssays > 0 ? (completedEssays / totalEssays) * 100 : 0;
 
-  // Check if this is a standalone program
-  const isStandaloneProgram =
-    program.degreeType === "STANDALONE" ||
-    program.programName === "My Custom Essays";
-
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow">
       {/* Program Header */}
@@ -754,7 +748,6 @@ function ProgramCard({
                 </div>
                 {essayData.userEssay && (
                   <div className="flex items-center space-x-1">
-                    {/* Completion Toggle Button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -781,7 +774,6 @@ function ProgramCard({
                       )}
                     </button>
 
-                    {/* Delete Button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -922,7 +914,8 @@ export default function IndependentWorkspacePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const userId = session?.user?.id;
+  // ✅ FIX: Get userId from session correctly
+  const userId = session?.userId || session?.user?.id;
   const userEmail = session?.user?.email;
 
   const [workspaceData, setWorkspaceData] = useState(null);
@@ -950,10 +943,8 @@ export default function IndependentWorkspacePage() {
   const [isSavingVersion, setIsSavingVersion] = useState(false);
 
   // Standalone essay state
-  const [showStandaloneEssayModal, setShowStandaloneEssayModal] =
-    useState(false);
-  const [isCreatingStandaloneEssay, setIsCreatingStandaloneEssay] =
-    useState(false);
+  const [showStandaloneEssayModal, setShowStandaloneEssayModal] = useState(false);
+  const [isCreatingStandaloneEssay, setIsCreatingStandaloneEssay] = useState(false);
 
   // Activity tracking
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
@@ -964,6 +955,7 @@ export default function IndependentWorkspacePage() {
   const lastContentRef = useRef("");
   const isUpdatingRef = useRef(false);
   const activityTimeoutRef = useRef(null);
+  const pendingContentRef = useRef(null); // ✅ Added properly
 
   // ==========================================
   // COMPUTED DATA
@@ -993,7 +985,6 @@ export default function IndependentWorkspacePage() {
         program.programName === "My Custom Essays";
 
       if (isStandaloneProgram) {
-        // Extract essays from standalone programs
         program.essays?.forEach((essayData) => {
           if (essayData.userEssay) {
             standalone.push({
@@ -1017,14 +1008,12 @@ export default function IndependentWorkspacePage() {
   const filteredPrograms = useMemo(() => {
     let programs = regularPrograms;
 
-    // Filter by university
     if (selectedUniversityId !== "all") {
       programs = programs.filter(
         (p) => p.universityId === selectedUniversityId,
       );
     }
 
-    // Filter by essay status
     if (filterStatus !== "all") {
       programs = programs
         .map((program) => ({
@@ -1041,7 +1030,6 @@ export default function IndependentWorkspacePage() {
         .filter((p) => p.essays?.length > 0);
     }
 
-    // Filter out programs with no essays
     programs = programs.filter((p) => p.essays && p.essays.length > 0);
 
     return programs;
@@ -1106,7 +1094,7 @@ export default function IndependentWorkspacePage() {
       }
 
       const data = await response.json();
-      console.log("Fetched workspace data:", data);
+      console.log("✅ Fetched workspace data:", data);
       setWorkspaceData(data);
 
       // Auto-expand first program and select first essay
@@ -1122,7 +1110,7 @@ export default function IndependentWorkspacePage() {
         }
       }
     } catch (err) {
-      console.error("Error fetching workspace data:", err);
+      console.error("❌ Error fetching workspace data:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -1134,7 +1122,7 @@ export default function IndependentWorkspacePage() {
   }, [fetchWorkspaceData]);
 
   // ==========================================
-  // ✅ FIX 3A: AUTO-SAVE LOGIC (FIXED)
+  // AUTO-SAVE LOGIC
   // ==========================================
 
   const autoSaveEssay = useCallback(async () => {
@@ -1151,14 +1139,18 @@ export default function IndependentWorkspacePage() {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
+      // Use pending content if available
+      const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
+      const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
+
       const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           essayId: currentEssay.id,
-          content: currentEssay.content,
-          wordCount: currentEssay.wordCount,
+          content: contentToSave,
+          wordCount: wordCountToSave,
           isAutoSave: true,
         }),
       });
@@ -1166,7 +1158,6 @@ export default function IndependentWorkspacePage() {
       if (response.ok) {
         const result = await response.json();
 
-        // ✅ FIX: Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1193,19 +1184,18 @@ export default function IndependentWorkspacePage() {
             ),
           };
 
-          // Recalculate stats
           updated.stats = calculateStats(updated);
-
           return updated;
         });
 
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
+        pendingContentRef.current = null; // Clear pending content
         return true;
       }
       return false;
     } catch (error) {
-      console.error("Auto-save error:", error);
+      console.error("❌ Auto-save error:", error);
       return false;
     } finally {
       setIsSaving(false);
@@ -1313,6 +1303,9 @@ export default function IndependentWorkspacePage() {
       try {
         isUpdatingRef.current = true;
 
+        // ✅ Store pending content for save operations
+        pendingContentRef.current = { content, wordCount };
+
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1341,7 +1334,6 @@ export default function IndependentWorkspacePage() {
           };
 
           updated.stats = calculateStats(updated);
-
           return updated;
         });
 
@@ -1376,6 +1368,9 @@ export default function IndependentWorkspacePage() {
         autoSaveTimerRef.current = null;
       }
 
+      // Clear pending content when switching essays
+      pendingContentRef.current = null;
+
       setActiveProgramId(programId);
       setActiveEssayPromptId(promptId);
       setHasUnsavedChanges(false);
@@ -1404,7 +1399,7 @@ export default function IndependentWorkspacePage() {
   }, []);
 
   // ==========================================
-  // ✅ FIX 3B: MANUAL SAVE FUNCTION (FIXED)
+  // MANUAL SAVE FUNCTION
   // ==========================================
 
   const manualSave = useCallback(async () => {
@@ -1413,14 +1408,18 @@ export default function IndependentWorkspacePage() {
     try {
       setIsSaving(true);
 
+      // Use pending content if available
+      const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
+      const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
+
       const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           essayId: currentEssay.id,
-          content: currentEssay.content,
-          wordCount: currentEssay.wordCount,
+          content: contentToSave,
+          wordCount: wordCountToSave,
           isAutoSave: false,
         }),
       });
@@ -1428,7 +1427,6 @@ export default function IndependentWorkspacePage() {
       if (response.ok) {
         const result = await response.json();
 
-        // ✅ FIX: Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1455,21 +1453,22 @@ export default function IndependentWorkspacePage() {
             ),
           };
 
-          // Recalculate stats
           updated.stats = calculateStats(updated);
-
           return updated;
         });
 
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
+        pendingContentRef.current = null;
         toast.success("Changes saved successfully!");
         return true;
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to save");
       }
-      return false;
     } catch (error) {
-      console.error("Manual save error:", error);
-      toast.error("Failed to save changes");
+      console.error("❌ Manual save error:", error);
+      toast.error(error.message || "Failed to save changes");
       return false;
     } finally {
       setIsSaving(false);
@@ -1477,45 +1476,48 @@ export default function IndependentWorkspacePage() {
   }, [currentEssay, isSaving, activeProgramId, activeEssayPromptId]);
 
   // ==========================================
-  // ✅ FIX 3C: SAVE VERSION FUNCTION (FIXED)
+  // ✅ FIXED: SAVE VERSION FUNCTION
   // ==========================================
 
-  // ✅ FIXED saveVersion in frontend ApplicationTabs
   const saveVersion = useCallback(
     async (label) => {
-      if (!currentEssay || isSaving || isSavingVersion || !userId) return false;
-
-      let contentToSave = currentEssay.content;
-      let wordCountToSave = currentEssay.wordCount;
-      if (pendingContentRef.current) {
-        contentToSave = pendingContentRef.current.content;
-        wordCountToSave = pendingContentRef.current.wordCount;
+      if (!currentEssay || isSaving || isSavingVersion || !userId) {
+        console.warn("Cannot save version:", { 
+          hasEssay: !!currentEssay, 
+          isSaving, 
+          isSavingVersion, 
+          userId 
+        });
+        return false;
       }
+
+      // Get content to save - prefer pending content
+      const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
+      const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
 
       try {
         setIsSavingVersion(true);
         isUpdatingRef.current = true;
 
+        // First, auto-save if there are unsaved changes
         if (hasUnsavedChanges) {
           const autoSaved = await autoSaveEssay();
           if (!autoSaved) {
-            toast.error("Failed to save current changes");
-            return false;
+            console.warn("Auto-save failed before version save, continuing anyway");
           }
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        // ✅ Independent page always uses independent route
-        const apiRoute = "/api/essay/independent";
-
-        console.log("💾 Saving version to:", apiRoute, {
+        console.log("💾 Saving version:", {
           essayId: currentEssay.id,
           label: label || `Version ${new Date().toLocaleString()}`,
+          wordCount: wordCountToSave,
         });
 
-        const response = await fetch(apiRoute, {
+        const response = await fetch("/api/essay/independent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             action: "save_version",
             essayId: currentEssay.id,
@@ -1523,8 +1525,6 @@ export default function IndependentWorkspacePage() {
             wordCount: wordCountToSave,
             label: label || `Version ${new Date().toLocaleString()}`,
             isCustomEssay: true,
-            userId,
-            userEmail,
           }),
         });
 
@@ -1543,6 +1543,7 @@ export default function IndependentWorkspacePage() {
 
         console.log("✅ Version saved successfully:", result);
 
+        // Update workspace data with the new essay data including versions
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1566,13 +1567,12 @@ export default function IndependentWorkspacePage() {
           };
         });
 
+        // Clear pending content
+        pendingContentRef.current = null;
+        setHasUnsavedChanges(false);
+        setLastSaved(new Date());
+
         toast.success("Version saved successfully");
-
-        setTimeout(() => {
-          setActiveView("list");
-          setOpenPanels([]);
-        }, 300);
-
         return true;
       } catch (error) {
         console.error("❌ Error saving version:", error);
@@ -1592,10 +1592,12 @@ export default function IndependentWorkspacePage() {
       activeProgramId,
       activeEssayPromptId,
       userId,
-      userEmail,
-      currentProgram,
     ],
   );
+
+  // ==========================================
+  // CREATE ESSAY HANDLERS
+  // ==========================================
 
   const handleCreateEssay = async (programId, essayPromptId) => {
     try {
@@ -1643,13 +1645,12 @@ export default function IndependentWorkspacePage() {
             ),
           };
 
-          // Recalculate stats
           updated.stats = calculateStats(updated);
-
           return updated;
         });
 
         lastContentRef.current = result.essay.content || "";
+        pendingContentRef.current = null;
         setHasUnsavedChanges(false);
         setLastSaved(new Date());
 
@@ -1657,7 +1658,7 @@ export default function IndependentWorkspacePage() {
         toast.success("Essay created successfully!");
       }
     } catch (error) {
-      console.error("Error creating essay:", error);
+      console.error("❌ Error creating essay:", error);
       setError(error.message);
       toast.error(error.message);
     } finally {
@@ -1673,6 +1674,8 @@ export default function IndependentWorkspacePage() {
     try {
       setIsCreatingStandaloneEssay(true);
       setError(null);
+
+      console.log("🚀 Creating standalone essay:", formData);
 
       const response = await fetch(`/api/essay/independent`, {
         method: "POST",
@@ -1690,25 +1693,29 @@ export default function IndependentWorkspacePage() {
       }
 
       const result = await response.json();
+      console.log("✅ Standalone essay created:", result);
 
       if (result.success) {
+        // Close modal first
+        setShowStandaloneEssayModal(false);
+        
         // Refresh workspace data to get the new essay
         await fetchWorkspaceData();
 
-        setShowStandaloneEssayModal(false);
         toast.success("Custom essay created successfully! 🎉", {
           description: "Your essay is ready for writing",
         });
 
-        // Auto-select the newly created essay if possible
-        if (result.essayPromptId && result.programId) {
+        // Auto-select the newly created essay
+        if (result.programId && result.essayPromptId) {
+          // Wait for state to update
           setTimeout(() => {
             handleEssaySelect(result.programId, result.essayPromptId);
-          }, 500);
+          }, 300);
         }
       }
     } catch (error) {
-      console.error("Error creating standalone essay:", error);
+      console.error("❌ Error creating standalone essay:", error);
       setError(error.message);
       toast.error(error.message || "Failed to create custom essay");
     } finally {
@@ -1735,50 +1742,35 @@ export default function IndependentWorkspacePage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to delete essay");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete essay");
+      }
 
-      setWorkspaceData((prev) => {
-        if (!prev) return prev;
+      // Refresh data to get updated list
+      await fetchWorkspaceData();
 
-        const updated = {
-          ...prev,
-          programs: prev.programs.map((program) => ({
-            ...program,
-            essays: program.essays.map((essayData) =>
-              essayData.userEssay?.id === essayId
-                ? {
-                    ...essayData,
-                    userEssay: null,
-                  }
-                : essayData,
-            ),
-          })),
-        };
-
-        // Recalculate stats
-        updated.stats = calculateStats(updated);
-
-        return updated;
-      });
-
+      // Clear selection if deleted essay was selected
       if (currentEssay?.id === essayId) {
         setActiveEssayPromptId(null);
         setActiveProgramId(null);
         lastContentRef.current = "";
+        pendingContentRef.current = null;
       }
 
       toast.success("Essay deleted successfully");
     } catch (error) {
+      console.error("❌ Error deleting essay:", error);
       setError(error.message);
-      toast.error("Failed to delete essay");
+      toast.error(error.message || "Failed to delete essay");
     }
   };
 
   const toggleEssayCompletion = useCallback(async (essayId, currentStatus) => {
     try {
-      // Optimistically update UI
       const newStatus = !currentStatus;
 
+      // Optimistic update
       setWorkspaceData((prev) => {
         if (!prev) return prev;
 
@@ -1801,11 +1793,9 @@ export default function IndependentWorkspacePage() {
         };
 
         updated.stats = calculateStats(updated);
-
         return updated;
       });
 
-      // Send API request
       const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1846,7 +1836,7 @@ export default function IndependentWorkspacePage() {
         throw new Error("Failed to update completion status");
       }
 
-      // Update with server data if available
+      // Update with server data
       try {
         const result = await response.json();
         if (result.essay) {
@@ -1873,7 +1863,7 @@ export default function IndependentWorkspacePage() {
           });
         }
       } catch (parseError) {
-        console.error("Error parsing response:", parseError);
+        console.warn("Could not parse response:", parseError);
       }
 
       toast.success(
@@ -1882,17 +1872,150 @@ export default function IndependentWorkspacePage() {
           : "Essay marked as incomplete",
       );
     } catch (error) {
-      console.error("Error toggling completion:", error);
+      console.error("❌ Error toggling completion:", error);
       setError(error.message);
       toast.error(error.message);
     }
   }, []);
+
+  // ==========================================
+  // VERSION OPERATIONS
+  // ==========================================
+
+  const handleRestoreVersion = useCallback(async (versionId) => {
+    if (!currentEssay) return;
+
+    try {
+      setError(null);
+      const response = await fetch(`/api/essay/independent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "restore_version",
+          essayId: currentEssay.id,
+          versionId,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        if (result.essay) {
+          setWorkspaceData((prev) => {
+            if (!prev) return prev;
+
+            const updated = {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: result.essay,
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+
+            updated.stats = calculateStats(updated);
+            return updated;
+          });
+
+          lastContentRef.current = result.essay.content || "";
+          pendingContentRef.current = null;
+        }
+
+        setHasUnsavedChanges(false);
+        setLastSaved(new Date());
+        toast.success("Version restored successfully!");
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to restore version");
+        toast.error(errorData.error || "Failed to restore version");
+      }
+    } catch (error) {
+      console.error("❌ Error restoring version:", error);
+      setError("Error restoring version");
+      toast.error("Error restoring version");
+    }
+  }, [currentEssay, activeProgramId, activeEssayPromptId]);
+
+  const handleDeleteVersion = useCallback(async (versionId) => {
+    if (!currentEssay) return;
+
+    try {
+      setError(null);
+      const response = await fetch(`/api/essay/independent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "delete_version",
+          versionId,
+          essayId: currentEssay.id,
+        }),
+      });
+
+      if (response.ok) {
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+
+          const updated = {
+            ...prev,
+            programs: prev.programs.map((program) =>
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map((essayData) =>
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: {
+                              ...essayData.userEssay,
+                              versions:
+                                essayData.userEssay?.versions?.filter(
+                                  (v) => v.id !== versionId,
+                                ) || [],
+                            },
+                          }
+                        : essayData,
+                    ),
+                  }
+                : program,
+            ),
+          };
+
+          updated.stats = calculateStats(updated);
+          return updated;
+        });
+        toast.success("Version deleted successfully");
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to delete version");
+        toast.error(errorData.error || "Failed to delete version");
+      }
+    } catch (error) {
+      console.error("❌ Error deleting version:", error);
+      setError("Error deleting version");
+      toast.error("Error deleting version");
+    }
+  }, [currentEssay, activeProgramId, activeEssayPromptId]);
 
   // Cleanup
   useEffect(() => {
     return () => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
+      }
+      if (activityTimeoutRef.current) {
+        clearTimeout(activityTimeoutRef.current);
       }
     };
   }, []);
@@ -1982,7 +2105,7 @@ export default function IndependentWorkspacePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
-      {/* Dynamic Header */}
+      {/* Header */}
       <header
         className="backdrop-blur-lg border-b sticky top-0 z-50 shadow-sm transition-all duration-300"
         style={{
@@ -2017,7 +2140,6 @@ export default function IndependentWorkspacePage() {
 
             {/* Right Section */}
             <div className="flex items-center space-x-4">
-              {/* University Selector */}
               <UniversitySelector
                 universities={workspaceData?.universities}
                 selectedUniversityId={selectedUniversityId}
@@ -2025,7 +2147,6 @@ export default function IndependentWorkspacePage() {
                 stats={enhancedStats}
               />
 
-              {/* Create Custom Essay Button */}
               <button
                 onClick={() => setShowStandaloneEssayModal(true)}
                 className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
@@ -2037,13 +2158,12 @@ export default function IndependentWorkspacePage() {
                 <span className="text-sm font-medium sm:hidden">New</span>
               </button>
 
-              {/* Word Count Display */}
               {currentEssay && (
                 <div className="hidden lg:flex items-center space-x-3 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                   <Target className="w-5 h-5 text-[#6C7280]" />
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-semibold text-[#002147]">
-                      {currentEssay.wordCount}/{currentEssayData.wordLimit}
+                      {currentEssay.wordCount}/{currentEssayData?.wordLimit || 0}
                     </span>
                     <div className="flex items-center space-x-1">
                       {isSaving ? (
@@ -2064,7 +2184,6 @@ export default function IndependentWorkspacePage() {
                 </div>
               )}
 
-              {/* Toggle Buttons */}
               <div className="hidden lg:flex items-center space-x-2">
                 <Button
                   variant={showAnalytics ? "default" : "outline"}
@@ -2110,6 +2229,7 @@ export default function IndependentWorkspacePage() {
           </div>
         </div>
       </header>
+
       {/* Stats Summary */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-4">
         <StatsSummary
@@ -2118,6 +2238,7 @@ export default function IndependentWorkspacePage() {
           universities={workspaceData?.universities}
         />
       </div>
+
       {/* Error Banner */}
       {error && (
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 pb-4">
@@ -2135,17 +2256,16 @@ export default function IndependentWorkspacePage() {
           </div>
         </div>
       )}
-      ;{/* Main Content */}
+
+      {/* Main Content */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 pb-8">
         <div className="grid grid-cols-12 gap-6">
-          {/* Left Sidebar - Programs & Essays List */}
+          {/* Left Sidebar */}
           <div className="col-span-12 lg:col-span-3">
             <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm sticky top-28 hover:shadow-2xl transition-shadow">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-[#002147]">Essays</h3>
-
-                  {/* Status Filter */}
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
@@ -2158,7 +2278,6 @@ export default function IndependentWorkspacePage() {
                   </select>
                 </div>
 
-                {/* Scrollable Content */}
                 <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
                   {/* Standalone Essays Section */}
                   {standaloneEssays.length > 0 && (
@@ -2178,18 +2297,11 @@ export default function IndependentWorkspacePage() {
                           <StandaloneEssayCard
                             key={essayData.promptId}
                             essayData={essayData}
-                            isActive={
-                              activeEssayPromptId === essayData.promptId
-                            }
+                            isActive={activeEssayPromptId === essayData.promptId}
                             onSelect={() =>
-                              handleEssaySelect(
-                                essayData.programId,
-                                essayData.promptId,
-                              )
+                              handleEssaySelect(essayData.programId, essayData.promptId)
                             }
-                            onDelete={() =>
-                              handleDeleteEssay(essayData.userEssay.id)
-                            }
+                            onDelete={() => handleDeleteEssay(essayData.userEssay.id)}
                             onToggleCompletion={() =>
                               toggleEssayCompletion(
                                 essayData.userEssay.id,
@@ -2236,23 +2348,22 @@ export default function IndependentWorkspacePage() {
                   )}
 
                   {/* Empty State */}
-                  {filteredPrograms.length === 0 &&
-                    standaloneEssays.length === 0 && (
-                      <div className="text-center py-8">
-                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500 mb-3">
-                          {filterStatus !== "all"
-                            ? `No ${filterStatus.replace("-", " ")} essays`
-                            : "No essays available"}
-                        </p>
-                        <button
-                          onClick={() => setShowStandaloneEssayModal(true)}
-                          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                        >
-                          Create your first custom essay →
-                        </button>
-                      </div>
-                    )}
+                  {filteredPrograms.length === 0 && standaloneEssays.length === 0 && (
+                    <div className="text-center py-8">
+                      <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 mb-3">
+                        {filterStatus !== "all"
+                          ? `No ${filterStatus.replace("-", " ")} essays`
+                          : "No essays available"}
+                      </p>
+                      <button
+                        onClick={() => setShowStandaloneEssayModal(true)}
+                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        Create your first custom essay →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -2271,20 +2382,17 @@ export default function IndependentWorkspacePage() {
                           <div
                             className="w-3 h-3 rounded-full shadow-sm flex-shrink-0"
                             style={{
-                              backgroundColor:
-                                currentProgram?.universityColor || "#002147",
+                              backgroundColor: currentProgram?.universityColor || "#002147",
                             }}
                           />
                           <span className="text-xs text-gray-500">
-                            {currentProgram?.universityName} •{" "}
-                            {currentProgram?.name}
+                            {currentProgram?.universityName} • {currentProgram?.name}
                           </span>
                         </div>
                         <h2 className="text-xl font-bold text-[#002147]">
                           {currentEssayData.promptTitle}
                         </h2>
 
-                        {/* FIXED: Full prompt text without truncation */}
                         <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                           <p className="text-xs text-blue-700 font-medium mb-1">
                             Essay Prompt:
@@ -2294,25 +2402,19 @@ export default function IndependentWorkspacePage() {
                             style={{
                               whiteSpace: "pre-wrap",
                               wordBreak: "break-word",
-                              overflow: "visible",
                             }}
                           >
                             {currentEssayData.promptText}
                           </p>
                           <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
-                            <span>
-                              Word limit: {currentEssayData.wordLimit}
-                            </span>
+                            <span>Word limit: {currentEssayData.wordLimit}</span>
                             {currentEssayData.isMandatory && (
-                              <span className="text-red-600 font-medium">
-                                • Required
-                              </span>
+                              <span className="text-red-600 font-medium">• Required</span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Versions Button */}
                       <Button
                         variant="outline"
                         size="sm"
@@ -2324,8 +2426,8 @@ export default function IndependentWorkspacePage() {
                           transition-all duration-200 font-medium shadow-sm flex-shrink-0
                           ${
                             showVersions
-                              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                              : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0"
+                              : "bg-white border-2 border-[#3598FE] text-[#3598FE]"
                           }
                         `}
                       >
@@ -2351,8 +2453,7 @@ export default function IndependentWorkspacePage() {
                     <div className="mt-6 flex justify-between items-center">
                       <div className="flex items-center space-x-4 text-xs text-[#6C7280]">
                         <span>
-                          Last modified:{" "}
-                          {new Date(currentEssay.lastModified).toLocaleString()}
+                          Last modified: {new Date(currentEssay.lastModified).toLocaleString()}
                         </span>
                         {lastSaved && (
                           <span className="text-green-600">
@@ -2363,13 +2464,9 @@ export default function IndependentWorkspacePage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          saveVersion(
-                            `Manual Save ${new Date().toLocaleTimeString()}`,
-                          )
-                        }
+                        onClick={() => saveVersion(`Manual Save ${new Date().toLocaleTimeString()}`)}
                         disabled={isSaving || isSavingVersion}
-                        className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:bg-green-100 hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm"
+                        className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:bg-green-100"
                       >
                         {isSaving || isSavingVersion ? (
                           <>
@@ -2386,41 +2483,28 @@ export default function IndependentWorkspacePage() {
                     </div>
                   </>
                 ) : currentEssayData && !currentEssay ? (
-                  /* Start Essay State - FIXED */
                   <div className="h-full flex flex-col items-center justify-center py-16">
                     <div
                       className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg"
                       style={{
-                        backgroundColor: `${
-                          currentProgram?.universityColor || "#002147"
-                        }20`,
+                        backgroundColor: `${currentProgram?.universityColor || "#002147"}20`,
                       }}
                     >
                       <FileText
                         className="w-8 h-8"
-                        style={{
-                          color: currentProgram?.universityColor || "#002147",
-                        }}
+                        style={{ color: currentProgram?.universityColor || "#002147" }}
                       />
                     </div>
                     <h3 className="text-lg font-semibold text-[#002147] mb-4">
                       {currentEssayData.promptTitle}
                     </h3>
 
-                    {/* FIXED: Full prompt text without truncation */}
                     <div className="w-full max-w-2xl px-4 mb-6">
                       <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
                         <p className="text-xs text-blue-700 font-medium mb-2">
                           Essay Prompt:
                         </p>
-                        <p
-                          className="text-sm text-gray-700 leading-relaxed"
-                          style={{
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                            overflow: "visible",
-                          }}
-                        >
+                        <p className="text-sm text-gray-700 leading-relaxed">
                           {currentEssayData.promptText}
                         </p>
                       </div>
@@ -2431,21 +2515,16 @@ export default function IndependentWorkspacePage() {
                       {currentEssayData.isMandatory && (
                         <>
                           <span>•</span>
-                          <span className="text-red-600 font-medium">
-                            Required
-                          </span>
+                          <span className="text-red-600 font-medium">Required</span>
                         </>
                       )}
                     </div>
                     <Button
                       onClick={() =>
-                        handleCreateEssay(
-                          currentProgram.id,
-                          currentEssayData.promptId,
-                        )
+                        handleCreateEssay(currentProgram.id, currentEssayData.promptId)
                       }
                       disabled={isCreatingEssay}
-                      className="bg-[#3598FE] hover:bg-[#2563EB] shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200"
+                      className="bg-[#3598FE] hover:bg-[#2563EB]"
                     >
                       {isCreatingEssay ? (
                         <>
@@ -2467,8 +2546,7 @@ export default function IndependentWorkspacePage() {
                       Select an Essay
                     </h3>
                     <p className="text-sm text-gray-600 text-center max-w-md">
-                      Choose a program and essay from the sidebar to start
-                      editing
+                      Choose a program and essay from the sidebar to start editing
                     </p>
                   </div>
                 )}
@@ -2476,158 +2554,31 @@ export default function IndependentWorkspacePage() {
             </Card>
           </div>
 
-          {/* Right Sidebar - Panels in Order */}
+          {/* Right Sidebar - Panels */}
           <div className="col-span-12 lg:col-span-3 space-y-6">
-            {/* Render panels based on order */}
             {panelOrder.map((panelName) => {
-              // Versions Panel
               if (panelName === "versions" && showVersions && currentEssay) {
                 return (
                   <VersionManager
                     key={`versions-${currentEssay.id}`}
                     versions={currentEssay.versions || []}
                     currentContent={currentEssay.content}
-                    onRestoreVersion={async (versionId) => {
-                      try {
-                        setError(null);
-                        const response = await fetch(`/api/essay/independent`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          credentials: "include",
-                          body: JSON.stringify({
-                            action: "restore_version",
-                            essayId: currentEssay.id,
-                            versionId,
-                          }),
-                        });
-
-                        if (response.ok) {
-                          const result = await response.json();
-
-                          // Update local state with restored content
-                          if (result.essay) {
-                            setWorkspaceData((prev) => {
-                              if (!prev) return prev;
-
-                              const updated = {
-                                ...prev,
-                                programs: prev.programs.map((program) =>
-                                  program.id === activeProgramId
-                                    ? {
-                                        ...program,
-                                        essays: program.essays.map(
-                                          (essayData) =>
-                                            essayData.promptId ===
-                                            activeEssayPromptId
-                                              ? {
-                                                  ...essayData,
-                                                  userEssay: result.essay,
-                                                }
-                                              : essayData,
-                                        ),
-                                      }
-                                    : program,
-                                ),
-                              };
-
-                              updated.stats = calculateStats(updated);
-                              return updated;
-                            });
-
-                            lastContentRef.current = result.essay.content || "";
-                          }
-
-                          setHasUnsavedChanges(false);
-                          setLastSaved(new Date());
-                          toast.success("Version restored successfully!");
-                        } else {
-                          const errorData = await response.json();
-                          setError(
-                            errorData.error || "Failed to restore version",
-                          );
-                        }
-                      } catch (error) {
-                        console.error("Error restoring version:", error);
-                        setError("Error restoring version");
-                      }
-                    }}
-                    onDeleteVersion={async (versionId) => {
-                      try {
-                        setError(null);
-                        const response = await fetch(`/api/essay/independent`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          credentials: "include",
-                          body: JSON.stringify({
-                            action: "delete_version",
-                            versionId,
-                            essayId: currentEssay.id,
-                          }),
-                        });
-
-                        if (response.ok) {
-                          // Update local state to remove the version
-                          setWorkspaceData((prev) => {
-                            if (!prev) return prev;
-
-                            const updated = {
-                              ...prev,
-                              programs: prev.programs.map((program) =>
-                                program.id === activeProgramId
-                                  ? {
-                                      ...program,
-                                      essays: program.essays.map((essayData) =>
-                                        essayData.promptId ===
-                                        activeEssayPromptId
-                                          ? {
-                                              ...essayData,
-                                              userEssay: {
-                                                ...essayData.userEssay,
-                                                versions:
-                                                  essayData.userEssay?.versions?.filter(
-                                                    (v) => v.id !== versionId,
-                                                  ) || [],
-                                              },
-                                            }
-                                          : essayData,
-                                      ),
-                                    }
-                                  : program,
-                              ),
-                            };
-
-                            updated.stats = calculateStats(updated);
-                            return updated;
-                          });
-                          toast.success("Version deleted successfully");
-                        } else {
-                          const errorData = await response.json();
-                          setError(
-                            errorData.error || "Failed to delete version",
-                          );
-                        }
-                      } catch (error) {
-                        console.error("Error deleting version:", error);
-                        setError("Error deleting version");
-                      }
-                    }}
+                    onRestoreVersion={handleRestoreVersion}
+                    onDeleteVersion={handleDeleteVersion}
                     essayId={currentEssay.id}
-                    universityName={
-                      currentProgram?.universityName || "University"
-                    }
+                    universityName={currentProgram?.universityName || "University"}
                     isLoading={loading}
                   />
                 );
               }
 
-              // Analytics Panel
               if (panelName === "analytics" && showAnalytics && currentEssay) {
                 return (
                   <EssayAnalytics
                     key={`analytics-${currentEssay.id}`}
                     essay={{
                       ...currentEssay,
-                      wordLimit: currentEssayData.wordLimit,
+                      wordLimit: currentEssayData?.wordLimit,
                     }}
                     allEssays={
                       currentProgram?.essays
@@ -2638,27 +2589,22 @@ export default function IndependentWorkspacePage() {
                         })) || []
                     }
                     essayId={currentEssay.id}
-                    userId={session?.userId}
-                    universityName={
-                      currentProgram?.universityName || "University"
-                    }
+                    userId={userId}
+                    universityName={currentProgram?.universityName || "University"}
                   />
                 );
               }
 
-              // AI Panel
               if (panelName === "ai" && showAI && currentEssay) {
                 return (
                   <AISuggestions
                     key={`ai-${currentEssay.id}`}
                     content={currentEssay.content}
-                    prompt={currentEssayData.promptText}
+                    prompt={currentEssayData?.promptText}
                     wordCount={currentEssay.wordCount}
-                    wordLimit={currentEssayData.wordLimit}
+                    wordLimit={currentEssayData?.wordLimit}
                     essayId={currentEssay.id}
-                    universityName={
-                      currentProgram?.universityName || "University"
-                    }
+                    universityName={currentProgram?.universityName || "University"}
                   />
                 );
               }
@@ -2666,17 +2612,15 @@ export default function IndependentWorkspacePage() {
               return null;
             })}
 
-            {/* Empty state for right sidebar */}
             {!currentEssay && (
-              <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm p-6 hover:shadow-2xl transition-shadow">
+              <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm p-6">
                 <div className="text-center">
                   <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-sm font-semibold text-gray-600 mb-2">
                     AI Analysis & Versions
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Select an essay to view analytics, AI suggestions, and
-                    version history
+                    Select an essay to view analytics, AI suggestions, and version history
                   </p>
                 </div>
               </Card>
@@ -2684,6 +2628,7 @@ export default function IndependentWorkspacePage() {
           </div>
         </div>
       </div>
+
       {/* Standalone Essay Modal */}
       <StandaloneEssayModal
         isOpen={showStandaloneEssayModal}
@@ -2692,44 +2637,27 @@ export default function IndependentWorkspacePage() {
         savedUniversities={workspaceData?.universities}
         isCreating={isCreatingStandaloneEssay}
       />
+
       {/* Animations */}
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-
         @keyframes slideUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.25s ease-out;
-        }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        .animate-slideUp { animation: slideUp 0.25s ease-out; }
       `}</style>
+
       {/* Footer */}
       <footer className="bg-white/50 backdrop-blur-sm border-t border-gray-200/50">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center space-x-4">
-              <span>
-                {workspaceData?.universities?.length || 0} saved universities
-              </span>
+              <span>{workspaceData?.universities?.length || 0} saved universities</span>
               <span>•</span>
               <span>Auto-save enabled (4 min inactivity)</span>
             </div>
