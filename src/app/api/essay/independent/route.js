@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FIXED VERSION
+// src/app/api/essay/independent/route.js - UPDATED FOR TRULY STANDALONE ESSAYS
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -169,11 +169,12 @@ async function getUserStudyLevel(userId) {
 }
 
 // ==========================================
-// STANDALONE ESSAY HELPERS - FIXED
+// STANDALONE ESSAY HELPERS - UPDATED FOR NO UNIVERSITY
 // ==========================================
 
 /**
  * Get or create a STANDALONE program for a specific university
+ * Only used when university IS tagged
  */
 async function getOrCreateStandaloneProgramForUniversity(universityId) {
   try {
@@ -207,100 +208,50 @@ async function getOrCreateStandaloneProgramForUniversity(universityId) {
 }
 
 /**
- * Get or create a STANDALONE program for personal essays (no university tagged)
+ * Get or create a truly independent STANDALONE program (no university)
  */
-async function getOrCreatePersonalStandaloneProgram(userId, savedUniversities = []) {
+async function getOrCreateIndependentStandaloneProgram(userId) {
   try {
-    // Try to find existing STANDALONE program that has user's essays
+    // Try to find existing independent STANDALONE program for this user
     const existingProgram = await prisma.program.findFirst({
       where: {
         degreeType: "STANDALONE",
-        programName: {
-          contains: "Personal"
-        },
+        universityId: null, // No university = truly independent
+        programName: "Independent Essays",
         essays: {
           some: { userId }
         }
-      },
-      include: {
-        university: true
       }
     });
 
     if (existingProgram) {
-      console.log(`✅ Found existing personal STANDALONE program`);
+      console.log(`✅ Found existing independent STANDALONE program`);
       return existingProgram;
     }
 
-    // Need to find a university to attach the program to
-    let targetUniversityId = null;
-
-    // First try user's saved universities
-    if (savedUniversities.length > 0) {
-      for (const savedUni of savedUniversities) {
-        const uniId = savedUni.id || savedUni.universityId || savedUni.university?.id;
-        if (uniId) {
-          const uniExists = await prisma.university.findUnique({
-            where: { id: uniId }
-          });
-          if (uniExists) {
-            targetUniversityId = uniId;
-            console.log(`✅ Using saved university for personal essays: ${uniExists.universityName}`);
-            break;
-          }
-        }
-      }
-    }
-
-    // If no saved university found, get any active university
-    if (!targetUniversityId) {
-      const anyUniversity = await prisma.university.findFirst({
-        where: { isActive: true },
-        orderBy: { universityName: 'asc' }
-      });
-
-      if (!anyUniversity) {
-        throw new Error("No universities available in the system");
-      }
-      targetUniversityId = anyUniversity.id;
-      console.log(`✅ Using fallback university for personal essays: ${anyUniversity.universityName}`);
-    }
-
-    // Check if there's already a STANDALONE personal program for this university
-    let program = await prisma.program.findFirst({
-      where: {
-        universityId: targetUniversityId,
+    // Create a new independent program (no university)
+    const program = await prisma.program.create({
+      data: {
+        universityId: null, // This is key - no university association
+        programName: "Independent Essays",
+        programSlug: `independent-essays-${userId.slice(-8)}-${Date.now()}`,
         degreeType: "STANDALONE",
-        programName: {
-          contains: "Personal"
-        }
+        isActive: true,
+        programDescription: "Independent standalone essays - not tied to any university",
       }
     });
-
-    if (!program) {
-      program = await prisma.program.create({
-        data: {
-          universityId: targetUniversityId,
-          programName: "Personal Essays",
-          programSlug: `personal-essays-${Date.now()}`,
-          degreeType: "STANDALONE",
-          isActive: true,
-          programDescription: "Personal standalone essays",
-        }
-      });
-      console.log(`✅ Created personal STANDALONE program`);
-    }
-
+    
+    console.log(`✅ Created independent STANDALONE program (no university)`);
     return program;
 
   } catch (error) {
-    console.error("Error getting/creating personal standalone program:", error);
+    console.error("Error getting/creating independent standalone program:", error);
     throw error;
   }
 }
 
 // ==========================================
-// GET: Fetch user's essays - UPDATED TO HANDLE STANDALONE
+// GET: Fetch user's essays - UPDATED TO HANDLE INDEPENDENT STANDALONE
 // ==========================================
 export async function GET(request) {
   try {
@@ -361,25 +312,8 @@ export async function GET(request) {
 
     console.log(`📋 Where conditions count: ${whereConditions.length}`);
 
-    // If no conditions, return empty
-    if (whereConditions.length === 0) {
-      console.log("⚠️ No universities found for user");
-      return NextResponse.json({
-        universities: [],
-        programs: [],
-        stats: {
-          totalPrograms: 0,
-          savedUniversitiesCount: 0,
-          totalEssayPrompts: 0,
-          completedEssays: 0,
-          totalWords: 0,
-          averageProgress: 0,
-        },
-        query: { universityId },
-      });
-    }
-
-    const universities = await prisma.university.findMany({
+    // Fetch universities (with programs) as before
+    const universities = whereConditions.length > 0 ? await prisma.university.findMany({
       where: {
         OR: whereConditions
       },
@@ -431,9 +365,50 @@ export async function GET(request) {
           },
         },
       },
-    });
+    }) : [];
 
     console.log(`✅ Found ${universities.length} universities in database`);
+
+    // Fetch independent programs (with no university)
+    const independentPrograms = await prisma.program.findMany({
+      where: {
+        universityId: null, // No university = independent
+        degreeType: "STANDALONE",
+        essays: {
+          some: { userId }
+        },
+        isActive: true
+      },
+      include: {
+        essayPrompts: {
+          where: { isActive: true },
+          include: {
+            essays: {
+              where: { userId },
+              include: {
+                versions: {
+                  orderBy: { timestamp: "desc" },
+                  take: 20,
+                  include: {
+                    aiResults: {
+                      orderBy: { createdAt: "desc" },
+                      take: 1,
+                    },
+                  },
+                },
+                aiResults: {
+                  where: { essayVersionId: null },
+                  orderBy: { createdAt: "desc" },
+                  take: 5,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log(`✅ Found ${independentPrograms.length} independent programs (no university)`);
 
     // Get user study level for filtering
     let userStudyLevel = null;
@@ -446,6 +421,7 @@ export async function GET(request) {
     const allPrograms = [];
     const universitiesData = [];
 
+    // Process universities and their programs
     for (const university of universities) {
       // Filter programs - always include STANDALONE, otherwise filter by study level
       const filteredPrograms = university.programs.filter(program => {
@@ -499,8 +475,21 @@ export async function GET(request) {
       allPrograms.push(...programsWithUniversity);
     }
 
+    // Add independent programs (with no university)
+    const independentProgramsWithMetadata = independentPrograms.map(program => ({
+      ...program,
+      universityName: null,
+      universityId: null,
+      universitySlug: null,
+      universityColor: DEFAULT_UNIVERSITY_COLOR,
+      isIndependent: true,
+    }));
+
+    allPrograms.push(...independentProgramsWithMetadata);
+
     const formattedPrograms = allPrograms.map(program => {
       const isStandalone = program.degreeType === "STANDALONE";
+      const isIndependent = program.universityId === null;
       
       return {
         id: program.id,
@@ -513,6 +502,7 @@ export async function GET(request) {
         degreeType: program.degreeType,
         description: program.programDescription,
         isCustomProgram: isStandalone,
+        isIndependentProgram: isIndependent,
         
         deadlines: program.admissions?.flatMap(
           admission =>
@@ -539,6 +529,7 @@ export async function GET(request) {
             programName: program.programName,
             universityName: program.universityName,
             isCustomEssay: isStandalone,
+            isIndependentEssay: isIndependent,
             
             userEssay: userEssay
               ? {
@@ -873,7 +864,7 @@ export async function PUT(request) {
 }
 
 // ==========================================
-// CREATE STANDALONE ESSAY - FIXED TO USE STANDALONE ONLY
+// CREATE STANDALONE ESSAY - UPDATED FOR TRULY INDEPENDENT ESSAYS
 // ==========================================
 async function createStandaloneEssay(data) {
   const {
@@ -883,7 +874,6 @@ async function createStandaloneEssay(data) {
     wordLimit,
     taggedUniversityId,
     priority = 'medium',
-    token
   } = data;
 
   console.log("🚀 Creating standalone essay:", {
@@ -912,7 +902,7 @@ async function createStandaloneEssay(data) {
     let targetUniversityId = null;
     let universityData = null;
 
-    // CASE 1: University IS tagged
+    // CASE 1: University IS tagged - attach to that university
     if (taggedUniversityId && taggedUniversityId.trim() !== '') {
       console.log(`🎯 University tagged: ${taggedUniversityId}`);
       
@@ -934,29 +924,16 @@ async function createStandaloneEssay(data) {
       targetProgram = await getOrCreateStandaloneProgramForUniversity(taggedUniversityId);
       console.log(`✅ Using university: ${universityData.universityName}, program: ${targetProgram.id}`);
     }
-    // CASE 2: No university tagged - create personal STANDALONE program
+    // CASE 2: No university tagged - create truly independent essay (no university)
     else {
-      console.log(`🎯 No university tagged - creating personal STANDALONE essay`);
+      console.log(`🎯 No university tagged - creating truly independent essay`);
       
-      // Fetch user's saved universities
-      let savedUniversities = [];
-      if (token) {
-        const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(token);
-        savedUniversities = savedUnisResult.universities || [];
-      }
+      // Get or create independent STANDALONE program (no university)
+      targetProgram = await getOrCreateIndependentStandaloneProgram(userId);
+      targetUniversityId = null; // No university
+      universityData = null; // No university data
 
-      // Get or create personal STANDALONE program
-      targetProgram = await getOrCreatePersonalStandaloneProgram(userId, savedUniversities);
-      targetUniversityId = targetProgram.universityId;
-
-      // Fetch university data
-      if (targetUniversityId) {
-        universityData = await prisma.university.findUnique({
-          where: { id: targetUniversityId }
-        });
-      }
-
-      console.log(`✅ Using personal STANDALONE program: ${targetProgram.id}`);
+      console.log(`✅ Using independent STANDALONE program: ${targetProgram.id} (no university)`);
     }
 
     if (!targetProgram) {
@@ -1017,8 +994,9 @@ async function createStandaloneEssay(data) {
       essayId: essay.id,
       programId: targetProgram.id,
       universityId: targetUniversityId,
-      universityName: universityData?.universityName,
+      universityName: universityData?.universityName || 'Independent',
       degreeType: targetProgram.degreeType,
+      isIndependent: !targetUniversityId,
     });
 
     // Format response
@@ -1026,8 +1004,8 @@ async function createStandaloneEssay(data) {
       id: essay.id,
       programId: targetProgram.id,
       universityId: targetUniversityId,
-      universityName: universityData?.universityName || 'Personal',
-      universitySlug: universityData?.slug || 'personal',
+      universityName: universityData?.universityName || 'Independent',
+      universitySlug: universityData?.slug || 'independent',
       universityColor: DEFAULT_UNIVERSITY_COLOR,
       title: customTitle,
       prompt: customPrompt,
@@ -1047,6 +1025,7 @@ async function createStandaloneEssay(data) {
       aiResults: essay.aiResults || [],
       isCustom: true,
       isTaggedToUniversity: !!taggedUniversityId,
+      isIndependent: !taggedUniversityId,
       degreeType: targetProgram.degreeType,
       essayPromptId: essayPrompt.id,
     };
@@ -1057,7 +1036,7 @@ async function createStandaloneEssay(data) {
       essayPromptId: essayPrompt.id,
       programId: targetProgram.id,
       universityId: targetUniversityId,
-      message: 'Custom essay created successfully'
+      message: taggedUniversityId ? 'Custom essay created successfully' : 'Independent essay created successfully'
     });
   } catch (error) {
     console.error('❌ Error creating standalone essay:', error);
@@ -1315,7 +1294,7 @@ async function autoSave(data) {
 }
 
 // ==========================================
-// Delete essay - FIXED FOR CUSTOM ESSAYS
+// Delete essay - UPDATED FOR INDEPENDENT ESSAYS
 // ==========================================
 async function deleteEssay(data) {
   const { essayId, userId } = data;
@@ -1351,9 +1330,10 @@ async function deleteEssay(data) {
 
     // Check if this is a custom essay (STANDALONE program)
     const isStandalone = essay.essayPrompt?.program?.degreeType === "STANDALONE";
+    const isIndependent = essay.essayPrompt?.program?.universityId === null;
     const isCustomEssay = isStandalone;
 
-    console.log(`🗑️ Deleting essay ${essayId}, isCustomEssay: ${isCustomEssay}`);
+    console.log(`🗑️ Deleting essay ${essayId}, isCustomEssay: ${isCustomEssay}, isIndependent: ${isIndependent}`);
 
     if (isCustomEssay) {
       // For custom essays: delete everything (essay, prompt, and related data)
@@ -1417,7 +1397,7 @@ async function deleteEssay(data) {
       console.log("✅ Custom essay deleted entirely");
       return NextResponse.json({ 
         success: true,
-        message: 'Custom essay deleted entirely'
+        message: isIndependent ? 'Independent essay deleted entirely' : 'Custom essay deleted entirely'
       });
     } else {
       // For non-custom essays: only delete content and related data, but keep essay record
@@ -1889,8 +1869,9 @@ async function getEssayAnalytics(data) {
       },
       program: essay.program ? {
         name: essay.program.programName,
-        university: essay.program.university.universityName,
+        university: essay.program.university?.universityName || 'Independent',
         degreeType: essay.program.degreeType,
+        isIndependent: !essay.program.universityId,
       } : null,
     };
 
@@ -2013,11 +1994,11 @@ async function performAIAnalysis(data) {
       });
     }
 
-    const analysisPrompt = `You are a Senior Admissions Officer at ${essay.program?.university?.universityName || "a top university"} with 15+ years of experience evaluating ${essay.program?.degreeType || "graduate"} applications.
+    const analysisPrompt = `You are a Senior Admissions Officer with 15+ years of experience evaluating ${essay.program?.degreeType || "graduate"} applications.
 INSTITUTIONAL CONTEXT:
 
-Institution: ${essay.program?.university?.universityName || "University"}
-Program: ${essay.program?.programName || "Graduate Program"} (${essay.program?.degreeType || "Graduate"})
+Institution: ${essay.program?.university?.universityName || "Independent Essay"}
+Program: ${essay.program?.programName || "Independent Essay"} (${essay.program?.degreeType || "STANDALONE"})
 Essay Prompt: "${essay.essayPrompt?.promptText || essay.title}"
 Word Limit: ${essay.essayPrompt?.wordLimit || essay.wordLimit}
 Current Word Count: ${wordCount}
@@ -2030,9 +2011,6 @@ PROMPT ADHERENCE: Does this directly answer what we asked?
 NARRATIVE SOPHISTICATION: Is this a compelling story or generic statements?
 LEADERSHIP EVIDENCE: Can I see concrete examples of impact and initiative?
 INTELLECTUAL CURIOSITY: Does this show deep thinking and genuine interest?
-PROGRAM FIT: Why specifically our program?
-DIFFERENTIATION: What makes this applicant unique?
-MATURITY & SELF-AWARENESS: Does this show genuine reflection and growth?
 COMMUNICATION SKILLS: Can they articulate complex ideas clearly?
 Return ONLY valid JSON in this exact format:
 {
