@@ -563,24 +563,7 @@ const LockedTabContent = ({
         </ul>
       </div>
 
-      <Button
-        onClick={onAddUniversity}
-        disabled={isAddingUniversity}
-        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/30 px-8 py-6"
-      >
-        {isAddingUniversity ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Adding University...
-          </>
-        ) : (
-          <>
-            <BookmarkPlus className="w-4 h-4 mr-2" />
-            Add to Dashboard
-          </>
-        )}
-      </Button>
-
+     
       <p className="text-xs text-white/50 mt-4">
         This will save the university to your application dashboard
       </p>
@@ -2026,8 +2009,8 @@ const ApplicationTabs = ({ university }) => {
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}
                   >
                     <PriorityIcon className="w-3 h-3" />
-                    {essay.priority.charAt(0).toUpperCase() +
-                      essay.priority.slice(1)}{" "}
+                    {essay?.priority?.charAt(0).toUpperCase() +
+                      essay?.priority?.slice(1)}{" "}
                     Priority
                   </span>
                 </div>
