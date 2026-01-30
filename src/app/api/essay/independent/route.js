@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FIXED brandColor ERROR
+// src/app/api/essay/independent/route.js - COMPLETE FIXED VERSION
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -46,7 +46,7 @@ async function authenticateUser(request) {
 async function callGeminiViaOpenRouter(prompt, maxTokens = 4096) {
   try {
     console.log(`🔌 Calling OpenRouter with Gemini model: ${GEMINI_MODEL}`);
-    
+
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
@@ -102,7 +102,7 @@ async function callGeminiViaOpenRouter(prompt, maxTokens = 4096) {
 async function fetchSavedUniversitiesFromExternalAPI(token) {
   try {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-    
+
     const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
       method: "GET",
       headers: {
@@ -118,7 +118,7 @@ async function fetchSavedUniversitiesFromExternalAPI(token) {
     }
 
     const data = await response.json();
-    
+
     let universities = [];
     if (Array.isArray(data)) {
       universities = data;
@@ -139,11 +139,48 @@ async function fetchSavedUniversitiesFromExternalAPI(token) {
 }
 
 // ==========================================
-// STANDALONE ESSAY HELPERS
+// GET USER STUDY LEVEL HELPER
+// ==========================================
+async function getUserStudyLevel(userId) {
+  try {
+    const userProfile = await prisma.userProfile.findUnique({
+      where: { userId },
+      select: { studyLevel: true }
+    });
+    
+    if (userProfile?.studyLevel) {
+      // Normalize study level
+      const level = userProfile.studyLevel.toUpperCase().trim();
+      // Map common variations
+      if (level.includes('MASTER') || level === 'MS' || level === 'MBA' || level === 'MA') {
+        return 'MASTERS';
+      }
+      if (level.includes('BACHELOR') || level === 'BS' || level === 'BA') {
+        return 'BACHELORS';
+      }
+      if (level.includes('PHD') || level.includes('DOCTOR')) {
+        return 'PHD';
+      }
+      return level;
+    }
+    return 'MASTERS'; // Default fallback
+  } catch (error) {
+    console.warn("Could not fetch user study level:", error.message);
+    return 'MASTERS';
+  }
+}
+
+// ==========================================
+// STANDALONE ESSAY HELPERS - FIXED
 // ==========================================
 
-async function getOrCreateStandaloneProgram(universityId) {
+/**
+ * Get or create a STANDALONE program for a specific university
+ * Used when university IS tagged for custom essays
+ */
+async function getOrCreateStandaloneProgramForUniversity(universityId, userStudyLevel) {
   try {
+    // First try to find existing STANDALONE program for this university
     let standaloneProgram = await prisma.program.findFirst({
       where: {
         universityId,
@@ -155,14 +192,14 @@ async function getOrCreateStandaloneProgram(universityId) {
       standaloneProgram = await prisma.program.create({
         data: {
           universityId,
-          programName: "My Custom Essays",
-          programSlug: `${universityId}-custom-essays-${Date.now()}`,
+          programName: "Custom Essays",
+          programSlug: `custom-essays-${universityId.slice(-8)}-${Date.now()}`,
           degreeType: "STANDALONE",
           isActive: true,
           programDescription: "Custom standalone essays for this university",
         }
       });
-      console.log(`✅ Created standalone program for university ${universityId}`);
+      console.log(`✅ Created STANDALONE program for university ${universityId}`);
     }
 
     return standaloneProgram;
@@ -172,29 +209,75 @@ async function getOrCreateStandaloneProgram(universityId) {
   }
 }
 
-async function getOrCreateVirtualUniversity() {
+/**
+ * Get or create a user-level custom program based on study level
+ * Used when NO university is tagged - creates program under first saved university
+ * with user's study level as degreeType
+ */
+async function getOrCreateUserCustomProgram(userId, userStudyLevel, savedUniversities = []) {
   try {
-    let virtualUni = await prisma.university.findFirst({
-      where: { slug: "my-custom-essays" }
+    // Find if user already has a custom program with their study level
+    const existingProgram = await prisma.program.findFirst({
+      where: {
+        degreeType: userStudyLevel,
+        programName: { contains: "Personal Essays" },
+        essays: {
+          some: { userId }
+        }
+      }
     });
 
-    if (!virtualUni) {
-      virtualUni = await prisma.university.create({
-        data: {
-          universityName: "My Essays",
-          slug: "my-custom-essays",
-          city: "Personal",
-          country: "Personal",
-          isActive: true,
-          shortDescription: "Your personal custom essays",
-        }
-      });
-      console.log(`✅ Created virtual university for custom essays`);
+    if (existingProgram) {
+      return existingProgram;
     }
 
-    return virtualUni;
+    // Need to attach to a university - use first saved university if available
+    let targetUniversityId = null;
+
+    if (savedUniversities.length > 0) {
+      const firstSaved = savedUniversities[0];
+      targetUniversityId = firstSaved.id || firstSaved.universityId || firstSaved.university?.id;
+      
+      // Verify it exists in our database
+      if (targetUniversityId) {
+        const uniExists = await prisma.university.findUnique({
+          where: { id: targetUniversityId }
+        });
+        if (!uniExists) {
+          targetUniversityId = null;
+        }
+      }
+    }
+
+    // If no saved university, find any university in the system
+    if (!targetUniversityId) {
+      const anyUniversity = await prisma.university.findFirst({
+        where: { isActive: true },
+        orderBy: { universityName: 'asc' }
+      });
+      
+      if (!anyUniversity) {
+        throw new Error("No universities available in the system. Please contact support.");
+      }
+      targetUniversityId = anyUniversity.id;
+    }
+
+    // Create the user's custom program with their study level
+    const customProgram = await prisma.program.create({
+      data: {
+        universityId: targetUniversityId,
+        programName: `Personal Essays - ${userStudyLevel}`,
+        programSlug: `personal-essays-${userId.slice(-8)}-${userStudyLevel.toLowerCase()}-${Date.now()}`,
+        degreeType: userStudyLevel, // Use user's study level as degreeType
+        isActive: true,
+        programDescription: `Personal custom essays for ${userStudyLevel} level`,
+      }
+    });
+
+    console.log(`✅ Created custom program for user ${userId} with study level ${userStudyLevel}`);
+    return customProgram;
   } catch (error) {
-    console.error("Error getting/creating virtual university:", error);
+    console.error("Error getting/creating user custom program:", error);
     throw error;
   }
 }
@@ -211,16 +294,22 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const universityId = searchParams.get("universityId");
+    const includeCustom = searchParams.get("includeCustom") !== "false"; // Default true
     const userId = auth.userId;
-    
-    console.log(`✅ Fetching essays for user ${userId}, universityId: ${universityId}`);
+
+    console.log(`✅ Fetching essays for user ${userId}, universityId: ${universityId}, includeCustom: ${includeCustom}`);
+
+    // Get user's study level for filtering
+    const userStudyLevel = await getUserStudyLevel(userId);
+    console.log(`📚 User study level: ${userStudyLevel}`);
 
     const whereConditions = [];
-    
+
     if (universityId) {
       console.log(`🔍 Filtering for specific university: ${universityId}`);
       whereConditions.push({ id: universityId });
     } else {
+      // Fetch saved universities from external API
       const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
       const savedUniversities = savedUnisResult.universities || [];
       
@@ -237,11 +326,40 @@ export async function GET(request) {
       if (ids.length > 0) whereConditions.push({ id: { in: ids } });
       if (names.length > 0) whereConditions.push({ universityName: { in: names } });
       if (slugs.length > 0) whereConditions.push({ slug: { in: slugs } });
-
-      whereConditions.push({ slug: "my-custom-essays" });
     }
 
-    console.log(`📋 Where conditions:`, JSON.stringify(whereConditions));
+    // If no conditions, get all universities that have user's essays
+    if (whereConditions.length === 0) {
+      const userEssays = await prisma.essay.findMany({
+        where: { userId },
+        select: { program: { select: { universityId: true } } },
+        distinct: ['programId']
+      });
+      
+      const userUniversityIds = [...new Set(userEssays.map(e => e.program?.universityId).filter(Boolean))];
+      if (userUniversityIds.length > 0) {
+        whereConditions.push({ id: { in: userUniversityIds } });
+      }
+    }
+
+    console.log(`📋 Where conditions count: ${whereConditions.length}`);
+
+    // Handle case where no conditions exist
+    if (whereConditions.length === 0) {
+      return NextResponse.json({
+        universities: [],
+        programs: [],
+        stats: {
+          totalPrograms: 0,
+          savedUniversitiesCount: 0,
+          totalEssayPrompts: 0,
+          completedEssays: 0,
+          totalWords: 0,
+          averageProgress: 0,
+        },
+        query: { universityId },
+      });
+    }
 
     const universities = await prisma.university.findMany({
       where: {
@@ -303,58 +421,140 @@ export async function GET(request) {
     const universitiesData = [];
 
     for (const university of universities) {
-      const filteredPrograms = university.programs.filter(async program => {
+      // Filter programs based on user's study level or STANDALONE type
+      const filteredPrograms = university.programs.filter(program => {
+        // Always include STANDALONE (custom essays)
         if (program.degreeType === "STANDALONE") {
           return true;
         }
         
-        if (!universityId) {
-          let userStudyLevel = null;
-          try {
-            const userProfile = await prisma.userProfile.findUnique({
-              where: { userId },
-              select: { studyLevel: true },
-            });
-            userStudyLevel = userProfile?.studyLevel?.toLowerCase();
-            
-            if (userStudyLevel) {
-              return program.degreeType?.toLowerCase() === userStudyLevel;
-            }
-          } catch (profileError) {
-            console.warn("Could not fetch user profile:", profileError.message);
-          }
+        // Include programs matching user's study level
+        if (program.degreeType?.toUpperCase() === userStudyLevel) {
+          return true;
+        }
+
+        // Include personal essays programs
+        if (program.programName?.includes("Personal Essays")) {
+          return true;
         }
         
-        return true;
+        // If no specific filter, include all programs with essays
+        const hasUserEssays = program.essayPrompts?.some(
+          prompt => prompt.essays?.some(essay => essay.userId === userId)
+        );
+        return hasUserEssays;
       });
 
-      universitiesData.push({
-        id: university.id,
-        name: university.universityName,
-        slug: university.slug,
-        description: university.shortDescription || university.overview,
-        website: university.websiteUrl,
-        city: university.city,
-        country: university.country,
-        // ✅ FIX: Use default color since brandColor doesn't exist
-        color: DEFAULT_UNIVERSITY_COLOR,
-        programCount: filteredPrograms.length,
+      // Only add university if it has relevant programs
+      if (filteredPrograms.length > 0) {
+        universitiesData.push({
+          id: university.id,
+          name: university.universityName,
+          slug: university.slug,
+          description: university.shortDescription || university.overview,
+          website: university.websiteUrl,
+          city: university.city,
+          country: university.country,
+          color: DEFAULT_UNIVERSITY_COLOR,
+          programCount: filteredPrograms.length,
+        });
+
+        const programsWithUniversity = filteredPrograms.map(program => ({
+          ...program,
+          universityName: university.universityName,
+          universityId: university.id,
+          universitySlug: university.slug,
+          universityColor: DEFAULT_UNIVERSITY_COLOR,
+          isCustomProgram: program.degreeType === "STANDALONE" || program.programName?.includes("Personal Essays"),
+        }));
+
+        allPrograms.push(...programsWithUniversity);
+      }
+    }
+
+    // Also fetch user's custom essays that might be in other programs
+    if (includeCustom) {
+      const customEssays = await prisma.essay.findMany({
+        where: {
+          userId,
+          program: {
+            OR: [
+              { degreeType: "STANDALONE" },
+              { programName: { contains: "Personal Essays" } },
+              { degreeType: userStudyLevel }
+            ]
+          }
+        },
+        include: {
+          program: {
+            include: {
+              university: true,
+              essayPrompts: {
+                include: {
+                  essays: {
+                    where: { userId }
+                  }
+                }
+              }
+            }
+          },
+          essayPrompt: true,
+          versions: {
+            orderBy: { timestamp: "desc" },
+            take: 20,
+            include: {
+              aiResults: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+              },
+            },
+          },
+          aiResults: {
+            where: { essayVersionId: null },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+        }
       });
 
-      const programsWithUniversity = filteredPrograms.map(program => ({
-        ...program,
-        universityName: university.universityName,
-        universityId: university.id,
-        universitySlug: university.slug,
-        // ✅ FIX: Use default color
-        universityColor: DEFAULT_UNIVERSITY_COLOR,
-      }));
+      // Add custom essays to programs if not already included
+      for (const essay of customEssays) {
+        const programExists = allPrograms.some(p => p.id === essay.programId);
+        if (!programExists && essay.program) {
+          const uni = essay.program.university;
+          
+          // Check if university is already in our list
+          const uniExists = universitiesData.some(u => u.id === uni?.id);
+          if (!uniExists && uni) {
+            universitiesData.push({
+              id: uni.id,
+              name: uni.universityName,
+              slug: uni.slug,
+              description: uni.shortDescription || uni.overview,
+              website: uni.websiteUrl,
+              city: uni.city,
+              country: uni.country,
+              color: DEFAULT_UNIVERSITY_COLOR,
+              programCount: 1,
+            });
+          }
 
-      allPrograms.push(...programsWithUniversity);
+          allPrograms.push({
+            ...essay.program,
+            universityName: uni?.universityName || 'Personal',
+            universityId: uni?.id,
+            universitySlug: uni?.slug,
+            universityColor: DEFAULT_UNIVERSITY_COLOR,
+            isCustomProgram: true,
+          });
+        }
+      }
     }
 
     const formattedPrograms = allPrograms.map(program => {
-      const isStandalone = program.degreeType === "STANDALONE" || program.isCustom;
+      const isCustom = program.degreeType === "STANDALONE" || 
+                       program.programName?.includes("Personal Essays") ||
+                       program.isCustomProgram;
       
       return {
         id: program.id,
@@ -366,6 +566,7 @@ export async function GET(request) {
         universityColor: program.universityColor,
         degreeType: program.degreeType,
         description: program.programDescription,
+        isCustomProgram: isCustom,
         
         deadlines: program.admissions?.flatMap(
           admission =>
@@ -379,7 +580,7 @@ export async function GET(request) {
         ) || [],
         
         essays: program.essayPrompts?.map(prompt => {
-          const userEssay = prompt.essays?.[0] || null;
+          const userEssay = prompt.essays?.find(e => e.userId === userId) || null;
           
           return {
             promptId: prompt.id,
@@ -391,6 +592,7 @@ export async function GET(request) {
             programId: program.id,
             programName: program.programName,
             universityName: program.universityName,
+            isCustomEssay: isCustom,
             
             userEssay: userEssay
               ? {
@@ -423,9 +625,10 @@ export async function GET(request) {
       };
     });
 
+    // Filter to only show programs with essays or custom programs
     const filteredFormattedPrograms = formattedPrograms.filter(p => 
       (p.essays && p.essays.length > 0) || 
-      p.degreeType === "STANDALONE"
+      p.isCustomProgram
     );
 
     const stats = {
@@ -475,13 +678,14 @@ export async function GET(request) {
 
         return totalProgress / totalPrompts;
       })(),
+      userStudyLevel,
     };
 
     const workspaceData = {
       universities: universitiesData,
       programs: filteredFormattedPrograms,
       stats,
-      query: { universityId },
+      query: { universityId, userStudyLevel },
     };
 
     return NextResponse.json(workspaceData);
@@ -514,7 +718,8 @@ export async function POST(request) {
       ...body,
       userId: auth.userId,
       userEmail: auth.userEmail,
-      userName: auth.userName
+      userName: auth.userName,
+      token: auth.token
     };
 
     switch (action) {
@@ -554,7 +759,7 @@ export async function POST(request) {
 }
 
 // ==========================================
-// PUT: Update essay content (auto-save) - FIXED VERSION
+// PUT: Update essay content (auto-save)
 // ==========================================
 export async function PUT(request) {
   try {
@@ -576,13 +781,17 @@ export async function PUT(request) {
 
     console.log(`📝 PUT request - Updating essay ${essayId}, wordCount: ${wordCount}, isAutoSave: ${isAutoSave}`);
 
+    // Verify essay ownership
     const essayOwnership = await prisma.essay.findFirst({
       where: {
         id: essayId,
         userId: userId
       },
       include: {
-        essayPrompt: true
+        essayPrompt: true,
+        program: {
+          include: { university: true }
+        }
       }
     });
 
@@ -611,6 +820,7 @@ export async function PUT(request) {
       updateData.lastAutoSaved = new Date();
     }
 
+    // Check completion status
     if (wordCount !== undefined && content !== undefined) {
       const wordLimit = essayOwnership.essayPrompt?.wordLimit || essayOwnership.wordLimit || 500;
       const completionResult = await checkEssayCompletion(
@@ -632,7 +842,6 @@ export async function PUT(request) {
 
     console.log(`📊 Update data:`, JSON.stringify(updateData, null, 2));
 
-    // ✅ FIX: Removed brandColor from select statement
     const updatedEssay = await prisma.essay.update({
       where: { id: essayId },
       data: updateData,
@@ -660,7 +869,6 @@ export async function PUT(request) {
                 id: true,
                 universityName: true,
                 slug: true,
-                // ✅ REMOVED: brandColor - field doesn't exist
               }
             }
           }
@@ -670,6 +878,7 @@ export async function PUT(request) {
 
     console.log(`✅ Essay updated - wordCount: ${updatedEssay.wordCount}, wordLimit: ${updatedEssay.wordLimit}`);
 
+    // Create auto-save version if needed
     if (isAutoSave && content && wordCount > 0) {
       const lastVersion = updatedEssay.versions[0];
       const shouldCreateAutoSave =
@@ -697,14 +906,14 @@ export async function PUT(request) {
       }
     }
 
-    // ✅ Add universityColor to response manually
+    // Format response with university color
     const responseEssay = {
       ...updatedEssay,
       program: updatedEssay.program ? {
         ...updatedEssay.program,
         university: updatedEssay.program.university ? {
           ...updatedEssay.program.university,
-          brandColor: DEFAULT_UNIVERSITY_COLOR // Add default color
+          brandColor: DEFAULT_UNIVERSITY_COLOR
         } : null
       } : null
     };
@@ -727,25 +936,27 @@ export async function PUT(request) {
 }
 
 // ==========================================
-// CREATE STANDALONE ESSAY - FIXED WITH COMPLETE DATA
+// CREATE STANDALONE ESSAY - FULLY FIXED
 // ==========================================
 async function createStandaloneEssay(data) {
-  const { 
-    userId, 
-    customTitle, 
-    customPrompt, 
-    wordLimit, 
-    taggedUniversityId, 
-    priority = 'medium' 
+  const {
+    userId,
+    customTitle,
+    customPrompt,
+    wordLimit,
+    taggedUniversityId,
+    priority = 'medium',
+    token
   } = data;
 
-  console.log("🚀 Creating standalone essay:", { 
-    userId, 
-    customTitle, 
+  console.log("🚀 Creating standalone essay:", {
+    userId,
+    customTitle,
     taggedUniversityId,
-    wordLimit 
+    wordLimit
   });
 
+  // Validate required fields
   if (!userId || !customTitle || !customPrompt) {
     return NextResponse.json(
       { error: 'Missing required fields: userId, customTitle, customPrompt' },
@@ -761,23 +972,77 @@ async function createStandaloneEssay(data) {
   }
 
   try {
-    let targetUniversityId;
-    
+    // Get user's study level
+    const userStudyLevel = await getUserStudyLevel(userId);
+    console.log(`📚 User study level: ${userStudyLevel}`);
+
+    let targetUniversityId = null;
+    let targetProgram = null;
+    let universityData = null;
+
+    // CASE 1: University IS tagged - use that university with STANDALONE program
     if (taggedUniversityId && taggedUniversityId.trim() !== '') {
+      console.log(`🎯 University tagged: ${taggedUniversityId}`);
+      
+      // Verify the tagged university exists
+      const university = await prisma.university.findUnique({
+        where: { id: taggedUniversityId }
+      });
+
+      if (!university) {
+        return NextResponse.json(
+          { error: 'Selected university not found' },
+          { status: 404 }
+        );
+      }
+
       targetUniversityId = taggedUniversityId;
-    } else {
-      const virtualUni = await getOrCreateVirtualUniversity();
-      targetUniversityId = virtualUni.id;
+      universityData = university;
+
+      // Get or create STANDALONE program for this university
+      targetProgram = await getOrCreateStandaloneProgramForUniversity(
+        taggedUniversityId, 
+        userStudyLevel
+      );
+
+      console.log(`✅ Using university: ${university.universityName}, program: ${targetProgram.id}`);
+    }
+    // CASE 2: No university tagged - use user's study level program
+    else {
+      console.log(`🎯 No university tagged - creating with user study level: ${userStudyLevel}`);
+      
+      // Fetch user's saved universities to potentially use one
+      let savedUniversities = [];
+      if (token) {
+        const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(token);
+        savedUniversities = savedUnisResult.universities || [];
+      }
+
+      // Get or create a program based on user's study level
+      targetProgram = await getOrCreateUserCustomProgram(userId, userStudyLevel, savedUniversities);
+      targetUniversityId = targetProgram.universityId;
+
+      // Fetch university data
+      if (targetUniversityId) {
+        universityData = await prisma.university.findUnique({
+          where: { id: targetUniversityId }
+        });
+      }
+
+      console.log(`✅ Using program: ${targetProgram.id} with study level: ${userStudyLevel}`);
     }
 
-    console.log(`🎯 Target university ID: ${targetUniversityId}`);
+    if (!targetProgram) {
+      return NextResponse.json(
+        { error: 'Failed to create or find appropriate program' },
+        { status: 500 }
+      );
+    }
 
-    const standaloneProgram = await getOrCreateStandaloneProgram(targetUniversityId);
-    console.log(`📝 Standalone program ID: ${standaloneProgram.id}`);
-
+    // Create essay prompt attached to the program
     const essayPrompt = await prisma.essayPrompt.create({
       data: {
-        programId: standaloneProgram.id,
+        programId: targetProgram.id,
         promptTitle: customTitle,
         promptText: customPrompt,
         wordLimit: wordLimit,
@@ -789,10 +1054,11 @@ async function createStandaloneEssay(data) {
 
     console.log(`✅ Created essay prompt: ${essayPrompt.id}`);
 
+    // Create the essay with userId
     const essay = await prisma.essay.create({
       data: {
         userId,
-        programId: standaloneProgram.id,
+        programId: targetProgram.id,
         essayPromptId: essayPrompt.id,
         title: customTitle,
         content: '',
@@ -810,7 +1076,6 @@ async function createStandaloneEssay(data) {
                 id: true,
                 universityName: true,
                 slug: true
-                // ✅ REMOVED: brandColor
               }
             }
           }
@@ -821,22 +1086,26 @@ async function createStandaloneEssay(data) {
       },
     });
 
-    console.log('✅ Created standalone essay:', {
+    console.log('✅ Created custom essay:', {
       essayId: essay.id,
-      programId: standaloneProgram.id,
+      programId: targetProgram.id,
       universityId: targetUniversityId,
+      universityName: universityData?.universityName,
       title: customTitle,
       wordLimit: essay.wordLimit,
-      universityName: essay.program?.university?.universityName
+      userId: userId,
+      userStudyLevel: userStudyLevel,
+      isTaggedToUniversity: !!taggedUniversityId,
     });
 
+    // Format response with complete data
     const formattedEssay = {
       id: essay.id,
-      programId: standaloneProgram.id,
+      programId: targetProgram.id,
       universityId: targetUniversityId,
-      universityName: essay.program?.university?.universityName || 'My Essays',
-      universitySlug: essay.program?.university?.slug || 'my-custom-essays',
-      universityColor: DEFAULT_UNIVERSITY_COLOR, // ✅ Use default color
+      universityName: universityData?.universityName || 'Personal',
+      universitySlug: universityData?.slug || 'personal',
+      universityColor: DEFAULT_UNIVERSITY_COLOR,
       title: customTitle,
       prompt: customPrompt,
       content: essay.content || '',
@@ -854,15 +1123,19 @@ async function createStandaloneEssay(data) {
       versions: essay.versions || [],
       aiResults: essay.aiResults || [],
       isCustom: true,
-      essayPromptId: essayPrompt.id
+      isTaggedToUniversity: !!taggedUniversityId,
+      userStudyLevel: userStudyLevel,
+      essayPromptId: essayPrompt.id,
+      degreeType: targetProgram.degreeType,
     };
 
     return NextResponse.json({ 
       success: true,
       essay: formattedEssay,
       essayPromptId: essayPrompt.id,
-      programId: standaloneProgram.id,
+      programId: targetProgram.id,
       universityId: targetUniversityId,
+      userStudyLevel: userStudyLevel,
       message: 'Custom essay created successfully'
     });
   } catch (error) {
@@ -875,7 +1148,7 @@ async function createStandaloneEssay(data) {
 }
 
 // ==========================================
-// Create essay (EXISTING - unchanged)
+// Create essay (for normal program essays)
 // ==========================================
 async function createEssay(data) {
   const { userId, programId, essayPromptId, applicationId } = data;
@@ -891,11 +1164,33 @@ async function createEssay(data) {
     );
   }
 
+  // Check if essay already exists
   const existingEssay = await prisma.essay.findFirst({
     where: {
       userId,
       programId,
       essayPromptId,
+    },
+    include: {
+      versions: {
+        orderBy: { timestamp: "desc" },
+        take: 10,
+        include: {
+          aiResults: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+      aiResults: {
+        where: { essayVersionId: null },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+      essayPrompt: true,
+      program: {
+        include: { university: true },
+      },
     },
   });
 
@@ -907,6 +1202,7 @@ async function createEssay(data) {
     });
   }
 
+  // Fetch essay prompt details
   const essayPrompt = await prisma.essayPrompt.findUnique({
     where: { id: essayPromptId },
     include: {
@@ -923,6 +1219,7 @@ async function createEssay(data) {
     );
   }
 
+  // Create the essay
   const essay = await prisma.essay.create({
     data: {
       userId,
@@ -956,9 +1253,8 @@ async function createEssay(data) {
 }
 
 // ==========================================
-// REST OF THE FUNCTIONS - FIXED
+// Update essay
 // ==========================================
-
 async function updateEssay(data) {
   const { essayId, content, wordCount, title, priority, status, userId } = data;
 
@@ -969,10 +1265,14 @@ async function updateEssay(data) {
     );
   }
 
+  // Verify ownership
   const essay = await prisma.essay.findFirst({
     where: {
       id: essayId,
       userId: userId
+    },
+    include: {
+      essayPrompt: true
     }
   });
 
@@ -983,7 +1283,8 @@ async function updateEssay(data) {
     );
   }
 
-  const result = await checkEssayCompletion(essayId, wordCount || 0, content, essay.wordLimit);
+  const wordLimitToUse = essay.essayPrompt?.wordLimit || essay.wordLimit;
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content, wordLimitToUse);
 
   if (result.success) {
     const additionalUpdates = {};
@@ -1002,6 +1303,10 @@ async function updateEssay(data) {
             orderBy: { createdAt: "desc" },
             take: 3,
           },
+          essayPrompt: true,
+          program: {
+            include: { university: true }
+          }
         },
       });
       return NextResponse.json({ essay: finalEssay });
@@ -1036,12 +1341,19 @@ async function updateEssay(data) {
         orderBy: { createdAt: "desc" },
         take: 3,
       },
+      essayPrompt: true,
+      program: {
+        include: { university: true }
+      }
     },
   });
 
   return NextResponse.json({ essay: updatedEssay });
 }
 
+// ==========================================
+// Auto save
+// ==========================================
 async function autoSave(data) {
   const { essayId, content, wordCount, userId } = data;
 
@@ -1052,10 +1364,14 @@ async function autoSave(data) {
     );
   }
 
+  // Verify ownership
   const essay = await prisma.essay.findFirst({
     where: {
       id: essayId,
       userId: userId
+    },
+    include: {
+      essayPrompt: true
     }
   });
 
@@ -1066,7 +1382,8 @@ async function autoSave(data) {
     );
   }
 
-  const result = await checkEssayCompletion(essayId, wordCount || 0, content, essay.wordLimit);
+  const wordLimitToUse = essay.essayPrompt?.wordLimit || essay.wordLimit;
+  const result = await checkEssayCompletion(essayId, wordCount || 0, content, wordLimitToUse);
 
   if (result.success) {
     const finalEssay = await prisma.essay.update({
@@ -1074,6 +1391,7 @@ async function autoSave(data) {
       data: { lastAutoSaved: new Date() },
     });
 
+    // Check if we should create auto-save version
     const lastVersion = await prisma.essayVersion.findFirst({
       where: { essayId },
       orderBy: { timestamp: "desc" },
@@ -1118,6 +1436,9 @@ async function autoSave(data) {
   return NextResponse.json({ success: true, essay: updatedEssay });
 }
 
+// ==========================================
+// Delete essay
+// ==========================================
 async function deleteEssay(data) {
   const { essayId, userId } = data;
 
@@ -1129,6 +1450,7 @@ async function deleteEssay(data) {
   }
 
   try {
+    // Verify ownership and get related data
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1151,9 +1473,11 @@ async function deleteEssay(data) {
     }
 
     const isStandalone = essay.essayPrompt?.program?.degreeType === "STANDALONE";
+    const isPersonalEssay = essay.essayPrompt?.program?.programName?.includes("Personal Essays");
 
-    console.log(`🗑️ Deleting essay ${essayId}, isStandalone: ${isStandalone}`);
+    console.log(`🗑️ Deleting essay ${essayId}, isStandalone: ${isStandalone}, isPersonalEssay: ${isPersonalEssay}`);
 
+    // Delete related records first
     await prisma.aIResult.deleteMany({
       where: { essayId },
     });
@@ -1162,6 +1486,7 @@ async function deleteEssay(data) {
       where: { essayId },
     });
 
+    // Try to delete completion logs (might not exist)
     try {
       await prisma.essayCompletionLog.deleteMany({
         where: { essayId },
@@ -1173,17 +1498,20 @@ async function deleteEssay(data) {
     const promptId = essay.essayPromptId;
     const programId = essay.essayPrompt?.programId;
 
+    // Delete the essay
     await prisma.essay.delete({
       where: { id: essayId },
     });
 
-    if (isStandalone && promptId) {
-      console.log(`🗑️ Deleting standalone prompt ${promptId}`);
+    // For custom essays, also delete the prompt
+    if ((isStandalone || isPersonalEssay) && promptId) {
+      console.log(`🗑️ Deleting custom essay prompt ${promptId}`);
       
       await prisma.essayPrompt.delete({
         where: { id: promptId }
       });
 
+      // Check if program is now empty and should be deleted
       if (programId) {
         const remainingPrompts = await prisma.essayPrompt.count({
           where: { programId }
@@ -1196,8 +1524,9 @@ async function deleteEssay(data) {
             where: { id: programId }
           });
           
-          if (program?.degreeType === "STANDALONE") {
-            console.log(`🗑️ Deleting empty standalone program ${programId}`);
+          // Only delete STANDALONE or Personal Essays programs when empty
+          if (program?.degreeType === "STANDALONE" || program?.programName?.includes("Personal Essays")) {
+            console.log(`🗑️ Deleting empty custom program ${programId}`);
             await prisma.program.delete({
               where: { id: programId }
             });
@@ -1220,7 +1549,9 @@ async function deleteEssay(data) {
   }
 }
 
-// ✅ FIXED saveVersion function - removed brandColor
+// ==========================================
+// Save version
+// ==========================================
 async function saveVersion(data) {
   const {
     essayId,
@@ -1241,6 +1572,7 @@ async function saveVersion(data) {
     );
   }
 
+  // Verify ownership
   const essay = await prisma.essay.findFirst({
     where: {
       id: essayId,
@@ -1261,6 +1593,7 @@ async function saveVersion(data) {
     );
   }
 
+  // Get last version for comparison
   const lastVersion = await prisma.essayVersion.findFirst({
     where: { essayId },
     orderBy: { timestamp: "desc" },
@@ -1270,6 +1603,7 @@ async function saveVersion(data) {
     ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${wordCount - lastVersion.wordCount} words`
     : "Initial version";
 
+  // Create new version
   const version = await prisma.essayVersion.create({
     data: {
       essayId,
@@ -1281,20 +1615,21 @@ async function saveVersion(data) {
     },
   });
 
-  // ✅ FIX: Removed brandColor from select
+  // Update essay
+  const wordLimitToUse = essay.essayPrompt?.wordLimit || essay.wordLimit;
   const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
-    data: { 
+    data: {
       content: content || "",
       wordCount: wordCount || 0,
       lastModified: new Date(),
-      completionPercentage: essay.essayPrompt?.wordLimit 
-        ? Math.min(100, (wordCount / essay.essayPrompt.wordLimit) * 100)
+      completionPercentage: wordLimitToUse
+        ? Math.min(100, (wordCount / wordLimitToUse) * 100)
         : 0,
     },
     include: {
-      versions: { 
-        orderBy: { timestamp: "desc" }, 
+      versions: {
+        orderBy: { timestamp: "desc" },
         take: 20,
         include: {
           aiResults: {
@@ -1316,7 +1651,6 @@ async function saveVersion(data) {
               id: true,
               universityName: true,
               slug: true,
-              // ✅ REMOVED: brandColor
             }
           }
         }
@@ -1326,6 +1660,7 @@ async function saveVersion(data) {
 
   let aiAnalysis = null;
 
+  // Perform AI analysis if requested
   if (performAiAnalysis && content && content.length >= 50) {
     try {
       const analysisResult = await performAIAnalysis({
@@ -1355,6 +1690,9 @@ async function saveVersion(data) {
   });
 }
 
+// ==========================================
+// Restore version
+// ==========================================
 async function restoreVersion(data) {
   const { essayId, versionId, userId } = data;
 
@@ -1366,6 +1704,7 @@ async function restoreVersion(data) {
   }
 
   try {
+    // Verify ownership
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1380,6 +1719,7 @@ async function restoreVersion(data) {
       );
     }
 
+    // Find the version to restore
     const version = await prisma.essayVersion.findUnique({
       where: { id: versionId },
     });
@@ -1388,6 +1728,7 @@ async function restoreVersion(data) {
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
     }
 
+    // Update essay with version content
     const updatedEssay = await prisma.essay.update({
       where: { id: essayId },
       data: {
@@ -1418,6 +1759,7 @@ async function restoreVersion(data) {
       },
     });
 
+    // Create restore version record
     await prisma.essayVersion.create({
       data: {
         essayId,
@@ -1439,6 +1781,9 @@ async function restoreVersion(data) {
   }
 }
 
+// ==========================================
+// Delete version
+// ==========================================
 async function deleteVersion(data) {
   const { versionId, essayId, userId } = data;
 
@@ -1450,6 +1795,7 @@ async function deleteVersion(data) {
   }
 
   try {
+    // Verify ownership
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1464,6 +1810,7 @@ async function deleteVersion(data) {
       );
     }
 
+    // Check version count
     const versionCount = await prisma.essayVersion.count({
       where: { essayId },
     });
@@ -1475,10 +1822,12 @@ async function deleteVersion(data) {
       );
     }
 
+    // Delete associated AI results first
     await prisma.aIResult.deleteMany({
       where: { essayVersionId: versionId },
     });
 
+    // Delete the version
     await prisma.essayVersion.delete({
       where: { id: versionId },
     });
@@ -1493,6 +1842,9 @@ async function deleteVersion(data) {
   }
 }
 
+// ==========================================
+// Get essay analytics
+// ==========================================
 async function getEssayAnalytics(data) {
   const { essayId, userId } = data;
 
@@ -1532,6 +1884,7 @@ async function getEssayAnalytics(data) {
       );
     }
 
+    // Get all user essays for progress calculation
     const allUserEssays = await prisma.essay.findMany({
       where: {
         userId,
@@ -1544,20 +1897,14 @@ async function getEssayAnalytics(data) {
 
     const validUserEssays = allUserEssays.filter((e) => e.essayPrompt !== null);
 
+    const wordLimitToUse = essay.essayPrompt?.wordLimit || essay.wordLimit;
+
     const analytics = {
       completion: {
-        percentage: Math.min(
-          100,
-          essay.essayPrompt 
-            ? (essay.wordCount / essay.essayPrompt.wordLimit) * 100
-            : (essay.wordCount / essay.wordLimit) * 100
-        ),
+        percentage: Math.min(100, (essay.wordCount / wordLimitToUse) * 100),
         wordCount: essay.wordCount,
-        wordLimit: essay.essayPrompt?.wordLimit || essay.wordLimit,
-        wordsRemaining: Math.max(
-          0,
-          (essay.essayPrompt?.wordLimit || essay.wordLimit) - essay.wordCount
-        ),
+        wordLimit: wordLimitToUse,
+        wordsRemaining: Math.max(0, wordLimitToUse - essay.wordCount),
       },
       timing: {
         readingTime: Math.ceil(essay.wordCount / 200),
@@ -1606,20 +1953,21 @@ async function getEssayAnalytics(data) {
             ? validUserEssays.reduce(
                 (acc, e) =>
                   acc +
-                  Math.min(100, (e.wordCount / e.essayPrompt.wordLimit) * 100),
+                  Math.min(100, (e.wordCount / (e.essayPrompt?.wordLimit || e.wordLimit)) * 100),
                 0
               ) / validUserEssays.length
             : 0,
         completed: validUserEssays.filter(
-          (e) => e.wordCount >= e.essayPrompt.wordLimit * 0.8
+          (e) => e.wordCount >= (e.essayPrompt?.wordLimit || e.wordLimit) * 0.8
         ).length,
         total: validUserEssays.length,
         orphaned: allUserEssays.length - validUserEssays.length,
       },
       program: essay.program ? {
         name: essay.program.programName,
-        university: essay.program.university.universityName,
+        university: essay.program.university?.universityName,
         degreeType: essay.program.degreeType,
+        isCustom: essay.program.degreeType === "STANDALONE" || essay.program.programName?.includes("Personal Essays"),
       } : null,
     };
 
@@ -1636,6 +1984,9 @@ async function getEssayAnalytics(data) {
   }
 }
 
+// ==========================================
+// Perform AI Analysis
+// ==========================================
 async function performAIAnalysis(data) {
   const {
     essayId,
@@ -1662,6 +2013,7 @@ async function performAIAnalysis(data) {
   const startTime = Date.now();
 
   try {
+    // Verify ownership and fetch essay data
     const essay = await prisma.essay.findFirst({
       where: {
         id: essayId,
@@ -1682,6 +2034,7 @@ async function performAIAnalysis(data) {
       );
     }
 
+    // Check for recent analysis (caching)
     const recentAnalysis = await prisma.aIResult.findFirst({
       where: {
         essayId,
@@ -1705,19 +2058,20 @@ async function performAIAnalysis(data) {
       });
     }
 
+    // Calculate content metrics
     const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
     const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    const completionRatio = (essay.essayPrompt?.wordLimit || essay.wordLimit) > 0 
-      ? wordCount / (essay.essayPrompt?.wordLimit || essay.wordLimit) 
-      : 0;
+    const wordLimitToUse = essay.essayPrompt?.wordLimit || essay.wordLimit;
+    const completionRatio = wordLimitToUse > 0 ? wordCount / wordLimitToUse : 0;
 
+    // Check for API key
     if (!OPENROUTER_API_KEY) {
       console.error("OPENROUTER_API_KEY not configured");
       const fallbackAnalysis = generateRealisticFallbackAnalysis(
         content,
         wordCount,
-        essay.essayPrompt?.wordLimit || essay.wordLimit,
+        wordLimitToUse,
         essay.essayPrompt?.promptText || essay.title,
         essay.program?.degreeType,
         completionRatio
@@ -1739,13 +2093,14 @@ async function performAIAnalysis(data) {
       });
     }
 
+    // Build analysis prompt
     const analysisPrompt = `You are a Senior Admissions Officer at ${essay.program?.university?.universityName || "a top university"} with 15+ years of experience evaluating ${essay.program?.degreeType || "graduate"} applications.
 
 INSTITUTIONAL CONTEXT:
 - Institution: ${essay.program?.university?.universityName || "University"}
 - Program: ${essay.program?.programName || "Graduate Program"} (${essay.program?.degreeType || "Graduate"})
 - Essay Prompt: "${essay.essayPrompt?.promptText || essay.title}"
-- Word Limit: ${essay.essayPrompt?.wordLimit || essay.wordLimit}
+- Word Limit: ${wordLimitToUse}
 - Current Word Count: ${wordCount}
 
 APPLICANT'S ESSAY:
@@ -1803,7 +2158,7 @@ REQUIREMENTS:
       const fallbackAnalysis = generateRealisticFallbackAnalysis(
         content,
         wordCount,
-        essay.essayPrompt?.wordLimit || essay.wordLimit,
+        wordLimitToUse,
         essay.essayPrompt?.promptText || essay.title,
         essay.program?.degreeType,
         completionRatio
@@ -1829,9 +2184,10 @@ REQUIREMENTS:
     const processingTime = Date.now() - startTime;
     const responseText = result.text;
 
+    // Parse AI response
     let analysisData;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/{[\s\S]*}/);
       if (jsonMatch) {
         analysisData = JSON.parse(jsonMatch[0]);
       } else {
@@ -1841,19 +2197,21 @@ REQUIREMENTS:
       analysisData = generateRealisticFallbackAnalysis(
         content,
         wordCount,
-        essay.essayPrompt?.wordLimit || essay.wordLimit,
+        wordLimitToUse,
         essay.essayPrompt?.promptText || essay.title,
         essay.program?.degreeType,
         completionRatio
       );
     }
 
+    // Validate and normalize
     analysisData = validateAndNormalizeAnalysis(
       analysisData,
       content,
-      essay.essayPrompt?.wordLimit || essay.wordLimit
+      wordLimitToUse
     );
 
+    // Save to database
     const aiResult = await saveAnalysisToDatabase(
       essayId,
       versionId,
@@ -1878,6 +2236,9 @@ REQUIREMENTS:
   }
 }
 
+// ==========================================
+// Check Essay Completion
+// ==========================================
 async function checkEssayCompletion(essayId, newWordCount, newContent = null, wordLimit = null) {
   try {
     const essay = await prisma.essay.findUnique({

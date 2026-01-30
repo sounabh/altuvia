@@ -1237,19 +1237,25 @@ const ApplicationTabs = ({ university }) => {
       return false;
     }
     
-    // Use pending content if available
+    // Use pending content if available, otherwise use current essay content
     let contentToSave = currentEssay.content;
     let wordCountToSave = currentEssay.wordCount;
+    
     if (pendingContentRef.current) {
       contentToSave = pendingContentRef.current.content;
       wordCountToSave = pendingContentRef.current.wordCount;
+    }
+
+    // Don't save if no content
+    if (!contentToSave || wordCountToSave === 0) {
+      return false;
     }
 
     try {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      // ✅ FIX: ALWAYS use /api/essay/independent route
+      // ✅ ALWAYS use /api/essay/independent route
       const apiRoute = "/api/essay/independent";
 
       const response = await fetch(apiRoute, {
@@ -1293,12 +1299,15 @@ const ApplicationTabs = ({ university }) => {
 
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
-        pendingContentRef.current = null;
+        pendingContentRef.current = null; // ✅ Clear pending content
+        lastContentRef.current = contentToSave; // ✅ Update last content ref
         return true;
       }
+      
       return false;
     } catch (error) {
       console.error("Auto-save error:", error);
+      toast.error("Failed to save changes");
       return false;
     } finally {
       setIsSaving(false);
@@ -1413,6 +1422,7 @@ const ApplicationTabs = ({ university }) => {
     (content, wordCount) => {
       if (!isUniversityAdded) return;
 
+      // ✅ Always update pending content ref
       pendingContentRef.current = { content, wordCount };
       isEditorActiveRef.current = true;
       lastTypingTimeRef.current = Date.now();
@@ -1421,12 +1431,14 @@ const ApplicationTabs = ({ university }) => {
         clearTimeout(updateDebounceRef.current);
       }
 
+      // ✅ Debounce the actual state update
       updateDebounceRef.current = setTimeout(() => {
         if (!pendingContentRef.current) return;
 
         const { content: newContent, wordCount: newWordCount } =
           pendingContentRef.current;
 
+        // Create essay if it doesn't exist
         if (
           !currentEssay &&
           currentProgram?.degreeType !== "STANDALONE" &&
@@ -1479,7 +1491,7 @@ const ApplicationTabs = ({ university }) => {
           });
 
           setHasUnsavedChanges(true);
-          pendingContentRef.current = null;
+          lastContentRef.current = newContent; // ✅ Update last content
         } catch (error) {
           console.error("Error updating content:", error);
         } finally {
@@ -1509,12 +1521,20 @@ const ApplicationTabs = ({ university }) => {
         isSavingVersion ||
         !userId ||
         !isUniversityAdded
-      )
+      ) {
+        console.warn("Cannot save version:", { 
+          hasEssay: !!currentEssay, 
+          isSaving, 
+          isSavingVersion, 
+          userId 
+        });
         return false;
+      }
 
       // ✅ Capture current content state
       let contentToSave = currentEssay.content;
       let wordCountToSave = currentEssay.wordCount;
+      
       if (pendingContentRef.current) {
         contentToSave = pendingContentRef.current.content;
         wordCountToSave = pendingContentRef.current.wordCount;
@@ -1525,12 +1545,13 @@ const ApplicationTabs = ({ university }) => {
         isUpdatingRef.current = true;
 
         // ✅ Save any pending changes FIRST
-        if (hasUnsavedChanges) {
+        if (hasUnsavedChanges || pendingContentRef.current) {
           const autoSaved = await autoSaveEssay();
           if (!autoSaved) {
             toast.error("Failed to save current changes");
             return false;
           }
+          // Wait for state to update
           await new Promise(resolve => setTimeout(resolve, 100));
         }
 
@@ -1592,6 +1613,12 @@ const ApplicationTabs = ({ university }) => {
             ),
           };
         });
+
+        // ✅ Clear all pending states
+        pendingContentRef.current = null;
+        setHasUnsavedChanges(false);
+        setLastSaved(new Date());
+        lastContentRef.current = contentToSave;
 
         toast.success("Version saved successfully");
         
@@ -2467,26 +2494,64 @@ const ApplicationTabs = ({ university }) => {
     );
   }, [customEssays]);
 
-  // ========== EFFECTS ==========
+  // ========== ✅ KEYBOARD SHORTCUT FOR MANUAL SAVE ==========
   useEffect(() => {
-    if (
-      !hasUnsavedChanges ||
-      !currentEssay ||
-      isSaving ||
-      activeView !== "editor" ||
-      !isUniversityAdded
-    ) {
-      return;
+    const handleKeyDown = (e) => {
+      // Ctrl+S or Cmd+S
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        
+        if (currentEssay && !isSaving && !isSavingVersion && isUniversityAdded) {
+          // First auto-save any pending changes
+          if (hasUnsavedChanges || pendingContentRef.current) {
+            autoSaveEssay().then(() => {
+              toast.success('Changes saved successfully!');
+            });
+          } else {
+            toast.info('No changes to save');
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentEssay, isSaving, isSavingVersion, hasUnsavedChanges, autoSaveEssay, isUniversityAdded]);
+
+  // ========== ✅ AUTO-SAVE TIMER ==========
+  useEffect(() => {
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
 
-    const timerId = setTimeout(() => {
-      const timeSinceLastType = Date.now() - lastTypingTimeRef.current;
-      if (timeSinceLastType >= 20000) {
-        autoSaveEssay();
-      }
-    }, 25000);
+    // Only set up auto-save if there are unsaved changes and we have a current essay
+    if (
+      hasUnsavedChanges &&
+      currentEssay &&
+      !isSaving &&
+      activeView === "editor" &&
+      isUniversityAdded &&
+      !isUpdatingRef.current
+    ) {
+      // Auto-save after 20 seconds of inactivity
+      autoSaveTimerRef.current = setTimeout(() => {
+        const timeSinceLastType = Date.now() - lastTypingTimeRef.current;
+        
+        // Only auto-save if user has been inactive for at least 15 seconds
+        if (timeSinceLastType >= 15000) {
+          console.log('⏰ Auto-saving after inactivity...');
+          autoSaveEssay();
+        }
+      }, 20000); // 20 seconds
+    }
 
-    return () => clearTimeout(timerId);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
   }, [
     hasUnsavedChanges,
     currentEssay?.id,
@@ -2496,6 +2561,7 @@ const ApplicationTabs = ({ university }) => {
     isUniversityAdded,
   ]);
 
+  // ========== EFFECTS ==========
   useEffect(() => {
     if (universityName && userId && isUniversityAdded) {
       fetchWorkspaceData();
@@ -3317,6 +3383,7 @@ const ApplicationTabs = ({ university }) => {
                                     lastSaved={lastSaved}
                                   />
 
+                                  {/* ✅ UPDATED: Footer Actions */}
                                   <div className="flex justify-between items-center text-xs text-white/50 pt-2">
                                     <span className="flex items-center">
                                       <Clock className="w-3 h-3 mr-1" />
@@ -3327,10 +3394,46 @@ const ApplicationTabs = ({ university }) => {
                                           ).toLocaleString()
                                         : "Never"}
                                       <span className="ml-3 text-white/30">
-                                        • Auto-saves every 15 seconds
+                                        • Auto-saves every 20 seconds
                                       </span>
+                                      {hasUnsavedChanges && (
+                                        <span className="ml-3 text-amber-400 flex items-center">
+                                          <span className="w-2 h-2 bg-amber-400 rounded-full mr-1 animate-pulse" />
+                                          Unsaved changes
+                                        </span>
+                                      )}
                                     </span>
                                     <div className="flex items-center gap-2">
+                                      {/* Manual Save Button */}
+                                      <Button
+                                        size="sm"
+                                        onClick={async () => {
+                                          if (hasUnsavedChanges || pendingContentRef.current) {
+                                            const saved = await autoSaveEssay();
+                                            if (saved) {
+                                              toast.success('Changes saved!');
+                                            }
+                                          } else {
+                                            toast.info('No changes to save');
+                                          }
+                                        }}
+                                        disabled={isSaving || (!hasUnsavedChanges && !pendingContentRef.current)}
+                                        className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-400/30"
+                                      >
+                                        {isSaving ? (
+                                          <>
+                                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                                            Saving...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Save className="w-3 h-3 mr-1.5" />
+                                            Save Now (Ctrl+S)
+                                          </>
+                                        )}
+                                      </Button>
+                                      
+                                      {/* Save Version Button */}
                                       <Button
                                         size="sm"
                                         onClick={() => saveVersion()}
@@ -3338,11 +3441,16 @@ const ApplicationTabs = ({ university }) => {
                                         className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
                                       >
                                         {isSavingVersion ? (
-                                          <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                                          <>
+                                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                                            Saving...
+                                          </>
                                         ) : (
-                                          <Save className="w-3 h-3 mr-1.5" />
+                                          <>
+                                            <Save className="w-3 h-3 mr-1.5" />
+                                            Save Version & Exit
+                                          </>
                                         )}
-                                        Save Version & Exit
                                       </Button>
                                     </div>
                                   </div>
