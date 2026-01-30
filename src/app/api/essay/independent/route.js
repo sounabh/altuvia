@@ -1,4 +1,4 @@
-// src/app/api/essay/independent/route.js - FIXED ONLY CUSTOM ESSAY CREATION
+// src/app/api/essay/independent/route.js - FIXED VERSION
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -97,7 +97,7 @@ async function callGeminiViaOpenRouter(prompt, maxTokens = 4096) {
 }
 
 // ==========================================
-// FETCH SAVED UNIVERSITIES FROM EXTERNAL API - ORIGINAL WORKING LOGIC
+// FETCH SAVED UNIVERSITIES FROM EXTERNAL API
 // ==========================================
 async function fetchSavedUniversitiesFromExternalAPI(token) {
   try {
@@ -147,7 +147,7 @@ async function getUserStudyLevel(userId) {
       where: { userId },
       select: { studyLevel: true }
     });
-    
+
     if (userProfile?.studyLevel) {
       const level = userProfile.studyLevel.toUpperCase().trim();
       if (level.includes('MASTER') || level === 'MS' || level === 'MBA' || level === 'MA') {
@@ -164,7 +164,7 @@ async function getUserStudyLevel(userId) {
     return 'MBA';
   } catch (error) {
     console.warn("Could not fetch user study level:", error.message);
-    return 'MASTERS';
+    return 'MBA';
   }
 }
 
@@ -199,6 +199,7 @@ async function getOrCreateStandaloneProgramForUniversity(universityId) {
     }
 
     return standaloneProgram;
+
   } catch (error) {
     console.error("Error getting/creating standalone program:", error);
     throw error;
@@ -206,14 +207,17 @@ async function getOrCreateStandaloneProgramForUniversity(universityId) {
 }
 
 /**
- * Get or create a program with user's study level for custom essays without university
+ * Get or create a STANDALONE program for personal essays (no university tagged)
  */
-async function getOrCreateUserStudyLevelProgram(userId, userStudyLevel, savedUniversities = []) {
+async function getOrCreatePersonalStandaloneProgram(userId, savedUniversities = []) {
   try {
-    // Try to find existing program with user's study level that has their essays
+    // Try to find existing STANDALONE program that has user's essays
     const existingProgram = await prisma.program.findFirst({
       where: {
-        degreeType: userStudyLevel,
+        degreeType: "STANDALONE",
+        programName: {
+          contains: "Personal"
+        },
         essays: {
           some: { userId }
         }
@@ -224,7 +228,7 @@ async function getOrCreateUserStudyLevelProgram(userId, userStudyLevel, savedUni
     });
 
     if (existingProgram) {
-      console.log(`✅ Found existing program with study level ${userStudyLevel}`);
+      console.log(`✅ Found existing personal STANDALONE program`);
       return existingProgram;
     }
 
@@ -241,7 +245,7 @@ async function getOrCreateUserStudyLevelProgram(userId, userStudyLevel, savedUni
           });
           if (uniExists) {
             targetUniversityId = uniId;
-            console.log(`✅ Using saved university: ${uniExists.universityName}`);
+            console.log(`✅ Using saved university for personal essays: ${uniExists.universityName}`);
             break;
           }
         }
@@ -254,19 +258,22 @@ async function getOrCreateUserStudyLevelProgram(userId, userStudyLevel, savedUni
         where: { isActive: true },
         orderBy: { universityName: 'asc' }
       });
-      
+
       if (!anyUniversity) {
         throw new Error("No universities available in the system");
       }
       targetUniversityId = anyUniversity.id;
-      console.log(`✅ Using fallback university: ${anyUniversity.universityName}`);
+      console.log(`✅ Using fallback university for personal essays: ${anyUniversity.universityName}`);
     }
 
-    // Check if there's already a program with this study level for this university
+    // Check if there's already a STANDALONE personal program for this university
     let program = await prisma.program.findFirst({
       where: {
         universityId: targetUniversityId,
-        degreeType: userStudyLevel,
+        degreeType: "STANDALONE",
+        programName: {
+          contains: "Personal"
+        }
       }
     });
 
@@ -274,25 +281,26 @@ async function getOrCreateUserStudyLevelProgram(userId, userStudyLevel, savedUni
       program = await prisma.program.create({
         data: {
           universityId: targetUniversityId,
-          programName: `Personal Essays`,
-          programSlug: `personal-essays-${userStudyLevel.toLowerCase()}-${Date.now()}`,
-          degreeType: userStudyLevel,
+          programName: "Personal Essays",
+          programSlug: `personal-essays-${Date.now()}`,
+          degreeType: "STANDALONE",
           isActive: true,
-          programDescription: `Personal custom essays for ${userStudyLevel} level`,
+          programDescription: "Personal standalone essays",
         }
       });
-      console.log(`✅ Created program with study level ${userStudyLevel}`);
+      console.log(`✅ Created personal STANDALONE program`);
     }
 
     return program;
+
   } catch (error) {
-    console.error("Error getting/creating user study level program:", error);
+    console.error("Error getting/creating personal standalone program:", error);
     throw error;
   }
 }
 
 // ==========================================
-// GET: Fetch user's essays - ORIGINAL WORKING LOGIC RESTORED
+// GET: Fetch user's essays - UPDATED TO HANDLE STANDALONE
 // ==========================================
 export async function GET(request) {
   try {
@@ -439,19 +447,21 @@ export async function GET(request) {
     const universitiesData = [];
 
     for (const university of universities) {
-      // Filter programs based on study level or STANDALONE
+      // Filter programs - always include STANDALONE, otherwise filter by study level
       const filteredPrograms = university.programs.filter(program => {
-        // Always include STANDALONE (custom essays)
+        // Always include STANDALONE programs (custom essays)
         if (program.degreeType === "STANDALONE") {
           return true;
         }
         
-        // Include if no study level filter or matches user's study level
+        // For non-STANDALONE programs, check if they match user's study level
         if (!userStudyLevel) {
           return true;
         }
         
-        if (program.degreeType?.toUpperCase() === userStudyLevel) {
+        // Check if program matches user's study level
+        const programDegreeType = program.degreeType?.toUpperCase();
+        if (programDegreeType === userStudyLevel) {
           return true;
         }
 
@@ -463,7 +473,7 @@ export async function GET(request) {
           return true;
         }
         
-        return true; // Include all by default
+        return false;
       });
 
       universitiesData.push({
@@ -490,7 +500,7 @@ export async function GET(request) {
     }
 
     const formattedPrograms = allPrograms.map(program => {
-      const isStandalone = program.degreeType === "STANDALONE" || program.isCustom;
+      const isStandalone = program.degreeType === "STANDALONE";
       
       return {
         id: program.id,
@@ -863,7 +873,7 @@ export async function PUT(request) {
 }
 
 // ==========================================
-// CREATE STANDALONE ESSAY - FIXED (NO VIRTUAL UNIVERSITY)
+// CREATE STANDALONE ESSAY - FIXED TO USE STANDALONE ONLY
 // ==========================================
 async function createStandaloneEssay(data) {
   const {
@@ -898,10 +908,6 @@ async function createStandaloneEssay(data) {
   }
 
   try {
-    // Get user's study level
-    const userStudyLevel = await getUserStudyLevel(userId);
-    console.log(`📚 User study level: ${userStudyLevel}`);
-
     let targetProgram = null;
     let targetUniversityId = null;
     let universityData = null;
@@ -928,9 +934,9 @@ async function createStandaloneEssay(data) {
       targetProgram = await getOrCreateStandaloneProgramForUniversity(taggedUniversityId);
       console.log(`✅ Using university: ${universityData.universityName}, program: ${targetProgram.id}`);
     }
-    // CASE 2: No university tagged - use user's study level
+    // CASE 2: No university tagged - create personal STANDALONE program
     else {
-      console.log(`🎯 No university tagged - using user study level: ${userStudyLevel}`);
+      console.log(`🎯 No university tagged - creating personal STANDALONE essay`);
       
       // Fetch user's saved universities
       let savedUniversities = [];
@@ -939,8 +945,8 @@ async function createStandaloneEssay(data) {
         savedUniversities = savedUnisResult.universities || [];
       }
 
-      // Get or create program with user's study level
-      targetProgram = await getOrCreateUserStudyLevelProgram(userId, userStudyLevel, savedUniversities);
+      // Get or create personal STANDALONE program
+      targetProgram = await getOrCreatePersonalStandaloneProgram(userId, savedUniversities);
       targetUniversityId = targetProgram.universityId;
 
       // Fetch university data
@@ -950,7 +956,7 @@ async function createStandaloneEssay(data) {
         });
       }
 
-      console.log(`✅ Using program: ${targetProgram.id}, degreeType: ${targetProgram.degreeType}`);
+      console.log(`✅ Using personal STANDALONE program: ${targetProgram.id}`);
     }
 
     if (!targetProgram) {
@@ -1013,7 +1019,6 @@ async function createStandaloneEssay(data) {
       universityId: targetUniversityId,
       universityName: universityData?.universityName,
       degreeType: targetProgram.degreeType,
-      userStudyLevel: userStudyLevel,
     });
 
     // Format response
@@ -1042,7 +1047,6 @@ async function createStandaloneEssay(data) {
       aiResults: essay.aiResults || [],
       isCustom: true,
       isTaggedToUniversity: !!taggedUniversityId,
-      userStudyLevel: userStudyLevel,
       degreeType: targetProgram.degreeType,
       essayPromptId: essayPrompt.id,
     };
@@ -1053,7 +1057,6 @@ async function createStandaloneEssay(data) {
       essayPromptId: essayPrompt.id,
       programId: targetProgram.id,
       universityId: targetUniversityId,
-      userStudyLevel: userStudyLevel,
       message: 'Custom essay created successfully'
     });
   } catch (error) {
@@ -1066,7 +1069,7 @@ async function createStandaloneEssay(data) {
 }
 
 // ==========================================
-// Create essay (for normal program essays) - UNCHANGED
+// Create essay (for normal program essays)
 // ==========================================
 async function createEssay(data) {
   const { userId, programId, essayPromptId, applicationId } = data;
@@ -1147,7 +1150,7 @@ async function createEssay(data) {
 }
 
 // ==========================================
-// Update essay - UNCHANGED
+// Update essay
 // ==========================================
 async function updateEssay(data) {
   const { essayId, content, wordCount, title, priority, status, userId } = data;
@@ -1233,7 +1236,7 @@ async function updateEssay(data) {
 }
 
 // ==========================================
-// Auto save - UNCHANGED
+// Auto save
 // ==========================================
 async function autoSave(data) {
   const { essayId, content, wordCount, userId } = data;
@@ -1346,71 +1349,127 @@ async function deleteEssay(data) {
       );
     }
 
+    // Check if this is a custom essay (STANDALONE program)
     const isStandalone = essay.essayPrompt?.program?.degreeType === "STANDALONE";
-    const isPersonalEssay = essay.essayPrompt?.program?.programName?.includes("Personal Essays");
-    const isCustom = isStandalone || isPersonalEssay;
+    const isCustomEssay = isStandalone;
 
-    console.log(`🗑️ Deleting essay ${essayId}, isCustom: ${isCustom}`);
+    console.log(`🗑️ Deleting essay ${essayId}, isCustomEssay: ${isCustomEssay}`);
 
-    // Delete related records
-    await prisma.aIResult.deleteMany({
-      where: { essayId },
-    });
+    if (isCustomEssay) {
+      // For custom essays: delete everything (essay, prompt, and related data)
+      const promptId = essay.essayPromptId;
+      const programId = essay.essayPrompt?.programId;
 
-    await prisma.essayVersion.deleteMany({
-      where: { essayId },
-    });
-
-    try {
-      await prisma.essayCompletionLog.deleteMany({
+      // Delete related records
+      await prisma.aIResult.deleteMany({
         where: { essayId },
       });
-    } catch (e) {
-      // EssayCompletionLog might not exist
-    }
 
-    const promptId = essay.essayPromptId;
-    const programId = essay.essayPrompt?.programId;
-
-    // Delete the essay
-    await prisma.essay.delete({
-      where: { id: essayId },
-    });
-
-    // For custom essays, also delete the prompt
-    if (isCustom && promptId) {
-      console.log(`🗑️ Deleting custom essay prompt ${promptId}`);
-      
-      await prisma.essayPrompt.delete({
-        where: { id: promptId }
+      await prisma.essayVersion.deleteMany({
+        where: { essayId },
       });
 
-      // Check if program is now empty
-      if (programId) {
-        const remainingPrompts = await prisma.essayPrompt.count({
-          where: { programId }
+      try {
+        await prisma.essayCompletionLog.deleteMany({
+          where: { essayId },
+        });
+      } catch (e) {
+        // EssayCompletionLog might not exist
+      }
+
+      // Delete the essay
+      await prisma.essay.delete({
+        where: { id: essayId },
+      });
+
+      // Also delete the prompt since it's custom
+      if (promptId) {
+        console.log(`🗑️ Deleting custom essay prompt ${promptId}`);
+        
+        await prisma.essayPrompt.delete({
+          where: { id: promptId }
         });
 
-        console.log(`📊 Remaining prompts in program ${programId}: ${remainingPrompts}`);
-
-        // Only delete custom programs when empty
-        if (remainingPrompts === 0) {
-          const program = await prisma.program.findUnique({
-            where: { id: programId }
+        // Check if program is now empty (only STANDALONE programs)
+        if (programId) {
+          const remainingPrompts = await prisma.essayPrompt.count({
+            where: { programId }
           });
-          
-          if (program?.degreeType === "STANDALONE" || program?.programName?.includes("Personal Essays")) {
-            console.log(`🗑️ Deleting empty custom program ${programId}`);
-            await prisma.program.delete({
+
+          console.log(`📊 Remaining prompts in program ${programId}: ${remainingPrompts}`);
+
+          // Only delete STANDALONE programs when empty
+          if (remainingPrompts === 0) {
+            const program = await prisma.program.findUnique({
               where: { id: programId }
             });
+            
+            if (program?.degreeType === "STANDALONE") {
+              console.log(`🗑️ Deleting empty STANDALONE program ${programId}`);
+              await prisma.program.delete({
+                where: { id: programId }
+              });
+            }
           }
         }
       }
-    }
 
-    console.log("✅ Essay deleted successfully");
-    return NextResponse.json({ success: true });
+      console.log("✅ Custom essay deleted entirely");
+      return NextResponse.json({ 
+        success: true,
+        message: 'Custom essay deleted entirely'
+      });
+    } else {
+      // For non-custom essays: only delete content and related data, but keep essay record
+      // This is for essays from pre-existing prompts that the user didn't create
+      
+      // Delete related records
+      await prisma.aIResult.deleteMany({
+        where: { essayId },
+      });
+
+      await prisma.essayVersion.deleteMany({
+        where: { essayId },
+      });
+
+      try {
+        await prisma.essayCompletionLog.deleteMany({
+          where: { essayId },
+        });
+      } catch (e) {
+        // EssayCompletionLog might not exist
+      }
+
+      // Reset the essay to empty state
+      const resetEssay = await prisma.essay.update({
+        where: { id: essayId },
+        data: {
+          content: "",
+          wordCount: 0,
+          title: `Essay for ${essay.essayPrompt?.promptTitle || 'Untitled'}`,
+          status: "DRAFT",
+          isCompleted: false,
+          completedAt: null,
+          completionPercentage: 0,
+          lastModified: new Date(),
+          lastAutoSaved: new Date(),
+          priority: "medium",
+        },
+        include: {
+          essayPrompt: true,
+          program: {
+            include: { university: true }
+          }
+        }
+      });
+
+      console.log("✅ Non-custom essay content cleared (essay record kept)");
+      return NextResponse.json({ 
+        success: true,
+        essay: resetEssay,
+        message: 'Essay content cleared (essay record kept)'
+      });
+    }
   } catch (error) {
     console.error("Error deleting essay:", error);
     return NextResponse.json(
@@ -1424,7 +1483,7 @@ async function deleteEssay(data) {
 }
 
 // ==========================================
-// Save version - UNCHANGED
+// Save version
 // ==========================================
 async function saveVersion(data) {
   const {
@@ -1559,7 +1618,7 @@ async function saveVersion(data) {
 }
 
 // ==========================================
-// Restore version - UNCHANGED
+// Restore version
 // ==========================================
 async function restoreVersion(data) {
   const { essayId, versionId, userId } = data;
@@ -1646,7 +1705,7 @@ async function restoreVersion(data) {
 }
 
 // ==========================================
-// Delete version - UNCHANGED
+// Delete version
 // ==========================================
 async function deleteVersion(data) {
   const { versionId, essayId, userId } = data;
@@ -1703,7 +1762,7 @@ async function deleteVersion(data) {
 }
 
 // ==========================================
-// Get essay analytics - UNCHANGED
+// Get essay analytics
 // ==========================================
 async function getEssayAnalytics(data) {
   const { essayId, userId } = data;
@@ -1849,7 +1908,7 @@ async function getEssayAnalytics(data) {
 }
 
 // ==========================================
-// Perform AI Analysis - UNCHANGED
+// Perform AI Analysis
 // ==========================================
 async function performAIAnalysis(data) {
   const {
@@ -1955,60 +2014,64 @@ async function performAIAnalysis(data) {
     }
 
     const analysisPrompt = `You are a Senior Admissions Officer at ${essay.program?.university?.universityName || "a top university"} with 15+ years of experience evaluating ${essay.program?.degreeType || "graduate"} applications.
-
 INSTITUTIONAL CONTEXT:
-- Institution: ${essay.program?.university?.universityName || "University"}
-- Program: ${essay.program?.programName || "Graduate Program"} (${essay.program?.degreeType || "Graduate"})
-- Essay Prompt: "${essay.essayPrompt?.promptText || essay.title}"
-- Word Limit: ${essay.essayPrompt?.wordLimit || essay.wordLimit}
-- Current Word Count: ${wordCount}
 
+Institution: ${essay.program?.university?.universityName || "University"}
+Program: ${essay.program?.programName || "Graduate Program"} (${essay.program?.degreeType || "Graduate"})
+Essay Prompt: "${essay.essayPrompt?.promptText || essay.title}"
+Word Limit: ${essay.essayPrompt?.wordLimit || essay.wordLimit}
+Current Word Count: ${wordCount}
 APPLICANT'S ESSAY:
 ${content}
 
 EVALUATION FRAMEWORK:
-1. PROMPT ADHERENCE: Does this directly answer what we asked?
-2. NARRATIVE SOPHISTICATION: Is this a compelling story or generic statements?
-3. LEADERSHIP EVIDENCE: Can I see concrete examples of impact and initiative?
-4. INTELLECTUAL CURIOSITY: Does this show deep thinking and genuine interest?
-5. PROGRAM FIT: Why specifically our program?
-6. DIFFERENTIATION: What makes this applicant unique?
-7. MATURITY & SELF-AWARENESS: Does this show genuine reflection and growth?
-8. COMMUNICATION SKILLS: Can they articulate complex ideas clearly?
 
+PROMPT ADHERENCE: Does this directly answer what we asked?
+NARRATIVE SOPHISTICATION: Is this a compelling story or generic statements?
+LEADERSHIP EVIDENCE: Can I see concrete examples of impact and initiative?
+INTELLECTUAL CURIOSITY: Does this show deep thinking and genuine interest?
+PROGRAM FIT: Why specifically our program?
+DIFFERENTIATION: What makes this applicant unique?
+MATURITY & SELF-AWARENESS: Does this show genuine reflection and growth?
+COMMUNICATION SKILLS: Can they articulate complex ideas clearly?
 Return ONLY valid JSON in this exact format:
 {
-  "overallScore": [25-95 based on quality],
-  "suggestions": [
-    {
-      "id": "1",
-      "type": "critical|warning|improvement|strength",
-      "priority": "high|medium|low",
-      "title": "Specific issue title (max 60 chars)",
-      "description": "Detailed description with quotes from essay (150-250 chars)",
-      "action": "Concrete steps to improve (100-200 chars)"
-    }
-  ],
-  "structureScore": [25-95],
-  "contentRelevance": [25-95],
-  "narrativeFlow": [25-95],
-  "leadershipEmphasis": [25-95],
-  "specificityScore": [25-95],
-  "readabilityScore": [25-95],
-  "sentenceCount": ${sentences.length},
-  "paragraphCount": ${Math.max(paragraphs.length, 1)},
-  "avgSentenceLength": ${sentences.length > 0 ? Math.round((wordCount / sentences.length) * 10) / 10 : 0},
-  "complexWordCount": [count sophisticated words],
-  "passiveVoiceCount": [count passive voice],
-  "grammarIssues": [0-15]
+"overallScore": [25-95 based on quality],
+"suggestions": [
+{
+"id": "1",
+"type": "critical|warning|improvement|strength",
+"priority": "high|medium|low",
+"title": "Specific issue title (max 60 chars)",
+"description": "Detailed description with quotes from essay (150-250 chars)",
+"action": "Concrete steps to improve (100-200 chars)"
+}
+],
+"structureScore": [25-95],
+"contentRelevance": [25-95],
+"narrativeFlow": [25-95],
+"leadershipEmphasis": [25-95],
+"specificityScore": [25-95],
+"readabilityScore": [25-95],
+"sentenceCount": ${sentences.length},
+"paragraphCount": ${Math.max(paragraphs.length, 1)},
+"avgSentenceLength": ${sentences.length > 0 ? Math.round((wordCount / sentences.length) * 10) / 10 : 0},
+"complexWordCount": [count sophisticated words],
+"passiveVoiceCount": [count passive voice],
+"grammarIssues": [0-15]
 }
 
 REQUIREMENTS:
-- Quote specific phrases from the essay
-- Be constructive and specific
-- Focus on actionable improvements
-- Include 6-10 suggestions minimum
-- Mix of critical, warning, improvement, and strength suggestions`;
+
+Quote specific phrases from the essay
+
+Be constructive and specific
+
+Focus on actionable improvements
+
+Include 6-10 suggestions minimum
+
+Mix of critical, warning, improvement, and strength suggestions`;
 
     let result;
     try {
@@ -2094,7 +2157,7 @@ REQUIREMENTS:
 }
 
 // ==========================================
-// Check Essay Completion - UNCHANGED
+// Check Essay Completion
 // ==========================================
 async function checkEssayCompletion(essayId, newWordCount, newContent = null, wordLimit = null) {
   try {
@@ -2182,7 +2245,7 @@ async function checkEssayCompletion(essayId, newWordCount, newContent = null, wo
 }
 
 // ==========================================
-// Helper Functions - UNCHANGED
+// Helper Functions
 // ==========================================
 
 function transformStoredAnalysisToComponentFormat(aiResult) {
