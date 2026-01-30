@@ -757,6 +757,7 @@ async function updateEssay(data) {
   return NextResponse.json({ essay: updatedEssay });
 }
 
+// ✅ FIXED saveVersion function in /api/essay/[universityName]/route.js
 async function saveVersion(data) {
   const {
     essayId,
@@ -801,6 +802,7 @@ async function saveVersion(data) {
       } words`
     : "Initial version";
 
+  // ✅ FIX 1: Create version
   const version = await prisma.essayVersion.create({
     data: {
       essayId,
@@ -812,7 +814,7 @@ async function saveVersion(data) {
     },
   });
 
-  // ✅ Fix 4C: Update main essay with version content AND return full essay data
+  // ✅ FIX 2: Update essay with complete include structure
   const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
     data: { 
@@ -875,17 +877,17 @@ async function saveVersion(data) {
     }
   }
 
+  // ✅ FIX 3: Return complete data structure
   return NextResponse.json({
     success: true,
     version: {
       ...version,
       aiAnalysis,
     },
-    essay: updatedEssay,  // ✅ CRITICAL: Include full essay data
+    essay: updatedEssay,  // ✅ Complete essay with all relations
     aiAnalysis,
   });
 }
-
 async function autoSave(data) {
   const { essayId, content, wordCount } = data;
 

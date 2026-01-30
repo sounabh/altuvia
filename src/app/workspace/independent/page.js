@@ -1156,55 +1156,43 @@ export default function IndependentWorkspacePage() {
   }, [currentEssay, isSaving, hasUnsavedChanges, activeProgramId, activeEssayPromptId]);
 
   // Auto-save timer
-// Auto-save timer - FIXED to not interfere with version save
-useEffect(() => {
-  if (autoSaveTimerRef.current) {
-    clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = null;
-  }
-
-  // ✅ FIX: Don't auto-save if version save is in progress
-  if (
-    hasUnsavedChanges &&
-    currentEssay &&
-    !isSaving &&
-    !isSavingVersion && // ← ADDED
-    !isUpdatingRef.current &&
-    activeView === "editor" &&
-    isUniversityAdded
-  ) {
-    const timeSinceLastActivity = Date.now() - lastUserActivity;
-
-    if (timeSinceLastActivity >= 4 * 60 * 1000) {
-      // User inactive for 4+ minutes
-      autoSaveEssay();
-    } else if (!isUserActive) {
-      // Schedule auto-save
-      const remainingTime = 4 * 60 * 1000 - timeSinceLastActivity;
-      autoSaveTimerRef.current = setTimeout(() => {
-        if (!isSavingVersion) { // ← Double-check
-          autoSaveEssay();
-        }
-      }, remainingTime);
-    }
-  }
-
-  return () => {
+  useEffect(() => {
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
-  };
-}, [
-  hasUnsavedChanges,
-  currentEssay?.id,
-  isSaving,
-  isSavingVersion, // ← ADDED
-  activeView,
-  lastUserActivity,
-  isUserActive,
-  autoSaveEssay,
-  isUniversityAdded,
-]);
+
+    if (
+      hasUnsavedChanges &&
+      currentEssay &&
+      !isSaving &&
+      !isUpdatingRef.current
+    ) {
+      const timeSinceLastActivity = Date.now() - lastUserActivity;
+
+      if (timeSinceLastActivity >= 4 * 60 * 1000) {
+        autoSaveEssay();
+      } else if (!isUserActive) {
+        const remainingTime = 4 * 60 * 1000 - timeSinceLastActivity;
+        autoSaveTimerRef.current = setTimeout(() => {
+          autoSaveEssay();
+        }, remainingTime);
+      }
+    }
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [
+    hasUnsavedChanges,
+    currentEssay?.id,
+    isSaving,
+    lastUserActivity,
+    isUserActive,
+    autoSaveEssay,
+  ]);
 
   // Activity tracking
   useEffect(() => {
@@ -1422,50 +1410,59 @@ useEffect(() => {
   // ✅ FIX 3C: SAVE VERSION FUNCTION (FIXED)
   // ==========================================
 
- const saveVersion = useCallback(
+ // ✅ FIXED saveVersion in frontend ApplicationTabs
+const saveVersion = useCallback(
   async (label) => {
-    // ✅ FIX: Prevent multiple simultaneous saves
-    if (!currentEssay || isSaving || isSavingVersion || isUpdatingRef.current) {
-      console.warn('Save already in progress');
+    if (
+      !currentEssay ||
+      isSaving ||
+      isSavingVersion ||
+      !userId ||
+      !isUniversityAdded
+    )
       return false;
+
+    // ✅ FIX 1: Capture current content state
+    let contentToSave = currentEssay.content;
+    let wordCountToSave = currentEssay.wordCount;
+    if (pendingContentRef.current) {
+      contentToSave = pendingContentRef.current.content;
+      wordCountToSave = pendingContentRef.current.wordCount;
     }
 
-    // ✅ FIX: Lock immediately to prevent race conditions
-    setIsSavingVersion(true);
-    isUpdatingRef.current = true;
-
     try {
-      // ✅ FIX: Get fresh content (handle pending updates)
-      let contentToSave = currentEssay.content || '';
-      let wordCountToSave = currentEssay.wordCount || 0;
+      setIsSavingVersion(true);
+      isUpdatingRef.current = true;
+
+      // ✅ FIX 2: Save any pending changes FIRST
+      if (hasUnsavedChanges) {
+        const autoSaved = await autoSaveEssay();
+        if (!autoSaved) {
+          toast.error("Failed to save current changes");
+          return false;
+        }
+        // Wait for state to settle
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // ✅ FIX 3: Determine correct API route
+      const isCustom =
+        currentProgram?.degreeType === "STANDALONE" ||
+        currentProgram?.isCustom;
       
-      if (pendingContentRef.current) {
-        contentToSave = pendingContentRef.current.content;
-        wordCountToSave = pendingContentRef.current.wordCount;
-      }
+      const apiRoute = isCustom
+        ? "/api/essay/independent"
+        : `/api/essay/${encodeURIComponent(universityName)}`;
 
-      // ✅ FIX: Validate content before saving
-      if (!contentToSave || wordCountToSave === 0) {
-        toast.error('Cannot save empty version');
-        return false;
-      }
-
-      console.log('📝 Saving version:', {
+      console.log('💾 Saving version to:', apiRoute, {
         essayId: currentEssay.id,
-        wordCount: wordCountToSave,
+        isCustom,
         label: label || `Version ${new Date().toLocaleString()}`
       });
-
-      // ✅ FIX: No auto-save before version save (it's redundant)
-      // If there are unsaved changes, they'll be included in the version
-
-      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-      const apiRoute = isCustom ? "/api/essay/independent" : `/api/essay/${encodeURIComponent(universityName)}`;
 
       const response = await fetch(apiRoute, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
         body: JSON.stringify({
           action: "save_version",
           essayId: currentEssay.id,
@@ -1480,19 +1477,18 @@ useEffect(() => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Save failed: ${response.status}`);
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       const result = await response.json();
 
-      // ✅ FIX: Validate response has required data
       if (!result.success || !result.essay) {
         throw new Error('Invalid response from server');
       }
 
-      console.log('✅ Version saved successfully:', result.version?.id);
+      console.log('✅ Version saved successfully:', result);
 
-      // ✅ FIX: Update workspace with COMPLETE essay data from server
+      // ✅ FIX 4: Update workspace data with complete essay data
       setWorkspaceData((prev) => {
         if (!prev) return prev;
 
@@ -1506,30 +1502,30 @@ useEffect(() => {
                     essayData.promptId === activeEssayPromptId
                       ? {
                           ...essayData,
-                          userEssay: result.essay, // ← Use complete server response
+                          userEssay: result.essay, // ✅ Use complete essay from server
                         }
-                      : essayData
+                      : essayData,
                   ),
                 }
-              : program
+              : program,
           ),
         };
       });
 
-      // ✅ FIX: Clear pending changes and update refs
-      pendingContentRef.current = null;
-      setHasUnsavedChanges(false);
-      setLastSaved(new Date());
-
-      toast.success('Version saved successfully! 🎉');
+      toast.success("Version saved successfully");
       
+      // ✅ FIX 5: Navigate back after successful save
+      setTimeout(() => {
+        setActiveView("list");
+        setOpenPanels([]);
+      }, 300);
+
       return true;
     } catch (error) {
       console.error("❌ Error saving version:", error);
-      toast.error(error.message || 'Failed to save version');
+      toast.error(error.message || "Failed to save version");
       return false;
     } finally {
-      // ✅ FIX: Always unlock, even on error
       setIsSavingVersion(false);
       isUpdatingRef.current = false;
     }
@@ -1538,14 +1534,18 @@ useEffect(() => {
     currentEssay,
     isSaving,
     isSavingVersion,
-    currentProgram,
+    hasUnsavedChanges,
+    autoSaveEssay,
     universityName,
     activeProgramId,
     activeEssayPromptId,
     userId,
     userEmail,
-  ]
+    isUniversityAdded,
+    currentProgram,
+  ],
 );
+
   const handleCreateEssay = async (programId, essayPromptId) => {
     try {
       setIsCreatingEssay(true);

@@ -1517,50 +1517,55 @@ const ApplicationTabs = ({ university }) => {
     ],
   );
 
-  // ✅ FIX D: UPDATED saveVersion function with immediate data refresh
- const saveVersion = useCallback(
+// ✅ FIXED saveVersion in frontend ApplicationTabs
+const saveVersion = useCallback(
   async (label) => {
-    // ✅ FIX: Comprehensive validation
-    if (!currentEssay || isSaving || isSavingVersion || !userId || !isUniversityAdded) {
-      console.warn('Cannot save version - missing requirements');
+    if (
+      !currentEssay ||
+      isSaving ||
+      isSavingVersion ||
+      !userId ||
+      !isUniversityAdded
+    )
       return false;
-    }
 
-    // ✅ FIX: Prevent race conditions with strict locking
-    if (isUpdatingRef.current) {
-      console.warn('Update already in progress');
-      return false;
+    // ✅ FIX 1: Capture current content state
+    let contentToSave = currentEssay.content;
+    let wordCountToSave = currentEssay.wordCount;
+    if (pendingContentRef.current) {
+      contentToSave = pendingContentRef.current.content;
+      wordCountToSave = pendingContentRef.current.wordCount;
     }
-
-    setIsSavingVersion(true);
-    isUpdatingRef.current = true;
 
     try {
-      // ✅ FIX: Get latest content (including pending changes)
-      let contentToSave = currentEssay.content || '';
-      let wordCountToSave = currentEssay.wordCount || 0;
+      setIsSavingVersion(true);
+      isUpdatingRef.current = true;
+
+      // ✅ FIX 2: Save any pending changes FIRST
+      if (hasUnsavedChanges) {
+        const autoSaved = await autoSaveEssay();
+        if (!autoSaved) {
+          toast.error("Failed to save current changes");
+          return false;
+        }
+        // Wait for state to settle
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // ✅ FIX 3: Determine correct API route
+      const isCustom =
+        currentProgram?.degreeType === "STANDALONE" ||
+        currentProgram?.isCustom;
       
-      if (pendingContentRef.current) {
-        contentToSave = pendingContentRef.current.content;
-        wordCountToSave = pendingContentRef.current.wordCount;
-      }
+      const apiRoute = isCustom
+        ? "/api/essay/independent"
+        : `/api/essay/${encodeURIComponent(universityName)}`;
 
-      // ✅ FIX: Validate content
-      if (!contentToSave || wordCountToSave === 0) {
-        toast.error('Cannot save empty version');
-        return false;
-      }
-
-      console.log('💾 Saving version:', {
+      console.log('💾 Saving version to:', apiRoute, {
         essayId: currentEssay.id,
-        wordCount: wordCountToSave,
-        hasUnsavedChanges,
+        isCustom,
+        label: label || `Version ${new Date().toLocaleString()}`
       });
-
-      // ✅ FIX: No auto-save needed - version save includes all changes
-
-      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
-      const apiRoute = isCustom ? "/api/essay/independent" : `/api/essay/${encodeURIComponent(universityName)}`;
 
       const response = await fetch(apiRoute, {
         method: "POST",
@@ -1579,19 +1584,18 @@ const ApplicationTabs = ({ university }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to save version');
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       const result = await response.json();
 
-      // ✅ FIX: Validate response structure
       if (!result.success || !result.essay) {
-        throw new Error('Invalid server response');
+        throw new Error('Invalid response from server');
       }
 
-      console.log('✅ Version saved, updating UI');
+      console.log('✅ Version saved successfully:', result);
 
-      // ✅ FIX: Update workspace with server data
+      // ✅ FIX 4: Update workspace data with complete essay data
       setWorkspaceData((prev) => {
         if (!prev) return prev;
 
@@ -1605,24 +1609,19 @@ const ApplicationTabs = ({ university }) => {
                     essayData.promptId === activeEssayPromptId
                       ? {
                           ...essayData,
-                          userEssay: result.essay, // ← Complete essay from server
+                          userEssay: result.essay, // ✅ Use complete essay from server
                         }
-                      : essayData
+                      : essayData,
                   ),
                 }
-              : program
+              : program,
           ),
         };
       });
 
-      // ✅ FIX: Clear all pending state
-      pendingContentRef.current = null;
-      setHasUnsavedChanges(false);
-      setLastSaved(new Date());
-
-      toast.success('Version saved successfully! 🎉');
-
-      // ✅ FIX: Optional - navigate back after short delay
+      toast.success("Version saved successfully");
+      
+      // ✅ FIX 5: Navigate back after successful save
       setTimeout(() => {
         setActiveView("list");
         setOpenPanels([]);
@@ -1634,7 +1633,6 @@ const ApplicationTabs = ({ university }) => {
       toast.error(error.message || "Failed to save version");
       return false;
     } finally {
-      // ✅ FIX: Always unlock
       setIsSavingVersion(false);
       isUpdatingRef.current = false;
     }
@@ -1644,6 +1642,7 @@ const ApplicationTabs = ({ university }) => {
     isSaving,
     isSavingVersion,
     hasUnsavedChanges,
+    autoSaveEssay,
     universityName,
     activeProgramId,
     activeEssayPromptId,
@@ -1651,9 +1650,8 @@ const ApplicationTabs = ({ university }) => {
     userEmail,
     isUniversityAdded,
     currentProgram,
-  ]
+  ],
 );
-
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;
 
