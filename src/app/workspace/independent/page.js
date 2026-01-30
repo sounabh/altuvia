@@ -1417,12 +1417,9 @@ const saveVersion = useCallback(
       !currentEssay ||
       isSaving ||
       isSavingVersion ||
-      !userId ||
-      !isUniversityAdded
-    )
-      return false;
+      !userId
+    ) return false;
 
-    // ✅ FIX 1: Capture current content state
     let contentToSave = currentEssay.content;
     let wordCountToSave = currentEssay.wordCount;
     if (pendingContentRef.current) {
@@ -1434,28 +1431,20 @@ const saveVersion = useCallback(
       setIsSavingVersion(true);
       isUpdatingRef.current = true;
 
-      // ✅ FIX 2: Save any pending changes FIRST
       if (hasUnsavedChanges) {
         const autoSaved = await autoSaveEssay();
         if (!autoSaved) {
           toast.error("Failed to save current changes");
           return false;
         }
-        // Wait for state to settle
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // ✅ FIX 3: Determine correct API route
-      const isCustom =
-        currentProgram?.degreeType === "STANDALONE" ||
-        currentProgram?.isCustom;
-      
-      // ✅ Independent essays ALWAYS use the independent route
+      // ✅ Independent page always uses independent route
       const apiRoute = "/api/essay/independent";
 
       console.log('💾 Saving version to:', apiRoute, {
         essayId: currentEssay.id,
-        isCustom,
         label: label || `Version ${new Date().toLocaleString()}`
       });
 
@@ -1468,7 +1457,7 @@ const saveVersion = useCallback(
           content: contentToSave,
           wordCount: wordCountToSave,
           label: label || `Version ${new Date().toLocaleString()}`,
-          isCustomEssay: isCustom,
+          isCustomEssay: true,
           userId,
           userEmail,
         }),
@@ -1487,7 +1476,6 @@ const saveVersion = useCallback(
 
       console.log('✅ Version saved successfully:', result);
 
-      // ✅ FIX 4: Update workspace data with complete essay data
       setWorkspaceData((prev) => {
         if (!prev) return prev;
 
@@ -1501,7 +1489,7 @@ const saveVersion = useCallback(
                     essayData.promptId === activeEssayPromptId
                       ? {
                           ...essayData,
-                          userEssay: result.essay, // ✅ Use complete essay from server
+                          userEssay: result.essay,
                         }
                       : essayData,
                   ),
@@ -1513,7 +1501,6 @@ const saveVersion = useCallback(
 
       toast.success("Version saved successfully");
       
-      // ✅ FIX 5: Navigate back after successful save
       setTimeout(() => {
         setActiveView("list");
         setOpenPanels([]);
@@ -1535,14 +1522,12 @@ const saveVersion = useCallback(
     isSavingVersion,
     hasUnsavedChanges,
     autoSaveEssay,
-    universityName,
     activeProgramId,
     activeEssayPromptId,
     userId,
     userEmail,
-    isUniversityAdded,
     currentProgram,
-  ],
+  ]
 );
 
   const handleCreateEssay = async (programId, essayPromptId) => {
