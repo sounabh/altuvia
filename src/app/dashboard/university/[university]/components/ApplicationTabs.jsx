@@ -3405,53 +3405,30 @@ const ApplicationTabs = ({ university }) => {
                                     </span>
                                     <div className="flex items-center gap-2">
                                       {/* Manual Save Button */}
-                                      <Button
-                                        size="sm"
-                                        onClick={async () => {
-                                          if (hasUnsavedChanges || pendingContentRef.current) {
-                                            const saved = await autoSaveEssay();
-                                            if (saved) {
-                                              toast.success('Changes saved!');
-                                            }
-                                          } else {
-                                            toast.info('No changes to save');
-                                          }
-                                        }}
-                                        disabled={isSaving || (!hasUnsavedChanges && !pendingContentRef.current)}
-                                        className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-400/30"
-                                      >
-                                        {isSaving ? (
-                                          <>
-                                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                                            Saving...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Save className="w-3 h-3 mr-1.5" />
-                                            Save Now (Ctrl+S)
-                                          </>
-                                        )}
-                                      </Button>
+                                     <span className="flex items-center text-white/60 text-xs">
+  <Save className="w-3 h-3 mr-1.5" />
+  Press Ctrl+S to save
+</span>
                                       
                                       {/* Save Version Button */}
-                                      <Button
-                                        size="sm"
-                                        onClick={() => saveVersion()}
-                                        disabled={isSaving || isSavingVersion}
-                                        className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
-                                      >
-                                        {isSavingVersion ? (
-                                          <>
-                                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                                            Saving...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Save className="w-3 h-3 mr-1.5" />
-                                            Save Version & Exit
-                                          </>
-                                        )}
-                                      </Button>
+                                    <Button
+  size="sm"
+  onClick={() => saveVersion()}
+  disabled={isSaving || isSavingVersion}
+  className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/30"
+>
+  {isSavingVersion ? (
+    <>
+      <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+      Saving...
+    </>
+  ) : (
+    <>
+      <Save className="w-3 h-3 mr-1.5" />
+      Save Version & Exit
+    </>
+  )}
+</Button>
                                     </div>
                                   </div>
                                 </>

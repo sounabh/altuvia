@@ -5,17 +5,6 @@ import { ArrowLeft } from "lucide-react";
 // =============================================================================
 // COUNTRY DATA CONSTANTS
 // =============================================================================
-/**
- * List of supported countries with their metadata
- * 
- * Structure:
- *   - name: Full country name
- *   - flag: URL to flag image (supports WebP and PNG)
- *   - code: ISO country code for flag API
- *   - map: Placeholder link to country map
- * 
- * Note: Uses FlagCDN service for optimized flag images
- */
 const countries = [
   { name: "United States", flag: "https://flagcdn.com/w160/us.png", code: "us", map: "https://example.com/maps/us" },
   { name: "United Kingdom", flag: "https://flagcdn.com/w160/gb.png", code: "gb", map: "https://example.com/maps/gb" },
@@ -38,22 +27,6 @@ const countries = [
 // =============================================================================
 // CountrySelectionStep Component
 // =============================================================================
-/**
- * CountrySelectionStep - Form step for selecting preferred study countries
- * 
- * Features:
- * - Allows selection of up to 3 countries
- * - Displays flags with responsive image formats (WebP preferred)
- * - Provides visual feedback for selection state
- * 
- * @param {Object} props - Component properties
- * @param {string[]} [props.selectedCountries=[]] - Pre-selected country names
- * @param {Function} [props.onNext=() => {}] - Callback when proceeding to next step
- * @param {Function} [props.onUpdate=() => {}] - Callback when updating country selection
- * @param {number} props.step - Current step number
- * @param {Object} props.user - User data object
- * @returns {JSX.Element} Country selection interface
- */
 export const CountrySelectionStep = ({
   selectedCountries = [],
   onNext = () => {},
@@ -64,22 +37,10 @@ export const CountrySelectionStep = ({
   // ===========================================================================
   // EVENT HANDLERS
   // ===========================================================================
-  /**
-   * Toggles country selection state
-   * 
-   * Rules:
-   * - If country is already selected, removes it
-   * - If country is not selected and less than 3 selected, adds it
-   * - Prevents selection when 3 countries already chosen
-   * 
-   * @param {string} countryName - Name of country to toggle
-   */
   const toggleCountry = (countryName) => {
     if (selectedCountries.includes(countryName)) {
-      // Remove country from selection
       onUpdate(selectedCountries.filter((c) => c !== countryName));
     } else if (selectedCountries.length < 3) {
-      // Add country to selection
       onUpdate([...selectedCountries, countryName]);
     }
   };
@@ -87,51 +48,21 @@ export const CountrySelectionStep = ({
   // ===========================================================================
   // UTILITY FUNCTIONS
   // ===========================================================================
-  /**
-   * Generates user initials for avatar fallback
-   * 
-   * Fallback hierarchy:
-   * 1. First letters of first and last name
-   * 2. First letter of email
-   * 3. Default 'U' if no user data
-   * 
-   * @returns {string} User initials in uppercase
-   */
   const getUserInitials = () => {
-    // Handle full name if available
     if (user?.name) {
-      const names = user?.name.split(' ');
-      return names.length > 1 
-        ? `${names[0][0]}${names[1][0]}`.toUpperCase()
+      const names = user.name.split(" ");
+      return names.length > 1
+        ? (names[0][0] + names[1][0]).toUpperCase()
         : names[0][0].toUpperCase();
     }
-    
-    // Fallback to email if name not available
+
     if (user?.email) {
-      return user?.name[0].toUpperCase();
+      return user.email[0].toUpperCase();
     }
-    
-    // Ultimate fallback
-    return 'U';
+
+    return "U";
   };
 
-  // ===========================================================================
-  // DEBUG LOGS (Maintained as per requirements)
-  // ===========================================================================
-  /*
-  console.log('====================================');
-  console.log(user);
-  console.log('====================================');
-
-  console.log('====================================');
-  console.log(selectedCountries);
-  console.log('====================================');
-
-  console.log('====================================');
- 
-  console.log(process.env.NEXT_PUBLIC_API_BASE_URL);
-  console.log('====================================');
-*/
   // ===========================================================================
   // RENDER COMPONENT
   // ===========================================================================
@@ -140,28 +71,30 @@ export const CountrySelectionStep = ({
       <div className="relative z-100 flex flex-col justify-center items-center px-8 py-4 -my-20">
         {/* HEADER SECTION: Logo and user avatar */}
         <header className="bg-[#002147] w-[95%] px-12 py-3 rounded-2xl mb-6 shadow-lg flex items-center justify-between">
-         <span className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-white">
-              Altu<span className="text-[#3598FE]">Via</span>
-            </span>
-          
+          <span className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-white">
+            Altu<span className="text-[#3598FE]">Via</span>
+          </span>
+
           {/* USER AVATAR: With fallback to initials */}
           <div className="relative">
             {user?.image ? (
               <img
-                src={user?.image}
-                alt={`${user?.user?.name || 'User'} avatar`}
+                src={user.image}
+                alt={(user?.name || "User") + " avatar"}
                 className="w-10 h-10 rounded-full border-3 border-blue-400 shadow-md object-cover"
                 onError={(e) => {
-                  // Fallback mechanism: Hide broken image and show initials
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
+                  e.target.style.display = "none";
+                  e.target.nextSibling.style.display = "flex";
                 }}
               />
             ) : null}
-            
+
             {/* FALLBACK AVATAR: Shows user initials */}
-            <div 
-              className={`w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm ${user?.image ? 'hidden' : 'flex'}`}
+            <div
+              className={
+                "w-10 h-10 bg-blue-100 border-3 border-blue-400 rounded-full shadow-md flex items-center justify-center text-blue-800 font-semibold text-sm " +
+                (user?.image ? "hidden" : "flex")
+              }
             >
               {getUserInitials()}
             </div>
@@ -188,7 +121,7 @@ export const CountrySelectionStep = ({
         {/* STEP INDICATOR */}
         <div className="text-center mb-8 mt-10">
           <div className="inline-flex items-center bg-blue-100 text-black px-4 py-2 rounded-lg font-semibold text-sm mb-4">
-            Step {`0${step}`} 
+            Step {"0" + step}
           </div>
           <p className="text-sm text-black font-medium mb-5 z-10">
             Select Upto 3 countries where you'd like to study
@@ -199,8 +132,27 @@ export const CountrySelectionStep = ({
         <div className="mb-8 flex justify-center z-10">
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6 justify-items-center max-w-6xl">
             {countries.map((country) => {
+              const isUSA = country.code === "us";
               const isSelected = selectedCountries.includes(country.name);
-              const isDisabled = !isSelected && selectedCountries.length >= 3;
+              const isDisabled = !isUSA || (!isSelected && selectedCountries.length >= 3);
+
+              let cardClassName = "w-28 h-30 rounded-2xl transition-all duration-300 transform cursor-pointer overflow-hidden relative ";
+              
+              if (isSelected) {
+                cardClassName += "border-[5px] border-[#002147] shadow-2xl scale-110 ring-4 ring-blue-300 ring-opacity-50 ";
+              } else if (isUSA) {
+                cardClassName += "border-[3px] border-gray-200 hover:border-blue-400 hover:shadow-lg hover:scale-105 ";
+              } else {
+                cardClassName += "border-[3px] border-gray-200 ";
+              }
+              
+              if (!isUSA) {
+                cardClassName += "opacity-60 cursor-not-allowed grayscale ";
+              }
+              
+              if (isUSA && isDisabled) {
+                cardClassName += "opacity-30 cursor-not-allowed ";
+              }
 
               return (
                 <div
@@ -209,37 +161,55 @@ export const CountrySelectionStep = ({
                 >
                   {/* COUNTRY FLAG CARD */}
                   <div
-                    onClick={() => !isDisabled && toggleCountry(country.name)}
-                    className={`w-28 h-30 rounded-2xl transition-all duration-300 transform cursor-pointer overflow-hidden relative ${
-                      isSelected
-                        ? "border-[5px] border-[#002147] shadow-2xl scale-110 ring-4 ring-blue-300 ring-opacity-50"
-                        : "border-[3px] border-gray-200 hover:border-blue-400 hover:shadow-lg hover:scale-105"
-                    } ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}
+                    onClick={() => {
+                      if (isUSA && !isDisabled) {
+                        toggleCountry(country.name);
+                      }
+                    }}
+                    className={cardClassName}
                   >
+                    {/* Coming Soon Tag for non-USA countries */}
+                    {!isUSA && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
+                        <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-md transform -rotate-12 shadow-lg">
+                          Coming Soon
+                        </span>
+                      </div>
+                    )}
+
                     {/* Selection Checkmark Indicator */}
                     {isSelected && (
                       <div className="absolute top-2 right-2 bg-[#002147] text-white rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md">
                         <span className="text-xs font-bold">✓</span>
                       </div>
                     )}
-                    
+
                     {/* RESPONSIVE IMAGE HANDLING: WebP preferred with PNG fallback */}
-                    <picture className={`w-full h-full block transition-all duration-300 ${isSelected ? 'brightness-100' : 'brightness-95'}`}>
+                    <picture
+                      className={
+                        "w-full h-full block transition-all duration-300 " +
+                        (isSelected ? "brightness-100" : "brightness-95")
+                      }
+                    >
                       {/* WebP source (preferred format) */}
                       <source
                         type="image/webp"
-                        srcSet={`https://flagcdn.com/w80/${country.code}.webp, https://flagcdn.com/w160/${country.code}.webp 2x`}
+                        srcSet={
+                          "https://flagcdn.com/w80/" + country.code + ".webp, https://flagcdn.com/w160/" + country.code + ".webp 2x"
+                        }
                       />
                       {/* PNG fallback for unsupported browsers */}
                       <source
                         type="image/png"
-                        srcSet={`https://flagcdn.com/w80/${country.code}.png, https://flagcdn.com/w160/${country.code}.png 2x`}
+                        srcSet={
+                          "https://flagcdn.com/w80/" + country.code + ".png, https://flagcdn.com/w160/" + country.code + ".png 2x"
+                        }
                       />
                       <img
-                        src={`https://flagcdn.com/w80/${country.code}.png`}
-                        alt={`${country.name} flag`}
+                        src={"https://flagcdn.com/w80/" + country.code + ".png"}
+                        alt={country.name + " flag"}
                         className="w-full h-full object-cover object-center"
-                        loading="lazy"  // Lazy loading for performance
+                        loading="lazy"
                       />
                     </picture>
                   </div>
@@ -271,18 +241,9 @@ export const CountrySelectionStep = ({
 // =============================================================================
 // Demo Wrapper Component
 // =============================================================================
-/**
- * DemoWrapper - Standalone component for development/testing
- * 
- * Manages state for:
- *   - selectedCountries: Currently selected country names
- * 
- * Note: Used for isolated component testing
- */
 export default function CountrySelectionDemo() {
-  // State for selected countries
   const [selectedCountries, setSelectedCountries] = useState([]);
-
+  
   return (
     <CountrySelectionStep
       selectedCountries={selectedCountries}
