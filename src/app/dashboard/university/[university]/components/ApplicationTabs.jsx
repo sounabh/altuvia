@@ -1275,11 +1275,10 @@ const ApplicationTabs = ({ university }) => {
 
       if (response.ok) {
         const result = await response.json();
-
-        // ✅ FIX: Update workspace data immediately with response
+        
+        // ✅ FIX: Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
-
           return {
             ...prev,
             programs: prev.programs.map((program) =>
@@ -1425,7 +1424,7 @@ const ApplicationTabs = ({ university }) => {
     currentProgram,
   ]);
 
-  // ========== UPDATE ESSAY CONTENT ==========
+  // ========== ✅ FIX B: UPDATED updateEssayContent function with race condition fix ==========
   const updateEssayContent = useCallback(
     (content, wordCount) => {
       if (!isUniversityAdded) return;
@@ -1453,51 +1452,59 @@ const ApplicationTabs = ({ university }) => {
           return;
         }
 
-        // Update workspace data correctly
-        setWorkspaceData((prev) => {
-          if (!prev) return prev;
+        // ✅ FIX B: Update with proper race condition handling
+        try {
+          isUpdatingRef.current = true; // Set BEFORE operations
 
-          const programIndex = prev.programs.findIndex(
-            (p) => p.id === activeProgramId,
-          );
-          if (programIndex === -1) return prev;
+          // Update workspace data correctly
+          setWorkspaceData((prev) => {
+            if (!prev) return prev;
 
-          const program = prev.programs[programIndex];
-          if (!program.essays) return prev;
+            const programIndex = prev.programs.findIndex(
+              (p) => p.id === activeProgramId,
+            );
+            if (programIndex === -1) return prev;
 
-          const essayIndex = program.essays.findIndex(
-            (e) => e.promptId === activeEssayPromptId,
-          );
-          if (essayIndex === -1) return prev;
+            const program = prev.programs[programIndex];
+            if (!program.essays) return prev;
 
-          const currentContent = program.essays[essayIndex].userEssay?.content;
-          if (currentContent === newContent) return prev;
+            const essayIndex = program.essays.findIndex(
+              (e) => e.promptId === activeEssayPromptId,
+            );
+            if (essayIndex === -1) return prev;
 
-          const newPrograms = [...prev.programs];
-          const newProgram = { ...program };
-          const newEssays = [...program.essays];
-          const newEssayData = { ...newEssays[essayIndex] };
+            const currentContent = program.essays[essayIndex].userEssay?.content;
+            if (currentContent === newContent) return prev;
 
-          newEssayData.userEssay = {
-            ...newEssayData.userEssay,
-            content: newContent,
-            wordCount: newWordCount,
-            lastModified: new Date(),
-          };
+            const newPrograms = [...prev.programs];
+            const newProgram = { ...program };
+            const newEssays = [...program.essays];
+            const newEssayData = { ...newEssays[essayIndex] };
 
-          newEssays[essayIndex] = newEssayData;
-          newProgram.essays = newEssays;
-          newPrograms[programIndex] = newProgram;
+            newEssayData.userEssay = {
+              ...newEssayData.userEssay,
+              content: newContent,
+              wordCount: newWordCount,
+              lastModified: new Date(),
+            };
 
-          return { ...prev, programs: newPrograms };
-        });
+            newEssays[essayIndex] = newEssayData;
+            newProgram.essays = newEssays;
+            newPrograms[programIndex] = newProgram;
 
-        setHasUnsavedChanges(true);
-        pendingContentRef.current = null;
+            return { ...prev, programs: newPrograms };
+          });
 
-        setTimeout(() => {
-          isEditorActiveRef.current = false;
-        }, 100);
+          setHasUnsavedChanges(true);
+          pendingContentRef.current = null;
+        } catch (error) {
+          console.error("Error updating content:", error);
+        } finally {
+          setTimeout(() => {
+            isEditorActiveRef.current = false;
+            isUpdatingRef.current = false; // ✅ Always reset
+          }, 100);
+        }
       }, 600);
     },
     [
@@ -1531,6 +1538,7 @@ const ApplicationTabs = ({ university }) => {
 
       try {
         setIsSavingVersion(true);
+        isUpdatingRef.current = true; // ✅ Add race condition protection
 
         if (hasUnsavedChanges) {
           const autoSaved = await autoSaveEssay();
@@ -1567,6 +1575,35 @@ const ApplicationTabs = ({ university }) => {
 
           toast.success("Version saved successfully");
           
+          // ✅ FIX C: Update workspace data with server response
+          if (result.essay) {
+            setWorkspaceData((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                programs: prev.programs.map((program) =>
+                  program.id === activeProgramId
+                    ? {
+                        ...program,
+                        essays: program.essays.map((essayData) =>
+                          essayData.promptId === activeEssayPromptId
+                            ? {
+                                ...essayData,
+                                userEssay: {
+                                  ...essayData.userEssay,
+                                  ...result.essay, // ← Use server response
+                                  lastModified: new Date(),
+                                },
+                              }
+                            : essayData,
+                        ),
+                      }
+                    : program,
+                ),
+              };
+            });
+          }
+
           // ✅ FIX: Force immediate refresh from API
           await forceRefresh();
           
@@ -1614,6 +1651,7 @@ const ApplicationTabs = ({ university }) => {
         return false;
       } finally {
         setIsSavingVersion(false);
+        isUpdatingRef.current = false; // ✅ Always reset
       }
     },
     [
@@ -2102,7 +2140,7 @@ const ApplicationTabs = ({ university }) => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                openDeleteConfirmation(essay.id, essay.title);
+                onDelete(essay.id);
               }}
               className="text-xs text-white/50 hover:text-red-400 flex items-center gap-1 transition-colors px-3 py-1.5 hover:bg-red-500/10 rounded-lg"
             >
@@ -2804,7 +2842,7 @@ const ApplicationTabs = ({ university }) => {
                               index={index}
                               onEdit={(essay) => handleOpenEditor(essay, true)}
                               onDelete={(essayId) =>
-                                handleDeleteCustomEssay(essayId)
+                                openDeleteConfirmation(essayId, essay.title)
                               }
                             />
                           ))}

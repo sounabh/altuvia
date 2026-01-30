@@ -1076,7 +1076,7 @@ export default function IndependentWorkspacePage() {
   }, [fetchWorkspaceData]);
 
   // ==========================================
-  // AUTO-SAVE LOGIC (FIXED)
+  // ✅ FIX 3A: AUTO-SAVE LOGIC (FIXED)
   // ==========================================
 
   const autoSaveEssay = useCallback(async () => {
@@ -1333,6 +1333,10 @@ export default function IndependentWorkspacePage() {
     });
   }, []);
 
+  // ==========================================
+  // ✅ FIX 3B: MANUAL SAVE FUNCTION (FIXED)
+  // ==========================================
+
   const manualSave = useCallback(async () => {
     if (!currentEssay || isSaving) return false;
     
@@ -1354,7 +1358,7 @@ export default function IndependentWorkspacePage() {
       if (response.ok) {
         const result = await response.json();
         
-        // Update workspace data with server response
+        // ✅ FIX: Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1401,6 +1405,10 @@ export default function IndependentWorkspacePage() {
       setIsSaving(false);
     }
   }, [currentEssay, isSaving, activeProgramId, activeEssayPromptId]);
+
+  // ==========================================
+  // ✅ FIX 3C: SAVE VERSION FUNCTION (FIXED)
+  // ==========================================
 
   const saveVersion = useCallback(
     async (label) => {
@@ -2025,7 +2033,7 @@ export default function IndependentWorkspacePage() {
             </button>
           </div>
         </div>
-      )}
+      )};
 
       {/* Main Content */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 pb-8">

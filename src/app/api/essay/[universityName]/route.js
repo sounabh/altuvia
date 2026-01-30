@@ -446,6 +446,19 @@ export async function PUT(request, { params }) {
       );
     }
 
+    // ✅ Fix 4A: Fetch essay to get wordLimit
+    const essayOwnership = await prisma.essay.findUnique({
+      where: { id: essayId },
+      include: { essayPrompt: true }
+    });
+
+    if (!essayOwnership) {
+      return NextResponse.json(
+        { error: "Essay not found" },
+        { status: 404 }
+      );
+    }
+
     const completionResult = await checkEssayCompletion(
       essayId,
       wordCount || 0,
@@ -461,6 +474,8 @@ export async function PUT(request, { params }) {
     if (!updatedEssay) {
       const updateData = {
         lastModified: new Date(),
+        // ✅ Fix 4A: Set wordLimit from essayPrompt
+        wordLimit: essayOwnership.essayPrompt?.wordLimit || 500,
       };
 
       if (content !== undefined) updateData.content = content;
@@ -472,17 +487,39 @@ export async function PUT(request, { params }) {
         updateData.lastAutoSaved = new Date();
       }
 
+      // ✅ Fix 4B: Enhanced include structure
       updatedEssay = await prisma.essay.update({
         where: { id: essayId },
         data: updateData,
         include: {
-          versions: { orderBy: { timestamp: "desc" }, take: 10 },
+          versions: { 
+            orderBy: { timestamp: "desc" }, 
+            take: 20,
+            include: {
+              aiResults: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+              },
+            },
+          },
           aiResults: {
             where: { essayVersionId: null },
             orderBy: { createdAt: "desc" },
-            take: 3,
+            take: 5,
           },
           essayPrompt: true,
+          program: {
+            include: {
+              university: {
+                select: {
+                  id: true,
+                  universityName: true,
+                  slug: true,
+                  brandColor: true,
+                }
+              }
+            }
+          }
         },
       });
     } else {
@@ -492,17 +529,39 @@ export async function PUT(request, { params }) {
       if (isAutoSave) additionalUpdates.lastAutoSaved = new Date();
 
       if (Object.keys(additionalUpdates).length > 0) {
+        // ✅ Fix 4B: Enhanced include structure for additional updates
         updatedEssay = await prisma.essay.update({
           where: { id: essayId },
           data: additionalUpdates,
           include: {
-            versions: { orderBy: { timestamp: "desc" }, take: 10 },
+            versions: { 
+              orderBy: { timestamp: "desc" }, 
+              take: 20,
+              include: {
+                aiResults: {
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                },
+              },
+            },
             aiResults: {
               where: { essayVersionId: null },
               orderBy: { createdAt: "desc" },
-              take: 3,
+              take: 5,
             },
             essayPrompt: true,
+            program: {
+              include: {
+                university: {
+                  select: {
+                    id: true,
+                    universityName: true,
+                    slug: true,
+                    brandColor: true,
+                  }
+                }
+              }
+            }
           },
         });
       }
@@ -534,8 +593,11 @@ export async function PUT(request, { params }) {
       }
     }
 
+    // ✅ Fix 1C: Return success and message
     return NextResponse.json({
       essay: updatedEssay,
+      success: true,
+      message: isAutoSave ? 'Auto-saved' : 'Saved'
     });
   } catch (error) {
     console.error("Error updating essay:", error);
@@ -750,9 +812,47 @@ async function saveVersion(data) {
     },
   });
 
-  await prisma.essay.update({
+  // ✅ Fix 4C: Update main essay with version content AND return full essay data
+  const updatedEssay = await prisma.essay.update({
     where: { id: essayId },
-    data: { lastModified: new Date() },
+    data: { 
+      content: content || "",
+      wordCount: wordCount || 0,
+      lastModified: new Date(),
+      completionPercentage: essay.essayPrompt?.wordLimit 
+        ? Math.min(100, (wordCount / essay.essayPrompt.wordLimit) * 100)
+        : 0,
+    },
+    include: {
+      versions: { 
+        orderBy: { timestamp: "desc" }, 
+        take: 20,
+        include: {
+          aiResults: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+      aiResults: {
+        where: { essayVersionId: null },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+      essayPrompt: true,
+      program: {
+        include: {
+          university: {
+            select: {
+              id: true,
+              universityName: true,
+              slug: true,
+              brandColor: true,
+            }
+          }
+        }
+      }
+    },
   });
 
   let aiAnalysis = null;
@@ -776,10 +876,12 @@ async function saveVersion(data) {
   }
 
   return NextResponse.json({
+    success: true,
     version: {
       ...version,
       aiAnalysis,
     },
+    essay: updatedEssay,  // ✅ CRITICAL: Include full essay data
     aiAnalysis,
   });
 }
@@ -995,6 +1097,7 @@ async function getEssayAnalytics(data) {
     );
   }
 }
+
 async function deleteVersion(data) {
   const { versionId, essayId } = data;
 
