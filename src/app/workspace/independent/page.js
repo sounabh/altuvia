@@ -61,8 +61,9 @@ const calculateStats = (workspaceData) => {
 
   workspaceData.programs.forEach((program) => {
     // Check if this is a standalone essay (no programId in essays or custom flag)
-    const isStandaloneProgram = program.degreeType === "STANDALONE" || 
-                                 program.programName === "My Custom Essays";
+    const isStandaloneProgram =
+      program.degreeType === "STANDALONE" ||
+      program.programName === "My Custom Essays";
 
     if (!stats.programsByUniversity[program.universityId]) {
       stats.programsByUniversity[program.universityId] = [];
@@ -75,7 +76,7 @@ const calculateStats = (workspaceData) => {
       program.essays.forEach((essay) => {
         if (essay.userEssay) {
           stats.totalWords += essay.userEssay.wordCount || 0;
-          
+
           if (isStandaloneProgram) {
             stats.standaloneEssays++;
             if (essay.userEssay.isCompleted) {
@@ -104,38 +105,38 @@ const calculateStats = (workspaceData) => {
 // STANDALONE ESSAY CREATION MODAL
 // ==========================================
 
-function StandaloneEssayModal({ 
-  isOpen, 
-  onClose, 
-  onCreateEssay, 
+function StandaloneEssayModal({
+  isOpen,
+  onClose,
+  onCreateEssay,
   savedUniversities,
-  isCreating 
+  isCreating,
 }) {
   const [formData, setFormData] = useState({
-    customTitle: '',
-    customPrompt: '',
+    customTitle: "",
+    customPrompt: "",
     wordLimit: 500,
-    taggedUniversityId: '', // Optional
-    priority: 'medium',
+    taggedUniversityId: "", // Optional
+    priority: "medium",
   });
 
   const [errors, setErrors] = useState({});
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.customTitle.trim()) {
-      newErrors.customTitle = 'Essay title is required';
+      newErrors.customTitle = "Essay title is required";
     }
-    
+
     if (!formData.customPrompt.trim()) {
-      newErrors.customPrompt = 'Essay prompt/question is required';
+      newErrors.customPrompt = "Essay prompt/question is required";
     }
-    
+
     if (formData.wordLimit < 100 || formData.wordLimit > 5000) {
-      newErrors.wordLimit = 'Word limit must be between 100 and 5000';
+      newErrors.wordLimit = "Word limit must be between 100 and 5000";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -148,11 +149,11 @@ function StandaloneEssayModal({
 
   const resetForm = () => {
     setFormData({
-      customTitle: '',
-      customPrompt: '',
+      customTitle: "",
+      customPrompt: "",
       wordLimit: 500,
-      taggedUniversityId: '',
-      priority: 'medium',
+      taggedUniversityId: "",
+      priority: "medium",
     });
     setErrors({});
   };
@@ -175,8 +176,12 @@ function StandaloneEssayModal({
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#002147]">Create Custom Essay</h2>
-              <p className="text-sm text-gray-500">Write your own essay with custom prompt</p>
+              <h2 className="text-xl font-bold text-[#002147]">
+                Create Custom Essay
+              </h2>
+              <p className="text-sm text-gray-500">
+                Write your own essay with custom prompt
+              </p>
             </div>
           </div>
           <button
@@ -197,9 +202,13 @@ function StandaloneEssayModal({
             <input
               type="text"
               value={formData.customTitle}
-              onChange={(e) => setFormData({ ...formData, customTitle: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, customTitle: e.target.value })
+              }
               className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all ${
-                errors.customTitle ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                errors.customTitle
+                  ? "border-red-300 bg-red-50"
+                  : "border-gray-300"
               }`}
               placeholder="e.g., Leadership Experience Essay"
             />
@@ -218,9 +227,13 @@ function StandaloneEssayModal({
             </label>
             <textarea
               value={formData.customPrompt}
-              onChange={(e) => setFormData({ ...formData, customPrompt: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, customPrompt: e.target.value })
+              }
               className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all resize-none ${
-                errors.customPrompt ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                errors.customPrompt
+                  ? "border-red-300 bg-red-50"
+                  : "border-gray-300"
               }`}
               rows={4}
               placeholder="Enter the essay question or topic you're writing about..."
@@ -245,15 +258,24 @@ function StandaloneEssayModal({
               <input
                 type="number"
                 value={formData.wordLimit}
-                onChange={(e) => setFormData({ ...formData, wordLimit: parseInt(e.target.value) || 500 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    wordLimit: parseInt(e.target.value) || 500,
+                  })
+                }
                 className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all ${
-                  errors.wordLimit ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  errors.wordLimit
+                    ? "border-red-300 bg-red-50"
+                    : "border-gray-300"
                 }`}
                 min={100}
                 max={5000}
               />
               {errors.wordLimit && (
-                <p className="mt-1 text-sm text-red-600 text-xs">{errors.wordLimit}</p>
+                <p className="mt-1 text-sm text-red-600 text-xs">
+                  {errors.wordLimit}
+                </p>
               )}
             </div>
 
@@ -263,7 +285,9 @@ function StandaloneEssayModal({
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, priority: e.target.value })
+                }
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
               >
                 <option value="low">Low Priority</option>
@@ -280,7 +304,9 @@ function StandaloneEssayModal({
             </label>
             <select
               value={formData.taggedUniversityId}
-              onChange={(e) => setFormData({ ...formData, taggedUniversityId: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, taggedUniversityId: e.target.value })
+              }
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
             >
               <option value="">📝 No University (Personal Essay)</option>
@@ -291,7 +317,8 @@ function StandaloneEssayModal({
               ))}
             </select>
             <p className="mt-1.5 text-xs text-gray-500">
-              Optionally tag this essay with a university to organize it with your applications
+              Optionally tag this essay with a university to organize it with
+              your applications
             </p>
           </div>
 
@@ -352,42 +379,61 @@ function StandaloneEssayModal({
 // STANDALONE ESSAY CARD COMPONENT
 // ==========================================
 
-function StandaloneEssayCard({ 
+function StandaloneEssayCard({
   essayData,
-  isActive, 
-  onSelect, 
+  isActive,
+  onSelect,
   onDelete,
   onToggleCompletion,
-  universityName 
+  universityName,
 }) {
   const essay = essayData.userEssay;
   if (!essay) return null;
 
-  const progress = essayData.wordLimit > 0 
-    ? (essay.wordCount / essayData.wordLimit) * 100 
-    : 0;
+  const progress =
+    essayData.wordLimit > 0 ? (essay.wordCount / essayData.wordLimit) * 100 : 0;
 
   const priorityColors = {
-    high: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' },
-    medium: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
-    low: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-500' },
+    high: {
+      bg: "bg-red-50",
+      text: "text-red-700",
+      border: "border-red-200",
+      dot: "bg-red-500",
+    },
+    medium: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200",
+      dot: "bg-amber-500",
+    },
+    low: {
+      bg: "bg-green-50",
+      text: "text-green-700",
+      border: "border-green-200",
+      dot: "bg-green-500",
+    },
   };
 
-  const priorityConfig = priorityColors[essay.priority] || priorityColors.medium;
+  const priorityConfig =
+    priorityColors[essay.priority] || priorityColors.medium;
 
   return (
     <div
       className={`group relative p-3 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
         isActive
-          ? 'bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-300 shadow-md'
-          : 'bg-white border-gray-200 hover:border-purple-200'
+          ? "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-300 shadow-md"
+          : "bg-white border-gray-200 hover:border-purple-200"
       }`}
       onClick={onSelect}
     >
       {/* Priority Badge */}
       <div className="absolute top-2 right-2">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`}></span>
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${priorityConfig.bg} ${priorityConfig.text} ${priorityConfig.border}`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`}
+          ></span>
           {essay.priority}
         </span>
       </div>
@@ -413,7 +459,9 @@ function StandaloneEssayCard({
       {/* Progress Bar */}
       <div className="mb-2">
         <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-          <span>{essay.wordCount} / {essayData.wordLimit} words</span>
+          <span>
+            {essay.wordCount} / {essayData.wordLimit} words
+          </span>
           <span>{Math.round(progress)}%</span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-1.5">
@@ -433,8 +481,8 @@ function StandaloneEssayCard({
           }}
           className={`flex items-center space-x-1 text-xs transition-colors ${
             essay.isCompleted
-              ? 'text-green-600 hover:text-green-700'
-              : 'text-gray-400 hover:text-gray-600'
+              ? "text-green-600 hover:text-green-700"
+              : "text-gray-400 hover:text-gray-600"
           }`}
         >
           {essay.isCompleted ? (
@@ -442,7 +490,9 @@ function StandaloneEssayCard({
           ) : (
             <Circle className="w-3.5 h-3.5" />
           )}
-          <span className="font-medium">{essay.isCompleted ? 'Completed' : 'Mark Complete'}</span>
+          <span className="font-medium">
+            {essay.isCompleted ? "Completed" : "Mark Complete"}
+          </span>
         </button>
 
         <button
@@ -473,7 +523,7 @@ function UniversitySelector({
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedUniversity = universities?.find(
-    (u) => u.id === selectedUniversityId
+    (u) => u.id === selectedUniversityId,
   );
 
   return (
@@ -549,7 +599,7 @@ function UniversitySelector({
                 stats?.programsByUniversity?.[university.id] || [];
               const uniEssayCount = uniPrograms.reduce(
                 (acc, p) => acc + (p.essays?.length || 0),
-                0
+                0,
               );
 
               return (
@@ -611,8 +661,9 @@ function ProgramCard({
   const progress = totalEssays > 0 ? (completedEssays / totalEssays) * 100 : 0;
 
   // Check if this is a standalone program
-  const isStandaloneProgram = program.degreeType === "STANDALONE" || 
-                               program.programName === "My Custom Essays";
+  const isStandaloneProgram =
+    program.degreeType === "STANDALONE" ||
+    program.programName === "My Custom Essays";
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow">
@@ -670,7 +721,7 @@ function ProgramCard({
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+                if (e.key === "Enter" || e.key === " ") {
                   onEssaySelect(program.id, essayData.promptId);
                 }
               }}
@@ -709,7 +760,7 @@ function ProgramCard({
                         e.stopPropagation();
                         onToggleCompletion(
                           essayData.userEssay.id,
-                          essayData.userEssay.isCompleted
+                          essayData.userEssay.isCompleted,
                         );
                       }}
                       className={`p-1 rounded transition-colors ${
@@ -729,7 +780,7 @@ function ProgramCard({
                         <Circle className="w-3.5 h-3.5" />
                       )}
                     </button>
-                    
+
                     {/* Delete Button */}
                     <button
                       onClick={(e) => {
@@ -781,19 +832,19 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
       stats?.programsByUniversity?.[selectedUniversityId] || [];
     const uniEssays = uniPrograms.reduce(
       (acc, p) => acc + (p.essays?.length || 0),
-      0
+      0,
     );
     const uniCompleted = uniPrograms.reduce(
       (acc, p) =>
         acc + (p.essays?.filter((e) => e.userEssay?.isCompleted).length || 0),
-      0
+      0,
     );
     const uniWords = uniPrograms.reduce(
       (acc, p) =>
         acc +
         (p.essays?.reduce((ea, e) => ea + (e.userEssay?.wordCount || 0), 0) ||
           0),
-      0
+      0,
     );
 
     return {
@@ -870,6 +921,10 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
 export default function IndependentWorkspacePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const userId = session?.user?.id;
+  const userEmail = session?.user?.email;
+
   const [workspaceData, setWorkspaceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -885,7 +940,7 @@ export default function IndependentWorkspacePage() {
   const [showAI, setShowAI] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(true);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [panelOrder, setPanelOrder] = useState(['versions', 'analytics', 'ai']);
+  const [panelOrder, setPanelOrder] = useState(["versions", "analytics", "ai"]);
 
   // Save state
   const [isSaving, setIsSaving] = useState(false);
@@ -895,8 +950,10 @@ export default function IndependentWorkspacePage() {
   const [isSavingVersion, setIsSavingVersion] = useState(false);
 
   // Standalone essay state
-  const [showStandaloneEssayModal, setShowStandaloneEssayModal] = useState(false);
-  const [isCreatingStandaloneEssay, setIsCreatingStandaloneEssay] = useState(false);
+  const [showStandaloneEssayModal, setShowStandaloneEssayModal] =
+    useState(false);
+  const [isCreatingStandaloneEssay, setIsCreatingStandaloneEssay] =
+    useState(false);
 
   // Activity tracking
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
@@ -930,13 +987,14 @@ export default function IndependentWorkspacePage() {
     const standalone = [];
     const regular = [];
 
-    workspaceData.programs.forEach(program => {
-      const isStandaloneProgram = program.degreeType === "STANDALONE" || 
-                                   program.programName === "My Custom Essays";
-      
+    workspaceData.programs.forEach((program) => {
+      const isStandaloneProgram =
+        program.degreeType === "STANDALONE" ||
+        program.programName === "My Custom Essays";
+
       if (isStandaloneProgram) {
         // Extract essays from standalone programs
-        program.essays?.forEach(essayData => {
+        program.essays?.forEach((essayData) => {
           if (essayData.userEssay) {
             standalone.push({
               ...essayData,
@@ -962,7 +1020,7 @@ export default function IndependentWorkspacePage() {
     // Filter by university
     if (selectedUniversityId !== "all") {
       programs = programs.filter(
-        (p) => p.universityId === selectedUniversityId
+        (p) => p.universityId === selectedUniversityId,
       );
     }
 
@@ -996,7 +1054,7 @@ export default function IndependentWorkspacePage() {
 
   const currentEssayData = useMemo(() => {
     return currentProgram?.essays?.find(
-      (e) => e.promptId === activeEssayPromptId
+      (e) => e.promptId === activeEssayPromptId,
     );
   }, [currentProgram, activeEssayPromptId]);
 
@@ -1010,7 +1068,7 @@ export default function IndependentWorkspacePage() {
       return null;
     }
     return workspaceData?.universities?.find(
-      (u) => u.id === selectedUniversityId
+      (u) => u.id === selectedUniversityId,
     );
   }, [workspaceData, selectedUniversityId]);
 
@@ -1107,7 +1165,7 @@ export default function IndependentWorkspacePage() {
 
       if (response.ok) {
         const result = await response.json();
-        
+
         // ✅ FIX: Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
@@ -1128,19 +1186,19 @@ export default function IndependentWorkspacePage() {
                               lastModified: new Date(),
                             },
                           }
-                        : essayData
+                        : essayData,
                     ),
                   }
-                : program
+                : program,
             ),
           };
 
           // Recalculate stats
           updated.stats = calculateStats(updated);
-          
+
           return updated;
         });
-        
+
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
         return true;
@@ -1153,7 +1211,13 @@ export default function IndependentWorkspacePage() {
       setIsSaving(false);
       isUpdatingRef.current = false;
     }
-  }, [currentEssay, isSaving, hasUnsavedChanges, activeProgramId, activeEssayPromptId]);
+  }, [
+    currentEssay,
+    isSaving,
+    hasUnsavedChanges,
+    activeProgramId,
+    activeEssayPromptId,
+  ]);
 
   // Auto-save timer
   useEffect(() => {
@@ -1205,9 +1269,12 @@ export default function IndependentWorkspacePage() {
         clearTimeout(activityTimeoutRef.current);
       }
 
-      activityTimeoutRef.current = setTimeout(() => {
-        setIsUserActive(false);
-      }, 2 * 60 * 1000);
+      activityTimeoutRef.current = setTimeout(
+        () => {
+          setIsUserActive(false);
+        },
+        2 * 60 * 1000,
+      );
     };
 
     const events = [
@@ -1266,15 +1333,15 @@ export default function IndependentWorkspacePage() {
                               lastModified: new Date(),
                             },
                           }
-                        : essayData
+                        : essayData,
                     ),
                   }
-                : program
+                : program,
             ),
           };
 
           updated.stats = calculateStats(updated);
-          
+
           return updated;
         });
 
@@ -1286,7 +1353,7 @@ export default function IndependentWorkspacePage() {
         isUpdatingRef.current = false;
       }
     },
-    [currentEssay, activeProgramId, activeEssayPromptId]
+    [currentEssay, activeProgramId, activeEssayPromptId],
   );
 
   // ==========================================
@@ -1295,7 +1362,10 @@ export default function IndependentWorkspacePage() {
 
   const handlePanelToggle = useCallback((panelName, currentState) => {
     if (!currentState) {
-      setPanelOrder(prev => [panelName, ...prev.filter(p => p !== panelName)]);
+      setPanelOrder((prev) => [
+        panelName,
+        ...prev.filter((p) => p !== panelName),
+      ]);
     }
   }, []);
 
@@ -1318,7 +1388,7 @@ export default function IndependentWorkspacePage() {
       const essayData = program?.essays?.find((e) => e.promptId === promptId);
       lastContentRef.current = essayData?.userEssay?.content || "";
     },
-    [workspaceData]
+    [workspaceData],
   );
 
   const toggleProgramExpansion = useCallback((programId) => {
@@ -1339,10 +1409,10 @@ export default function IndependentWorkspacePage() {
 
   const manualSave = useCallback(async () => {
     if (!currentEssay || isSaving) return false;
-    
+
     try {
       setIsSaving(true);
-      
+
       const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1357,7 +1427,7 @@ export default function IndependentWorkspacePage() {
 
       if (response.ok) {
         const result = await response.json();
-        
+
         // ✅ FIX: Update workspace data with server response
         setWorkspaceData((prev) => {
           if (!prev) return prev;
@@ -1378,22 +1448,22 @@ export default function IndependentWorkspacePage() {
                               lastModified: new Date(),
                             },
                           }
-                        : essayData
+                        : essayData,
                     ),
                   }
-                : program
+                : program,
             ),
           };
 
           // Recalculate stats
           updated.stats = calculateStats(updated);
-          
+
           return updated;
         });
-        
+
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
-        toast.success('Changes saved successfully!');
+        toast.success("Changes saved successfully!");
         return true;
       }
       return false;
@@ -1410,125 +1480,122 @@ export default function IndependentWorkspacePage() {
   // ✅ FIX 3C: SAVE VERSION FUNCTION (FIXED)
   // ==========================================
 
- // ✅ FIXED saveVersion in frontend ApplicationTabs
-const saveVersion = useCallback(
-  async (label) => {
-    if (
-      !currentEssay ||
-      isSaving ||
-      isSavingVersion ||
-      !userId
-    ) return false;
+  // ✅ FIXED saveVersion in frontend ApplicationTabs
+  const saveVersion = useCallback(
+    async (label) => {
+      if (!currentEssay || isSaving || isSavingVersion || !userId) return false;
 
-    let contentToSave = currentEssay.content;
-    let wordCountToSave = currentEssay.wordCount;
-    if (pendingContentRef.current) {
-      contentToSave = pendingContentRef.current.content;
-      wordCountToSave = pendingContentRef.current.wordCount;
-    }
+      let contentToSave = currentEssay.content;
+      let wordCountToSave = currentEssay.wordCount;
+      if (pendingContentRef.current) {
+        contentToSave = pendingContentRef.current.content;
+        wordCountToSave = pendingContentRef.current.wordCount;
+      }
 
-    try {
-      setIsSavingVersion(true);
-      isUpdatingRef.current = true;
+      try {
+        setIsSavingVersion(true);
+        isUpdatingRef.current = true;
 
-      if (hasUnsavedChanges) {
-        const autoSaved = await autoSaveEssay();
-        if (!autoSaved) {
-          toast.error("Failed to save current changes");
-          return false;
+        if (hasUnsavedChanges) {
+          const autoSaved = await autoSaveEssay();
+          if (!autoSaved) {
+            toast.error("Failed to save current changes");
+            return false;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
 
-      // ✅ Independent page always uses independent route
-      const apiRoute = "/api/essay/independent";
+        // ✅ Independent page always uses independent route
+        const apiRoute = "/api/essay/independent";
 
-      console.log('💾 Saving version to:', apiRoute, {
-        essayId: currentEssay.id,
-        label: label || `Version ${new Date().toLocaleString()}`
-      });
-
-      const response = await fetch(apiRoute, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "save_version",
+        console.log("💾 Saving version to:", apiRoute, {
           essayId: currentEssay.id,
-          content: contentToSave,
-          wordCount: wordCountToSave,
           label: label || `Version ${new Date().toLocaleString()}`,
-          isCustomEssay: true,
-          userId,
-          userEmail,
-        }),
-      });
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        const response = await fetch(apiRoute, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save_version",
+            essayId: currentEssay.id,
+            content: contentToSave,
+            wordCount: wordCountToSave,
+            label: label || `Version ${new Date().toLocaleString()}`,
+            isCustomEssay: true,
+            userId,
+            userEmail,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || `Server error: ${response.status}`,
+          );
+        }
+
+        const result = await response.json();
+
+        if (!result.success || !result.essay) {
+          throw new Error("Invalid response from server");
+        }
+
+        console.log("✅ Version saved successfully:", result);
+
+        setWorkspaceData((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            programs: prev.programs.map((program) =>
+              program.id === activeProgramId
+                ? {
+                    ...program,
+                    essays: program.essays.map((essayData) =>
+                      essayData.promptId === activeEssayPromptId
+                        ? {
+                            ...essayData,
+                            userEssay: result.essay,
+                          }
+                        : essayData,
+                    ),
+                  }
+                : program,
+            ),
+          };
+        });
+
+        toast.success("Version saved successfully");
+
+        setTimeout(() => {
+          setActiveView("list");
+          setOpenPanels([]);
+        }, 300);
+
+        return true;
+      } catch (error) {
+        console.error("❌ Error saving version:", error);
+        toast.error(error.message || "Failed to save version");
+        return false;
+      } finally {
+        setIsSavingVersion(false);
+        isUpdatingRef.current = false;
       }
-
-      const result = await response.json();
-
-      if (!result.success || !result.essay) {
-        throw new Error('Invalid response from server');
-      }
-
-      console.log('✅ Version saved successfully:', result);
-
-      setWorkspaceData((prev) => {
-        if (!prev) return prev;
-
-        return {
-          ...prev,
-          programs: prev.programs.map((program) =>
-            program.id === activeProgramId
-              ? {
-                  ...program,
-                  essays: program.essays.map((essayData) =>
-                    essayData.promptId === activeEssayPromptId
-                      ? {
-                          ...essayData,
-                          userEssay: result.essay,
-                        }
-                      : essayData,
-                  ),
-                }
-              : program,
-          ),
-        };
-      });
-
-      toast.success("Version saved successfully");
-      
-      setTimeout(() => {
-        setActiveView("list");
-        setOpenPanels([]);
-      }, 300);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Error saving version:", error);
-      toast.error(error.message || "Failed to save version");
-      return false;
-    } finally {
-      setIsSavingVersion(false);
-      isUpdatingRef.current = false;
-    }
-  },
-  [
-    currentEssay,
-    isSaving,
-    isSavingVersion,
-    hasUnsavedChanges,
-    autoSaveEssay,
-    activeProgramId,
-    activeEssayPromptId,
-    userId,
-    userEmail,
-    currentProgram,
-  ]
-);
+    },
+    [
+      currentEssay,
+      isSaving,
+      isSavingVersion,
+      hasUnsavedChanges,
+      autoSaveEssay,
+      activeProgramId,
+      activeEssayPromptId,
+      userId,
+      userEmail,
+      currentProgram,
+    ],
+  );
 
   const handleCreateEssay = async (programId, essayPromptId) => {
     try {
@@ -1569,16 +1636,16 @@ const saveVersion = useCallback(
                             ...essayData,
                             userEssay: result.essay,
                           }
-                        : essayData
+                        : essayData,
                     ),
                   }
-                : program
+                : program,
             ),
           };
 
           // Recalculate stats
           updated.stats = calculateStats(updated);
-          
+
           return updated;
         });
 
@@ -1587,7 +1654,7 @@ const saveVersion = useCallback(
         setLastSaved(new Date());
 
         handleEssaySelect(programId, essayPromptId);
-        toast.success('Essay created successfully!');
+        toast.success("Essay created successfully!");
       }
     } catch (error) {
       console.error("Error creating essay:", error);
@@ -1608,18 +1675,18 @@ const saveVersion = useCallback(
       setError(null);
 
       const response = await fetch(`/api/essay/independent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          action: 'create_standalone_essay',
+          action: "create_standalone_essay",
           ...formData,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create custom essay');
+        throw new Error(errorData.error || "Failed to create custom essay");
       }
 
       const result = await response.json();
@@ -1627,10 +1694,10 @@ const saveVersion = useCallback(
       if (result.success) {
         // Refresh workspace data to get the new essay
         await fetchWorkspaceData();
-        
+
         setShowStandaloneEssayModal(false);
-        toast.success('Custom essay created successfully! 🎉', {
-          description: 'Your essay is ready for writing',
+        toast.success("Custom essay created successfully! 🎉", {
+          description: "Your essay is ready for writing",
         });
 
         // Auto-select the newly created essay if possible
@@ -1641,16 +1708,21 @@ const saveVersion = useCallback(
         }
       }
     } catch (error) {
-      console.error('Error creating standalone essay:', error);
+      console.error("Error creating standalone essay:", error);
       setError(error.message);
-      toast.error(error.message || 'Failed to create custom essay');
+      toast.error(error.message || "Failed to create custom essay");
     } finally {
       setIsCreatingStandaloneEssay(false);
     }
   };
 
   const handleDeleteEssay = async (essayId) => {
-    if (!confirm("Are you sure you want to delete this essay? This action cannot be undone.")) return;
+    if (
+      !confirm(
+        "Are you sure you want to delete this essay? This action cannot be undone.",
+      )
+    )
+      return;
 
     try {
       const response = await fetch(`/api/essay/independent`, {
@@ -1678,14 +1750,14 @@ const saveVersion = useCallback(
                     ...essayData,
                     userEssay: null,
                   }
-                : essayData
+                : essayData,
             ),
           })),
         };
 
         // Recalculate stats
         updated.stats = calculateStats(updated);
-        
+
         return updated;
       });
 
@@ -1695,19 +1767,57 @@ const saveVersion = useCallback(
         lastContentRef.current = "";
       }
 
-      toast.success('Essay deleted successfully');
+      toast.success("Essay deleted successfully");
     } catch (error) {
       setError(error.message);
-      toast.error('Failed to delete essay');
+      toast.error("Failed to delete essay");
     }
   };
 
-  const toggleEssayCompletion = useCallback(
-    async (essayId, currentStatus) => {
-      try {
-        // Optimistically update UI
-        const newStatus = !currentStatus;
-        
+  const toggleEssayCompletion = useCallback(async (essayId, currentStatus) => {
+    try {
+      // Optimistically update UI
+      const newStatus = !currentStatus;
+
+      setWorkspaceData((prev) => {
+        if (!prev) return prev;
+
+        const updated = {
+          ...prev,
+          programs: prev.programs.map((program) => ({
+            ...program,
+            essays: program.essays.map((essayData) =>
+              essayData.userEssay?.id === essayId
+                ? {
+                    ...essayData,
+                    userEssay: {
+                      ...essayData.userEssay,
+                      isCompleted: newStatus,
+                    },
+                  }
+                : essayData,
+            ),
+          })),
+        };
+
+        updated.stats = calculateStats(updated);
+
+        return updated;
+      });
+
+      // Send API request
+      const response = await fetch(`/api/essay/independent`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          essayId,
+          isCompleted: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        // Revert on error
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1721,32 +1831,25 @@ const saveVersion = useCallback(
                       ...essayData,
                       userEssay: {
                         ...essayData.userEssay,
-                        isCompleted: newStatus,
+                        isCompleted: currentStatus,
                       },
                     }
-                  : essayData
+                  : essayData,
               ),
             })),
           };
 
           updated.stats = calculateStats(updated);
-          
           return updated;
         });
 
-        // Send API request
-        const response = await fetch(`/api/essay/independent`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            essayId,
-            isCompleted: newStatus,
-          }),
-        });
+        throw new Error("Failed to update completion status");
+      }
 
-        if (!response.ok) {
-          // Revert on error
+      // Update with server data if available
+      try {
+        const result = await response.json();
+        if (result.essay) {
           setWorkspaceData((prev) => {
             if (!prev) return prev;
 
@@ -1758,12 +1861,9 @@ const saveVersion = useCallback(
                   essayData.userEssay?.id === essayId
                     ? {
                         ...essayData,
-                        userEssay: {
-                          ...essayData.userEssay,
-                          isCompleted: currentStatus,
-                        },
+                        userEssay: result.essay,
                       }
-                    : essayData
+                    : essayData,
                 ),
               })),
             };
@@ -1771,51 +1871,22 @@ const saveVersion = useCallback(
             updated.stats = calculateStats(updated);
             return updated;
           });
-
-          throw new Error("Failed to update completion status");
         }
-
-        // Update with server data if available
-        try {
-          const result = await response.json();
-          if (result.essay) {
-            setWorkspaceData((prev) => {
-              if (!prev) return prev;
-
-              const updated = {
-                ...prev,
-                programs: prev.programs.map((program) => ({
-                  ...program,
-                  essays: program.essays.map((essayData) =>
-                    essayData.userEssay?.id === essayId
-                      ? {
-                          ...essayData,
-                          userEssay: result.essay,
-                        }
-                      : essayData
-                  ),
-                })),
-              };
-
-              updated.stats = calculateStats(updated);
-              return updated;
-            });
-          }
-        } catch (parseError) {
-          console.error("Error parsing response:", parseError);
-        }
-
-        toast.success(
-          newStatus ? 'Essay marked as complete! 🎉' : 'Essay marked as incomplete'
-        );
-      } catch (error) {
-        console.error("Error toggling completion:", error);
-        setError(error.message);
-        toast.error(error.message);
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError);
       }
-    },
-    []
-  );
+
+      toast.success(
+        newStatus
+          ? "Essay marked as complete! 🎉"
+          : "Essay marked as incomplete",
+      );
+    } catch (error) {
+      console.error("Error toggling completion:", error);
+      setError(error.message);
+      toast.error(error.message);
+    }
+  }, []);
 
   // Cleanup
   useEffect(() => {
@@ -1882,7 +1953,8 @@ const saveVersion = useCallback(
             No Saved Universities
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Save universities to start working on their essays or create custom essays
+            Save universities to start working on their essays or create custom
+            essays
           </p>
           <div className="flex gap-3 justify-center">
             <Button
@@ -1959,7 +2031,9 @@ const saveVersion = useCallback(
                 className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
               >
                 <Sparkles className="w-4 h-4" />
-                <span className="text-sm font-medium hidden sm:inline">Create Essay</span>
+                <span className="text-sm font-medium hidden sm:inline">
+                  Create Essay
+                </span>
                 <span className="text-sm font-medium sm:hidden">New</span>
               </button>
 
@@ -1996,14 +2070,15 @@ const saveVersion = useCallback(
                   variant={showAnalytics ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
-                    handlePanelToggle('analytics', showAnalytics);
+                    handlePanelToggle("analytics", showAnalytics);
                     setShowAnalytics(!showAnalytics);
                   }}
                   className={`
                     transition-all duration-200 font-medium shadow-sm
-                    ${showAnalytics
-                      ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-purple-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                      : "bg-white border-2 border-purple-500 text-purple-600 hover:bg-purple-50 hover:border-purple-600 hover:shadow-md active:scale-95"
+                    ${
+                      showAnalytics
+                        ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-purple-200 hover:shadow-lg hover:scale-105 active:scale-95"
+                        : "bg-white border-2 border-purple-500 text-purple-600 hover:bg-purple-50 hover:border-purple-600 hover:shadow-md active:scale-95"
                     }
                   `}
                 >
@@ -2015,14 +2090,15 @@ const saveVersion = useCallback(
                   variant={showAI ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
-                    handlePanelToggle('ai', showAI);
+                    handlePanelToggle("ai", showAI);
                     setShowAI(!showAI);
                   }}
                   className={`
                     transition-all duration-200 font-medium shadow-sm
-                    ${showAI
-                      ? "bg-gradient-to-r from-[#3598FE] to-[#2563EB] text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                      : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                    ${
+                      showAI
+                        ? "bg-gradient-to-r from-[#3598FE] to-[#2563EB] text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
+                        : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
                     }
                   `}
                 >
@@ -2034,7 +2110,6 @@ const saveVersion = useCallback(
           </div>
         </div>
       </header>
-
       {/* Stats Summary */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-4">
         <StatsSummary
@@ -2043,7 +2118,6 @@ const saveVersion = useCallback(
           universities={workspaceData?.universities}
         />
       </div>
-
       {/* Error Banner */}
       {error && (
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 pb-4">
@@ -2060,9 +2134,8 @@ const saveVersion = useCallback(
             </button>
           </div>
         </div>
-      )};
-
-      {/* Main Content */}
+      )}
+      ;{/* Main Content */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 pb-8">
         <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar - Programs & Essays List */}
@@ -2070,9 +2143,7 @@ const saveVersion = useCallback(
             <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm sticky top-28 hover:shadow-2xl transition-shadow">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-[#002147]">
-                    Essays
-                  </h3>
+                  <h3 className="font-bold text-[#002147]">Essays</h3>
 
                   {/* Status Filter */}
                   <select
@@ -2101,19 +2172,30 @@ const saveVersion = useCallback(
                           {standaloneEssays.length}
                         </span>
                       </div>
-                      
+
                       <div className="space-y-2">
                         {standaloneEssays.map((essayData) => (
                           <StandaloneEssayCard
                             key={essayData.promptId}
                             essayData={essayData}
-                            isActive={activeEssayPromptId === essayData.promptId}
-                            onSelect={() => handleEssaySelect(essayData.programId, essayData.promptId)}
-                            onDelete={() => handleDeleteEssay(essayData.userEssay.id)}
-                            onToggleCompletion={() => toggleEssayCompletion(
-                              essayData.userEssay.id,
-                              essayData.userEssay.isCompleted
-                            )}
+                            isActive={
+                              activeEssayPromptId === essayData.promptId
+                            }
+                            onSelect={() =>
+                              handleEssaySelect(
+                                essayData.programId,
+                                essayData.promptId,
+                              )
+                            }
+                            onDelete={() =>
+                              handleDeleteEssay(essayData.userEssay.id)
+                            }
+                            onToggleCompletion={() =>
+                              toggleEssayCompletion(
+                                essayData.userEssay.id,
+                                essayData.userEssay.isCompleted,
+                              )
+                            }
                             universityName={essayData.universityName}
                           />
                         ))}
@@ -2154,22 +2236,23 @@ const saveVersion = useCallback(
                   )}
 
                   {/* Empty State */}
-                  {filteredPrograms.length === 0 && standaloneEssays.length === 0 && (
-                    <div className="text-center py-8">
-                      <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 mb-3">
-                        {filterStatus !== "all"
-                          ? `No ${filterStatus.replace("-", " ")} essays`
-                          : "No essays available"}
-                      </p>
-                      <button
-                        onClick={() => setShowStandaloneEssayModal(true)}
-                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                      >
-                        Create your first custom essay →
-                      </button>
-                    </div>
-                  )}
+                  {filteredPrograms.length === 0 &&
+                    standaloneEssays.length === 0 && (
+                      <div className="text-center py-8">
+                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500 mb-3">
+                          {filterStatus !== "all"
+                            ? `No ${filterStatus.replace("-", " ")} essays`
+                            : "No essays available"}
+                        </p>
+                        <button
+                          onClick={() => setShowStandaloneEssayModal(true)}
+                          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                        >
+                          Create your first custom essay →
+                        </button>
+                      </div>
+                    )}
                 </div>
               </div>
             </Card>
@@ -2200,26 +2283,30 @@ const saveVersion = useCallback(
                         <h2 className="text-xl font-bold text-[#002147]">
                           {currentEssayData.promptTitle}
                         </h2>
-                        
+
                         {/* FIXED: Full prompt text without truncation */}
                         <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                           <p className="text-xs text-blue-700 font-medium mb-1">
                             Essay Prompt:
                           </p>
-                          <p 
+                          <p
                             className="text-sm text-gray-700 leading-relaxed"
                             style={{
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                              overflow: 'visible',
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              overflow: "visible",
                             }}
                           >
                             {currentEssayData.promptText}
                           </p>
                           <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
-                            <span>Word limit: {currentEssayData.wordLimit}</span>
+                            <span>
+                              Word limit: {currentEssayData.wordLimit}
+                            </span>
                             {currentEssayData.isMandatory && (
-                              <span className="text-red-600 font-medium">• Required</span>
+                              <span className="text-red-600 font-medium">
+                                • Required
+                              </span>
                             )}
                           </div>
                         </div>
@@ -2230,14 +2317,15 @@ const saveVersion = useCallback(
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          handlePanelToggle('versions', showVersions);
+                          handlePanelToggle("versions", showVersions);
                           setShowVersions(!showVersions);
                         }}
                         className={`
                           transition-all duration-200 font-medium shadow-sm flex-shrink-0
-                          ${showVersions
-                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                            : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                          ${
+                            showVersions
+                              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
+                              : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
                           }
                         `}
                       >
@@ -2277,7 +2365,7 @@ const saveVersion = useCallback(
                         size="sm"
                         onClick={() =>
                           saveVersion(
-                            `Manual Save ${new Date().toLocaleTimeString()}`
+                            `Manual Save ${new Date().toLocaleTimeString()}`,
                           )
                         }
                         disabled={isSaving || isSavingVersion}
@@ -2318,32 +2406,34 @@ const saveVersion = useCallback(
                     <h3 className="text-lg font-semibold text-[#002147] mb-4">
                       {currentEssayData.promptTitle}
                     </h3>
-                    
+
                     {/* FIXED: Full prompt text without truncation */}
                     <div className="w-full max-w-2xl px-4 mb-6">
                       <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
                         <p className="text-xs text-blue-700 font-medium mb-2">
                           Essay Prompt:
                         </p>
-                        <p 
+                        <p
                           className="text-sm text-gray-700 leading-relaxed"
                           style={{
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            overflow: 'visible',
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            overflow: "visible",
                           }}
                         >
                           {currentEssayData.promptText}
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-3 text-xs text-gray-500 mb-6">
                       <span>{currentEssayData.wordLimit} words max</span>
                       {currentEssayData.isMandatory && (
                         <>
                           <span>•</span>
-                          <span className="text-red-600 font-medium">Required</span>
+                          <span className="text-red-600 font-medium">
+                            Required
+                          </span>
                         </>
                       )}
                     </div>
@@ -2351,7 +2441,7 @@ const saveVersion = useCallback(
                       onClick={() =>
                         handleCreateEssay(
                           currentProgram.id,
-                          currentEssayData.promptId
+                          currentEssayData.promptId,
                         )
                       }
                       disabled={isCreatingEssay}
@@ -2391,7 +2481,7 @@ const saveVersion = useCallback(
             {/* Render panels based on order */}
             {panelOrder.map((panelName) => {
               // Versions Panel
-              if (panelName === 'versions' && showVersions && currentEssay) {
+              if (panelName === "versions" && showVersions && currentEssay) {
                 return (
                   <VersionManager
                     key={`versions-${currentEssay.id}`}
@@ -2402,8 +2492,8 @@ const saveVersion = useCallback(
                         setError(null);
                         const response = await fetch(`/api/essay/independent`, {
                           method: "POST",
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
                           body: JSON.stringify({
                             action: "restore_version",
                             essayId: currentEssay.id,
@@ -2413,7 +2503,7 @@ const saveVersion = useCallback(
 
                         if (response.ok) {
                           const result = await response.json();
-                          
+
                           // Update local state with restored content
                           if (result.essay) {
                             setWorkspaceData((prev) => {
@@ -2425,16 +2515,18 @@ const saveVersion = useCallback(
                                   program.id === activeProgramId
                                     ? {
                                         ...program,
-                                        essays: program.essays.map((essayData) =>
-                                          essayData.promptId === activeEssayPromptId
-                                            ? {
-                                                ...essayData,
-                                                userEssay: result.essay,
-                                              }
-                                            : essayData
+                                        essays: program.essays.map(
+                                          (essayData) =>
+                                            essayData.promptId ===
+                                            activeEssayPromptId
+                                              ? {
+                                                  ...essayData,
+                                                  userEssay: result.essay,
+                                                }
+                                              : essayData,
                                         ),
                                       }
-                                    : program
+                                    : program,
                                 ),
                               };
 
@@ -2447,10 +2539,12 @@ const saveVersion = useCallback(
 
                           setHasUnsavedChanges(false);
                           setLastSaved(new Date());
-                          toast.success('Version restored successfully!');
+                          toast.success("Version restored successfully!");
                         } else {
                           const errorData = await response.json();
-                          setError(errorData.error || "Failed to restore version");
+                          setError(
+                            errorData.error || "Failed to restore version",
+                          );
                         }
                       } catch (error) {
                         console.error("Error restoring version:", error);
@@ -2462,8 +2556,8 @@ const saveVersion = useCallback(
                         setError(null);
                         const response = await fetch(`/api/essay/independent`, {
                           method: "POST",
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
                           body: JSON.stringify({
                             action: "delete_version",
                             versionId,
@@ -2483,30 +2577,34 @@ const saveVersion = useCallback(
                                   ? {
                                       ...program,
                                       essays: program.essays.map((essayData) =>
-                                        essayData.promptId === activeEssayPromptId
+                                        essayData.promptId ===
+                                        activeEssayPromptId
                                           ? {
                                               ...essayData,
                                               userEssay: {
                                                 ...essayData.userEssay,
-                                                versions: essayData.userEssay?.versions?.filter(
-                                                  (v) => v.id !== versionId
-                                                ) || [],
+                                                versions:
+                                                  essayData.userEssay?.versions?.filter(
+                                                    (v) => v.id !== versionId,
+                                                  ) || [],
                                               },
                                             }
-                                          : essayData
+                                          : essayData,
                                       ),
                                     }
-                                  : program
+                                  : program,
                               ),
                             };
 
                             updated.stats = calculateStats(updated);
                             return updated;
                           });
-                          toast.success('Version deleted successfully');
+                          toast.success("Version deleted successfully");
                         } else {
                           const errorData = await response.json();
-                          setError(errorData.error || "Failed to delete version");
+                          setError(
+                            errorData.error || "Failed to delete version",
+                          );
                         }
                       } catch (error) {
                         console.error("Error deleting version:", error);
@@ -2514,14 +2612,16 @@ const saveVersion = useCallback(
                       }
                     }}
                     essayId={currentEssay.id}
-                    universityName={currentProgram?.universityName || "University"}
+                    universityName={
+                      currentProgram?.universityName || "University"
+                    }
                     isLoading={loading}
                   />
                 );
               }
 
               // Analytics Panel
-              if (panelName === 'analytics' && showAnalytics && currentEssay) {
+              if (panelName === "analytics" && showAnalytics && currentEssay) {
                 return (
                   <EssayAnalytics
                     key={`analytics-${currentEssay.id}`}
@@ -2539,13 +2639,15 @@ const saveVersion = useCallback(
                     }
                     essayId={currentEssay.id}
                     userId={session?.userId}
-                    universityName={currentProgram?.universityName || "University"}
+                    universityName={
+                      currentProgram?.universityName || "University"
+                    }
                   />
                 );
               }
 
               // AI Panel
-              if (panelName === 'ai' && showAI && currentEssay) {
+              if (panelName === "ai" && showAI && currentEssay) {
                 return (
                   <AISuggestions
                     key={`ai-${currentEssay.id}`}
@@ -2554,7 +2656,9 @@ const saveVersion = useCallback(
                     wordCount={currentEssay.wordCount}
                     wordLimit={currentEssayData.wordLimit}
                     essayId={currentEssay.id}
-                    universityName={currentProgram?.universityName || "University"}
+                    universityName={
+                      currentProgram?.universityName || "University"
+                    }
                   />
                 );
               }
@@ -2580,7 +2684,6 @@ const saveVersion = useCallback(
           </div>
         </div>
       </div>
-
       {/* Standalone Essay Modal */}
       <StandaloneEssayModal
         isOpen={showStandaloneEssayModal}
@@ -2589,12 +2692,15 @@ const saveVersion = useCallback(
         savedUniversities={workspaceData?.universities}
         isCreating={isCreatingStandaloneEssay}
       />
-
       {/* Animations */}
       <style jsx>{`
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
 
         @keyframes slideUp {
@@ -2616,15 +2722,13 @@ const saveVersion = useCallback(
           animation: slideUp 0.25s ease-out;
         }
       `}</style>
-
       {/* Footer */}
       <footer className="bg-white/50 backdrop-blur-sm border-t border-gray-200/50">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center space-x-4">
               <span>
-                {workspaceData?.universities?.length || 0}{" "}
-                saved universities
+                {workspaceData?.universities?.length || 0} saved universities
               </span>
               <span>•</span>
               <span>Auto-save enabled (4 min inactivity)</span>
