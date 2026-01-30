@@ -253,6 +253,9 @@ async function getOrCreateIndependentStandaloneProgram(userId) {
 // ==========================================
 // GET: Fetch user's essays - UPDATED TO HANDLE INDEPENDENT STANDALONE
 // ==========================================
+// ==========================================
+// GET: Fetch user's essays - FIXED FETCHING LOGIC
+// ==========================================
 export async function GET(request) {
   try {
     const auth = await authenticateUser(request);
@@ -266,149 +269,372 @@ export async function GET(request) {
 
     console.log(`✅ Fetching essays for user ${userId}, universityId: ${universityId}`);
 
-    const whereConditions = [];
-
+    // If specific university is requested
     if (universityId) {
       console.log(`🔍 Filtering for specific university: ${universityId}`);
-      whereConditions.push({ id: universityId });
-    } else {
-      // Fetch saved universities from external API
-      const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
-      const savedUniversities = savedUnisResult.universities || [];
       
-      const universityIdentifiers = savedUniversities.map(uni => ({
-        id: uni.id || uni.universityId || uni.university?.id,
-        name: uni.universityName || uni.name || uni.university?.universityName || uni.university?.name,
-        slug: uni.slug || uni.university?.slug,
-      })).filter(u => u.id || u.name || u.slug);
-
-      const ids = universityIdentifiers.map(u => u.id).filter(Boolean);
-      const names = universityIdentifiers.map(u => u.name).filter(Boolean);
-      const slugs = universityIdentifiers.map(u => u.slug).filter(Boolean);
-
-      if (ids.length > 0) whereConditions.push({ id: { in: ids } });
-      if (names.length > 0) whereConditions.push({ universityName: { in: names } });
-      if (slugs.length > 0) whereConditions.push({ slug: { in: slugs } });
-
-      // Also include universities where user has essays (for custom essays)
-      const userEssayUniversities = await prisma.essay.findMany({
-        where: { userId },
-        select: {
-          program: {
-            select: { universityId: true }
-          }
-        },
-        distinct: ['programId']
-      });
-
-      const userUniIds = userEssayUniversities
-        .map(e => e.program?.universityId)
-        .filter(Boolean);
-
-      if (userUniIds.length > 0) {
-        whereConditions.push({ id: { in: userUniIds } });
-      }
-    }
-
-    console.log(`📋 Where conditions count: ${whereConditions.length}`);
-
-    // Fetch universities (with programs) as before
-    const universities = whereConditions.length > 0 ? await prisma.university.findMany({
-      where: {
-        OR: whereConditions
-      },
-      include: {
-        programs: {
-          where: { isActive: true },
-          include: {
-            essayPrompts: {
-              where: { isActive: true },
-              include: {
-                essays: {
-                  where: { userId },
-                  include: {
-                    versions: {
-                      orderBy: { timestamp: "desc" },
-                      take: 20,
-                      include: {
-                        aiResults: {
-                          orderBy: { createdAt: "desc" },
-                          take: 1,
+      const university = await prisma.university.findUnique({
+        where: { id: universityId },
+        include: {
+          programs: {
+            where: { isActive: true },
+            include: {
+              essayPrompts: {
+                where: { isActive: true },
+                include: {
+                  essays: {
+                    where: { userId },
+                    include: {
+                      versions: {
+                        orderBy: { timestamp: "desc" },
+                        take: 20,
+                        include: {
+                          aiResults: {
+                            orderBy: { createdAt: "desc" },
+                            take: 1,
+                          },
                         },
                       },
-                    },
-                    aiResults: {
-                      where: { essayVersionId: null },
-                      orderBy: { createdAt: "desc" },
-                      take: 5,
+                      aiResults: {
+                        where: { essayVersionId: null },
+                        orderBy: { createdAt: "desc" },
+                        take: 5,
+                      },
                     },
                   },
                 },
               },
-            },
-            admissions: {
-              where: { isActive: true },
-              include: {
-                deadlines: {
-                  where: {
-                    isActive: true,
-                    deadlineDate: { gte: new Date() },
+              admissions: {
+                where: { isActive: true },
+                include: {
+                  deadlines: {
+                    where: {
+                      isActive: true,
+                      deadlineDate: { gte: new Date() },
+                    },
+                    orderBy: { deadlineDate: "asc" },
                   },
-                  orderBy: { deadlineDate: "asc" },
-                },
-                intakes: {
-                  where: { isActive: true },
-                  orderBy: { intakeYear: "desc" },
+                  intakes: {
+                    where: { isActive: true },
+                    orderBy: { intakeYear: "desc" },
+                  },
                 },
               },
             },
           },
         },
-      },
-    }) : [];
+      });
 
-    console.log(`✅ Found ${universities.length} universities in database`);
+      if (!university) {
+        return NextResponse.json({
+          universities: [],
+          programs: [],
+          stats: {
+            totalPrograms: 0,
+            savedUniversitiesCount: 0,
+            totalEssayPrompts: 0,
+            completedEssays: 0,
+            totalWords: 0,
+            averageProgress: 0,
+          },
+          query: { universityId },
+        });
+      }
 
-    // Fetch independent programs (with no university)
-    const independentPrograms = await prisma.program.findMany({
-      where: {
-        universityId: null, // No university = independent
-        degreeType: "STANDALONE",
-        essays: {
-          some: { userId }
+      const universitiesData = [{
+        id: university.id,
+        name: university.universityName,
+        slug: university.slug,
+        description: university.shortDescription || university.overview,
+        website: university.websiteUrl,
+        city: university.city,
+        country: university.country,
+        color: DEFAULT_UNIVERSITY_COLOR,
+        programCount: university.programs.length,
+      }];
+
+      // Process university programs
+      const formattedPrograms = university.programs.map(program => {
+        const isStandalone = program.degreeType === "STANDALONE";
+        
+        return {
+          id: program.id,
+          name: program.programName,
+          slug: program.programSlug,
+          universityName: university.universityName,
+          universityId: university.id,
+          universitySlug: university.slug,
+          universityColor: DEFAULT_UNIVERSITY_COLOR,
+          degreeType: program.degreeType,
+          description: program.programDescription,
+          isCustomProgram: isStandalone,
+          
+          deadlines: program.admissions?.flatMap(
+            admission =>
+              admission.deadlines?.map(deadline => ({
+                id: deadline.id,
+                type: deadline.deadlineType,
+                date: deadline.deadlineDate,
+                title: deadline.title,
+                priority: deadline.priority,
+              })) || []
+          ) || [],
+          
+          essays: program.essayPrompts?.map(prompt => {
+            const userEssay = prompt.essays?.[0] || null;
+            
+            return {
+              promptId: prompt.id,
+              promptTitle: prompt.promptTitle,
+              promptText: prompt.promptText,
+              wordLimit: prompt.wordLimit,
+              minWordCount: prompt.minWordCount,
+              isMandatory: prompt.isMandatory,
+              programId: program.id,
+              programName: program.programName,
+              universityName: university.universityName,
+              isCustomEssay: isStandalone,
+              
+              userEssay: userEssay
+                ? {
+                    id: userEssay.id,
+                    content: userEssay.content || "",
+                    wordCount: userEssay.wordCount || 0,
+                    title: userEssay.title,
+                    priority: userEssay.priority,
+                    status: userEssay.status,
+                    isCompleted: userEssay.isCompleted || false,
+                    completionPercentage: userEssay.completionPercentage || 0,
+                    lastModified: userEssay.lastModified,
+                    lastAutoSaved: userEssay.lastAutoSaved,
+                    createdAt: userEssay.createdAt,
+                    versions: userEssay.versions?.map(v => ({
+                      id: v.id,
+                      label: v.label,
+                      content: v.content,
+                      wordCount: v.wordCount,
+                      timestamp: v.timestamp,
+                      isAutoSave: v.isAutoSave,
+                      changesSinceLastVersion: v.changesSinceLastVersion,
+                      aiAnalysis: v.aiResults?.[0] || null,
+                    })) || [],
+                    aiResults: userEssay.aiResults || [],
+                  }
+                : null,
+            };
+          }) || [],
+        };
+      }).filter(p => (p.essays && p.essays.length > 0) || p.degreeType === "STANDALONE");
+
+      // Now fetch independent programs (no university)
+      const independentPrograms = await prisma.program.findMany({
+        where: {
+          universityId: null,
+          degreeType: "STANDALONE",
+          isActive: true,
         },
-        isActive: true
-      },
-      include: {
-        essayPrompts: {
-          where: { isActive: true },
-          include: {
-            essays: {
-              where: { userId },
-              include: {
-                versions: {
-                  orderBy: { timestamp: "desc" },
-                  take: 20,
-                  include: {
-                    aiResults: {
-                      orderBy: { createdAt: "desc" },
-                      take: 1,
+        include: {
+          essayPrompts: {
+            where: { isActive: true },
+            include: {
+              essays: {
+                where: { userId },
+                include: {
+                  versions: {
+                    orderBy: { timestamp: "desc" },
+                    take: 20,
+                    include: {
+                      aiResults: {
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                      },
                     },
                   },
-                },
-                aiResults: {
-                  where: { essayVersionId: null },
-                  orderBy: { createdAt: "desc" },
-                  take: 5,
+                  aiResults: {
+                    where: { essayVersionId: null },
+                    orderBy: { createdAt: "desc" },
+                    take: 5,
+                  },
                 },
               },
             },
           },
         },
+      });
+
+      // Add independent programs
+      const independentFormattedPrograms = independentPrograms.map(program => {
+        const isStandalone = program.degreeType === "STANDALONE";
+        
+        return {
+          id: program.id,
+          name: program.programName,
+          slug: program.programSlug,
+          universityName: null,
+          universityId: null,
+          universitySlug: null,
+          universityColor: DEFAULT_UNIVERSITY_COLOR,
+          degreeType: program.degreeType,
+          description: program.programDescription,
+          isCustomProgram: isStandalone,
+          isIndependent: true,
+          
+          deadlines: [],
+          
+          essays: program.essayPrompts?.map(prompt => {
+            const userEssay = prompt.essays?.[0] || null;
+            
+            return {
+              promptId: prompt.id,
+              promptTitle: prompt.promptTitle,
+              promptText: prompt.promptText,
+              wordLimit: prompt.wordLimit,
+              minWordCount: prompt.minWordCount,
+              isMandatory: prompt.isMandatory,
+              programId: program.id,
+              programName: program.programName,
+              universityName: null,
+              isCustomEssay: isStandalone,
+              isIndependentEssay: true,
+              
+              userEssay: userEssay
+                ? {
+                    id: userEssay.id,
+                    content: userEssay.content || "",
+                    wordCount: userEssay.wordCount || 0,
+                    title: userEssay.title,
+                    priority: userEssay.priority,
+                    status: userEssay.status,
+                    isCompleted: userEssay.isCompleted || false,
+                    completionPercentage: userEssay.completionPercentage || 0,
+                    lastModified: userEssay.lastModified,
+                    lastAutoSaved: userEssay.lastAutoSaved,
+                    createdAt: userEssay.createdAt,
+                    versions: userEssay.versions?.map(v => ({
+                      id: v.id,
+                      label: v.label,
+                      content: v.content,
+                      wordCount: v.wordCount,
+                      timestamp: v.timestamp,
+                      isAutoSave: v.isAutoSave,
+                      changesSinceLastVersion: v.changesSinceLastVersion,
+                      aiAnalysis: v.aiResults?.[0] || null,
+                    })) || [],
+                    aiResults: userEssay.aiResults || [],
+                  }
+                : null,
+            };
+          }) || [],
+        };
+      }).filter(p => (p.essays && p.essays.length > 0) || p.degreeType === "STANDALONE");
+
+      const allPrograms = [...formattedPrograms, ...independentFormattedPrograms];
+
+      const stats = calculateStats(allPrograms);
+
+      const workspaceData = {
+        universities: universitiesData,
+        programs: allPrograms,
+        stats,
+        query: { universityId },
+      };
+
+      return NextResponse.json(workspaceData);
+    }
+
+    // NO specific university requested - get saved universities
+    console.log("🔍 No specific university requested - fetching saved universities");
+    
+    let savedUniversities = [];
+    try {
+      const savedUnisResult = await fetchSavedUniversitiesFromExternalAPI(auth.token);
+      savedUniversities = savedUnisResult.universities || [];
+    } catch (error) {
+      console.warn("Failed to fetch saved universities:", error);
+    }
+
+    // Get IDs of saved universities
+    const savedUniversityIds = savedUniversities
+      .map(uni => uni.id || uni.universityId || uni.university?.id)
+      .filter(Boolean);
+
+    // Also get universities where user has essays
+    const userEssayUniversities = await prisma.essay.findMany({
+      where: { userId },
+      select: {
+        program: {
+          select: { universityId: true }
+        }
       },
+      distinct: ['programId']
     });
 
-    console.log(`✅ Found ${independentPrograms.length} independent programs (no university)`);
+    const userUniIds = userEssayUniversities
+      .map(e => e.program?.universityId)
+      .filter(Boolean);
+
+    // Combine all university IDs
+    const allUniversityIds = [...new Set([...savedUniversityIds, ...userUniIds])];
+
+    let universities = [];
+    if (allUniversityIds.length > 0) {
+      universities = await prisma.university.findMany({
+        where: {
+          id: { in: allUniversityIds },
+          isActive: true,
+        },
+        include: {
+          programs: {
+            where: { isActive: true },
+            include: {
+              essayPrompts: {
+                where: { isActive: true },
+                include: {
+                  essays: {
+                    where: { userId },
+                    include: {
+                      versions: {
+                        orderBy: { timestamp: "desc" },
+                        take: 20,
+                        include: {
+                          aiResults: {
+                            orderBy: { createdAt: "desc" },
+                            take: 1,
+                          },
+                        },
+                      },
+                      aiResults: {
+                        where: { essayVersionId: null },
+                        orderBy: { createdAt: "desc" },
+                        take: 5,
+                      },
+                    },
+                  },
+                },
+              },
+              admissions: {
+                where: { isActive: true },
+                include: {
+                  deadlines: {
+                    where: {
+                      isActive: true,
+                      deadlineDate: { gte: new Date() },
+                    },
+                    orderBy: { deadlineDate: "asc" },
+                  },
+                  intakes: {
+                    where: { isActive: true },
+                    orderBy: { intakeYear: "desc" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    console.log(`✅ Found ${universities.length} universities with programs`);
 
     // Get user study level for filtering
     let userStudyLevel = null;
@@ -421,7 +647,6 @@ export async function GET(request) {
     const allPrograms = [];
     const universitiesData = [];
 
-    // Process universities and their programs
     for (const university of universities) {
       // Filter programs - always include STANDALONE, otherwise filter by study level
       const filteredPrograms = university.programs.filter(program => {
@@ -474,6 +699,44 @@ export async function GET(request) {
 
       allPrograms.push(...programsWithUniversity);
     }
+
+    // Fetch independent programs (no university)
+    const independentPrograms = await prisma.program.findMany({
+      where: {
+        universityId: null,
+        degreeType: "STANDALONE",
+        isActive: true,
+      },
+      include: {
+        essayPrompts: {
+          where: { isActive: true },
+          include: {
+            essays: {
+              where: { userId },
+              include: {
+                versions: {
+                  orderBy: { timestamp: "desc" },
+                  take: 20,
+                  include: {
+                    aiResults: {
+                      orderBy: { createdAt: "desc" },
+                      take: 1,
+                    },
+                  },
+                },
+                aiResults: {
+                  where: { essayVersionId: null },
+                  orderBy: { createdAt: "desc" },
+                  take: 5,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log(`✅ Found ${independentPrograms.length} independent programs (no university)`);
 
     // Add independent programs (with no university)
     const independentProgramsWithMetadata = independentPrograms.map(program => ({
@@ -567,54 +830,7 @@ export async function GET(request) {
       p.degreeType === "STANDALONE"
     );
 
-    const stats = {
-      totalPrograms: filteredFormattedPrograms.length,
-      savedUniversitiesCount: universitiesData.length,
-      totalEssayPrompts: filteredFormattedPrograms.reduce(
-        (acc, p) => acc + (p.essays?.length || 0),
-        0
-      ),
-      completedEssays: filteredFormattedPrograms.reduce(
-        (acc, p) =>
-          acc +
-          (p.essays?.filter(essay => essay.userEssay && essay.userEssay.isCompleted).length || 0),
-        0
-      ),
-      totalWords: filteredFormattedPrograms.reduce(
-        (acc, p) =>
-          acc +
-          (p.essays?.reduce(
-            (essayAcc, essay) =>
-              essayAcc + (essay.userEssay?.wordCount || 0),
-            0
-          ) || 0),
-        0
-      ),
-      averageProgress: (() => {
-        const totalPrompts = filteredFormattedPrograms.reduce(
-          (acc, p) => acc + (p.essays?.length || 0),
-          0
-        );
-        if (totalPrompts === 0) return 0;
-
-        const totalProgress = filteredFormattedPrograms.reduce((acc, p) => {
-          return (
-            acc +
-            (p.essays?.reduce((essayAcc, essay) => {
-              const userEssay = essay.userEssay;
-              return (
-                essayAcc +
-                (userEssay
-                  ? Math.min(100, (userEssay.wordCount / essay.wordLimit) * 100)
-                  : 0)
-              );
-            }, 0) || 0)
-          );
-        }, 0);
-
-        return totalProgress / totalPrompts;
-      })(),
-    };
+    const stats = calculateStats(filteredFormattedPrograms);
 
     const workspaceData = {
       universities: universitiesData,
@@ -636,6 +852,59 @@ export async function GET(request) {
   }
 }
 
+// ==========================================
+// Helper function to calculate stats
+// ==========================================
+function calculateStats(programs) {
+  return {
+    totalPrograms: programs.length,
+    savedUniversitiesCount: [...new Set(programs.map(p => p.universityId).filter(id => id !== null))].length,
+    totalEssayPrompts: programs.reduce(
+      (acc, p) => acc + (p.essays?.length || 0),
+      0
+    ),
+    completedEssays: programs.reduce(
+      (acc, p) =>
+        acc +
+        (p.essays?.filter(essay => essay.userEssay && essay.userEssay.isCompleted).length || 0),
+      0
+    ),
+    totalWords: programs.reduce(
+      (acc, p) =>
+        acc +
+        (p.essays?.reduce(
+          (essayAcc, essay) =>
+            essayAcc + (essay.userEssay?.wordCount || 0),
+          0
+        ) || 0),
+      0
+    ),
+    averageProgress: (() => {
+      const totalPrompts = programs.reduce(
+        (acc, p) => acc + (p.essays?.length || 0),
+        0
+      );
+      if (totalPrompts === 0) return 0;
+
+      const totalProgress = programs.reduce((acc, p) => {
+        return (
+          acc +
+          (p.essays?.reduce((essayAcc, essay) => {
+            const userEssay = essay.userEssay;
+            return (
+              essayAcc +
+              (userEssay
+                ? Math.min(100, (userEssay.wordCount / essay.wordLimit) * 100)
+                : 0)
+            );
+          }, 0) || 0)
+        );
+      }, 0);
+
+      return totalProgress / totalPrompts;
+    })(),
+  };
+}
 // ==========================================
 // POST: Handle all essay operations
 // ==========================================
