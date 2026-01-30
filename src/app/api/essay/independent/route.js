@@ -1259,10 +1259,10 @@ async function saveVersion(data) {
     label,
     isAutoSave = false,
     changeDescription,
-    performAiAnalysis = false,
-    prompt,
     userId
   } = data;
+
+  console.log('📝 API saveVersion called:', { essayId, wordCount, label });
 
   if (!essayId) {
     return NextResponse.json(
@@ -1271,120 +1271,157 @@ async function saveVersion(data) {
     );
   }
 
-  const essay = await prisma.essay.findFirst({
-    where: {
-      id: essayId,
-      userId: userId
-    },
-    include: {
-      essayPrompt: true,
-      program: {
-        include: { university: true }
-      }
-    }
-  });
-
-  if (!essay) {
+  if (!content || wordCount === 0) {
     return NextResponse.json(
-      { error: "Essay not found or access denied" },
-      { status: 403 }
+      { error: "Cannot save empty version" },
+      { status: 400 }
     );
   }
 
-  const lastVersion = await prisma.essayVersion.findFirst({
-    where: { essayId },
-    orderBy: { timestamp: "desc" },
-  });
+  try {
+    // ✅ FIX: Fetch essay with all required relations
+    const essay = await prisma.essay.findFirst({
+      where: {
+        id: essayId,
+        userId: userId
+      },
+      include: {
+        essayPrompt: true,
+        program: {
+          include: { 
+            university: {
+              select: {
+                id: true,
+                universityName: true,
+                slug: true,
+                brandColor: true,
+              }
+            }
+          }
+        }
+      }
+    });
 
-  const changesSinceLastVersion = lastVersion
-    ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${wordCount - lastVersion.wordCount} words`
-    : "Initial version";
+    if (!essay) {
+      return NextResponse.json(
+        { error: "Essay not found or access denied" },
+        { status: 403 }
+      );
+    }
 
-  // Create version
-const version = await prisma.essayVersion.create({
-  data: {
-    essayId,
-    content: content || "",
-    wordCount: wordCount || 0,
-    label: label || `Version ${new Date().toLocaleString()}`,
-    isAutoSave,
-    changesSinceLastVersion: changeDescription || changesSinceLastVersion,
-  },
-});
+    // ✅ FIX: Get last version for change tracking
+    const lastVersion = await prisma.essayVersion.findFirst({
+      where: { essayId },
+      orderBy: { timestamp: "desc" },
+    });
 
-  // ✅ FIX: Update main essay with version content AND return full essay data
-// ✅ Update main essay with version content AND return full essay data
-const updatedEssay = await prisma.essay.update({
-  where: { id: essayId },
-  data: { 
-    content: content || "",
-    wordCount: wordCount || 0,
-    lastModified: new Date(),
-    completionPercentage: essay.essayPrompt?.wordLimit 
-      ? Math.min(100, (wordCount / essay.essayPrompt.wordLimit) * 100)
-      : 0,
-  },
-  include: {
-    versions: { 
-      orderBy: { timestamp: "desc" }, 
-      take: 20,
+    const changesSinceLastVersion = lastVersion
+      ? `${wordCount - lastVersion.wordCount > 0 ? "+" : ""}${wordCount - lastVersion.wordCount} words`
+      : "Initial version";
+
+    console.log('💾 Creating version in database...');
+
+    // ✅ FIX: Create version with proper data
+    const version = await prisma.essayVersion.create({
+      data: {
+        essayId,
+        content: content || "",
+        wordCount: wordCount || 0,
+        label: label || `Version ${new Date().toLocaleString()}`,
+        isAutoSave,
+        changesSinceLastVersion: changeDescription || changesSinceLastVersion,
+      },
       include: {
         aiResults: {
           orderBy: { createdAt: "desc" },
           take: 1,
         },
       },
-    },
-    aiResults: {
-      where: { essayVersionId: null },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    },
-    essayPrompt: true,
-    program: {
+    });
+
+    console.log('✅ Version created:', version.id);
+
+    // ✅ FIX: Calculate completion percentage
+    const wordLimit = essay.essayPrompt?.wordLimit || essay.wordLimit || 500;
+    const completionPercentage = Math.min(100, (wordCount / wordLimit) * 100);
+
+    // ✅ FIX: Update main essay with ALL required fields
+    const updatedEssay = await prisma.essay.update({
+      where: { id: essayId },
+      data: { 
+        content: content || "",
+        wordCount: wordCount || 0,
+        wordLimit: wordLimit, // ← CRITICAL: Always include wordLimit
+        lastModified: new Date(),
+        completionPercentage,
+        status: completionPercentage >= 90 ? 'COMPLETED' : 
+                wordCount > 0 ? 'IN_PROGRESS' : 'DRAFT',
+      },
       include: {
-        university: {
-          select: {
-            id: true,
-            universityName: true,
-            slug: true,
-            brandColor: true,
+        versions: { 
+          orderBy: { timestamp: "desc" }, 
+          take: 20,
+          include: {
+            aiResults: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+        aiResults: {
+          where: { essayVersionId: null },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
+        essayPrompt: true,
+        program: {
+          include: {
+            university: {
+              select: {
+                id: true,
+                universityName: true,
+                slug: true,
+                brandColor: true,
+              }
+            }
           }
         }
-      }
+      },
+    });
+
+    console.log('✅ Essay updated with version');
+
+    // ✅ FIX: Return complete data structure
+    return NextResponse.json({
+      success: true,
+      version: {
+        ...version,
+        aiAnalysis: version.aiResults?.[0] || null,
+      },
+      essay: updatedEssay, // ← CRITICAL: Include full essay with versions
+      message: 'Version saved successfully',
+    });
+  } catch (error) {
+    console.error("❌ Error saving version:", error);
+    
+    // ✅ FIX: Better error messages
+    let errorMessage = 'Failed to save version';
+    if (error.code === 'P2002') {
+      errorMessage = 'A version with this label already exists';
+    } else if (error.code === 'P2003') {
+      errorMessage = 'Essay not found';
+    } else if (error.message.includes('wordLimit')) {
+      errorMessage = 'Word limit configuration error';
     }
-  },
-});
-
-  let aiAnalysis = null;
-
-  if (performAiAnalysis && content && content.length >= 50) {
-    try {
-      const analysisResult = await performAIAnalysis({
-        essayId,
-        versionId: version.id,
-        content,
-        prompt: prompt || essay.essayPrompt?.promptText,
-        userId
-      });
-
-      if (analysisResult.success) {
-        aiAnalysis = analysisResult.analysis;
-      }
-    } catch (error) {
-      console.warn("AI analysis failed during version save:", error);
-    }
+    
+    return NextResponse.json(
+      {
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      },
+      { status: 500 }
+    );
   }
-
- return NextResponse.json({
-  success: true,
-  version: {
-    ...version,
-    aiAnalysis,
-  },
-  essay: updatedEssay,  // ✅ CRITICAL: Include full essay data
-  aiAnalysis,
-});
 }
 
 async function restoreVersion(data) {

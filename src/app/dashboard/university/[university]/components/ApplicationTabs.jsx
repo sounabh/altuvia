@@ -1518,158 +1518,141 @@ const ApplicationTabs = ({ university }) => {
   );
 
   // ✅ FIX D: UPDATED saveVersion function with immediate data refresh
-  const saveVersion = useCallback(
-    async (label) => {
-      if (
-        !currentEssay ||
-        isSaving ||
-        isSavingVersion ||
-        !userId ||
-        !isUniversityAdded
-      )
-        return false;
+ const saveVersion = useCallback(
+  async (label) => {
+    // ✅ FIX: Comprehensive validation
+    if (!currentEssay || isSaving || isSavingVersion || !userId || !isUniversityAdded) {
+      console.warn('Cannot save version - missing requirements');
+      return false;
+    }
 
-      let contentToSave = currentEssay.content;
-      let wordCountToSave = currentEssay.wordCount;
+    // ✅ FIX: Prevent race conditions with strict locking
+    if (isUpdatingRef.current) {
+      console.warn('Update already in progress');
+      return false;
+    }
+
+    setIsSavingVersion(true);
+    isUpdatingRef.current = true;
+
+    try {
+      // ✅ FIX: Get latest content (including pending changes)
+      let contentToSave = currentEssay.content || '';
+      let wordCountToSave = currentEssay.wordCount || 0;
+      
       if (pendingContentRef.current) {
         contentToSave = pendingContentRef.current.content;
         wordCountToSave = pendingContentRef.current.wordCount;
       }
 
-      try {
-        setIsSavingVersion(true);
-        isUpdatingRef.current = true; // ✅ Add race condition protection
-
-        if (hasUnsavedChanges) {
-          const autoSaved = await autoSaveEssay();
-          if (!autoSaved) {
-            toast.error("Failed to save current changes");
-            return false;
-          }
-        }
-
-        const isCustom =
-          currentProgram?.degreeType === "STANDALONE" ||
-          currentProgram?.isCustom;
-        const apiRoute = isCustom
-          ? "/api/essay/independent"
-          : `/api/essay/${encodeURIComponent(universityName)}`;
-
-        const response = await fetch(apiRoute, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "save_version",
-            essayId: currentEssay.id,
-            content: contentToSave,
-            wordCount: wordCountToSave,
-            label: label || `Version ${new Date().toLocaleString()}`,
-            isCustomEssay: isCustom,
-            userId,
-            userEmail,
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-
-          toast.success("Version saved successfully");
-          
-          // ✅ FIX C: Update workspace data with server response
-          if (result.essay) {
-            setWorkspaceData((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                programs: prev.programs.map((program) =>
-                  program.id === activeProgramId
-                    ? {
-                        ...program,
-                        essays: program.essays.map((essayData) =>
-                          essayData.promptId === activeEssayPromptId
-                            ? {
-                                ...essayData,
-                                userEssay: {
-                                  ...essayData.userEssay,
-                                  ...result.essay, // ← Use server response
-                                  lastModified: new Date(),
-                                },
-                              }
-                            : essayData,
-                        ),
-                      }
-                    : program,
-                ),
-              };
-            });
-          }
-
-          // ✅ FIX: Force immediate refresh from API
-          await forceRefresh();
-          
-          // ✅ FIX: Update UI immediately with optimistic update
-          setWorkspaceData((prev) => {
-            if (!prev) return prev;
-
-            return {
-              ...prev,
-              programs: prev.programs.map((program) =>
-                program.id === activeProgramId
-                  ? {
-                      ...program,
-                      essays: program.essays.map((essayData) =>
-                        essayData.promptId === activeEssayPromptId
-                          ? {
-                              ...essayData,
-                              userEssay: {
-                                ...essayData.userEssay,
-                                ...result.essay, // ← Use latest from server
-                                versions: result.essay.versions || essayData.userEssay.versions,
-                                lastModified: new Date(),
-                              },
-                            }
-                          : essayData,
-                      ),
-                    }
-                  : program,
-              ),
-            };
-          });
-
-          // Navigate back to list view after short delay for smooth UX
-          setTimeout(() => {
-            setActiveView("list");
-            setOpenPanels([]);
-          }, 300);
-
-          return true;
-        }
+      // ✅ FIX: Validate content
+      if (!contentToSave || wordCountToSave === 0) {
+        toast.error('Cannot save empty version');
         return false;
-      } catch (error) {
-        console.error("Error saving version:", error);
-        toast.error("Failed to save version");
-        return false;
-      } finally {
-        setIsSavingVersion(false);
-        isUpdatingRef.current = false; // ✅ Always reset
       }
-    },
-    [
-      currentEssay,
-      isSaving,
-      isSavingVersion,
-      hasUnsavedChanges,
-      autoSaveEssay,
-      universityName,
-      activeProgramId,
-      activeEssayPromptId,
-      userId,
-      userEmail,
-      isUniversityAdded,
-      currentProgram,
-      forceRefresh,
-    ],
-  );
+
+      console.log('💾 Saving version:', {
+        essayId: currentEssay.id,
+        wordCount: wordCountToSave,
+        hasUnsavedChanges,
+      });
+
+      // ✅ FIX: No auto-save needed - version save includes all changes
+
+      const isCustom = currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+      const apiRoute = isCustom ? "/api/essay/independent" : `/api/essay/${encodeURIComponent(universityName)}`;
+
+      const response = await fetch(apiRoute, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_version",
+          essayId: currentEssay.id,
+          content: contentToSave,
+          wordCount: wordCountToSave,
+          label: label || `Version ${new Date().toLocaleString()}`,
+          isCustomEssay: isCustom,
+          userId,
+          userEmail,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save version');
+      }
+
+      const result = await response.json();
+
+      // ✅ FIX: Validate response structure
+      if (!result.success || !result.essay) {
+        throw new Error('Invalid server response');
+      }
+
+      console.log('✅ Version saved, updating UI');
+
+      // ✅ FIX: Update workspace with server data
+      setWorkspaceData((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          programs: prev.programs.map((program) =>
+            program.id === activeProgramId
+              ? {
+                  ...program,
+                  essays: program.essays.map((essayData) =>
+                    essayData.promptId === activeEssayPromptId
+                      ? {
+                          ...essayData,
+                          userEssay: result.essay, // ← Complete essay from server
+                        }
+                      : essayData
+                  ),
+                }
+              : program
+          ),
+        };
+      });
+
+      // ✅ FIX: Clear all pending state
+      pendingContentRef.current = null;
+      setHasUnsavedChanges(false);
+      setLastSaved(new Date());
+
+      toast.success('Version saved successfully! 🎉');
+
+      // ✅ FIX: Optional - navigate back after short delay
+      setTimeout(() => {
+        setActiveView("list");
+        setOpenPanels([]);
+      }, 300);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Error saving version:", error);
+      toast.error(error.message || "Failed to save version");
+      return false;
+    } finally {
+      // ✅ FIX: Always unlock
+      setIsSavingVersion(false);
+      isUpdatingRef.current = false;
+    }
+  },
+  [
+    currentEssay,
+    isSaving,
+    isSavingVersion,
+    hasUnsavedChanges,
+    universityName,
+    activeProgramId,
+    activeEssayPromptId,
+    userId,
+    userEmail,
+    isUniversityAdded,
+    currentProgram,
+  ]
+);
 
   const handleRestoreVersion = async (versionId) => {
     if (!currentEssay || !userId || !isUniversityAdded) return;

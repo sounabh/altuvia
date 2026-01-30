@@ -88,38 +88,43 @@ export function VersionManager({
     return "Just now"
   }, [])
 
-  const handleRestoreVersion = useCallback(async (versionId) => {
-    if (!onRestoreVersion || !versionId) return
-    
-    setLoadingAction(`restore-${versionId}`)
-    try {
-      await onRestoreVersion(versionId)
-      setSelectedVersion(null)
-    } catch (error) {
-      console.error('Error restoring version:', error)
-    } finally {
-      setLoadingAction(null)
-    }
-  }, [onRestoreVersion])
+ const handleRestoreVersion = useCallback(async (versionId) => {
+  if (!onRestoreVersion || !versionId) return;
+  
+  setLoadingAction(`restore-${versionId}`);
+  try {
+    await onRestoreVersion(versionId);
+    setSelectedVersion(null);
+  } catch (error) {
+    console.error('Error restoring version:', error);
+    // ✅ FIX: Show user-friendly error
+    toast.error(error.message || 'Failed to restore version');
+  } finally {
+    setLoadingAction(null);
+  }
+}, [onRestoreVersion]);
 
-  const handleDeleteVersion = useCallback(async (versionId) => {
-    if (!onDeleteVersion || !versionId) return
-    
-    if (versions.length <= 1) {
-      console.warn("Cannot delete the only version")
-      return
-    }
-    
-    setLoadingAction(`delete-${versionId}`)
-    try {
-      await onDeleteVersion(versionId)
-      setSelectedVersion(null)
-    } catch (error) {
-      console.error('Error deleting version:', error)
-    } finally {
-      setLoadingAction(null)
-    }
-  }, [onDeleteVersion, versions.length])
+const handleDeleteVersion = useCallback(async (versionId) => {
+  if (!onDeleteVersion || !versionId) return;
+  
+  if (versions.length <= 1) {
+    // ✅ FIX: Better user feedback
+    toast.error("Cannot delete the only version");
+    return;
+  }
+  
+  setLoadingAction(`delete-${versionId}`);
+  try {
+    await onDeleteVersion(versionId);
+    setSelectedVersion(null);
+    toast.success('Version deleted successfully');
+  } catch (error) {
+    console.error('Error deleting version:', error);
+    toast.error(error.message || 'Failed to delete version');
+  } finally {
+    setLoadingAction(null);
+  }
+}, [onDeleteVersion, versions.length]);
 
   const exportVersion = useCallback((version, format = 'docx') => {
     if (!version || !version.content) return
