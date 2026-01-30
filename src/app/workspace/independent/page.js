@@ -1450,9 +1450,8 @@ const saveVersion = useCallback(
         currentProgram?.degreeType === "STANDALONE" ||
         currentProgram?.isCustom;
       
-      const apiRoute = isCustom
-        ? "/api/essay/independent"
-        : `/api/essay/${encodeURIComponent(universityName)}`;
+      // ✅ Independent essays ALWAYS use the independent route
+      const apiRoute = "/api/essay/independent";
 
       console.log('💾 Saving version to:', apiRoute, {
         essayId: currentEssay.id,
