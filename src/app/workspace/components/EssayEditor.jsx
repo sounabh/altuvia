@@ -59,6 +59,7 @@ export const EssayEditor = memo(function EssayEditor({
   const [copied, setCopied] = useState(false)
   const [readingTime, setReadingTime] = useState(0)
   const [selectedText, setSelectedText] = useState('')
+  const [isSaving, setIsSaving] = useState(false) // ✅ ADDED: Simple saving state
   
   // Refs to prevent stale closures and re-renders
   const onChangeRef = useRef(onChange)
@@ -69,11 +70,7 @@ export const EssayEditor = memo(function EssayEditor({
   const skipNextSyncRef = useRef(false)
   const initialContentRef = useRef(content)
   
-  // Auto-save refs - completely isolated from render cycle
-  const autoSaveIntervalRef = useRef(null)
-  const lastAutoSavedContentRef = useRef(content)
-  const saveIndicatorRef = useRef(null)
-  const isSavingRef = useRef(false)
+  // Save indicator refs
   const hasUnsavedChangesRef = useRef(false)
 
   // Update refs without triggering re-renders
@@ -184,93 +181,38 @@ export const EssayEditor = memo(function EssayEditor({
     setReadingTime(reading)
   }, [countWords, countChars, countSentences, countParagraphs, calculateReadingTime])
 
-  // ✅ FIX A: Improved auto-save function with proper async handling
-  const performAutoSave = useCallback(async () => {
-    if (!editorRef.current || !onSaveRef.current || isSavingRef.current) return;
-    
-    const currentContent = editorRef.current.innerHTML;
-    
-    // Only save if content has changed
-    if (currentContent === lastAutoSavedContentRef.current) return;
-    
-    isSavingRef.current = true;
-    hasUnsavedChangesRef.current = false; // Mark as saving
-    
-    // Show subtle saving indicator
-    if (saveIndicatorRef.current) {
-      saveIndicatorRef.current.style.opacity = '1';
-      saveIndicatorRef.current.classList.add('pulse-save');
-    }
-    
-    try {
-      // Call save with await to ensure it completes
-      const saveResult = await onSaveRef.current(currentContent, countWords(currentContent));
-      
-      if (saveResult !== false) {
-        lastAutoSavedContentRef.current = currentContent;
-        
-        // Show success indicator
-        setTimeout(() => {
-          if (saveIndicatorRef.current) {
-            saveIndicatorRef.current.classList.remove('pulse-save');
-            saveIndicatorRef.current.classList.add('saved-success');
-            
-            // Fade out after success
-            setTimeout(() => {
-              if (saveIndicatorRef.current) {
-                saveIndicatorRef.current.classList.remove('saved-success');
-                saveIndicatorRef.current.style.opacity = '0.6';
-              }
-            }, 800);
-          }
-        }, 300);
-      }
-    } catch (error) {
-      console.error('Auto-save failed:', error);
-      hasUnsavedChangesRef.current = true; // Mark as unsaved on error
-      
-      // Show error indicator
-      if (saveIndicatorRef.current) {
-        saveIndicatorRef.current.classList.remove('pulse-save');
-        saveIndicatorRef.current.style.opacity = '0.6';
-      }
-    } finally {
-      isSavingRef.current = false;
-    }
-  }, [countWords]);
-
-  // Initialize auto-save interval - runs completely in background
+  // ✅ FIXED: Removed auto-save timer completely - parent controls all auto-saves
+  // Only handle visibility change and beforeunload
   useEffect(() => {
-    // Start auto-save interval (15 seconds)
-    autoSaveIntervalRef.current = setInterval(() => {
-      performAutoSave()
-    }, 15000)
-    
-    // Also save on page visibility change (when user switches tabs)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        performAutoSave()
+        // Just mark that we should save, don't actually save here
+        if (hasUnsavedChangesRef.current && editorRef.current) {
+          hasUnsavedChangesRef.current = true;
+        }
       }
-    }
+    };
     
-    // Save before unload
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (e) => {
       if (hasUnsavedChangesRef.current && editorRef.current && onSaveRef.current) {
-        onSaveRef.current(editorRef.current.innerHTML, countWords(editorRef.current.innerHTML))
+        // Synchronous save attempt on unload
+        const content = editorRef.current.innerHTML;
+        onSaveRef.current(content, countWords(content));
+        
+        // Optional: You can show a confirmation dialog
+        e.preventDefault();
+        e.returnValue = '';
       }
-    }
+    };
     
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
     
     return () => {
-      if (autoSaveIntervalRef.current) {
-        clearInterval(autoSaveIntervalRef.current)
-      }
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [performAutoSave, countWords])
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [countWords]);
 
   // Handle content changes with debounce
   const handleContentChange = useCallback(() => {
@@ -355,7 +297,7 @@ export const EssayEditor = memo(function EssayEditor({
     execCommand('removeFormat')
   }, [execCommand])
 
-  // ✅ FIX B: Improved keyboard shortcuts handler
+  // ✅ FIXED: Improved keyboard shortcuts handler
   const handleKeyDown = useCallback(async (e) => {
     // Only handle shortcuts with modifier keys
     if (e.ctrlKey || e.metaKey) {
@@ -379,35 +321,22 @@ export const EssayEditor = memo(function EssayEditor({
             const currentWordCount = countWords(currentContent)
             
             // Show saving state
-            if (saveIndicatorRef.current) {
-              saveIndicatorRef.current.classList.add('pulse-save')
-            }
+            setIsSaving(true)
             
             try {
               // Await the save operation
               await onSaveRef.current(currentContent, currentWordCount)
               
               // Update tracking refs
-              lastAutoSavedContentRef.current = currentContent
               hasUnsavedChangesRef.current = false
               
               // Show success
               toast.success('Changes saved')
-              
-              if (saveIndicatorRef.current) {
-                saveIndicatorRef.current.classList.remove('pulse-save')
-                saveIndicatorRef.current.classList.add('saved-success')
-                setTimeout(() => {
-                  saveIndicatorRef.current?.classList.remove('saved-success')
-                }, 800)
-              }
             } catch (error) {
               console.error('Manual save failed:', error)
               toast.error('Failed to save changes')
-              
-              if (saveIndicatorRef.current) {
-                saveIndicatorRef.current.classList.remove('pulse-save')
-              }
+            } finally {
+              setIsSaving(false)
             }
           }
           break
@@ -492,7 +421,6 @@ export const EssayEditor = memo(function EssayEditor({
     if (content) {
       editor.innerHTML = content
       lastSyncedContentRef.current = content
-      lastAutoSavedContentRef.current = content
       initialContentRef.current = content
     }
 
@@ -529,7 +457,7 @@ export const EssayEditor = memo(function EssayEditor({
         externalContent !== currentContent) {
       
       // Only sync if not currently saving
-      if (!isSavingRef.current && !hasUnsavedChangesRef.current) {
+      if (!isSaving && !hasUnsavedChangesRef.current) {
         // Preserve cursor position
         const selection = window.getSelection();
         const hadFocus = document.activeElement === editorRef.current;
@@ -537,7 +465,6 @@ export const EssayEditor = memo(function EssayEditor({
         // Update content
         editorRef.current.innerHTML = externalContent;
         lastSyncedContentRef.current = externalContent;
-        lastAutoSavedContentRef.current = externalContent;
         updateStats(externalContent);
         
         // Restore focus if needed
@@ -546,7 +473,7 @@ export const EssayEditor = memo(function EssayEditor({
         }
       }
     }
-  }, [content, isInitialized, updateStats]);
+  }, [content, isInitialized, updateStats, isSaving]);
 
   // Word limit status
   const limitStatus = useMemo(() => {
@@ -626,35 +553,6 @@ export const EssayEditor = memo(function EssayEditor({
 
   return (
     <div className={containerClass}>
-      {/* Auto-save indicator styles - injected once */}
-      <style jsx global>{`
-        @keyframes pulse-save-animation {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.2); opacity: 0.8; }
-        }
-        
-        @keyframes saved-success-animation {
-          0% { transform: scale(1); }
-          30% { transform: scale(1.3); }
-          100% { transform: scale(1); }
-        }
-        
-        .pulse-save {
-          animation: pulse-save-animation 0.5s ease-in-out infinite;
-        }
-        
-        .pulse-save .save-dot {
-          background-color: #3b82f6 !important;
-          box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
-        }
-        
-        .saved-success .save-dot {
-          background-color: #22c55e !important;
-          box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
-          animation: saved-success-animation 0.4s ease-out;
-        }
-      `}</style>
-
       {/* Main Toolbar */}
       <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-200 p-2 flex-shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -988,18 +886,16 @@ export const EssayEditor = memo(function EssayEditor({
             </span>
           </div>
 
-          {/* Auto-save indicator - subtle, non-intrusive */}
+          {/* ✅ FIXED: Simplified Auto-save indicator */}
           <div className="flex items-center gap-2">
-            <div 
-              ref={saveIndicatorRef}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300"
-              style={{ opacity: 0.6 }}
-            >
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300">
               <div 
-                className="save-dot w-2 h-2 rounded-full bg-green-400 transition-all duration-300"
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  isSaving ? 'bg-blue-400 animate-pulse' : 'bg-green-400'
+                }`}
               />
               <span className="text-xs text-gray-500 font-medium">
-                Auto-saving
+                {isSaving ? 'Saving...' : 'Saved'}
               </span>
             </div>
           </div>
@@ -1041,7 +937,7 @@ export const EssayEditor = memo(function EssayEditor({
               </ul>
               <p className="opacity-60 text-xs mt-3 flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
-                Your work is auto-saved every 15 seconds
+                Your work is auto-saved when you pause typing
               </p>
             </div>
           </div>
@@ -1140,8 +1036,8 @@ export const EssayEditor = memo(function EssayEditor({
           
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5 text-green-600">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              Auto-save enabled
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              Auto-save 
             </span>
             {lastSaved && (
               <span className="text-gray-400">

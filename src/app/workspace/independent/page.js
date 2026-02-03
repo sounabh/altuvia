@@ -955,7 +955,7 @@ export default function IndependentWorkspacePage() {
   const lastContentRef = useRef("");
   const isUpdatingRef = useRef(false);
   const activityTimeoutRef = useRef(null);
-  const pendingContentRef = useRef(null); // ✅ Added properly
+  const pendingContentRef = useRef(null);
 
   // ==========================================
   // COMPUTED DATA
@@ -1122,14 +1122,16 @@ export default function IndependentWorkspacePage() {
   }, [fetchWorkspaceData]);
 
   // ==========================================
-  // AUTO-SAVE LOGIC
+  // ✅ FIXED: AUTO-SAVE FUNCTION
   // ==========================================
 
   const autoSaveEssay = useCallback(async () => {
+    // ✅ FIX: Block auto-save if version save is running
     if (
-      !currentEssay ||
-      isSaving ||
-      !hasUnsavedChanges ||
+      !currentEssay || 
+      isSaving || 
+      isSavingVersion ||  // ← ADDED THIS CHECK
+      !hasUnsavedChanges || 
       isUpdatingRef.current
     ) {
       return false;
@@ -1139,7 +1141,6 @@ export default function IndependentWorkspacePage() {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      // Use pending content if available
       const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
       const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
 
@@ -1190,7 +1191,7 @@ export default function IndependentWorkspacePage() {
 
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
-        pendingContentRef.current = null; // Clear pending content
+        pendingContentRef.current = null;
         return true;
       }
       return false;
@@ -1204,30 +1205,38 @@ export default function IndependentWorkspacePage() {
   }, [
     currentEssay,
     isSaving,
+    isSavingVersion,  // ← ADDED THIS DEPENDENCY
     hasUnsavedChanges,
     activeProgramId,
     activeEssayPromptId,
   ]);
 
-  // Auto-save timer
+  // ==========================================
+  // ✅ FIXED: AUTO-SAVE TIMER LOGIC
+  // ==========================================
+
   useEffect(() => {
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
     }
 
+    // ✅ FIX: Don't auto-save if version save is in progress
     if (
-      hasUnsavedChanges &&
-      currentEssay &&
-      !isSaving &&
+      hasUnsavedChanges && 
+      currentEssay && 
+      !isSaving && 
+      !isSavingVersion &&  // ← ADDED THIS CHECK
       !isUpdatingRef.current
     ) {
       const timeSinceLastActivity = Date.now() - lastUserActivity;
+      const INACTIVITY_THRESHOLD = 20 * 1000; // ✅ FIX: 20 seconds (not 4 minutes)
 
-      if (timeSinceLastActivity >= 4 * 60 * 1000) {
+      // Only auto-save if user has been inactive for 20+ seconds
+      if (timeSinceLastActivity >= INACTIVITY_THRESHOLD) {
         autoSaveEssay();
       } else if (!isUserActive) {
-        const remainingTime = 4 * 60 * 1000 - timeSinceLastActivity;
+        const remainingTime = INACTIVITY_THRESHOLD - timeSinceLastActivity;
         autoSaveTimerRef.current = setTimeout(() => {
           autoSaveEssay();
         }, remainingTime);
@@ -1240,15 +1249,19 @@ export default function IndependentWorkspacePage() {
       }
     };
   }, [
-    hasUnsavedChanges,
-    currentEssay?.id,
-    isSaving,
-    lastUserActivity,
-    isUserActive,
-    autoSaveEssay,
+    hasUnsavedChanges, 
+    currentEssay?.id, 
+    isSaving, 
+    isSavingVersion,  // ← ADDED THIS DEPENDENCY
+    lastUserActivity, 
+    isUserActive, 
+    autoSaveEssay
   ]);
 
-  // Activity tracking
+  // ==========================================
+  // ✅ FIXED: ACTIVITY TRACKING
+  // ==========================================
+
   useEffect(() => {
     const handleUserActivity = () => {
       const now = Date.now();
@@ -1259,11 +1272,12 @@ export default function IndependentWorkspacePage() {
         clearTimeout(activityTimeoutRef.current);
       }
 
+      // ✅ FIX: Set to inactive after 20 seconds (not 2 minutes)
       activityTimeoutRef.current = setTimeout(
         () => {
           setIsUserActive(false);
         },
-        2 * 60 * 1000,
+        20 * 1000,  // ✅ 20 seconds
       );
     };
 
@@ -1303,7 +1317,6 @@ export default function IndependentWorkspacePage() {
       try {
         isUpdatingRef.current = true;
 
-        // ✅ Store pending content for save operations
         pendingContentRef.current = { content, wordCount };
 
         setWorkspaceData((prev) => {
@@ -1368,7 +1381,6 @@ export default function IndependentWorkspacePage() {
         autoSaveTimerRef.current = null;
       }
 
-      // Clear pending content when switching essays
       pendingContentRef.current = null;
 
       setActiveProgramId(programId);
@@ -1408,7 +1420,6 @@ export default function IndependentWorkspacePage() {
     try {
       setIsSaving(true);
 
-      // Use pending content if available
       const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
       const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
 
@@ -1491,7 +1502,6 @@ export default function IndependentWorkspacePage() {
         return false;
       }
 
-      // Get content to save - prefer pending content
       const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
       const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
 
@@ -1499,12 +1509,23 @@ export default function IndependentWorkspacePage() {
         setIsSavingVersion(true);
         isUpdatingRef.current = true;
 
-        // First, auto-save if there are unsaved changes
-        if (hasUnsavedChanges) {
+        // ✅ FIX: Clear auto-save timer to prevent conflict
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+          autoSaveTimerRef.current = null;
+        }
+
+        // ✅ FIX: Only auto-save if there are ACTUALLY unsaved changes
+        // Skip if content matches last saved
+        const needsAutoSave = hasUnsavedChanges && 
+          contentToSave !== currentEssay.content;
+
+        if (needsAutoSave) {
           const autoSaved = await autoSaveEssay();
           if (!autoSaved) {
             console.warn("Auto-save failed before version save, continuing anyway");
           }
+          // Small delay to ensure DB consistency
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
@@ -1543,7 +1564,6 @@ export default function IndependentWorkspacePage() {
 
         console.log("✅ Version saved successfully:", result);
 
-        // Update workspace data with the new essay data including versions
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
@@ -1567,7 +1587,6 @@ export default function IndependentWorkspacePage() {
           };
         });
 
-        // Clear pending content
         pendingContentRef.current = null;
         setHasUnsavedChanges(false);
         setLastSaved(new Date());
@@ -2086,13 +2105,7 @@ export default function IndependentWorkspacePage() {
             >
               Browse Universities
             </Button>
-            <Button
-              onClick={() => setShowStandaloneEssayModal(true)}
-              className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:shadow-lg active:scale-95"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Create Custom Essay
-            </Button>
+            
           </div>
         </Card>
       </div>
@@ -2659,7 +2672,7 @@ export default function IndependentWorkspacePage() {
             <div className="flex items-center space-x-4">
               <span>{workspaceData?.universities?.length || 0} saved universities</span>
               <span>•</span>
-              <span>Auto-save enabled (4 min inactivity)</span>
+              <span>Auto-save enabled (20 sec inactivity)</span>
             </div>
             <div className="flex items-center space-x-4">
               {session?.user?.email && (

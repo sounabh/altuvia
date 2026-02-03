@@ -22,6 +22,10 @@ import { motion } from 'framer-motion';
  * - Consider adding structured data for resume/portfolio if public
  */
 export const CVSummaryCard = ({ cvSummary }) => {
+
+  console.log('====================================');
+  console.log(cvSummary);
+  console.log('====================================');
   // ========== EMPTY STATE HANDLING ==========
   // If no CV summary data exists, render empty state component
   if (!cvSummary) {

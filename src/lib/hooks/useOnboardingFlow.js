@@ -13,7 +13,7 @@ export const useOnboardingFlow = () => {
   const [showAuthModal, setShowAuthModal] = useState(false); //Whether login/signup modal is visible
   const [user, setUser] = useState(null); //Stores logged-in user info
   const [renderKey, setRenderKey] = useState(0); //force render
-  const [hasCompleteProfile, setHasCompleteProfile] = useState(false); //Whether user’s onboarding is done
+  const [hasCompleteProfile, setHasCompleteProfile] = useState(false); //Whether user's onboarding is done
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Initializing...");
   const [data, setData] = useState({}); //Stores collected onboarding form data
@@ -55,10 +55,21 @@ export const useOnboardingFlow = () => {
             setLoadingMessage("Profile complete! Redirecting...");
             setTimeout(() => router.push("/dashboard"), 1500);
           } else {
-            // ✅ FIX: Profile incomplete → Go directly to onboarding (skip auth modal)
-            setShowAuthModal(false); // Don't show auth modal
-            setCurrentStep(0); // Start onboarding
-            setIsLoading(false);
+            // ============================================================
+            // BETA BYPASS — profile incomplete but we skip onboarding.
+            // Redirect straight to dashboard for all users in beta.
+            // ============================================================
+            setLoadingMessage("Redirecting to dashboard...");
+            setTimeout(() => router.push("/dashboard"), 1500);
+
+            // ============================================================
+            // FUTURE USE — uncomment the block below (and remove the two
+            // lines above) when onboarding should run again for users
+            // whose profile is not yet complete.
+            // ============================================================
+            // setShowAuthModal(false); // Don't show auth modal
+            // setCurrentStep(0); // Start onboarding
+            // setIsLoading(false);
           }
         } else {
           // ❌ Not authenticated → Show auth modal
@@ -83,9 +94,22 @@ export const useOnboardingFlow = () => {
    // console.log("🔐 Auth success, starting onboarding");
     setUser(authenticatedUser);
     setShowAuthModal(false);
-    setCurrentStep(0);
-    setRenderKey(prev => prev + 1);
-  }, []);
+
+    // ============================================================
+    // BETA BYPASS — after successful auth redirect to dashboard
+    // instead of starting onboarding.
+    // ============================================================
+    setLoadingMessage("Redirecting to dashboard...");
+    setIsLoading(true);
+    setTimeout(() => router.push("/dashboard"), 1500);
+
+    // ============================================================
+    // FUTURE USE — uncomment the two lines below (and remove the
+    // three lines above) when onboarding should start after login.
+    // ============================================================
+    // setCurrentStep(0);
+    // setRenderKey(prev => prev + 1);
+  }, [router]);
 
 
   //next

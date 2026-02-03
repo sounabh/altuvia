@@ -3,19 +3,90 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 
 // ============================================
-// CUSTOM HOOK FOR DASHBOARD DATA MANAGEMENT
-// Fixed version - prevents unnecessary refetches & empty state flash
+// CUSTOM FETCHER WITH AUTH
 // ============================================
+const createFetcher = (token, apiBaseUrl) => async (url) => {
+  if (!token) {
+    throw new Error('No authentication token');
+  }
 
-export const useDashboardData = () => {
-  // ========== STATE MANAGEMENT ==========
-  const [universities, setUniversities] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
-  const [cvSummary, setCVSummary] = useState(null);
-  const [stats, setStats] = useState({
-    total: 0,
+  const response = await fetch(`${apiBaseUrl}${url}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (response.status === 401) {
+    const error = new Error('Authentication failed');
+    error.status = 401;
+    error.info = await response.json();
+    throw error;
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    const error = new Error(errorData.error || 'Failed to fetch data');
+    error.status = response.status;
+    error.info = errorData;
+    throw error;
+  }
+
+  return response.json();
+};
+
+// ============================================
+// CALCULATE STATS FROM UNIVERSITIES DATA
+// ============================================
+const calculateStats = (uniArray) => {
+  if (!uniArray || uniArray.length === 0) {
+    return {
+      total: 0,
+      inProgress: 0,
+      submitted: 0,
+      notStarted: 0,
+      upcomingDeadlines: 0,
+      totalTasks: 0,
+      completedTasks: 0,
+      totalEssays: 0,
+      completedEssays: 0,
+      inProgressEssays: 0,
+      notStartedEssays: 0,
+      averageProgress: 0,
+      fullyCompletedUniversities: 0,
+      universitiesReadyForSubmission: 0
+    };
+  }
+
+  // Single pass calculation for better performance
+  const result = uniArray.reduce((acc, u) => {
+    // Count by status
+    if (u.status === 'in-progress') acc.inProgress++;
+    else if (u.status === 'submitted') acc.submitted++;
+    else acc.notStarted++;
+    
+    // Aggregate numbers
+    acc.upcomingDeadlines += u.upcomingDeadlines || 0;
+    acc.totalTasks += u.totalTasks || 0;
+    acc.completedTasks += u.tasks || 0;
+    acc.totalEssays += u.totalEssays || 0;
+    acc.completedEssays += u.completedEssays || 0;
+    acc.inProgressEssays += u.inProgressEssays || 0;
+    acc.notStartedEssays += u.notStartedEssays || 0;
+    acc.totalProgress += u.overallProgress || 0;
+    
+    // Count ready for submission
+    if (u.stats?.applicationHealth?.readyForSubmission) {
+      acc.universitiesReadyForSubmission++;
+    }
+    
+    return acc;
+  }, {
+    total: uniArray.length,
     inProgress: 0,
     submitted: 0,
     notStarted: 0,
@@ -26,40 +97,95 @@ export const useDashboardData = () => {
     completedEssays: 0,
     inProgressEssays: 0,
     notStartedEssays: 0,
-    averageProgress: 0,
-    fullyCompletedUniversities: 0,
+    totalProgress: 0,
     universitiesReadyForSubmission: 0
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // ========== KEY STATE: Track initialization ==========
-  const [isInitialized, setIsInitialized] = useState(false);
 
-  // ========== REFS FOR PREVENTING DUPLICATE FETCHES ==========
-  const isFetchingRef = useRef(false);
-  const fetchControllerRef = useRef(null);
-  const lastSuccessfulFetchRef = useRef(0);
-  const mountedRef = useRef(true);
-  const hasAttemptedFetchRef = useRef(false);
+  result.averageProgress = Math.round(result.totalProgress / uniArray.length) || 0;
+  result.fullyCompletedUniversities = result.submitted;
 
+  return result;
+};
+
+// ============================================
+// CUSTOM HOOK FOR DASHBOARD DATA MANAGEMENT
+// Optimized version with SWR - NO SESSION STORAGE
+// ============================================
+export const useDashboardData = () => {
   // ========== AUTHENTICATION & ROUTING ==========
   const { data: session, status } = useSession();
   const router = useRouter();
+  
+  // ========== REFS ==========
+  const mountedRef = useRef(true);
+  const isHandlingAuthErrorRef = useRef(false);
 
   // ========== CONSTANTS ==========
   const API_BASE_URL = useMemo(() => 
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000", 
   []);
+
+  // ========== STATE FOR INITIALIZATION TRACKING ==========
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // ============================================
+  // SWR CONFIGURATION
+  // ============================================
+  const shouldFetch = status === "authenticated" && !!session?.token;
   
-  // Cache durations
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes - don't refetch within this time
-  const STALE_DURATION = 15 * 60 * 1000; // 15 minutes - background refresh threshold
+  const { data, error, isValidating, mutate } = useSWR(
+    // Only fetch if authenticated
+    shouldFetch ? '/api/university/saved' : null,
+    // Fetcher with auth token
+    shouldFetch ? createFetcher(session.token, API_BASE_URL) : null,
+    {
+      // Revalidation settings
+      revalidateOnFocus: true,        // Refresh when tab gains focus
+      revalidateOnReconnect: true,    // Refresh on network reconnect
+      revalidateOnMount: true,        // Always fetch fresh data on mount
+      revalidateIfStale: true,        // Revalidate if data is stale
+      
+      // Performance settings
+      dedupingInterval: 2000,         // Dedupe requests within 2 seconds
+      focusThrottleInterval: 5000,    // Throttle focus revalidation to 5 seconds
+      
+      // Error handling
+      shouldRetryOnError: true,       // Retry on error
+      errorRetryCount: 3,             // Max 3 retries
+      errorRetryInterval: 1000,       // 1 second between retries
+      
+      // No auto-refresh interval (only manual/focus/reconnect)
+      refreshInterval: 0,
+      
+      // Optimistic updates
+      optimisticData: undefined,
+      
+      // Callback on success
+      onSuccess: (data) => {
+        if (mountedRef.current) {
+          console.log('✅ SWR data fetched:', data?.universities?.length || 0, 'universities');
+          setIsInitialized(true);
+        }
+      },
+      
+      // Callback on error
+      onError: (err) => {
+        if (mountedRef.current) {
+          console.error('❌ SWR error:', err);
+          setIsInitialized(true);
+        }
+      },
+    }
+  );
 
   // ============================================
   // AUTHENTICATION ERROR HANDLER
   // ============================================
   const handleAuthError = useCallback(async (errorMessage) => {
+    // Prevent multiple simultaneous auth error handlers
+    if (isHandlingAuthErrorRef.current) return;
+    isHandlingAuthErrorRef.current = true;
+
     console.error("Authentication error:", errorMessage);
     
     const isJWTError = errorMessage?.toLowerCase().includes('jwt') || 
@@ -68,202 +194,45 @@ export const useDashboardData = () => {
                        errorMessage?.toLowerCase().includes('invalid');
     
     if (isJWTError) {
-      await signOut({ redirect: false });
-      router.push('/onboarding/signup');
-    } else {
-      if (mountedRef.current) {
-        setError(errorMessage);
-        setLoading(false);
-        setIsInitialized(true); // Mark as initialized even on error
+      try {
+        await signOut({ redirect: false });
+        router.push('/onboarding/signup');
+      } finally {
+        isHandlingAuthErrorRef.current = false;
       }
+    } else {
+      isHandlingAuthErrorRef.current = false;
     }
   }, [router]);
 
   // ============================================
-  // CALCULATE STATS FROM UNIVERSITIES DATA
+  // HANDLE SWR ERRORS (including auth errors)
   // ============================================
-  const calculateStats = useCallback((uniArray) => {
-    if (!uniArray || uniArray.length === 0) {
-      return {
-        total: 0,
-        inProgress: 0,
-        submitted: 0,
-        notStarted: 0,
-        upcomingDeadlines: 0,
-        totalTasks: 0,
-        completedTasks: 0,
-        totalEssays: 0,
-        completedEssays: 0,
-        inProgressEssays: 0,
-        notStartedEssays: 0,
-        averageProgress: 0,
-        fullyCompletedUniversities: 0,
-        universitiesReadyForSubmission: 0
-      };
+  useEffect(() => {
+    if (error && mountedRef.current) {
+      if (error.status === 401 || 
+          error.message?.toLowerCase().includes('jwt') || 
+          error.message?.toLowerCase().includes('token')) {
+        handleAuthError(error.message || 'Authentication failed');
+      }
     }
-
-    return {
-      total: uniArray.length,
-      inProgress: uniArray.filter(u => u.status === 'in-progress').length,
-      submitted: uniArray.filter(u => u.status === 'submitted').length,
-      notStarted: uniArray.filter(u => u.status === 'not-started').length,
-      upcomingDeadlines: uniArray.reduce((sum, u) => sum + (u.upcomingDeadlines || 0), 0),
-      totalTasks: uniArray.reduce((sum, u) => sum + (u.totalTasks || 0), 0),
-      completedTasks: uniArray.reduce((sum, u) => sum + (u.tasks || 0), 0),
-      totalEssays: uniArray.reduce((sum, u) => sum + (u.totalEssays || 0), 0),
-      completedEssays: uniArray.reduce((sum, u) => sum + (u.completedEssays || 0), 0),
-      inProgressEssays: uniArray.reduce((sum, u) => sum + (u.inProgressEssays || 0), 0),
-      notStartedEssays: uniArray.reduce((sum, u) => sum + (u.notStartedEssays || 0), 0),
-      averageProgress: Math.round(
-        uniArray.reduce((sum, u) => sum + (u.overallProgress || 0), 0) / uniArray.length
-      ) || 0,
-      fullyCompletedUniversities: uniArray.filter(u => u.status === 'submitted').length,
-      universitiesReadyForSubmission: uniArray.filter(u => 
-        u.stats?.applicationHealth?.readyForSubmission
-      ).length
-    };
-  }, []);
+  }, [error, handleAuthError]);
 
   // ============================================
-  // FETCH SAVED UNIVERSITIES DATA
+  // EXTRACT DATA FROM SWR RESPONSE
   // ============================================
-  const fetchSavedUniversities = useCallback(async (options = {}) => {
-    const { forceRefresh = false, silent = false } = options;
-
-    // ========== GUARD CLAUSES ==========
-    
-    // Prevent multiple simultaneous fetches
-    if (isFetchingRef.current) {
-      console.log('⏳ Already fetching, skipping...');
-      return;
-    }
-
-    // Check cache validity (only if already initialized and not forcing refresh)
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastSuccessfulFetchRef.current;
-    
-    if (!forceRefresh && isInitialized && timeSinceLastFetch < CACHE_DURATION) {
-      console.log('📦 Using cached data, skipping fetch...');
-      return;
-    }
-
-    // Wait for session status
-    if (status === "loading") {
-      console.log('⏳ Session loading, waiting...');
-      return;
-    }
-
-    // Check authentication
-    if (status !== "authenticated" || !session?.token) {
-      console.log('🚫 Not authenticated, redirecting...');
-      setLoading(false);
-      setIsInitialized(true);
-      router.push('/onboarding/signup');
-      return;
-    }
-
-    // ========== START FETCH ==========
-    
-    // Cancel any existing fetch
-    if (fetchControllerRef.current) {
-      fetchControllerRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    fetchControllerRef.current = controller;
-    isFetchingRef.current = true;
-    hasAttemptedFetchRef.current = true;
-
-    try {
-      // Set loading state (silent mode doesn't show loading spinner)
-      if (!silent) {
-        setLoading(true);
-      }
-      setError(null);
-
-      console.log('🔄 Fetching saved universities...');
-
-      const response = await fetch(`${API_BASE_URL}/api/university/saved`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.token}`,
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      // Check if component is still mounted
-      if (!mountedRef.current) return;
-
-      // Handle auth errors
-      if (response.status === 401) {
-        const errorData = await response.json();
-        await handleAuthError(errorData.error || 'Authentication failed');
-        return;
-      }
-
-      // Process successful response
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (!mountedRef.current) return;
-
-        console.log('✅ Data fetched successfully:', data.universities?.length || 0, 'universities');
-
-        // Update all state
-        setUniversities(data.universities || []);
-        setUserProfile(data.userProfile || null);
-        setCVSummary(data.cvSummary || null);
-        
-        const calculatedStats = calculateStats(data.universities || []);
-        setStats(data.stats || calculatedStats);
-        
-        // Update cache timestamp
-        lastSuccessfulFetchRef.current = Date.now();
-        
-        // ✅ IMPORTANT: Set initialized BEFORE setting loading to false
-        setIsInitialized(true);
-        setLoading(false);
-        
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch saved universities');
-      }
-    } catch (err) {
-      // Ignore abort errors (expected when cancelling)
-      if (err.name === 'AbortError') {
-        console.log('🛑 Fetch aborted');
-        return;
-      }
-      
-      if (!mountedRef.current) return;
-
-      console.error('❌ Error fetching:', err);
-      
-      if (err.message?.toLowerCase().includes('jwt') || 
-          err.message?.toLowerCase().includes('token')) {
-        await handleAuthError(err.message);
-      } else {
-        setError('Error loading saved universities. Please try again.');
-        setLoading(false);
-        setIsInitialized(true); // Mark as initialized even on error
-      }
-    } finally {
-      isFetchingRef.current = false;
-    }
-  }, [
-    session?.token, 
-    status, 
-    router, 
-    handleAuthError, 
-    API_BASE_URL, 
-    calculateStats, 
-    isInitialized,
-    CACHE_DURATION
-  ]);
+  const universities = useMemo(() => data?.universities || [], [data?.universities]);
+  const userProfile = useMemo(() => data?.userProfile || null, [data?.userProfile]);
+  const cvSummary = useMemo(() => data?.cvSummary || null, [data?.cvSummary]);
+  
+  // Use stats from API or calculate if not provided
+  const stats = useMemo(() => {
+    if (data?.stats) return data.stats;
+    return calculateStats(universities);
+  }, [data?.stats, universities]);
 
   // ============================================
-  // REMOVE UNIVERSITY FROM SAVED LIST
+  // REMOVE UNIVERSITY WITH OPTIMISTIC UPDATE
   // ============================================
   const handleRemoveUniversity = useCallback(async (universityId) => {
     if (!session?.token) {
@@ -272,10 +241,56 @@ export const useDashboardData = () => {
     }
 
     try {
+      // Optimistic update - immediately update UI
+      await mutate(
+        async (currentData) => {
+          if (!currentData) return currentData;
+          
+          // Filter out the removed university
+          const updatedUniversities = currentData.universities.filter(
+            (u) => u.id !== universityId
+          );
+          
+          // Recalculate stats
+          const updatedStats = calculateStats(updatedUniversities);
+          
+          // Return optimistically updated data
+          return {
+            ...currentData,
+            universities: updatedUniversities,
+            stats: updatedStats,
+            count: updatedUniversities.length
+          };
+        },
+        {
+          // Don't revalidate yet - wait for API call to complete
+          revalidate: false,
+          // Show optimistic update immediately
+          optimisticData: (currentData) => {
+            if (!currentData) return currentData;
+            
+            const updatedUniversities = currentData.universities.filter(
+              (u) => u.id !== universityId
+            );
+            const updatedStats = calculateStats(updatedUniversities);
+            
+            return {
+              ...currentData,
+              universities: updatedUniversities,
+              stats: updatedStats,
+              count: updatedUniversities.length
+            };
+          },
+          // Rollback on error
+          rollbackOnError: true,
+        }
+      );
+
+      // Make the actual API call
       const response = await fetch(`${API_BASE_URL}/api/university/toggleSaved`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.token}`,
+          'Authorization': `Bearer ${session.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ universityId }),
@@ -284,37 +299,48 @@ export const useDashboardData = () => {
       if (response.status === 401) {
         const errorData = await response.json();
         await handleAuthError(errorData.error || 'Authentication failed');
+        // Revalidate to get fresh data
+        await mutate();
         return;
       }
 
-      if (response.ok) {
-        // Optimistic update - immediately remove from UI
-        setUniversities(prev => {
-          const updated = prev.filter(u => u.id !== universityId);
-          // Also update stats
-          const newStats = calculateStats(updated);
-          setStats(newStats);
-          return updated;
-        });
-        
-        // Update cache timestamp to prevent immediate refetch
-        lastSuccessfulFetchRef.current = Date.now();
-      } else {
+      if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to remove university');
       }
+
+      // Success - revalidate to ensure consistency
+      await mutate();
+      
+      console.log('✅ University removed successfully');
+      
     } catch (err) {
-      console.error('Error removing university:', err);
+      console.error('❌ Error removing university:', err);
+      
+      // Revalidate to restore correct state
+      await mutate();
       
       if (err.message?.toLowerCase().includes('jwt') || 
           err.message?.toLowerCase().includes('token')) {
         await handleAuthError(err.message);
       }
     }
-  }, [session?.token, handleAuthError, API_BASE_URL, calculateStats]);
+  }, [session?.token, handleAuthError, API_BASE_URL, mutate]);
 
   // ============================================
-  // EFFECT: Redirect unauthenticated users
+  // MANUAL REFETCH FUNCTION
+  // ============================================
+  const refetch = useCallback(async () => {
+    console.log('🔄 Manual refetch triggered');
+    try {
+      await mutate();
+    } catch (err) {
+      console.error('Error refetching data:', err);
+    }
+  }, [mutate]);
+
+  // ============================================
+  // REDIRECT UNAUTHENTICATED USERS
   // ============================================
   useEffect(() => {
     if (status !== "loading" && status !== "authenticated") {
@@ -323,67 +349,29 @@ export const useDashboardData = () => {
   }, [status, router]);
 
   // ============================================
-  // EFFECT: Initial data fetch (ONLY ONCE)
-  // ============================================
-  useEffect(() => {
-    // Only fetch when:
-    // 1. Session is authenticated
-    // 2. Not yet initialized
-    // 3. Not currently fetching
-    if (status === "authenticated" && !isInitialized && !isFetchingRef.current) {
-      console.log('🚀 Initial fetch triggered');
-      fetchSavedUniversities();
-    }
-  }, [status, isInitialized, fetchSavedUniversities]);
-
-  // ============================================
-  // EFFECT: Cleanup on unmount
+  // CLEANUP ON UNMOUNT
   // ============================================
   useEffect(() => {
     mountedRef.current = true;
     
     return () => {
       mountedRef.current = false;
-      
-      // Abort any ongoing fetch
-      if (fetchControllerRef.current) {
-        fetchControllerRef.current.abort();
-      }
+      isHandlingAuthErrorRef.current = false;
     };
   }, []);
 
   // ============================================
-  // EFFECT: Background refresh on tab visibility
-  // Only refreshes if data is stale (15+ minutes)
+  // LOADING STATE
   // ============================================
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isInitialized) {
-        const now = Date.now();
-        const timeSinceLastFetch = now - lastSuccessfulFetchRef.current;
-        
-        // Only refresh if data is stale (15+ minutes old)
-        if (timeSinceLastFetch > STALE_DURATION) {
-          console.log('📡 Background refresh - data is stale');
-          fetchSavedUniversities({ silent: true });
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isInitialized, STALE_DURATION, fetchSavedUniversities]);
+  // Loading is true when:
+  // 1. No data yet AND no error AND currently validating
+  // 2. OR not initialized yet AND validating
+  const loading = (!data && !error && isValidating) || (!isInitialized && isValidating);
 
   // ============================================
-  // MANUAL REFETCH FUNCTION
+  // ERROR STATE
   // ============================================
-  const refetch = useCallback(() => {
-    console.log('🔄 Manual refetch triggered');
-    return fetchSavedUniversities({ forceRefresh: true });
-  }, [fetchSavedUniversities]);
+  const errorMessage = error ? (error.message || 'Failed to load dashboard data') : null;
 
   // ============================================
   // RETURN HOOK VALUES
@@ -397,11 +385,15 @@ export const useDashboardData = () => {
     
     // Status
     loading,
-    error,
+    error: errorMessage,
     isInitialized,
+    isValidating, // Expose for background refresh indicators
     
     // Actions
     handleRemoveUniversity,
     refetch,
+    mutate, // Expose for advanced use cases
   };
 };
+
+export default useDashboardData;
