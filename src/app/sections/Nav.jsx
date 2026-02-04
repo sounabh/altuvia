@@ -34,8 +34,8 @@ const Nav = () => {
           </motion.span>
         </div>
 
-        {/* Conditional button */}
-        <Link href={isLoggedIn && session?.hasCompleteProfile ? "/dashboard" : "/onboarding/signup"}>
+        {/* Conditional button isLoggedIn && session?.hasCompleteProfile */}
+        <Link href={isLoggedIn ? "/dashboard" : "/onboarding/signup"}>
           <button className="px-3 py-3 md:px-6 md:py-2 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
             {isLoggedIn && session?.hasCompleteProfile ? "Dashboard" : "Sign Up"}
           </button>
