@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Book,
   Search,
-  LogOut
+  LogOut,
+  MessageSquare // NEW: Feedback icon
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from "next-auth/react";
@@ -99,7 +100,6 @@ const Layout = ({ children }) => {
   // ============================================
   const handleItemClick = useCallback((href, comingSoon) => {
     if (comingSoon) {
-      // Optional: Add toast notification for coming soon items
       console.log('This feature is coming soon!');
       return;
     }
@@ -118,9 +118,16 @@ const Layout = ({ children }) => {
       });
     } catch (error) {
       console.error('Logout error:', error);
-      // Optional: Add error handling/notification
     }
   }, []);
+
+  // ============================================
+  // FEEDBACK HANDLER
+  // Redirects to feedback page
+  // ============================================
+  const handleFeedback = useCallback(() => {
+    router.push('/dashboard/feedback');
+  }, [router]);
 
   // ============================================
   // SIDEBAR COLLAPSE HANDLER
@@ -291,7 +298,32 @@ const Layout = ({ children }) => {
           </div>
 
           {/* ========== SIDEBAR BOTTOM SECTION ========== */}
-          <div className="p-4 mb-3 border-t border-[#6C7280]/10">
+          <div className="p-4 mb-3 space-y-2 border-t border-[#6C7280]/10">
+            {/* ========== FEEDBACK BUTTON (NEW) ========== */}
+            <button
+              onClick={handleFeedback}
+              className={`
+                w-full flex items-center gap-3 px-3 py-3 rounded-lg 
+               bg-[#002147]
+                text-white font-medium 
+                focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50
+                shadow-md hover:shadow-lg transform hover:scale-[1.02]
+                ${isCollapsed ? 'justify-center' : ''}
+              `}
+              aria-label="Share your feedback"
+            >
+              <MessageSquare className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+              {!isCollapsed && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Feedback</span>
+                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                    🎯
+                  </span>
+                </div>
+              )}
+            </button>
+
+            {/* ========== LOGOUT BUTTON ========== */}
             <button
               onClick={handleLogout}
               className={`
