@@ -6,7 +6,6 @@ import { useCVData } from "@/lib/constants/CVDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -32,9 +31,7 @@ import {
   Lightbulb,
   Check,
   AlertCircle,
-  FileText,
   Sparkles,
-  Target,
 } from "lucide-react";
 
 export const PersonalInfoForm = () => {
@@ -47,7 +44,7 @@ export const PersonalInfoForm = () => {
 
   const calculateCompletion = () => {
     const requiredFields = ["fullName", "email"];
-    const optionalFields = ["phone", "location", "website", "linkedin", "summary"];
+    const optionalFields = ["phone", "location", "website", "linkedin"];
     
     let filled = 0;
     let total = requiredFields.length + optionalFields.length;
@@ -77,7 +74,7 @@ export const PersonalInfoForm = () => {
               <div>
                 <h2 className="text-2xl font-bold cv-heading">Personal Information</h2>
                 <p className="cv-body text-sm mt-1">
-                  Your contact details and professional summary
+                  Your contact details and professional profile
                 </p>
               </div>
             </div>
@@ -267,71 +264,6 @@ export const PersonalInfoForm = () => {
           </CardContent>
         </Card>
 
-        {/* Professional Summary Card */}
-        <Card className="border-cvBorder">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-lg cv-heading">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <FileText className="w-4 h-4 text-emerald-600" />
-              </div>
-              Professional Summary
-              <Badge variant="outline" className="text-xs font-normal ml-2">
-                Important
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label className="cv-heading text-sm flex items-center gap-2">
-                <Target className="w-3.5 h-3.5 text-cvBody" />
-                Your Professional Summary
-              </Label>
-              <Textarea
-                value={data.summary}
-                onChange={(e) => handleInputChange("summary", e.target.value)}
-                placeholder="A results-driven professional with X years of experience in [industry/function]. Proven track record in [key achievement areas]. Seeking MBA to transition into [target role/industry] and leverage skills in [relevant areas]..."
-                className="min-h-[120px] border-cvBorder focus:border-cvAccent resize-none"
-              />
-              <div className="flex items-center justify-between text-xs cv-body">
-                <span>2-4 sentences that capture your professional identity</span>
-                <span
-                  className={`${
-                    data.summary?.length > 500 ? "text-orange-500" : ""
-                  }`}
-                >
-                  {data.summary?.length || 0} / 500 characters
-                </span>
-              </div>
-            </div>
-
-            {/* Summary Tips */}
-            <div className="bg-emerald-50 rounded-lg p-4 space-y-2">
-              <p className="text-xs font-medium text-emerald-900 flex items-center gap-1.5">
-                <Lightbulb className="w-3.5 h-3.5 text-emerald-600" />
-                Writing an Effective Summary for MBA Applications
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-emerald-800">
-                <div className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>Highlight years of experience and industry</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>Mention key achievements with metrics</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>State your career goals post-MBA</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>Keep it concise and impactful</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Pro Tips */}
         <Card className="border-cvBorder bg-gradient-to-r from-purple-50 to-pink-50">
           <CardContent className="pt-4">
@@ -366,8 +298,7 @@ export const PersonalInfoForm = () => {
                   <li className="flex items-start gap-2">
                     <Check className="w-4 h-4 mt-0.5 shrink-0" />
                     <span>
-                      Keep your summary focused on professional achievements, not personal
-                      traits
+                      Double-check all contact information for accuracy
                     </span>
                   </li>
                 </ul>

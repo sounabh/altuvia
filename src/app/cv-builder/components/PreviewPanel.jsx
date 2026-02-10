@@ -16,14 +16,15 @@ const Label = ({ children, className }) => (
  * Each theme has a main color and a light variant for backgrounds
  */
 const THEME_COLORS = [
-  { name: "Navy Blue", value: "#1e40af", light: "#dbeafe" },
-  { name: "Emerald", value: "#059669", light: "#d1fae5" },
-  { name: "Purple", value: "#7c3aed", light: "#ede9fe" },
-  { name: "Rose", value: "#e11d48", light: "#ffe4e6" },
-  { name: "Amber", value: "#d97706", light: "#fef3c7" },
-  { name: "Teal", value: "#0d9488", light: "#ccfbf1" },
-  { name: "Indigo", value: "#4f46e5", light: "#e0e7ff" },
-  { name: "Slate", value: "#475569", light: "#e2e8f0" },
+  // Comment out all themes except black
+  // { name: "Navy Blue", value: "#1e40af", light: "#dbeafe" },
+  // { name: "Emerald", value: "#059669", light: "#d1fae5" },
+  // { name: "Purple", value: "#7c3aed", light: "#ede9fe" },
+  // { name: "Rose", value: "#e11d48", light: "#ffe4e6" },
+  // { name: "Amber", value: "#d97706", light: "#fef3c7" },
+  // { name: "Teal", value: "#0d9488", light: "#ccfbf1" },
+  // { name: "Indigo", value: "#4f46e5", light: "#e0e7ff" },
+  // { name: "Slate", value: "#475569", light: "#e2e8f0" },
   { name: "Black", value: "#000000", light: "#f3f4f6" },
 ];
 
@@ -88,7 +89,7 @@ const getSkillsList = (category) => {
  * @param {Function} props.onThemeColorChange - Callback for theme color change
  * @returns {JSX.Element} Preview panel component
  */
-export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#1e40af", onThemeColorChange }) => {
+export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#000000", onThemeColorChange }) => {
   
   /**
    * Formats date from YYYY-MM format to human readable format
@@ -279,8 +280,8 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
     return hasMeaningfulValue(safeData.personal?.summary);
   };
 
-  // Get current theme object based on selected color
-  const currentTheme = THEME_COLORS.find(t => t.value === themeColor) || THEME_COLORS[0];
+  // Get current theme object - always black
+  const currentTheme = THEME_COLORS.find(t => t.value === "#000000") || THEME_COLORS[0];
 
   /**
    * Renders the selected template component
@@ -346,7 +347,8 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
             </select>
           </div>
 
-          {/* Theme color selection */}
+          {/* Theme color selection - REMOVED FROM UI BUT KEEP IN CODE */}
+          {/* 
           <div className="flex items-center space-x-3">
             <Label className="text-gray-700 text-sm">Theme:</Label>
             <div className="flex gap-2">
@@ -365,6 +367,7 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
               ))}
             </div>
           </div>
+          */}
         </div>
       </div>
 
