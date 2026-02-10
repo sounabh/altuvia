@@ -12,11 +12,12 @@ import {
   Book,
   Search,
   LogOut,
-  MessageSquare // NEW: Feedback icon
+  MessageSquare
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from "next-auth/react";
 import Head from 'next/head';
+import Link from 'next/link';
 
 // ============================================
 // SIDEBAR LAYOUT COMPONENT
@@ -93,18 +94,6 @@ const Layout = ({ children }) => {
       description: 'Access learning resources'
     },
   ], []);
-
-  // ============================================
-  // NAVIGATION HANDLER
-  // Handles menu item clicks with validation
-  // ============================================
-  const handleItemClick = useCallback((href, comingSoon) => {
-    if (comingSoon) {
-      console.log('This feature is coming soon!');
-      return;
-    }
-    router.push(href);
-  }, [router]);
 
   // ============================================
   // LOGOUT HANDLER
@@ -226,70 +215,91 @@ const Layout = ({ children }) => {
 
                   return (
                     <li key={item.id} className="relative" role="none">
-                      <button
-                        onClick={() => handleItemClick(item.href, item.comingSoon)}
-                        disabled={isComingSoon}
-                        className={`
-                          w-full flex items-center gap-3 px-3 py-3 rounded-lg 
-                          transition-all duration-200 group relative
-                          focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50
-                          ${isComingSoon
-                            ? 'opacity-40 cursor-not-allowed'
-                            : isActive
-                            ? 'bg-[#002147] text-white shadow-md'
-                            : 'text-[#002147] hover:bg-[#F0F4FA] hover:text-[#001e3e]'
-                          }
-                        `}
-                        role="menuitem"
-                        aria-label={item.label}
-                        aria-describedby={isComingSoon ? `coming-soon-${item.id}` : undefined}
-                        aria-current={isActive ? 'page' : undefined}
-                      >
-                        {/* ========== MENU ITEM ICON ========== */}
-                        <Icon
+                      {isComingSoon ? (
+                        <button
+                          disabled
                           className={`
-                            w-5 h-5 transition-colors flex-shrink-0
-                            ${isComingSoon
-                              ? 'text-[#002147]'
-                              : isActive
-                              ? 'text-white'
-                              : 'text-[#002147] group-hover:text-[#001e3e]'
+                            w-full flex items-center gap-3 px-3 py-3 rounded-lg 
+                            transition-all duration-200 group relative
+                            opacity-40 cursor-not-allowed
+                            focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50
+                          `}
+                          role="menuitem"
+                          aria-label={item.label}
+                          aria-describedby={`coming-soon-${item.id}`}
+                        >
+                          {/* ========== MENU ITEM ICON ========== */}
+                          <Icon
+                            className="w-5 h-5 transition-colors flex-shrink-0 text-[#002147]"
+                            aria-hidden="true"
+                          />
+
+                          {/* ========== MENU ITEM LABEL ========== */}
+                          {!isCollapsed && (
+                            <span className="font-medium text-sm tracking-[0.4px] text-left truncate text-[#002147]">
+                              {item.label}
+                            </span>
+                          )}
+
+                          {/* ========== COMING SOON BADGE ========== */}
+                          {!isCollapsed && (
+                            <div 
+                              className="absolute -top-2 -right-2 z-10"
+                              id={`coming-soon-${item.id}`}
+                              aria-label="Coming soon"
+                            >
+                              <div className="relative bg-[#002147] text-white text-[10px] font-bold px-3 py-1 transform rotate-12 shadow-lg">
+                                <span className="tracking-wider">SOON</span>
+                                <div className="absolute -bottom-1 -left-1 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-[#001122]"></div>
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          className={`
+                            w-full flex items-center gap-3 px-3 py-3 rounded-lg 
+                            transition-all duration-200 group relative
+                            focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50
+                            ${isActive
+                              ? 'bg-[#002147] text-white shadow-md'
+                              : 'text-[#002147] hover:bg-[#F0F4FA] hover:text-[#001e3e]'
                             }
                           `}
-                          aria-hidden="true"
-                        />
-
-                        {/* ========== MENU ITEM LABEL ========== */}
-                        {!isCollapsed && (
-                          <span
+                          role="menuitem"
+                          aria-label={item.label}
+                          aria-current={isActive ? 'page' : undefined}
+                          prefetch={true}
+                        >
+                          {/* ========== MENU ITEM ICON ========== */}
+                          <Icon
                             className={`
-                              font-medium text-sm tracking-[0.4px] text-left truncate
-                              ${isComingSoon
-                                ? 'text-[#002147]'
-                                : isActive
+                              w-5 h-5 transition-colors flex-shrink-0
+                              ${isActive
                                 ? 'text-white'
                                 : 'text-[#002147] group-hover:text-[#001e3e]'
                               }
                             `}
-                          >
-                            {item.label}
-                          </span>
-                        )}
+                            aria-hidden="true"
+                          />
 
-                        {/* ========== COMING SOON BADGE ========== */}
-                        {isComingSoon && !isCollapsed && (
-                          <div 
-                            className="absolute -top-2 -right-2 z-10"
-                            id={`coming-soon-${item.id}`}
-                            aria-label="Coming soon"
-                          >
-                            <div className="relative bg-[#002147] text-white text-[10px] font-bold px-3 py-1 transform rotate-12 shadow-lg">
-                              <span className="tracking-wider">SOON</span>
-                              <div className="absolute -bottom-1 -left-1 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-[#001122]"></div>
-                            </div>
-                          </div>
-                        )}
-                      </button>
+                          {/* ========== MENU ITEM LABEL ========== */}
+                          {!isCollapsed && (
+                            <span
+                              className={`
+                                font-medium text-sm tracking-[0.4px] text-left truncate
+                                ${isActive
+                                  ? 'text-white'
+                                  : 'text-[#002147] group-hover:text-[#001e3e]'
+                                }
+                              `}
+                            >
+                              {item.label}
+                            </span>
+                          )}
+                        </Link>
+                      )}
                     </li>
                   );
                 })}
@@ -299,7 +309,7 @@ const Layout = ({ children }) => {
 
           {/* ========== SIDEBAR BOTTOM SECTION ========== */}
           <div className="p-4 mb-3 space-y-2 border-t border-[#6C7280]/10">
-            {/* ========== FEEDBACK BUTTON (NEW) ========== */}
+            {/* ========== FEEDBACK BUTTON ========== */}
             <button
               onClick={handleFeedback}
               className={`
@@ -308,6 +318,7 @@ const Layout = ({ children }) => {
                 text-white font-medium 
                 focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50
                 shadow-md hover:shadow-lg transform hover:scale-[1.02]
+                transition-all duration-200
                 ${isCollapsed ? 'justify-center' : ''}
               `}
               aria-label="Share your feedback"

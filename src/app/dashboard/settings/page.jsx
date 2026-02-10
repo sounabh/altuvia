@@ -22,9 +22,9 @@ export default async function Settings() {
   }
 
   // Redirect to onboarding if profile incomplete
-  if (!session.hasCompleteProfile) {
+  /*if (!session.hasCompleteProfile) {
     redirect("/onboarding/signup");
-  }
+  }*/
 
   return <SettingsPage />;
 }
