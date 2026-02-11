@@ -4,13 +4,15 @@ import React, { useEffect, useRef } from "react";
 import Lenis from "lenis";
 
 export default function SmoothScroll({ children }) {
-  // Store lenis instance in a ref — must use React.useRef explicitly
   const lenisRef = useRef(null);
+  const rafIdRef = useRef(null);
 
   useEffect(() => {
-    // Prevent double-init in React StrictMode
     if (lenisRef.current) {
       lenisRef.current.destroy();
+    }
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
     }
 
     const lenis = new Lenis({
@@ -25,30 +27,25 @@ export default function SmoothScroll({ children }) {
       autoResize: true,
     });
 
-    // ✅ Assign to ref AFTER creation
     lenisRef.current = lenis;
 
-    // Expose globally for other components
     if (typeof window !== "undefined") {
       window.__lenis = lenis;
     }
 
-    // Animation frame loop
-    let rafId;
-
     function raf(time) {
       lenis.raf(time);
-      rafId = requestAnimationFrame(raf);
+      rafIdRef.current = requestAnimationFrame(raf);
     }
 
-    rafId = requestAnimationFrame(raf);
+    rafIdRef.current = requestAnimationFrame(raf);
 
-    // Cleanup on unmount
     return () => {
-      cancelAnimationFrame(rafId);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
       lenis.destroy();
       lenisRef.current = null;
-
       if (typeof window !== "undefined") {
         delete window.__lenis;
       }

@@ -162,14 +162,17 @@ const Layout = ({ children }) => {
       </Head>
 
       {/* ========== MAIN LAYOUT CONTAINER ========== */}
+      {/* CHANGED: removed "flex h-screen w-screen" — sidebar is now fixed, 
+          so body scrolls naturally and Lenis controls it */}
       <div 
-        className="flex h-screen w-screen" 
         role="application"
         aria-label="University application platform"
       >
         {/* ========== SIDEBAR SECTION ========== */}
+        {/* CHANGED: added "fixed top-0 left-0 h-screen z-40" 
+            so sidebar stays in place while body scrolls via Lenis */}
         <aside
-          className={`bg-white shadow-lg transition-all duration-300 ease-in-out ${
+          className={`fixed top-0 left-0 h-screen z-40 bg-white shadow-lg transition-all duration-300 ease-in-out ${
             isCollapsed ? 'w-16' : 'w-64'
           } flex flex-col justify-between`}
           role="navigation"
@@ -353,8 +356,13 @@ const Layout = ({ children }) => {
         </aside>
 
         {/* ========== MAIN CONTENT AREA ========== */}
+        {/* CHANGED: removed "flex-1 overflow-auto" 
+            added "min-h-screen" + dynamic margin-left to match sidebar width
+            Now content is in the body flow → Lenis scrolls it smoothly */}
         <main 
-          className="flex-1 overflow-auto bg-blue-50/60" 
+          className={`min-h-screen bg-blue-50/60 transition-all duration-300 ${
+            isCollapsed ? 'ml-16' : 'ml-64'
+          }`}
           role="main"
           aria-label="Application content"
         >
