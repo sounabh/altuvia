@@ -17,29 +17,51 @@ import { LoadingSkeletons, SectionDivider, ProgressSummary } from './components/
 // MEMOIZED SUB-COMPONENTS FOR PERFORMANCE
 // ============================================
 
+// OPTIMIZED: Reduced blur intensity and simplified animation
 const BackgroundAnimation = memo(() => (
-  <div className="absolute top-0 left-0 w-full h-[500px] pointer-events-none z-0 overflow-hidden">
-    <div className="absolute top-[-10%] left-[-5%] w-[25rem] h-[25rem] rounded-full bg-blue-100 blur-[80px] mix-blend-multiply opacity-60 animate-blob" />
-    <div className="absolute top-[20%] right-[-5%] w-[20rem] h-[20rem] rounded-full bg-blue-100 blur-[80px] mix-blend-multiply opacity-60 animate-blob animation-delay-2000" />
-    <div className="absolute top-[40%] left-[30%] w-[15rem] h-[15rem] rounded-full bg-purple-100 blur-[60px] mix-blend-multiply opacity-40 animate-blob animation-delay-4000" />
+  <div className="absolute top-0 left-0 w-full h-[500px] pointer-events-none z-0 overflow-hidden gpu-accelerated">
+    <div 
+      className="absolute top-[-10%] left-[-5%] w-[25rem] h-[25rem] rounded-full bg-blue-100 opacity-60 animate-blob"
+      style={{ 
+        filter: 'blur(60px)',
+        transform: 'translateZ(0)',
+        willChange: 'transform'
+      }}
+    />
+    <div 
+      className="absolute top-[20%] right-[-5%] w-[20rem] h-[20rem] rounded-full bg-blue-100 opacity-60 animate-blob animation-delay-2000"
+      style={{ 
+        filter: 'blur(60px)',
+        transform: 'translateZ(0)',
+        willChange: 'transform'
+      }}
+    />
+    <div 
+      className="absolute top-[40%] left-[30%] w-[15rem] h-[15rem] rounded-full bg-purple-100 opacity-40 animate-blob animation-delay-4000"
+      style={{ 
+        filter: 'blur(50px)',
+        transform: 'translateZ(0)',
+        willChange: 'transform'
+      }}
+    />
   </div>
 ));
 BackgroundAnimation.displayName = 'BackgroundAnimation';
 
+// OPTIMIZED: Disabled animations during initial render
 const HeroHeader = memo(({ title, subtitle }) => (
-  <div className="relative z-10 backdrop-blur-sm">
+  <div className="relative z-10 backdrop-blur-sm gpu-accelerated">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14 text-center">
       <motion.h1 
-        initial={{ opacity: 0, y: 10 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="text-3xl md:text-5xl font-bold text-[#002147] mb-4 tracking-tight"
       >
         {title}
       </motion.h1>
       <motion.p 
-        initial={{ opacity: 0, y: 10 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
         className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto font-medium"
       >
         {subtitle}
@@ -49,12 +71,12 @@ const HeroHeader = memo(({ title, subtitle }) => (
 ));
 HeroHeader.displayName = 'HeroHeader';
 
+// OPTIMIZED: Simplified animation
 const TabNavigation = memo(({ activeTab, setActiveTab }) => (
   <motion.div 
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.2 }}
-    className="flex gap-2 sm:gap-4 mb-8 border-b border-gray-200 overflow-x-auto"
+    initial={false}
+    animate={{ opacity: 1 }}
+    className="flex gap-2 sm:gap-4 mb-8 border-b border-gray-200 overflow-x-auto gpu-accelerated"
   >
     <button
       onClick={() => setActiveTab('dashboard')}
@@ -85,7 +107,7 @@ const TabNavigation = memo(({ activeTab, setActiveTab }) => (
 TabNavigation.displayName = 'TabNavigation';
 
 const EmptyState = memo(() => (
-  <div className="text-center py-16 bg-white/50 rounded-2xl border border-gray-100 backdrop-blur-sm">
+  <div className="text-center py-16 bg-white/50 rounded-2xl border border-gray-100 backdrop-blur-sm gpu-accelerated">
     <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center" 
       aria-hidden="true"
     >
@@ -99,7 +121,7 @@ const EmptyState = memo(() => (
     </p>
     <Link href="/dashboard/search" aria-label="Explore universities to add to your list">
       <button 
-        className="px-6 py-3 bg-[#002147] text-white rounded-xl hover:bg-[#3598FE] transition-all duration-300 font-medium flex items-center gap-2 mx-auto shadow-lg hover:shadow-xl"
+        className="px-6 py-3 bg-[#002147] text-white rounded-xl hover:bg-[#3598FE] transition-all duration-300 font-medium flex items-center gap-2 mx-auto shadow-lg hover:shadow-xl gpu-accelerated"
       >
         <Search className="w-4 h-4" aria-hidden="true" />
         Explore Universities
@@ -171,7 +193,7 @@ const UniversitiesSection = memo(({ universities, handleRemoveUniversity }) => (
         href="/dashboard/search" 
         aria-label="Add more universities to your list"
       >
-        <button className="px-4 py-2 bg-white border border-gray-200 text-[#002147] rounded-xl text-sm font-medium hover:bg-gray-50 hover:border-[#3598FE] transition-all duration-300 flex items-center gap-2 shadow-sm">
+        <button className="px-4 py-2 bg-white border border-gray-200 text-[#002147] rounded-xl text-sm font-medium hover:bg-gray-50 hover:border-[#3598FE] transition-all duration-300 flex items-center gap-2 shadow-sm gpu-accelerated">
           <Search className="w-4 h-4" aria-hidden="true" />
           <span className="hidden sm:inline">Add More</span>
         </button>
@@ -230,11 +252,11 @@ const Index = () => {
   }), [universities.length, stats.completedEssays, stats.totalEssays]);
 
   // ============================================
-  // LOADING STATE - Only show when NOT initialized AND loading
+  // LOADING STATE
   // ============================================
   if ((loading && !isInitialized) || status === "loading") {
     return (
-      <div className="min-h-screen bg-blue-50/60 relative overflow-hidden">
+      <div className="min-h-screen bg-blue-50/60 relative overflow-hidden gpu-accelerated">
         <BackgroundAnimation />
 
         <HeroHeader 
@@ -283,7 +305,7 @@ const Index = () => {
   }
 
   // ============================================
-  // ERROR STATE - Only show if not initialized
+  // ERROR STATE
   // ============================================
   if (error && !isInitialized) {
     return (
@@ -303,13 +325,13 @@ const Index = () => {
           <div className="flex gap-3 justify-center">
             <button 
               onClick={() => refetch()} 
-              className="px-6 py-2 bg-[#002147] text-white rounded-lg hover:bg-[#3598FE] transition-colors font-medium"
+              className="px-6 py-2 bg-[#002147] text-white rounded-lg hover:bg-[#3598FE] transition-colors font-medium gpu-accelerated"
             >
               Try Again
             </button>
             <button 
               onClick={() => window.location.reload()} 
-              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium gpu-accelerated"
             >
               Reload Page
             </button>
@@ -320,10 +342,10 @@ const Index = () => {
   }
 
   // ============================================
-  // MAIN RENDER
+  // MAIN RENDER - OPTIMIZED
   // ============================================
   return (
-    <div className="min-h-screen bg-blue-50/60 relative overflow-hidden">
+    <div className="min-h-screen bg-blue-50/60 relative overflow-hidden gpu-accelerated">
       <BackgroundAnimation />
 
       <HeroHeader 
@@ -335,12 +357,12 @@ const Index = () => {
         
         <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        {/* Dashboard Tab Content */}
+        {/* Dashboard Tab Content - OPTIMIZED: Removed initial animation */}
         {activeTab === 'dashboard' ? (
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+            className="gpu-accelerated"
           >
             <StatsOverview stats={stats} />
             
@@ -360,11 +382,11 @@ const Index = () => {
             <CVSummaryCard cvSummary={cvSummary} />
           </motion.div>
         ) : (
-          /* AI Timeline Tab Content */
+          /* AI Timeline Tab Content - OPTIMIZED */
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+            className="gpu-accelerated"
           >
             <UniversityTimeline 
               universities={universities} 

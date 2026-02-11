@@ -1,23 +1,16 @@
 "use client";
 
-import React, { Suspense, memo } from "react";
-import { Header } from "./components/Header";
-import { Sidebar } from "./components/Sidebar";
-import { CVBuilder } from "./components/CVBuilder";
-import { PreviewPanel } from "./components/PreviewPanel";
-import SmartTipsPanel from "./components/SmartTipsPanel";
-import { VersionSaveDialog } from "./components/VersionSavedDialog";
-import AIAnalysisChatPopup from "./components/AiAnalysisChatPopup";
-import { VersionManager } from "./components/VersionManager";
+import React, { Suspense, memo, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { CVDataContext } from "@/lib/constants/CVDataContext";
-import useCVBuilder from "@/lib/hooks/useCVBuilder";
+import CVDashboard from "./components/CVdashboard";
+import CVBuilderEditor from "./components/CVbuilderEditor";
 
 /**
  * LoadingSpinner - Reusable loading component
  * @param {string} message - Loading message to display
  */
-const LoadingSpinner = memo(({ message = "Loading CV Builder..." }) => (
+const LoadingSpinner = memo(({ message = "Loading..." }) => (
   <div className="min-h-screen bg-cvLightBg flex items-center justify-center">
     <div className="text-center">
       <Loader2 className="w-8 h-8 animate-spin text-[#002147] mx-auto mb-2" />
@@ -29,211 +22,45 @@ const LoadingSpinner = memo(({ message = "Loading CV Builder..." }) => (
 LoadingSpinner.displayName = "LoadingSpinner";
 
 /**
- * MainContent - Renders the main builder content area
- * Memoized for performance optimization
- */
-const MainContent = memo(({
-  activeSection,
-  setActiveSection,
-  isPreviewMode,
-  selectedTemplate,
-  setSelectedTemplate,
-  cvData,
-  themeColor,
-  setThemeColor,
-}) => (
-  <div className="flex-1 flex">
-    {/* Builder area with dynamic width based on preview mode */}
-    <div
-      className={`transition-all duration-300 ${
-        isPreviewMode ? "w-1/2" : "flex-1"
-      }`}
-    >
-      {/* Main CV builder form */}
-      <CVBuilder
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-      />
-    </div>
-
-    {/* Preview panel (only shown in preview mode) */}
-    {isPreviewMode && (
-      <div className="w-1/2 border-l border-cvBorder">
-        <PreviewPanel
-          selectedTemplate={selectedTemplate}
-          onTemplateChange={setSelectedTemplate}
-          cvData={cvData}
-          themeColor={themeColor}
-          onThemeColorChange={setThemeColor}
-        />
-      </div>
-    )}
-  </div>
-));
-
-MainContent.displayName = "MainContent";
-
-/**
- * CVBuilderContent - Main content component that uses search params
- * Handles authentication, CV loading, and state management
+ * CVBuilderContent - Main content component that decides which view to show
+ * Shows dashboard by default, editor when cvId OR edit/new parameter is present in URL
  */
 const CVBuilderContent = () => {
-  // Use custom hook for all state and handlers
-  const {
-    // Authentication state
-    status,
-    userEmail,
+  const searchParams = useSearchParams();
+  const [showEditor, setShowEditor] = useState(false);
 
-    // CV identification
-    cvNumber,
-    currentCVId,
+  useEffect(() => {
+    // Check if we should show the editor
+    // Show editor if:
+    // 1. cvId is present (editing existing CV from dashboard)
+    // 2. 'edit' parameter is present (editing mode)
+    // 3. 'new' parameter is present (creating new CV from dashboard)
+    const cvId = searchParams.get("cvId");
+    const editParam = searchParams.get("edit");
+    const newParam = searchParams.get("new");
+    
+    // Determine if editor should be shown
+    const shouldShowEditor = !!(cvId || editParam === "true" || newParam === "true");
+    
+    console.log("Route params check:", { 
+      cvId, 
+      editParam, 
+      newParam, 
+      shouldShowEditor 
+    });
+    
+    setShowEditor(shouldShowEditor);
+  }, [searchParams]);
 
-    // CV data
-    cvData,
-    updateCVData,
-
-    // UI state
-    activeSection,
-    setActiveSection,
-    selectedTemplate,
-    setSelectedTemplate,
-    themeColor,
-    setThemeColor,
-    isPreviewMode,
-    showVersionManager,
-    showVersionDialog,
-    showAIChat,
-    isInitialLoading,
-
-    // Operation states
-    isSaving,
-    isAnalyzing,
-    aiAnalysis,
-    atsScore,
-
-    // Handlers
-    handlePreviewToggle,
-    handleVersionToggle,
-    handleCloseVersionManager,
-    handleSaveClick,
-    handleCloseVersionDialog,
-    handleSaveWithVersion,
-    handleNewCV,
-    handleExportPDF,
-    handleAnalyzeCV,
-    handleOpenAIChat,
-    handleCloseAIChat,
-    handleLoadVersion,
-  } = useCVBuilder();
-
-  /**
-   * Loading state while checking authentication or initializing CV
-   * Shows spinner with appropriate message
-   */
-  if (status === "loading" || isInitialLoading) {
-    return (
-      <LoadingSpinner
-        message={
-          status === "loading" ? "Loading CV Builder..." : "Loading your CV..."
-        }
-      />
-    );
+  // Show editor if conditions are met, otherwise show dashboard
+  if (showEditor) {
+    return <CVBuilderEditor />;
   }
 
-  /**
-   * Return null if unauthenticated (will redirect via useEffect in hook)
-   */
-  if (status === "unauthenticated") {
-    return null;
-  }
-
-  return (
-    /* CV Data Context Provider for sharing data across components */
-    <CVDataContext.Provider value={{ cvData, updateCVData }}>
-      {/* Main container with background */}
-      <div className="min-h-screen bg-cvLightBg mb-10">
-        {/* Header component with all action buttons */}
-        <Header
-          onPreviewToggle={handlePreviewToggle}
-          isPreviewMode={isPreviewMode}
-          onAIToggle={() => {}}
-          onVersionToggle={handleVersionToggle}
-          onSave={handleSaveClick}
-          onNewCV={handleNewCV}
-          cvNumber={cvNumber}
-          cvData={cvData}
-          selectedTemplate={selectedTemplate}
-          isSaving={isSaving}
-          isAnalyzing={isAnalyzing}
-          atsScore={atsScore}
-          onOpenAIChat={handleOpenAIChat}
-          cvId={currentCVId}
-          onExportPDF={handleExportPDF}
-        />
-
-        {/* Main content area with sidebar and builder */}
-        <div className="flex h-[calc(100vh-80px)]">
-          {/* Sidebar navigation for CV sections */}
-          <Sidebar
-            activeSection={activeSection}
-            onSectionChange={setActiveSection}
-          />
-
-          {/* Main content area */}
-          <MainContent
-            activeSection={activeSection}
-            setActiveSection={setActiveSection}
-            isPreviewMode={isPreviewMode}
-            selectedTemplate={selectedTemplate}
-            setSelectedTemplate={setSelectedTemplate}
-            cvData={cvData}
-            themeColor={themeColor}
-            setThemeColor={setThemeColor}
-          />
-
-          {/* AI Chat Popup (conditionally rendered) */}
-          {showAIChat && (
-            <AIAnalysisChatPopup
-              onClose={handleCloseAIChat}
-              cvData={cvData}
-              activeSection={activeSection}
-            />
-          )}
-
-          {/* Version Manager Modal (conditionally rendered) */}
-          {showVersionManager && (
-            <VersionManager
-              onClose={handleCloseVersionManager}
-              cvId={currentCVId}
-              onLoadVersion={handleLoadVersion}
-              userEmail={userEmail}
-            />
-          )}
-
-          {/* Smart Tips Panel (shown when not in preview mode) */}
-          <SmartTipsPanel
-            activeSection={activeSection}
-            isVisible={!isPreviewMode}
-            cvData={cvData}
-            aiAnalysis={aiAnalysis}
-            isAnalyzing={isAnalyzing}
-            onRequestAnalysis={handleAnalyzeCV}
-          />
-        </div>
-
-        {/* Version Save Dialog (conditionally rendered) */}
-        {showVersionDialog && (
-          <VersionSaveDialog
-            isOpen={showVersionDialog}
-            onClose={handleCloseVersionDialog}
-            onSave={handleSaveWithVersion}
-            currentVersionName=""
-          />
-        )}
-      </div>
-    </CVDataContext.Provider>
-  );
+  return <CVDashboard />;
 };
+
+CVBuilderContent.displayName = "CVBuilderContent";
 
 /**
  * Index - Main component wrapped with Suspense for loading states
@@ -241,10 +68,12 @@ const CVBuilderContent = () => {
  */
 const Index = () => {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={<LoadingSpinner message="Loading CV Builder..." />}>
       <CVBuilderContent />
     </Suspense>
   );
 };
+
+Index.displayName = "Index";
 
 export default Index;

@@ -42,13 +42,37 @@ export const Header = ({
     }
   };
 
+  /**
+   * Handle New CV button click
+   * This should call the onNewCV handler which resets everything in memory
+   * NOT navigate to a new route
+   */
+  const handleNewCV = () => {
+    if (onNewCV) {
+      onNewCV();
+    }
+  };
+
+  /**
+   * Handle back to dashboard
+   * Clear URL parameters to show dashboard
+   */
+  const handleBackToDashboard = () => {
+    // Clear localStorage to ensure fresh state
+    localStorage.removeItem("currentCVId");
+    localStorage.removeItem("currentCVNumber");
+    
+    // Navigate to clean dashboard URL
+    router.push("/cv-builder");
+  };
+
   return (
     <header className="bg-white border-b border-gray-100 px-5 py-5 flex items-center justify-between">
       {/* Left Section */}
       <div className="flex items-center gap-5">
         {/* Dashboard Navigation Button */}
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={handleBackToDashboard}
           className="flex items-center gap-2.5 text-gray-700 hover:text-[#002147] hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors group"
           title="Back to Dashboard"
         >
@@ -160,17 +184,20 @@ export const Header = ({
           <span>Export</span>
         </button>
 
-        <button
-          onClick={onNewCV}
+{/**  <button
+          onClick={handleNewCV}
           disabled={isSaving}
           className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
           <span>New</span>
-        </button>
+        </button>*/}
+       
       </div>
     </header>
   );
 };
+
+Header.displayName = "Header";
 
 export default Header;

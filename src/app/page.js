@@ -1,28 +1,47 @@
-"use client"
+"use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import Nav from "./sections/Nav";
 import Hero from "./sections/Hero";
-import Steps from "./sections/Steps";
-import ImpactNumbers from "./sections/ImpactNumbers";
-import Accordions from "./sections/Accordion";
-import AltuviaFooter from "./sections/Footer";
-import ContactUsPage from "./sections/ContactUsPage";
-import PricingCards from "./sections/Pricing";
-import ApplicationManagement from "./sections/ApplicationMgmt";
-import Marquee from "./sections/Marqueee";
-import ProductShowcase from "./sections/Products";
 
-const LoadingScreen = ({ onComplete }) => {
+// Lazy-load below-fold sections to reduce initial bundle & paint cost
+const Steps = dynamic(() => import("./sections/Steps"), { ssr: false });
+const ApplicationManagement = dynamic(
+  () => import("./sections/ApplicationMgmt"),
+  { ssr: false }
+);
+const Accordions = dynamic(() => import("./sections/Accordion"), {
+  ssr: false,
+});
+const ProductShowcase = dynamic(() => import("./sections/Products"), {
+  ssr: false,
+});
+const ContactUsPage = dynamic(() => import("./sections/ContactUsPage"), {
+  ssr: false,
+});
+const AltuviaFooter = dynamic(() => import("./sections/Footer"), {
+  ssr: false,
+});
+
+// ─── Loading Screen ──────────────────────────────────────────────
+const LoadingScreen = ({
+  onComplete,
+}) => {
   useEffect(() => {
-    // Complete animation after 2.5 seconds
-    const timer = setTimeout(() => {
-      onComplete();
-    }, 2500);
-
+    const timer = setTimeout(onComplete, 2500);
     return () => clearTimeout(timer);
   }, [onComplete]);
+
+  // Pause Lenis while loading screen is active
+  useEffect(() => {
+    const lenis = (window ).__lenis;
+    if (lenis) lenis.stop();
+    return () => {
+      if (lenis) lenis.start();
+    };
+  }, []);
 
   return (
     <motion.div
@@ -32,38 +51,36 @@ const LoadingScreen = ({ onComplete }) => {
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#002147]"
     >
       <div className="relative">
-        {/* Container to keep both parts on the same line */}
         <div className="flex items-center justify-center">
-          {/* "ALT" coming from top */}
           <motion.div
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{
               duration: 0.8,
               delay: 0.2,
-              ease: [0.6, -0.05, 0.01, 0.99]
+              ease: [0.6, -0.05, 0.01, 0.99],
             }}
             className="text-6xl md:text-8xl lg:text-9xl font-bold text-white"
+            style={{ willChange: "transform, opacity" }}
           >
             ALT
           </motion.div>
-          
-          {/* "UVIA" coming from bottom */}
+
           <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{
               duration: 0.8,
               delay: 0.2,
-              ease: [0.6, -0.05, 0.01, 0.99]
+              ease: [0.6, -0.05, 0.01, 0.99],
             }}
             className="text-6xl md:text-8xl lg:text-9xl font-bold bg-gradient-to-r from-[#3598FE] to-[#60B4FF] bg-clip-text text-transparent"
+            style={{ willChange: "transform, opacity" }}
           >
             UVIA
           </motion.div>
         </div>
 
-        {/* Subtle pulse effect */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.1 }}
@@ -71,7 +88,7 @@ const LoadingScreen = ({ onComplete }) => {
             duration: 1,
             delay: 1,
             repeat: Infinity,
-            repeatType: "reverse"
+            repeatType: "reverse",
           }}
           className="absolute inset-0 -z-10 rounded-full bg-white blur-3xl"
         />
@@ -80,18 +97,22 @@ const LoadingScreen = ({ onComplete }) => {
   );
 };
 
+// ─── Main Page ───────────────────────────────────────────────────
 const Page = () => {
   const [isLoading, setIsLoading] = useState(true);
 
-  const handleLoadingComplete = () => {
+  const handleLoadingComplete = useCallback(() => {
     setIsLoading(false);
-  };
+  }, []);
 
   return (
     <>
       <AnimatePresence mode="wait">
         {isLoading && (
-          <LoadingScreen key="loading" onComplete={handleLoadingComplete} />
+          <LoadingScreen
+            key="loading"
+            onComplete={handleLoadingComplete}
+          />
         )}
       </AnimatePresence>
 
@@ -104,12 +125,12 @@ const Page = () => {
         <div className="relative z-10 w-full max-w-[1130px] mx-auto px-5">
           <Nav />
         </div>
+
         <Hero />
+
         <div className="relative z-10 w-full max-w-[1130px] mx-auto px-5">
           <Steps />
           <ApplicationManagement />
-          {/**  <PricingCards /> */}
-        
           <Accordions />
           <ProductShowcase />
           <ContactUsPage />

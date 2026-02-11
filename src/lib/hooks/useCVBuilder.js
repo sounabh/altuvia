@@ -147,7 +147,7 @@ export const useCVBuilder = () => {
 
         // Successfully loaded - update state with transformed data
         setCvData({
-          personal: result.cv.personalInfo || cvData.personal,
+          personal: result.cv.personalInfo || DEFAULT_CV_DATA.personal,
           education:
             result.cv.educations?.map((edu) => ({
               id: edu.id,
@@ -158,7 +158,7 @@ export const useCVBuilder = () => {
               endDate: edu.endDate || "",
               gpa: edu.gpa || "",
               description: edu.description || "",
-            })) || cvData.education,
+            })) || DEFAULT_CV_DATA.education,
           experience:
             result.cv.experiences?.map((exp) => ({
               id: exp.id,
@@ -169,7 +169,7 @@ export const useCVBuilder = () => {
               endDate: exp.endDate || "",
               isCurrentRole: exp.isCurrent || false,
               description: exp.description || "",
-            })) || cvData.experience,
+            })) || DEFAULT_CV_DATA.experience,
           projects:
             result.cv.projects?.map((proj) => ({
               id: proj.id,
@@ -187,7 +187,7 @@ export const useCVBuilder = () => {
               id: skill.id,
               name: skill.categoryName || "",
               skills: skill.skills || [],
-            })) || cvData.skills,
+            })) || DEFAULT_CV_DATA.skills,
           achievements:
             result.cv.achievements?.map((ach) => ({
               id: ach.id,
@@ -196,7 +196,7 @@ export const useCVBuilder = () => {
               date: ach.date || "",
               type: ach.type || "",
               description: ach.description || "",
-            })) || cvData.achievements,
+            })) || DEFAULT_CV_DATA.achievements,
           volunteer:
             result.cv.volunteers?.map((vol) => ({
               id: vol.id,
@@ -207,7 +207,7 @@ export const useCVBuilder = () => {
               endDate: vol.endDate || "",
               description: vol.description || "",
               impact: vol.impact || "",
-            })) || cvData.volunteer,
+            })) || DEFAULT_CV_DATA.volunteer,
         });
 
         // Load template and theme preferences
@@ -237,7 +237,7 @@ export const useCVBuilder = () => {
         }
       }
     },
-    [cvData.personal, cvData.education, cvData.experience, cvData.skills, cvData.achievements, cvData.volunteer]
+    []
   );
 
   /**
@@ -252,8 +252,40 @@ export const useCVBuilder = () => {
       }
 
       try {
-        // Check for cvId in URL parameters (from dashboard)
+        // Check for 'new' parameter first (highest priority)
+        const isNewCV = searchParams.get("new") === "true";
+        
+        if (isNewCV) {
+          console.log("Creating new CV from dashboard");
+          
+          // Clear old CV data
+          setCurrentCVId(null);
+          localStorage.removeItem("currentCVId");
+          
+          // Generate new unique CV number
+          const uniqueNumber = generateUniqueCVNumber(userId);
+          setCvNumber(uniqueNumber);
+          localStorage.setItem("currentCVNumber", uniqueNumber);
+          
+          // Reset CV data to fresh state
+          setCvData(createFreshCVData());
+          
+          // Reset analysis and theme
+          setAiAnalysis(null);
+          setAtsScore(null);
+          setThemeColor(DEFAULT_THEME_COLOR);
+          setSelectedTemplate(DEFAULT_TEMPLATE);
+          
+          // DON'T clean URL - let the page.js handle showing the editor
+          
+          toast.success(`New CV #${uniqueNumber} created!`);
+          setIsInitialLoading(false);
+          return;
+        }
+
+        // Check for cvId in URL parameters (from dashboard edit)
         const urlCVId = searchParams.get("cvId");
+        const urlVersionId = searchParams.get("versionId");
 
         if (urlCVId) {
           // Load CV from URL parameter
@@ -266,8 +298,13 @@ export const useCVBuilder = () => {
           // Load CV data (this will update cvNumber internally)
           await loadCVData(urlCVId, userEmail);
 
-          // Clean URL (remove query parameter)
-          router.replace("/cv-builder", { scroll: false });
+          // If versionId is present, load that specific version
+          if (urlVersionId) {
+            console.log("Loading specific version:", urlVersionId);
+            // Version loading will happen through the version manager
+          }
+
+          // DON'T clean URL - let it stay so page.js knows to show editor
         } else {
           // Fallback to localStorage for existing CV
           const savedCVId = localStorage.getItem("currentCVId");
@@ -575,154 +612,146 @@ export const useCVBuilder = () => {
    * Loads a specific saved version into the editor
    * @param {Object} version - Version object containing CV data snapshots
    */
- /**
- * Loads a specific saved version into the editor
- * @param {Object} version - Version object containing CV data snapshots
- */
-/**
- * Loads a specific saved version into the editor
- * @param {Object} version - Version object containing CV data snapshots
- */
-const handleLoadVersion = useCallback(
-  (version) => {
-    try {
-      // Helper function to safely parse JSON (handles both string and object)
-      const safeJsonParse = (data) => {
-        if (!data) return null;
-        if (typeof data === 'object') return data; // Already parsed
-        try {
-          return JSON.parse(data);
-        } catch (e) {
-          console.error("Failed to parse snapshot:", e);
-          return null;
+  const handleLoadVersion = useCallback(
+    (version) => {
+      try {
+        // Helper function to safely parse JSON (handles both string and object)
+        const safeJsonParse = (data) => {
+          if (!data) return null;
+          if (typeof data === 'object') return data; // Already parsed
+          try {
+            return JSON.parse(data);
+          } catch (e) {
+            console.error("Failed to parse snapshot:", e);
+            return null;
+          }
+        };
+
+        // Parse snapshots safely
+        const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
+        const educationSnapshot = safeJsonParse(version.educationSnapshot);
+        const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
+        const projectsSnapshot = safeJsonParse(version.projectsSnapshot);
+        const skillsSnapshot = safeJsonParse(version.skillsSnapshot);
+        const achievementsSnapshot = safeJsonParse(version.achievementsSnapshot);
+        const volunteerSnapshot = safeJsonParse(version.volunteerSnapshot);
+
+        // Transform data to match expected format (same as loadCVData)
+        const newCvData = {
+          personal: personalSnapshot || DEFAULT_CV_DATA.personal,
+          
+          education: educationSnapshot && Array.isArray(educationSnapshot)
+            ? educationSnapshot.map((edu) => ({
+                id: edu.id,
+                institution: edu.institution || "",
+                degree: edu.degree || "",
+                field: edu.fieldOfStudy || edu.field || "",
+                startDate: edu.startDate || "",
+                endDate: edu.endDate || "",
+                gpa: edu.gpa || "",
+                description: edu.description || "",
+              }))
+            : DEFAULT_CV_DATA.education,
+          
+          experience: experienceSnapshot && Array.isArray(experienceSnapshot)
+            ? experienceSnapshot.map((exp) => ({
+                id: exp.id,
+                company: exp.company || "",
+                position: exp.position || "",
+                location: exp.location || "",
+                startDate: exp.startDate || "",
+                endDate: exp.endDate || "",
+                isCurrentRole: exp.isCurrent || exp.isCurrentRole || false,
+                description: exp.description || "",
+              }))
+            : DEFAULT_CV_DATA.experience,
+          
+          projects: projectsSnapshot && Array.isArray(projectsSnapshot)
+            ? projectsSnapshot.map((proj) => ({
+                id: proj.id,
+                name: proj.name || "",
+                description: proj.description || "",
+                technologies: Array.isArray(proj.technologies) 
+                  ? proj.technologies.join(", ") 
+                  : (proj.technologies || ""),
+                startDate: proj.startDate || "",
+                endDate: proj.endDate || "",
+                githubUrl: proj.githubUrl || "",
+                liveUrl: proj.liveUrl || "",
+                achievements: Array.isArray(proj.achievements) 
+                  ? proj.achievements[0] 
+                  : (proj.achievements || ""),
+              }))
+            : [],
+          
+          skills: skillsSnapshot && Array.isArray(skillsSnapshot)
+            ? skillsSnapshot.map((skill) => ({
+                id: skill.id,
+                name: skill.categoryName || skill.name || "",
+                skills: skill.skills || [],
+              }))
+            : DEFAULT_CV_DATA.skills,
+          
+          achievements: achievementsSnapshot && Array.isArray(achievementsSnapshot)
+            ? achievementsSnapshot.map((ach) => ({
+                id: ach.id,
+                title: ach.title || "",
+                organization: ach.organization || "",
+                date: ach.date || "",
+                type: ach.type || "",
+                description: ach.description || "",
+              }))
+            : DEFAULT_CV_DATA.achievements,
+          
+          volunteer: volunteerSnapshot && Array.isArray(volunteerSnapshot)
+            ? volunteerSnapshot.map((vol) => ({
+                id: vol.id,
+                organization: vol.organization || "",
+                role: vol.role || "",
+                location: vol.location || "",
+                startDate: vol.startDate || "",
+                endDate: vol.endDate || "",
+                description: vol.description || "",
+                impact: vol.impact || "",
+              }))
+            : DEFAULT_CV_DATA.volunteer,
+        };
+
+        // Update CV data state
+        setCvData(newCvData);
+
+        // Restore template and theme preferences
+        if (version.templateId) {
+          setSelectedTemplate(version.templateId);
         }
-      };
 
-      // Parse snapshots safely
-      const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
-      const educationSnapshot = safeJsonParse(version.educationSnapshot);
-      const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
-      const projectsSnapshot = safeJsonParse(version.projectsSnapshot);
-      const skillsSnapshot = safeJsonParse(version.skillsSnapshot);
-      const achievementsSnapshot = safeJsonParse(version.achievementsSnapshot);
-      const volunteerSnapshot = safeJsonParse(version.volunteerSnapshot);
+        if (version.colorScheme) {
+          setThemeColor(version.colorScheme);
+        }
 
-      // Transform data to match expected format (same as loadCVData)
-      const newCvData = {
-        personal: personalSnapshot || DEFAULT_CV_DATA.personal,
-        
-        education: educationSnapshot && Array.isArray(educationSnapshot)
-          ? educationSnapshot.map((edu) => ({
-              id: edu.id,
-              institution: edu.institution || "",
-              degree: edu.degree || "",
-              field: edu.fieldOfStudy || edu.field || "",
-              startDate: edu.startDate || "",
-              endDate: edu.endDate || "",
-              gpa: edu.gpa || "",
-              description: edu.description || "",
-            }))
-          : DEFAULT_CV_DATA.education,
-        
-        experience: experienceSnapshot && Array.isArray(experienceSnapshot)
-          ? experienceSnapshot.map((exp) => ({
-              id: exp.id,
-              company: exp.company || "",
-              position: exp.position || "",
-              location: exp.location || "",
-              startDate: exp.startDate || "",
-              endDate: exp.endDate || "",
-              isCurrentRole: exp.isCurrent || exp.isCurrentRole || false,
-              description: exp.description || "",
-            }))
-          : DEFAULT_CV_DATA.experience,
-        
-        projects: projectsSnapshot && Array.isArray(projectsSnapshot)
-          ? projectsSnapshot.map((proj) => ({
-              id: proj.id,
-              name: proj.name || "",
-              description: proj.description || "",
-              technologies: Array.isArray(proj.technologies) 
-                ? proj.technologies.join(", ") 
-                : (proj.technologies || ""),
-              startDate: proj.startDate || "",
-              endDate: proj.endDate || "",
-              githubUrl: proj.githubUrl || "",
-              liveUrl: proj.liveUrl || "",
-              achievements: Array.isArray(proj.achievements) 
-                ? proj.achievements[0] 
-                : (proj.achievements || ""),
-            }))
-          : [],
-        
-        skills: skillsSnapshot && Array.isArray(skillsSnapshot)
-          ? skillsSnapshot.map((skill) => ({
-              id: skill.id,
-              name: skill.categoryName || skill.name || "",
-              skills: skill.skills || [],
-            }))
-          : DEFAULT_CV_DATA.skills,
-        
-        achievements: achievementsSnapshot && Array.isArray(achievementsSnapshot)
-          ? achievementsSnapshot.map((ach) => ({
-              id: ach.id,
-              title: ach.title || "",
-              organization: ach.organization || "",
-              date: ach.date || "",
-              type: ach.type || "",
-              description: ach.description || "",
-            }))
-          : DEFAULT_CV_DATA.achievements,
-        
-        volunteer: volunteerSnapshot && Array.isArray(volunteerSnapshot)
-          ? volunteerSnapshot.map((vol) => ({
-              id: vol.id,
-              organization: vol.organization || "",
-              role: vol.role || "",
-              location: vol.location || "",
-              startDate: vol.startDate || "",
-              endDate: vol.endDate || "",
-              description: vol.description || "",
-              impact: vol.impact || "",
-            }))
-          : DEFAULT_CV_DATA.volunteer,
-      };
+        // Reset analysis for loaded version
+        setAiAnalysis(null);
+        setAtsScore(null);
 
-      // Update CV data state
-      setCvData(newCvData);
+        // Update CV identification
+        setCurrentCVId(version.cvId);
+        setCvNumber(version.cvSlug);
+        localStorage.setItem("currentCVId", version.cvId);
+        localStorage.setItem("currentCVNumber", version.cvSlug);
 
-      // Restore template and theme preferences
-      if (version.templateId) {
-        setSelectedTemplate(version.templateId);
+        toast.success(
+          `Loaded CV #${version.cvSlug} - version: ${version.versionLabel}`
+        );
+
+        // Close version manager after loading
+        setShowVersionManager(false);
+      } catch (error) {
+        console.error("Failed to load version:", error);
+        toast.error("Failed to load version");
       }
-
-      if (version.colorScheme) {
-        setThemeColor(version.colorScheme);
-      }
-
-      // Reset analysis for loaded version
-      setAiAnalysis(null);
-      setAtsScore(null);
-
-      // Update CV identification
-      setCurrentCVId(version.cvId);
-      setCvNumber(version.cvSlug);
-      localStorage.setItem("currentCVId", version.cvId);
-      localStorage.setItem("currentCVNumber", version.cvSlug);
-
-      toast.success(
-        `Loaded CV #${version.cvSlug} - version: ${version.versionLabel}`
-      );
-
-      // Close version manager after loading
-      setShowVersionManager(false);
-    } catch (error) {
-      console.error("Failed to load version:", error);
-      toast.error("Failed to load version");
-    }
-  },
-  [] // Remove cvData dependency to prevent stale closure issues
-);
+    },
+    []
+  );
 
   // Return all state and handlers
   return {
