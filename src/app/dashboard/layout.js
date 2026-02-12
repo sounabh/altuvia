@@ -73,7 +73,7 @@ const Layout = ({ children }) => {
       id: 'cv-builder', 
       label: 'CV Builder', 
       icon: FileText, 
-      href: '/cv-builder', 
+      href: '/dashboard/cv-builder', 
       comingSoon: false,
       description: 'Build and edit your CV/resume'
     },

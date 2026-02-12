@@ -1,6 +1,6 @@
 // ================================================================================
 // FILE: app/api/cv/versions/[versionId]/route.js
-// PURPOSE: Delete a specific CV version and its independent data
+// PURPOSE: Fetch or delete a specific CV version
 // LOGIC: Each version (including V1) is independent. Deleting last version = delete entire CV
 // ================================================================================
 
@@ -10,6 +10,103 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
+ * GET /api/cv/versions/[versionId]
+ * Fetches a specific CV version by its ID
+ */
+export async function GET(request, { params }) {
+  try {
+    const { versionId } = params;
+    const { searchParams } = new URL(request.url);
+    const userEmail = searchParams.get("userEmail");
+
+    // Validate required parameters
+    if (!versionId) {
+      return NextResponse.json(
+        { success: false, error: "Version ID is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!userEmail) {
+      return NextResponse.json(
+        { success: false, error: "User email is required" },
+        { status: 400 }
+      );
+    }
+
+    console.log(`🔍 Fetching version ${versionId} for user ${userEmail}`);
+
+    // Fetch the version with CV data for authorization check
+    const version = await prisma.cVVersion.findUnique({
+      where: { id: versionId },
+      include: {
+        cv: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    // Check if version exists
+    if (!version) {
+      return NextResponse.json(
+        { success: false, error: "Version not found" },
+        { status: 404 }
+      );
+    }
+
+    // Verify user owns this CV version
+    if (version.cv.user.email !== userEmail) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
+
+    console.log(`✅ Version ${version.versionLabel} found and authorized`);
+
+    // Return the version data
+    return NextResponse.json({
+      success: true,
+      version: {
+        id: version.id,
+        cvId: version.cvId,
+        cvSlug: version.cv.slug,
+        versionNumber: version.versionNumber,
+        versionLabel: version.versionLabel,
+        changeDescription: version.changeDescription,
+        isBookmarked: version.isBookmarked,
+        isCurrentCV: version.isCurrentCV,
+        templateId: version.templateId,
+        colorScheme: version.colorScheme,
+        createdAt: version.createdAt,
+        updatedAt: version.updatedAt,
+        // Snapshots (these might be JSON strings or objects)
+        personalInfoSnapshot: version.personalInfoSnapshot,
+        educationSnapshot: version.educationSnapshot,
+        experienceSnapshot: version.experienceSnapshot,
+        projectsSnapshot: version.projectsSnapshot,
+        skillsSnapshot: version.skillsSnapshot,
+        achievementsSnapshot: version.achievementsSnapshot,
+        volunteerSnapshot: version.volunteerSnapshot,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching version:", error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: "Failed to fetch version",
+        details: error.message 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/cv/versions/[versionId]
  * Deletes a CV version and its associated data
  * - Each version stores its own data in snapshots (JSON)
  * - Deleting any version removes ONLY that version's data

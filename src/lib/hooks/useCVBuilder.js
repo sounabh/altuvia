@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { clearVersionsCache } from "@/app/cv-builder/components/VersionManager";
+import { clearVersionsCache } from "@/app/dashboard/cv-builder/components/VersionManager";
 import {
   generateUniqueCVNumber,
   DEFAULT_CV_DATA,
@@ -241,6 +241,168 @@ export const useCVBuilder = () => {
   );
 
   /**
+   * Helper function to safely parse JSON snapshots
+   */
+  const safeJsonParse = useCallback((data) => {
+    if (!data) return null;
+    if (typeof data === 'object') return data;
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse snapshot:", e);
+      return null;
+    }
+  }, []);
+
+  /**
+   * Loads a specific version's data
+   * @param {string} versionId - Version identifier
+   * @param {string} email - User's email for authentication
+   */
+  const loadVersionData = useCallback(
+    async (versionId, email) => {
+      try {
+        console.log("Loading specific version:", versionId);
+        
+        // Fetch the specific version data
+        const versionResponse = await fetch(
+          `/api/cv/versions/${versionId}?userEmail=${encodeURIComponent(email)}`
+        );
+
+        if (!versionResponse.ok) {
+          throw new Error("Failed to load version");
+        }
+
+        const versionData = await versionResponse.json();
+
+        if (versionData.success && versionData.version) {
+          const version = versionData.version;
+          
+          // Parse snapshots
+          const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
+          const educationSnapshot = safeJsonParse(version.educationSnapshot);
+          const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
+          const projectsSnapshot = safeJsonParse(version.projectsSnapshot);
+          const skillsSnapshot = safeJsonParse(version.skillsSnapshot);
+          const achievementsSnapshot = safeJsonParse(version.achievementsSnapshot);
+          const volunteerSnapshot = safeJsonParse(version.volunteerSnapshot);
+
+          // Transform data to match expected format
+          const versionCvData = {
+            personal: personalSnapshot || DEFAULT_CV_DATA.personal,
+            
+            education: educationSnapshot && Array.isArray(educationSnapshot)
+              ? educationSnapshot.map((edu) => ({
+                  id: edu.id,
+                  institution: edu.institution || "",
+                  degree: edu.degree || "",
+                  field: edu.fieldOfStudy || edu.field || "",
+                  startDate: edu.startDate || "",
+                  endDate: edu.endDate || "",
+                  gpa: edu.gpa || "",
+                  description: edu.description || "",
+                }))
+              : DEFAULT_CV_DATA.education,
+            
+            experience: experienceSnapshot && Array.isArray(experienceSnapshot)
+              ? experienceSnapshot.map((exp) => ({
+                  id: exp.id,
+                  company: exp.company || "",
+                  position: exp.position || "",
+                  location: exp.location || "",
+                  startDate: exp.startDate || "",
+                  endDate: exp.endDate || "",
+                  isCurrentRole: exp.isCurrent || exp.isCurrentRole || false,
+                  description: exp.description || "",
+                }))
+              : DEFAULT_CV_DATA.experience,
+            
+            projects: projectsSnapshot && Array.isArray(projectsSnapshot)
+              ? projectsSnapshot.map((proj) => ({
+                  id: proj.id,
+                  name: proj.name || "",
+                  description: proj.description || "",
+                  technologies: Array.isArray(proj.technologies) 
+                    ? proj.technologies.join(", ") 
+                    : (proj.technologies || ""),
+                  startDate: proj.startDate || "",
+                  endDate: proj.endDate || "",
+                  githubUrl: proj.githubUrl || "",
+                  liveUrl: proj.liveUrl || "",
+                  achievements: Array.isArray(proj.achievements) 
+                    ? proj.achievements[0] 
+                    : (proj.achievements || ""),
+                }))
+              : [],
+            
+            skills: skillsSnapshot && Array.isArray(skillsSnapshot)
+              ? skillsSnapshot.map((skill) => ({
+                  id: skill.id,
+                  name: skill.categoryName || skill.name || "",
+                  skills: skill.skills || [],
+                }))
+              : DEFAULT_CV_DATA.skills,
+            
+            achievements: achievementsSnapshot && Array.isArray(achievementsSnapshot)
+              ? achievementsSnapshot.map((ach) => ({
+                  id: ach.id,
+                  title: ach.title || "",
+                  organization: ach.organization || "",
+                  date: ach.date || "",
+                  type: ach.type || "",
+                  description: ach.description || "",
+                }))
+              : DEFAULT_CV_DATA.achievements,
+            
+            volunteer: volunteerSnapshot && Array.isArray(volunteerSnapshot)
+              ? volunteerSnapshot.map((vol) => ({
+                  id: vol.id,
+                  organization: vol.organization || "",
+                  role: vol.role || "",
+                  location: vol.location || "",
+                  startDate: vol.startDate || "",
+                  endDate: vol.endDate || "",
+                  description: vol.description || "",
+                  impact: vol.impact || "",
+                }))
+              : DEFAULT_CV_DATA.volunteer,
+          };
+
+          // Update CV data state with version data
+          setCvData(versionCvData);
+
+          // Restore template and theme preferences
+          if (version.templateId) {
+            setSelectedTemplate(version.templateId);
+          }
+
+          if (version.colorScheme) {
+            setThemeColor(version.colorScheme);
+          }
+
+          // Update CV identification
+          if (version.cvSlug) {
+            setCvNumber(version.cvSlug);
+            localStorage.setItem("currentCVNumber", version.cvSlug);
+          }
+
+          console.log("Version loaded successfully");
+          toast.success(`Loaded version: ${version.versionLabel}`);
+          
+          return true;
+        } else {
+          throw new Error("Invalid version data");
+        }
+      } catch (error) {
+        console.error("Failed to load version:", error);
+        toast.error("Failed to load version");
+        return false;
+      }
+    },
+    [safeJsonParse]
+  );
+
+  /**
    * Effect: Load CV based on URL parameters or localStorage
    * Handles CV initialization from URL params, localStorage, or creating new CV
    */
@@ -276,8 +438,6 @@ export const useCVBuilder = () => {
           setThemeColor(DEFAULT_THEME_COLOR);
           setSelectedTemplate(DEFAULT_TEMPLATE);
           
-          // DON'T clean URL - let the page.js handle showing the editor
-          
           toast.success(`New CV #${uniqueNumber} created!`);
           setIsInitialLoading(false);
           return;
@@ -288,23 +448,23 @@ export const useCVBuilder = () => {
         const urlVersionId = searchParams.get("versionId");
 
         if (urlCVId) {
-          // Load CV from URL parameter
           console.log("Loading CV from URL parameter:", urlCVId);
           setCurrentCVId(urlCVId);
-
-          // Store in localStorage for future sessions
           localStorage.setItem("currentCVId", urlCVId);
 
-          // Load CV data (this will update cvNumber internally)
-          await loadCVData(urlCVId, userEmail);
-
-          // If versionId is present, load that specific version
+          // If versionId is present, load that specific version instead of the CV
           if (urlVersionId) {
-            console.log("Loading specific version:", urlVersionId);
-            // Version loading will happen through the version manager
+            const versionLoaded = await loadVersionData(urlVersionId, userEmail);
+            
+            if (!versionLoaded) {
+              // Fallback to loading the CV normally if version load fails
+              console.log("Version load failed, falling back to CV");
+              await loadCVData(urlCVId, userEmail);
+            }
+          } else {
+            // No version specified, load the latest CV data
+            await loadCVData(urlCVId, userEmail);
           }
-
-          // DON'T clean URL - let it stay so page.js knows to show editor
         } else {
           // Fallback to localStorage for existing CV
           const savedCVId = localStorage.getItem("currentCVId");
@@ -615,19 +775,7 @@ export const useCVBuilder = () => {
   const handleLoadVersion = useCallback(
     (version) => {
       try {
-        // Helper function to safely parse JSON (handles both string and object)
-        const safeJsonParse = (data) => {
-          if (!data) return null;
-          if (typeof data === 'object') return data; // Already parsed
-          try {
-            return JSON.parse(data);
-          } catch (e) {
-            console.error("Failed to parse snapshot:", e);
-            return null;
-          }
-        };
-
-        // Parse snapshots safely
+        // Parse snapshots
         const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
         const educationSnapshot = safeJsonParse(version.educationSnapshot);
         const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
@@ -750,7 +898,7 @@ export const useCVBuilder = () => {
         toast.error("Failed to load version");
       }
     },
-    []
+    [safeJsonParse]
   );
 
   // Return all state and handlers
