@@ -163,8 +163,7 @@ const CVBuilderEditor = () => {
       {/* Main container with background */}
       <div className="min-h-screen bg-cvLightBg mb-10">
         
-        {/* Back to Dashboard Button */}
-        <div className="bg-white border-b border-gray-200">
+        {/* Back to Dashboard Button <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <button
               onClick={handleBackToDashboard}
@@ -174,7 +173,8 @@ const CVBuilderEditor = () => {
               Back to Dashboard
             </button>
           </div>
-        </div>
+        </div>*/}
+        
 
         {/* Header component with all action buttons */}
         <Header

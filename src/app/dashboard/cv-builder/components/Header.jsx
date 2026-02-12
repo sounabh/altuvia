@@ -63,7 +63,7 @@ export const Header = ({
     localStorage.removeItem("currentCVNumber");
     
     // Navigate to clean dashboard URL
-    router.push("/cv-builder");
+    router.push("/dashboard/cv-builder");
   };
 
   return (
@@ -79,7 +79,7 @@ export const Header = ({
           <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-[#002147] flex items-center justify-center transition-colors">
             <ArrowLeft className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
           </div>
-          <span className="text-base font-medium">Dashboard</span>
+          <span className="text-base font-medium">Back</span>
         </button>
 
         {/* ATS Score */}
