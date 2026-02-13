@@ -161,7 +161,7 @@ const CVBuilderEditor = () => {
     /* CV Data Context Provider for sharing data across components */
     <CVDataContext.Provider value={{ cvData, updateCVData }}>
       {/* Main container with background */}
-      <div className="min-h-screen bg-cvLightBg mb-10">
+      <div className="min-h-screen bg-cvLightBg">
         
        
         {/* Header component with all action buttons */}
