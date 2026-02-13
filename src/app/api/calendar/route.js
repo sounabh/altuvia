@@ -11,7 +11,7 @@ const GEMINI_MODEL = "google/gemini-2.5-flash-lite";
 
 
 // ========================================
-// AI COLOR FETCHER
+// AI COLOR FETCHER (FIXED)
 // ========================================
 async function fetchSchoolColorFromAI(universityName) {
   try {
@@ -20,16 +20,11 @@ async function fetchSchoolColorFromAI(universityName) {
       return null;
     }
 
-    const prompt = `You are a university branding expert. Return ONLY the primary brand color hex code for ${universityName}.
+    const prompt = `What is the official primary brand color hex code for ${universityName}? 
 
-Rules:
-- Return ONLY the hex code in format #RRGGBB
-- No explanation, no additional text
-- If uncertain, return the most commonly associated color
-- Examples: Harvard = #A51C30, MIT = #A31F34, Stanford = #8C1515
+Return ONLY the hex code in this exact format: #RRGGBB
 
-University: ${universityName}
-Hex Code:`;
+Do not include any explanation or additional text. Just the hex code.`;
 
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: "POST",
@@ -41,10 +36,18 @@ Hex Code:`;
       },
       body: JSON.stringify({
         model: GEMINI_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        top_p: 0.8,
-        max_tokens: 200,
+        messages: [
+          {
+            role: "system",
+            content: "You are a university branding expert. You only return official brand color hex codes from university brand guidelines. Return ONLY the hex code with no explanation."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 20,
         stream: false,
       }),
     });
@@ -66,10 +69,11 @@ Hex Code:`;
     console.log(`AI Response for ${universityName}:`, responseText);
     
     // Extract hex code from response
-    const hexMatch = responseText.match(/#[0-9A-Fa-f]{6}/);
+    const hexMatch = responseText.match(/#[0-9A-Fa-f]{6}\b/);
     if (hexMatch) {
-      console.log(`Extracted color for ${universityName}:`, hexMatch[0]);
-      return hexMatch[0];
+      const color = hexMatch[0].toUpperCase();
+      console.log(`Extracted color for ${universityName}:`, color);
+      return color;
     }
 
     console.warn(`No valid hex code found for ${universityName}`);

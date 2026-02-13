@@ -229,7 +229,7 @@ html.lenis body {
 }
 
 .lenis.lenis-smooth {
-  scroll-behavior: auto !important; /* Lenis handles smoothness */
+  scroll-behavior: auto !important;
 }
 
 .lenis.lenis-smooth [data-lenis-prevent] {
@@ -242,6 +242,40 @@ html.lenis body {
 
 .lenis.lenis-scrolling iframe {
   pointer-events: none;
+}
+
+/* ========================================
+   GLOBAL SCROLLABLE CONTAINER FIXES
+   ======================================== */
+
+/* Ensure all scrollable containers work with touch/trackpad */
+[style*="overflow: auto"],
+[style*="overflow: scroll"],
+[style*="overflow-y: auto"],
+[style*="overflow-y: scroll"],
+[style*="overflow-x: auto"],
+[style*="overflow-x: scroll"],
+.overflow-auto,
+.overflow-scroll,
+.overflow-y-auto,
+.overflow-y-scroll,
+.overflow-x-auto,
+.overflow-x-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+}
+
+/* Ensure dialogs, modals, dropdowns scroll properly */
+dialog,
+[role="dialog"],
+[role="menu"],
+[role="listbox"],
+.modal,
+.dropdown-menu,
+.popover,
+.select-options {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ========================================
