@@ -696,8 +696,8 @@ const CVDashboard = () => {
         <BackgroundAnimation />
 
         <HeroHeader 
-          title={<>Your <span className="text-[#3598FE]">CV Portfolio.</span></>}
-          subtitle="Loading your professional documents..."
+          title={<>Your <span className="text-[#3598FE]">CV Collections.</span></>}
+        subtitle="Manage and track all your professional CV versions in one place"
           onNewCV={handleNewCV}
         />
 
