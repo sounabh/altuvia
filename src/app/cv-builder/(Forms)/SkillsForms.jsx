@@ -175,7 +175,13 @@ export const SkillsForm = () => {
       skills: [],
       showProficiency: false,
     };
-    updateCVData("skills", [...skillCategories, newCategory]);
+    
+    // Use functional update to ensure we get the latest state
+    updateCVData("skills", (prevSkills) => {
+      const currentSkills = Array.isArray(prevSkills) ? prevSkills : [];
+      return [...currentSkills, newCategory];
+    });
+    
     setExpandedCards((prev) => ({ ...prev, [newCategory.id]: true }));
     setShowTemplates(false);
   };
@@ -384,10 +390,11 @@ export const SkillsForm = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <Input
+                          key={`category-name-${category.id}`}
                           value={category.name || ""}
                           onChange={(e) => updateCategoryName(category.id, e.target.value)}
                           placeholder="Category Name (e.g., Technical Skills)"
-                          className="border-0 p-0 h-auto text-lg font-semibold cv-heading bg-transparent focus-visible:ring-0"
+                          className="border-b border-cvBorder/30 hover:border-cvAccent/50 focus:border-cvAccent p-2 h-auto text-lg font-semibold cv-heading bg-transparent focus-visible:ring-0 focus:ring-0 focus:ring-offset-0 transition-colors"
                         />
                         {category.name && skillsList.length > 0 && (
                           <Badge variant="secondary" className="shrink-0">
