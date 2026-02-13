@@ -466,15 +466,14 @@ async function generatePDF(cvData, templateId, themeColor) {
   /**
    * Converts hex color to RGB (0-1 range)
    */
-  const hexToRgb = (hex) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16) / 255,
-      g: parseInt(result[2], 16) / 255,
-      b: parseInt(result[3], 16) / 255,
-    } : { r: 0.12, g: 0.25, b: 0.69 };
-  };
-
+ const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16) / 255,
+    g: parseInt(result[2], 16) / 255,
+    b: parseInt(result[3], 16) / 255,
+  } : { r: 0, g: 0, b: 0 };  // ← BLACK FALLBACK
+};
   /**
    * Creates a lighter version of the theme color
    */
