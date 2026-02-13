@@ -163,19 +163,7 @@ const CVBuilderEditor = () => {
       {/* Main container with background */}
       <div className="min-h-screen bg-cvLightBg mb-10">
         
-        {/* Back to Dashboard Button */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <button
-              onClick={handleBackToDashboard}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#002147] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
-
+       
         {/* Header component with all action buttons */}
         <Header
           onPreviewToggle={handlePreviewToggle}

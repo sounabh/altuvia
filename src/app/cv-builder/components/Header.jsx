@@ -63,7 +63,7 @@ export const Header = ({
     localStorage.removeItem("currentCVNumber");
     
     // Navigate to clean dashboard URL
-    router.push("/cv-builder");
+    router.push("/dashboard/cv-builder");
   };
 
   return (
