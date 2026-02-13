@@ -5,10 +5,11 @@ import {
   FileText, Eye, Download, Copy, Trash2, Loader2, 
   Star, Clock, Plus, Edit, Calendar,
   Sparkles, FolderOpen, GitBranch, ChevronRight, TrendingUp,
-  LayoutGrid, List, Filter, Search, Zap, Target, CheckCircle2
+  LayoutGrid, List, Filter, Search, Zap, Target, CheckCircle2,
+  X // Added X for the dialog close button (optional, can be used)
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // Added AnimatePresence
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
@@ -25,7 +26,69 @@ export const clearVersionsCache = (userEmail) => {
 };
 
 // ============================================
-// MEMOIZED SUB-COMPONENTS
+// NEW CV DIALOG COMPONENT
+// ============================================
+
+const NewCVDialog = memo(({ isOpen, onClose, onConfirm }) => {
+  const [cvName, setCvName] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (cvName.trim()) {
+      onConfirm(cvName.trim());
+      setCvName('');
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+      >
+        <h3 className="text-2xl font-bold text-[#002147] mb-2">Create New CV</h3>
+        <p className="text-gray-600 mb-6">Give your CV a name</p>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={cvName}
+            onChange={(e) => setCvName(e.target.value)}
+            placeholder="e.g., Software Engineer Resume 2024"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#3598FE] outline-none mb-6"
+            autoFocus
+            maxLength={100}
+          />
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setCvName(''); onClose(); }}
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!cvName.trim()}
+              className="flex-1 px-4 py-3 bg-[#002147] text-white rounded-xl font-semibold hover:bg-[#3598FE] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Create
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+});
+NewCVDialog.displayName = 'NewCVDialog';
+
+// ============================================
+// MEMOIZED SUB-COMPONENTS (unchanged)
 // ============================================
 
 const BackgroundAnimation = memo(() => (
@@ -84,7 +147,7 @@ const HeroHeader = memo(({ title, subtitle, onNewCV }) => (
 HeroHeader.displayName = 'HeroHeader';
 
 // ============================================
-// ENHANCED STATS OVERVIEW
+// ENHANCED STATS OVERVIEW (unchanged)
 // ============================================
 
 const StatsOverview = memo(({ stats }) => {
@@ -189,7 +252,7 @@ const StatsOverview = memo(({ stats }) => {
 StatsOverview.displayName = 'StatsOverview';
 
 // ============================================
-// ENHANCED VERSION CARD - CUTOUT STYLE
+// ENHANCED VERSION CARD - CUTOUT STYLE (unchanged)
 // ============================================
 
 const VersionCard = memo(({ version, index, onEdit, onDuplicate, onExport, onDelete }) => {
@@ -354,7 +417,7 @@ const VersionCard = memo(({ version, index, onEdit, onDuplicate, onExport, onDel
 VersionCard.displayName = 'VersionCard';
 
 // ============================================
-// LOADING STATES
+// LOADING STATES (unchanged)
 // ============================================
 
 const LoadingCard = memo(() => (
@@ -381,7 +444,7 @@ const LoadingCard = memo(() => (
 LoadingCard.displayName = 'LoadingCard';
 
 // ============================================
-// EMPTY STATE
+// EMPTY STATE (unchanged)
 // ============================================
 
 const EmptyState = memo(({ onNewCV }) => (
@@ -457,6 +520,7 @@ const CVDashboard = () => {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showNewCVDialog, setShowNewCVDialog] = useState(false); // Added state
 
   const userEmail = session?.user?.email;
   const cacheKey = useMemo(() => `versions_${userEmail}`, [userEmail]);
@@ -526,8 +590,15 @@ const CVDashboard = () => {
     }
   }, [status, userEmail, loadVersions]);
 
+  // Updated handler: opens dialog instead of direct navigation
   const handleNewCV = useCallback(() => {
-    router.push('/cv-builder?new=true');
+    setShowNewCVDialog(true);
+  }, []);
+
+  // Handler to confirm creation with name
+  const handleCreateCV = useCallback((cvName) => {
+    setShowNewCVDialog(false);
+    router.push(`/cv-builder?new=true&cvName=${encodeURIComponent(cvName)}`);
   }, [router]);
 
   const handleEditVersion = useCallback((version) => {
@@ -714,6 +785,13 @@ const CVDashboard = () => {
       </div>
 
       <div className="h-20"></div>
+
+      {/* New CV Dialog */}
+      <NewCVDialog 
+        isOpen={showNewCVDialog}
+        onClose={() => setShowNewCVDialog(false)}
+        onConfirm={handleCreateCV}
+      />
     </div>
   );
 };

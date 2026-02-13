@@ -53,7 +53,6 @@ export const useCVBuilder = () => {
 
   /**
    * Effect: Redirect to login if user is not authenticated
-   * Runs when authentication status changes
    */
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -64,7 +63,6 @@ export const useCVBuilder = () => {
 
   /**
    * Effect: Initialize user data from session
-   * Sets userId and userEmail when session is available
    */
   useEffect(() => {
     if (status === "authenticated" && session?.userId && session?.user?.email) {
@@ -75,8 +73,6 @@ export const useCVBuilder = () => {
 
   /**
    * Loads CV data from API based on CV ID and user email
-   * @param {string} cvId - CV identifier
-   * @param {string} email - User's email for authentication
    */
   const loadCVData = useCallback(
     async (cvId, email) => {
@@ -86,12 +82,10 @@ export const useCVBuilder = () => {
           return;
         }
 
-        // Fetch CV data from API
         const response = await fetch(
           `/api/cv/save?cvId=${cvId}&userEmail=${encodeURIComponent(email)}`
         );
 
-        // Handle 404 - CV not found
         if (response.status === 404) {
           console.log("CV not found - clearing invalid ID");
           setCurrentCVId(null);
@@ -100,20 +94,15 @@ export const useCVBuilder = () => {
           return;
         }
 
-        // Handle other response errors
         if (!response.ok) {
           console.warn(`Failed to load CV: ${response.status}`);
-
           if (response.status === 401 || response.status === 403) {
             toast.error("Authentication error. Please log in again.");
-            return;
           }
           return;
         }
 
         const text = await response.text();
-
-        // Handle empty response
         if (!text || text.trim() === "") {
           console.log("Empty response - no CV data available");
           return;
@@ -127,10 +116,8 @@ export const useCVBuilder = () => {
           return;
         }
 
-        // Validate response structure
         if (!result.success || !result.cv) {
           console.log("Invalid CV data structure received");
-
           if (result.code === "CV_NOT_FOUND") {
             setCurrentCVId(null);
             localStorage.removeItem("currentCVId");
@@ -139,13 +126,11 @@ export const useCVBuilder = () => {
           return;
         }
 
-        // Update CV number from loaded data
         if (result.cv.slug) {
           setCvNumber(result.cv.slug);
           localStorage.setItem("currentCVNumber", result.cv.slug);
         }
 
-        // Successfully loaded - update state with transformed data
         setCvData({
           personal: result.cv.personalInfo || DEFAULT_CV_DATA.personal,
           education:
@@ -210,11 +195,9 @@ export const useCVBuilder = () => {
             })) || DEFAULT_CV_DATA.volunteer,
         });
 
-        // Load template and theme preferences
         if (result.cv.templateId) {
           setSelectedTemplate(result.cv.templateId);
         }
-
         if (result.cv.colorScheme) {
           setThemeColor(result.cv.colorScheme);
         }
@@ -227,8 +210,6 @@ export const useCVBuilder = () => {
         }
       } catch (error) {
         console.error("Error loading CV data:", error);
-
-        // Handle network errors
         if (
           error.message?.includes("Failed to fetch") ||
           error.message?.includes("NetworkError")
@@ -256,15 +237,12 @@ export const useCVBuilder = () => {
 
   /**
    * Loads a specific version's data
-   * @param {string} versionId - Version identifier
-   * @param {string} email - User's email for authentication
    */
   const loadVersionData = useCallback(
     async (versionId, email) => {
       try {
         console.log("Loading specific version:", versionId);
-        
-        // Fetch the specific version data
+
         const versionResponse = await fetch(
           `/api/cv/versions/${versionId}?userEmail=${encodeURIComponent(email)}`
         );
@@ -277,8 +255,7 @@ export const useCVBuilder = () => {
 
         if (versionData.success && versionData.version) {
           const version = versionData.version;
-          
-          // Parse snapshots
+
           const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
           const educationSnapshot = safeJsonParse(version.educationSnapshot);
           const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
@@ -287,10 +264,9 @@ export const useCVBuilder = () => {
           const achievementsSnapshot = safeJsonParse(version.achievementsSnapshot);
           const volunteerSnapshot = safeJsonParse(version.volunteerSnapshot);
 
-          // Transform data to match expected format
           const versionCvData = {
             personal: personalSnapshot || DEFAULT_CV_DATA.personal,
-            
+
             education: educationSnapshot && Array.isArray(educationSnapshot)
               ? educationSnapshot.map((edu) => ({
                   id: edu.id,
@@ -303,7 +279,7 @@ export const useCVBuilder = () => {
                   description: edu.description || "",
                 }))
               : DEFAULT_CV_DATA.education,
-            
+
             experience: experienceSnapshot && Array.isArray(experienceSnapshot)
               ? experienceSnapshot.map((exp) => ({
                   id: exp.id,
@@ -316,7 +292,7 @@ export const useCVBuilder = () => {
                   description: exp.description || "",
                 }))
               : DEFAULT_CV_DATA.experience,
-            
+
             projects: projectsSnapshot && Array.isArray(projectsSnapshot)
               ? projectsSnapshot.map((proj) => ({
                   id: proj.id,
@@ -334,7 +310,7 @@ export const useCVBuilder = () => {
                     : (proj.achievements || ""),
                 }))
               : [],
-            
+
             skills: skillsSnapshot && Array.isArray(skillsSnapshot)
               ? skillsSnapshot.map((skill) => ({
                   id: skill.id,
@@ -342,7 +318,7 @@ export const useCVBuilder = () => {
                   skills: skill.skills || [],
                 }))
               : DEFAULT_CV_DATA.skills,
-            
+
             achievements: achievementsSnapshot && Array.isArray(achievementsSnapshot)
               ? achievementsSnapshot.map((ach) => ({
                   id: ach.id,
@@ -353,7 +329,7 @@ export const useCVBuilder = () => {
                   description: ach.description || "",
                 }))
               : DEFAULT_CV_DATA.achievements,
-            
+
             volunteer: volunteerSnapshot && Array.isArray(volunteerSnapshot)
               ? volunteerSnapshot.map((vol) => ({
                   id: vol.id,
@@ -368,19 +344,14 @@ export const useCVBuilder = () => {
               : DEFAULT_CV_DATA.volunteer,
           };
 
-          // Update CV data state with version data
           setCvData(versionCvData);
 
-          // Restore template and theme preferences
           if (version.templateId) {
             setSelectedTemplate(version.templateId);
           }
-
           if (version.colorScheme) {
             setThemeColor(version.colorScheme);
           }
-
-          // Update CV identification
           if (version.cvSlug) {
             setCvNumber(version.cvSlug);
             localStorage.setItem("currentCVNumber", version.cvSlug);
@@ -388,7 +359,6 @@ export const useCVBuilder = () => {
 
           console.log("Version loaded successfully");
           toast.success(`Loaded version: ${version.versionLabel}`);
-          
           return true;
         } else {
           throw new Error("Invalid version data");
@@ -404,46 +374,43 @@ export const useCVBuilder = () => {
 
   /**
    * Effect: Load CV based on URL parameters or localStorage
-   * Handles CV initialization from URL params, localStorage, or creating new CV
    */
   useEffect(() => {
     const initializeCV = async () => {
-      // Wait for authentication and user data
       if (status !== "authenticated" || !userEmail || !userId) {
         return;
       }
 
       try {
-        // Check for 'new' parameter first (highest priority)
         const isNewCV = searchParams.get("new") === "true";
-        
+        const cvName = searchParams.get("cvName"); // GET NAME
+
         if (isNewCV) {
           console.log("Creating new CV from dashboard");
-          
-          // Clear old CV data
+
           setCurrentCVId(null);
           localStorage.removeItem("currentCVId");
-          
-          // Generate new unique CV number
+
           const uniqueNumber = generateUniqueCVNumber(userId);
           setCvNumber(uniqueNumber);
           localStorage.setItem("currentCVNumber", uniqueNumber);
-          
-          // Reset CV data to fresh state
+
+          // STORE CV NAME
+          if (cvName) {
+            localStorage.setItem("currentCVTitle", cvName);
+          }
+
           setCvData(createFreshCVData());
-          
-          // Reset analysis and theme
           setAiAnalysis(null);
           setAtsScore(null);
           setThemeColor(DEFAULT_THEME_COLOR);
           setSelectedTemplate(DEFAULT_TEMPLATE);
-          
-          toast.success(`New CV #${uniqueNumber} created!`);
+
+          toast.success(cvName ? `New CV "${cvName}" created!` : `New CV #${uniqueNumber} created!`);
           setIsInitialLoading(false);
           return;
         }
 
-        // Check for cvId in URL parameters (from dashboard edit)
         const urlCVId = searchParams.get("cvId");
         const urlVersionId = searchParams.get("versionId");
 
@@ -452,21 +419,16 @@ export const useCVBuilder = () => {
           setCurrentCVId(urlCVId);
           localStorage.setItem("currentCVId", urlCVId);
 
-          // If versionId is present, load that specific version instead of the CV
           if (urlVersionId) {
             const versionLoaded = await loadVersionData(urlVersionId, userEmail);
-            
             if (!versionLoaded) {
-              // Fallback to loading the CV normally if version load fails
               console.log("Version load failed, falling back to CV");
               await loadCVData(urlCVId, userEmail);
             }
           } else {
-            // No version specified, load the latest CV data
             await loadCVData(urlCVId, userEmail);
           }
         } else {
-          // Fallback to localStorage for existing CV
           const savedCVId = localStorage.getItem("currentCVId");
           const savedCVNumber = localStorage.getItem("currentCVNumber");
 
@@ -475,7 +437,6 @@ export const useCVBuilder = () => {
             setCvNumber(savedCVNumber);
             await loadCVData(savedCVId, userEmail);
           } else {
-            // Create new CV number for new user
             const uniqueNumber = generateUniqueCVNumber(userId);
             setCvNumber(uniqueNumber);
             localStorage.setItem("currentCVNumber", uniqueNumber);
@@ -483,7 +444,6 @@ export const useCVBuilder = () => {
         }
       } catch (error) {
         console.error("Error initializing CV:", error);
-        // Fallback to new CV on error
         const uniqueNumber = generateUniqueCVNumber(userId);
         setCvNumber(uniqueNumber);
         localStorage.setItem("currentCVNumber", uniqueNumber);
@@ -498,8 +458,6 @@ export const useCVBuilder = () => {
 
   /**
    * Updates CV data for a specific section
-   * @param {string} section - Section name (personal, education, etc.)
-   * @param {Object} data - New data for the section
    */
   const updateCVData = useCallback((section, data) => {
     setCvData((prev) => ({
@@ -510,7 +468,6 @@ export const useCVBuilder = () => {
 
   /**
    * Triggers AI analysis of the CV
-   * Sends CV data to analysis API and updates state with results
    */
   const handleAnalyzeCV = useCallback(async () => {
     setIsAnalyzing(true);
@@ -531,7 +488,6 @@ export const useCVBuilder = () => {
 
       const data = await response.json();
 
-      // Update analysis state
       setAiAnalysis(data);
       setAtsScore(data.atsScore);
 
@@ -597,7 +553,6 @@ export const useCVBuilder = () => {
 
   /**
    * Saves CV with version information
-   * @param {Object} versionInfo - Version metadata (name, description, bookmark)
    */
   const handleSaveWithVersion = useCallback(
     async (versionInfo) => {
@@ -605,25 +560,25 @@ export const useCVBuilder = () => {
         setIsSaving(true);
         setShowVersionDialog(false);
 
-        // Authentication check
         if (!userEmail) {
           toast.error("Authentication required. Please log in.");
           return;
         }
 
-        // Prepare save payload
+        // GET CV TITLE FROM LOCALSTORAGE
+        const cvTitle = localStorage.getItem("currentCVTitle") || `CV #${cvNumber}`;
+
         const payload = {
           cvData,
           selectedTemplate,
           themeColor,
-          cvTitle: `CV #${cvNumber}`,
+          cvTitle, // THIS IS THE CV NAME
           userEmail,
           cvId: currentCVId,
           cvNumber: cvNumber,
           versionInfo,
         };
 
-        // Send save request to API
         const response = await fetch("/api/cv/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -640,7 +595,6 @@ export const useCVBuilder = () => {
         const result = await response.json();
 
         if (result.success) {
-          // Update current CV ID and number
           if (result.cv.id) {
             setCurrentCVId(result.cv.id);
             localStorage.setItem("currentCVId", result.cv.id);
@@ -651,16 +605,13 @@ export const useCVBuilder = () => {
             }
           }
 
-          // Clear versions cache for this user
           clearVersionsCache(userEmail);
 
-          // Show appropriate success message
           const action = result.isNewCV ? "created" : "updated";
           toast.success(
             `CV ${action} successfully as version: ${versionInfo.versionName}`
           );
 
-          // Additional info for new CV creation
           if (result.isNewCV && currentCVId) {
             toast.info(
               "A new CV was created. Previous CV may have been deleted.",
@@ -673,7 +624,6 @@ export const useCVBuilder = () => {
       } catch (error) {
         console.error("CV Save Error:", error);
 
-        // Handle CV not found errors
         if (
           error.message?.includes("not found") ||
           error.message?.includes("CV_NOT_FOUND")
@@ -697,46 +647,39 @@ export const useCVBuilder = () => {
 
   /**
    * Creates a new CV with default empty data
-   * Resets all CV-related state and localStorage
    */
   const handleNewCV = useCallback(() => {
-    // User authentication check
     if (!userId) {
       toast.error("User ID not found. Please log in again.");
       return;
     }
 
-    // Generate new unique CV number
     const uniqueNumber = generateUniqueCVNumber(userId);
 
-    // Reset CV identification
     setCurrentCVId(null);
     localStorage.removeItem("currentCVId");
     setCvNumber(uniqueNumber);
     localStorage.setItem("currentCVNumber", uniqueNumber);
 
-    // Reset analysis and theme
+    // Optionally clear stored title if desired, but we keep it for new CVs?
+    // If you want to start fresh without a title, uncomment next line:
+    // localStorage.removeItem("currentCVTitle");
+
     setAiAnalysis(null);
     setAtsScore(null);
     setThemeColor(DEFAULT_THEME_COLOR);
-
-    // Reset CV data to default empty state
     setCvData(createFreshCVData());
-
-    // Reset UI state
     setActiveSection("personal");
     toast.success(`New CV #${uniqueNumber} created!`);
   }, [userId]);
 
   /**
    * Exports current CV as PDF
-   * Generates PDF using API and triggers browser download
    */
   const handleExportPDF = useCallback(async () => {
     try {
       toast.info("Generating PDF...");
 
-      // Request PDF generation from API
       const response = await fetch("/api/cv/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -750,7 +693,6 @@ export const useCVBuilder = () => {
 
       if (!response.ok) throw new Error("Failed to generate PDF");
 
-      // Create download link for PDF blob
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -770,12 +712,10 @@ export const useCVBuilder = () => {
 
   /**
    * Loads a specific saved version into the editor
-   * @param {Object} version - Version object containing CV data snapshots
    */
   const handleLoadVersion = useCallback(
     (version) => {
       try {
-        // Parse snapshots
         const personalSnapshot = safeJsonParse(version.personalInfoSnapshot);
         const educationSnapshot = safeJsonParse(version.educationSnapshot);
         const experienceSnapshot = safeJsonParse(version.experienceSnapshot);
@@ -784,10 +724,9 @@ export const useCVBuilder = () => {
         const achievementsSnapshot = safeJsonParse(version.achievementsSnapshot);
         const volunteerSnapshot = safeJsonParse(version.volunteerSnapshot);
 
-        // Transform data to match expected format (same as loadCVData)
         const newCvData = {
           personal: personalSnapshot || DEFAULT_CV_DATA.personal,
-          
+
           education: educationSnapshot && Array.isArray(educationSnapshot)
             ? educationSnapshot.map((edu) => ({
                 id: edu.id,
@@ -800,7 +739,7 @@ export const useCVBuilder = () => {
                 description: edu.description || "",
               }))
             : DEFAULT_CV_DATA.education,
-          
+
           experience: experienceSnapshot && Array.isArray(experienceSnapshot)
             ? experienceSnapshot.map((exp) => ({
                 id: exp.id,
@@ -813,7 +752,7 @@ export const useCVBuilder = () => {
                 description: exp.description || "",
               }))
             : DEFAULT_CV_DATA.experience,
-          
+
           projects: projectsSnapshot && Array.isArray(projectsSnapshot)
             ? projectsSnapshot.map((proj) => ({
                 id: proj.id,
@@ -831,7 +770,7 @@ export const useCVBuilder = () => {
                   : (proj.achievements || ""),
               }))
             : [],
-          
+
           skills: skillsSnapshot && Array.isArray(skillsSnapshot)
             ? skillsSnapshot.map((skill) => ({
                 id: skill.id,
@@ -839,7 +778,7 @@ export const useCVBuilder = () => {
                 skills: skill.skills || [],
               }))
             : DEFAULT_CV_DATA.skills,
-          
+
           achievements: achievementsSnapshot && Array.isArray(achievementsSnapshot)
             ? achievementsSnapshot.map((ach) => ({
                 id: ach.id,
@@ -850,7 +789,7 @@ export const useCVBuilder = () => {
                 description: ach.description || "",
               }))
             : DEFAULT_CV_DATA.achievements,
-          
+
           volunteer: volunteerSnapshot && Array.isArray(volunteerSnapshot)
             ? volunteerSnapshot.map((vol) => ({
                 id: vol.id,
@@ -865,23 +804,18 @@ export const useCVBuilder = () => {
             : DEFAULT_CV_DATA.volunteer,
         };
 
-        // Update CV data state
         setCvData(newCvData);
 
-        // Restore template and theme preferences
         if (version.templateId) {
           setSelectedTemplate(version.templateId);
         }
-
         if (version.colorScheme) {
           setThemeColor(version.colorScheme);
         }
 
-        // Reset analysis for loaded version
         setAiAnalysis(null);
         setAtsScore(null);
 
-        // Update CV identification
         setCurrentCVId(version.cvId);
         setCvNumber(version.cvSlug);
         localStorage.setItem("currentCVId", version.cvId);
@@ -891,7 +825,6 @@ export const useCVBuilder = () => {
           `Loaded CV #${version.cvSlug} - version: ${version.versionLabel}`
         );
 
-        // Close version manager after loading
         setShowVersionManager(false);
       } catch (error) {
         console.error("Failed to load version:", error);
@@ -901,7 +834,6 @@ export const useCVBuilder = () => {
     [safeJsonParse]
   );
 
-  // Return all state and handlers
   return {
     // Authentication state
     status,
