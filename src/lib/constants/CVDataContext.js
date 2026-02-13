@@ -175,7 +175,7 @@ export const createFreshCVData = () => ({
 /**
  * Default theme color for CV
  */
-export const DEFAULT_THEME_COLOR = "#1e40af";
+export const DEFAULT_THEME_COLOR = "#000000";
 
 /**
  * Default template for CV

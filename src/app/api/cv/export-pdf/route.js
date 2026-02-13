@@ -450,10 +450,8 @@ const hasVolunteerData = (volunteer) => {
 async function generatePDF(cvData, templateId, themeColor) {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
 
-  // Create new PDF document
   const pdfDoc = await PDFDocument.create();
   
-  // Embed all required fonts
   const fonts = {
     helvetica: await pdfDoc.embedFont(StandardFonts.Helvetica),
     helveticaBold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
@@ -465,20 +463,33 @@ async function generatePDF(cvData, templateId, themeColor) {
 
   /**
    * Converts hex color to RGB (0-1 range)
+   * Fixed: fallback is now BLACK, not blue
    */
- const hexToRgb = (hex) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16) / 255,
-    g: parseInt(result[2], 16) / 255,
-    b: parseInt(result[3], 16) / 255,
-  } : { r: 0, g: 0, b: 0 };  // ← BLACK FALLBACK
-};
+  const hexToRgb = (hex) => {
+    if (!hex) return { r: 0, g: 0, b: 0 };
+    const cleaned = hex.replace('#', '');
+    const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(cleaned);
+    return result ? {
+      r: parseInt(result[1], 16) / 255,
+      g: parseInt(result[2], 16) / 255,
+      b: parseInt(result[3], 16) / 255,
+    } : { r: 0, g: 0, b: 0 }; // ← BLACK fallback, not blue
+  };
+
   /**
    * Creates a lighter version of the theme color
+   * Fixed: when color is black/very dark, returns a neutral light gray
+   * instead of a tinted color
    */
   const getLightColor = (hex) => {
     const c = hexToRgb(hex);
+    
+    // If the color is very dark (near black), use neutral light gray
+    const brightness = (c.r + c.g + c.b) / 3;
+    if (brightness < 0.1) {
+      return rgb(0.93, 0.93, 0.93); // Neutral light gray
+    }
+    
     return rgb(
       Math.min(1, c.r * 0.15 + 0.85),
       Math.min(1, c.g * 0.15 + 0.85),
@@ -486,14 +497,10 @@ async function generatePDF(cvData, templateId, themeColor) {
     );
   };
 
-  // Calculate theme colors
   const themeRgb = hexToRgb(themeColor);
   const primaryColor = rgb(themeRgb.r, themeRgb.g, themeRgb.b);
   const lightColor = getLightColor(themeColor);
 
-  /**
-   * Formats date string to "Mon YYYY" format
-   */
   const formatDate = (date) => {
     if (!date) return "";
     const parts = date.split("-");
@@ -506,7 +513,6 @@ async function generatePDF(cvData, templateId, themeColor) {
     return `${MONTH_NAMES[monthIndex]} ${year}`;
   };
 
-  // Bundle utilities for template functions
   const utils = {
     ...fonts,
     primaryColor,
@@ -519,7 +525,6 @@ async function generatePDF(cvData, templateId, themeColor) {
     hasMeaningfulValue,
   };
 
-  // Route to appropriate template
   switch (templateId) {
     case 'classic':
       return generateClassicTemplate(pdfDoc, cvData, utils);
