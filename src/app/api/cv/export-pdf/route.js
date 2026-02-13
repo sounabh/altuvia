@@ -186,13 +186,7 @@ const stripHtmlTags = (text) => {
 };
 
 /**
- * Improved parseDescription — handles all bullet formats:
- * - ReactQuill <ul><li> and <ol><li>
- * - ReactQuill <p> paragraphs
- * - <br> separated lines
- * - Plain text with •, -, *, numbered bullets
- * - Arrays of strings
- * - Single text paragraphs
+ * FIXED: parseDescription now properly handles ReactQuill <p> tags
  */
 const parseDescription = (description) => {
   if (!description) return [];
@@ -216,16 +210,29 @@ const parseDescription = (description) => {
   }
   if (bullets.length > 0) return bullets;
 
-  // 2. Extract <p> items (ReactQuill paragraph format)
+  // 2. Extract <p> items (ReactQuill paragraph format) - FIXED
+  // Each <p> tag represents a separate bullet point
   const pItems = [];
   HTML_PATTERNS.paragraphs.lastIndex = 0;
   while ((match = HTML_PATTERNS.paragraphs.exec(descString)) !== null) {
-    const clean = stripHtmlTags(match[1]).trim();
-    if (clean.length > 0) pItems.push(clean);
+    let cleaned = match[1]
+      .replace(/<[^>]*>/g, '') // Remove any nested HTML tags
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+    
+    // Remove leading bullet characters if present
+    cleaned = cleaned.replace(/^[•●○◦▪▸►\s]+/, '').trim();
+    
+    if (cleaned.length > 0) pItems.push(cleaned);
   }
   if (pItems.length > 0) return pItems;
 
-  // 3. Handle <br> separated content — replace <br> with \n before stripping
+  // 3. Handle <br> separated content
   const withNewlines = descString
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]*>/g, "")
@@ -238,7 +245,7 @@ const parseDescription = (description) => {
 
   if (!withNewlines.trim()) return [];
 
-  // 4. Split by newlines, then clean bullet prefixes
+  // 4. Split by newlines
   const lines = withNewlines.split(/\n+/);
   const result = [];
   for (const line of lines) {
@@ -253,7 +260,7 @@ const parseDescription = (description) => {
   }
   if (result.length > 0) return result;
 
-  // 5. Last resort — return as single item
+  // 5. Last resort
   const singleClean = withNewlines.replace(/\s+/g, " ").trim();
   return singleClean ? [singleClean] : [];
 };
@@ -289,6 +296,18 @@ const getSkillsList = (category) => {
 
 const formatDate = (date) => {
   if (!date) return "";
+  
+  // Handle ISO timestamp format (e.g., 2024-05-01T00:00:00.000Z)
+  if (date.includes('T')) {
+    const d = new Date(date);
+    if (!isNaN(d.getTime())) {
+      const month = MONTH_NAMES[d.getMonth()];
+      const year = d.getFullYear();
+      return `${month} ${year}`;
+    }
+  }
+  
+  // Handle YYYY-MM format
   const parts = date.split("-");
   if (parts.length < 2) return date;
   const monthIndex = parseInt(parts[1]) - 1;
@@ -320,7 +339,7 @@ const hasVolunteerData = (d) =>
   d.some((v) => hasMeaningfulValue(v.organization) || hasMeaningfulValue(v.role));
 
 // ============================================
-// PDF GENERATION — MAIN
+// PDF GENERATION
 // ============================================
 
 async function generatePDF(cvData, templateId, themeColor) {
@@ -337,7 +356,6 @@ async function generatePDF(cvData, templateId, themeColor) {
     timesRomanItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
   };
 
-  // Force black — ignore frontend color
   const hexToRgb = (hex) => {
     if (!hex) return { r: 0, g: 0, b: 0 };
     const cleaned = hex.replace("#", "");
@@ -389,10 +407,6 @@ async function generatePDF(cvData, templateId, themeColor) {
   }
 }
 
-// ============================================
-// SHARED HELPER: wrapText
-// ============================================
-
 function createWrapText(stripFn) {
   return (text, font, size, maxWidth) => {
     if (!text) return [];
@@ -416,7 +430,7 @@ function createWrapText(stripFn) {
 }
 
 // ============================================
-// MODERN TEMPLATE — Compact Professional
+// MODERN TEMPLATE
 // ============================================
 
 async function generateModernTemplate(pdfDoc, cvData, utils) {
@@ -442,7 +456,6 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
-  // Neutral black/gray palette only
   const C = {
     black: rgb(0, 0, 0),
     heading: rgb(0.05, 0.05, 0.05),
@@ -465,7 +478,6 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     if (y - needed < margin + 20) addNewPage();
   };
 
-  // --- Draw right-aligned date ---
   const drawDateRight = (dateText, yPos) => {
     if (!dateText) return;
     const w = helvetica.widthOfTextAtSize(dateText, 8.5);
@@ -478,10 +490,9 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     });
   };
 
-  // --- Section Header: ■ TITLE ────── ---
   const drawSectionHeader = (title) => {
-    ensureSpace(24);
-    y -= 10;
+    ensureSpace(22);
+    y -= 9;
 
     page.drawRectangle({
       x: margin,
@@ -494,7 +505,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     page.drawText(title.toUpperCase(), {
       x: margin + 12,
       y: y - 3,
-      size: 9.5,
+      size: 10,
       font: helveticaBold,
       color: C.black,
     });
@@ -506,10 +517,9 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
       color: C.border,
     });
 
-    y -= 22;
+    y -= 20;
   };
 
-  // --- Bullet List: compact ---
   const drawBullets = (items, x) => {
     for (const item of items) {
       if (!item) continue;
@@ -520,7 +530,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
 
       const textX = x + 10;
       const maxW = contentWidth - (textX - margin);
-      const lines = wrapText(clean, helvetica, 9, maxW);
+      const lines = wrapText(clean, helvetica, 9.5, maxW);
 
       lines.forEach((line, idx) => {
         ensureSpace(12);
@@ -535,7 +545,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         page.drawText(line, {
           x: textX,
           y: y,
-          size: 9,
+          size: 9.5,
           font: helvetica,
           color: C.body,
         });
@@ -545,21 +555,31 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     }
   };
 
-  // ==================== HEADER ====================
+  // ==================== HEADER - IMPROVED ====================
 
-  ensureSpace(80);
+  ensureSpace(85);
 
   const fullName = stripHtmlTags(cvData.personal?.fullName) || "Your Name";
   page.drawText(fullName, {
     x: margin,
     y: y,
-    size: 24,
+    size: 28,
     font: helveticaBold,
     color: C.black,
   });
-  y -= 30;
+  y -= 32;
 
-  // Contact info — single line with separators
+  if (hasMeaningfulValue(cvData.personal?.headline)) {
+    page.drawText(stripHtmlTags(cvData.personal.headline), {
+      x: margin,
+      y: y,
+      size: 10.5,
+      font: helvetica,
+      color: C.secondary,
+    });
+    y -= 17;
+  }
+
   const contactItems = [];
   if (hasMeaningfulValue(cvData.personal?.email))
     contactItems.push(stripHtmlTags(cvData.personal.email));
@@ -573,30 +593,28 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     contactItems.push(stripHtmlTags(cvData.personal.website));
 
   if (contactItems.length > 0) {
-    const contactText = contactItems.join("  \u2022  ");
-    const contactLines = wrapText(contactText, helvetica, 9, contentWidth);
+    const contactText = contactItems.join("  •  ");
+    const contactLines = wrapText(contactText, helvetica, 9.5, contentWidth);
     contactLines.forEach((line) => {
       page.drawText(line, {
         x: margin,
         y: y,
-        size: 9,
+        size: 9.5,
         font: helvetica,
         color: C.secondary,
       });
-      y -= 13;
+      y -= 12;
     });
+    y -= 3;
   }
 
-  y -= 3;
-
-  // Header line
   page.drawLine({
     start: { x: margin, y: y },
     end: { x: rightEdge, y: y },
     thickness: 1.2,
     color: C.black,
   });
-  y -= 14;
+  y -= 16;
 
   // ==================== SUMMARY ====================
 
@@ -606,7 +624,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     const summaryLines = wrapText(
       stripHtmlTags(cvData.personal.summary),
       helvetica,
-      9.5,
+      10,
       contentWidth
     );
     summaryLines.forEach((line) => {
@@ -614,13 +632,13 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
       page.drawText(line, {
         x: margin,
         y: y,
-        size: 9.5,
+        size: 10,
         font: helvetica,
         color: C.body,
       });
       y -= 13;
     });
-    y -= 6;
+    y -= 5;
   }
 
   // ==================== EDUCATION ====================
@@ -647,16 +665,14 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         dateStr = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
 
       if (degreeText) {
-        const dateW = dateStr
-          ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-          : 0;
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
         const maxW = contentWidth - dateW;
-        const lines = wrapText(degreeText, helveticaBold, 10.5, maxW);
+        const lines = wrapText(degreeText, helveticaBold, 11, maxW);
         lines.forEach((line, idx) => {
           page.drawText(line, {
             x: margin,
             y: y - idx * 13,
-            size: 10.5,
+            size: 11,
             font: helveticaBold,
             color: C.heading,
           });
@@ -670,22 +686,22 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         page.drawText(stripHtmlTags(edu.institution), {
           x: margin,
           y: y,
-          size: 9.5,
+          size: 10,
           font: helvetica,
           color: C.secondary,
         });
-        y -= 13;
+        y -= 12;
       }
 
       if (hasMeaningfulValue(edu.gpa)) {
         page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, {
           x: margin,
           y: y,
-          size: 9,
+          size: 9.5,
           font: helvetica,
           color: C.muted,
         });
-        y -= 12;
+        y -= 11;
       }
 
       if (hasMeaningfulValue(edu.description)) {
@@ -721,21 +737,14 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
       }
 
       if (hasPos) {
-        const dateW = dateStr
-          ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-          : 0;
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
         const maxW = contentWidth - dateW;
-        const lines = wrapText(
-          stripHtmlTags(exp.position),
-          helveticaBold,
-          10.5,
-          maxW
-        );
+        const lines = wrapText(stripHtmlTags(exp.position), helveticaBold, 11, maxW);
         lines.forEach((line, idx) => {
           page.drawText(line, {
             x: margin,
             y: y - idx * 13,
-            size: 10.5,
+            size: 11,
             font: helveticaBold,
             color: C.heading,
           });
@@ -752,11 +761,11 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         page.drawText(companyText, {
           x: margin,
           y: y,
-          size: 9.5,
+          size: 10,
           font: helvetica,
           color: C.secondary,
         });
-        y -= 14;
+        y -= 13;
       }
 
       if (hasMeaningfulValue(exp.description)) {
@@ -786,21 +795,14 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         else dateStr = formatDate(proj.startDate) || formatDate(proj.endDate);
       }
 
-      const dateW = dateStr
-        ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-        : 0;
+      const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
       const maxW = contentWidth - dateW;
-      const nameLines = wrapText(
-        stripHtmlTags(proj.name),
-        helveticaBold,
-        10.5,
-        maxW
-      );
+      const nameLines = wrapText(stripHtmlTags(proj.name), helveticaBold, 11, maxW);
       nameLines.forEach((line, idx) => {
         page.drawText(line, {
           x: margin,
           y: y - idx * 13,
-          size: 10.5,
+          size: 11,
           font: helveticaBold,
           color: C.heading,
         });
@@ -809,16 +811,15 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
       if (dateStr) drawDateRight(dateStr, y);
       y -= 14;
 
-      // Technologies inline
       if (hasMeaningfulValue(proj.technologies)) {
         page.drawText(`Tech: ${stripHtmlTags(proj.technologies)}`, {
           x: margin,
           y: y,
-          size: 8.5,
+          size: 9,
           font: helvetica,
           color: C.muted,
         });
-        y -= 12;
+        y -= 11;
       }
 
       if (hasMeaningfulValue(proj.description)) {
@@ -826,7 +827,6 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         if (items.length > 0) drawBullets(items, margin + 4);
       }
 
-      // Links on same line if both exist
       const links = [];
       if (hasMeaningfulValue(proj.githubUrl))
         links.push(`GitHub: ${stripHtmlTags(proj.githubUrl)}`);
@@ -863,30 +863,25 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
 
       const catName = stripHtmlTags(category.name) || "Skills";
       const label = `${catName}: `;
-      const labelW = helveticaBold.widthOfTextAtSize(label, 9.5);
+      const labelW = helveticaBold.widthOfTextAtSize(label, 10);
 
       page.drawText(label, {
         x: margin,
         y: y,
-        size: 9.5,
+        size: 10,
         font: helveticaBold,
         color: C.heading,
       });
 
       if (skillsList.length > 0) {
         const skillsText = skillsList.join(", ");
-        const skillLines = wrapText(
-          skillsText,
-          helvetica,
-          9.5,
-          contentWidth - labelW - 4
-        );
+        const skillLines = wrapText(skillsText, helvetica, 10, contentWidth - labelW - 4);
         const startY = y;
         skillLines.forEach((line, idx) => {
           page.drawText(line, {
             x: margin + labelW,
             y: startY - idx * 12,
-            size: 9.5,
+            size: 10,
             font: helvetica,
             color: C.body,
           });
@@ -907,61 +902,44 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     for (const ach of cvData.achievements) {
       if (!hasMeaningfulValue(ach.title)) continue;
 
-      ensureSpace(30);
+      ensureSpace(28);
 
       let dateW = 0;
       if (hasMeaningfulValue(ach.date))
-        dateW = helvetica.widthOfTextAtSize(stripHtmlTags(ach.date), 8.5) + 15;
+        dateW = helvetica.widthOfTextAtSize(formatDate(ach.date), 8.5) + 15;
 
       const maxW = contentWidth - dateW;
-      const titleLines = wrapText(
-        stripHtmlTags(ach.title),
-        helveticaBold,
-        10.5,
-        maxW
-      );
+      const titleLines = wrapText(stripHtmlTags(ach.title), helveticaBold, 11, maxW);
       titleLines.forEach((line, idx) => {
         page.drawText(line, {
           x: margin,
           y: y - idx * 13,
-          size: 10.5,
+          size: 11,
           font: helveticaBold,
           color: C.heading,
         });
       });
       if (titleLines.length > 1) y -= (titleLines.length - 1) * 13;
-      if (hasMeaningfulValue(ach.date)) drawDateRight(stripHtmlTags(ach.date), y);
+      if (hasMeaningfulValue(ach.date)) drawDateRight(formatDate(ach.date), y);
       y -= 14;
 
       if (hasMeaningfulValue(ach.organization)) {
         page.drawText(stripHtmlTags(ach.organization), {
           x: margin,
           y: y,
-          size: 9.5,
+          size: 10,
           font: helvetica,
           color: C.secondary,
         });
-        y -= 13;
+        y -= 12;
       }
 
       if (hasMeaningfulValue(ach.description)) {
-        const descLines = wrapText(
-          stripHtmlTags(ach.description),
-          helvetica,
-          9,
-          contentWidth
-        );
-        descLines.forEach((line) => {
-          ensureSpace(12);
-          page.drawText(line, {
-            x: margin,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: C.body,
-          });
-          y -= 12;
-        });
+        const items = parseDescription(ach.description);
+        if (items.length > 0) {
+          y -= 2;
+          drawBullets(items, margin + 4);
+        }
       }
 
       y -= 6;
@@ -986,21 +964,14 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         dateStr = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
 
       if (hasRole) {
-        const dateW = dateStr
-          ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-          : 0;
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
         const maxW = contentWidth - dateW;
-        const lines = wrapText(
-          stripHtmlTags(vol.role),
-          helveticaBold,
-          10.5,
-          maxW
-        );
+        const lines = wrapText(stripHtmlTags(vol.role), helveticaBold, 11, maxW);
         lines.forEach((line, idx) => {
           page.drawText(line, {
             x: margin,
             y: y - idx * 13,
-            size: 10.5,
+            size: 11,
             font: helveticaBold,
             color: C.heading,
           });
@@ -1017,11 +988,11 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         page.drawText(orgText, {
           x: margin,
           y: y,
-          size: 9.5,
+          size: 10,
           font: helvetica,
           color: C.secondary,
         });
-        y -= 14;
+        y -= 13;
       }
 
       if (hasMeaningfulValue(vol.description)) {
@@ -1029,7 +1000,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         if (items.length > 0) drawBullets(items, margin + 4);
       }
 
-      y -= 6;
+      y -= 5;
     }
   }
 
@@ -1037,7 +1008,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
 }
 
 // ============================================
-// CLASSIC TEMPLATE — Compact Professional
+// CLASSIC TEMPLATE  
 // ============================================
 
 async function generateClassicTemplate(pdfDoc, cvData, utils) {
@@ -1109,13 +1080,13 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
   };
 
   const drawSectionHeader = (title) => {
-    ensureSpace(24);
-    y -= 10;
+    ensureSpace(22);
+    y -= 9;
 
     page.drawText(title.toUpperCase(), {
       x: margin,
       y: y,
-      size: 10.5,
+      size: 11,
       font: timesRomanBold,
       color: C.black,
     });
@@ -1127,7 +1098,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
       color: C.black,
     });
 
-    y -= 20;
+    y -= 18;
   };
 
   const drawBullets = (items, x) => {
@@ -1140,7 +1111,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 
       const textX = x + 10;
       const maxW = contentWidth - (textX - margin);
-      const lines = wrapText(clean, timesRoman, 9.5, maxW);
+      const lines = wrapText(clean, timesRoman, 10, maxW);
 
       lines.forEach((line, idx) => {
         ensureSpace(12);
@@ -1148,7 +1119,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
           page.drawText("\u2022", {
             x: x,
             y: y,
-            size: 9.5,
+            size: 10,
             font: timesRoman,
             color: C.light,
           });
@@ -1156,7 +1127,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
         page.drawText(line, {
           x: textX,
           y: y,
-          size: 9.5,
+          size: 10,
           font: timesRoman,
           color: C.body,
         });
@@ -1166,17 +1137,19 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     }
   };
 
-  // ==================== HEADER (centered) ====================
+  // ==================== HEADER - IMPROVED ====================
 
-  ensureSpace(70);
+  ensureSpace(82);
 
-  const name = (
-    stripHtmlTags(cvData.personal?.fullName) || "Your Name"
-  ).toUpperCase();
-  drawCentered(name, 20, timesRomanBold, C.black);
-  y -= 2;
+  const name = (stripHtmlTags(cvData.personal?.fullName) || "Your Name").toUpperCase();
+  drawCentered(name, 24, timesRomanBold, C.black);
+  y -= 3;
 
-  // Contact rows
+  if (hasMeaningfulValue(cvData.personal?.headline)) {
+    drawCentered(stripHtmlTags(cvData.personal.headline), 11.5, timesRoman, C.secondary);
+    y -= 1;
+  }
+
   const row1 = [];
   const row2 = [];
   if (hasMeaningfulValue(cvData.personal?.email))
@@ -1190,28 +1163,29 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
   if (hasMeaningfulValue(cvData.personal?.website))
     row2.push(stripHtmlTags(cvData.personal.website));
 
-  if (row1.length > 0) drawCentered(row1.join("   |   "), 9.5, timesRoman, C.secondary);
-  if (row2.length > 0) drawCentered(row2.join("   |   "), 9.5, timesRoman, C.secondary);
+  if (row1.length > 0) {
+    drawCentered(row1.join("  •  "), 10, timesRoman, C.secondary);
+    y -= 1;
+  }
+  if (row2.length > 0) {
+    drawCentered(row2.join("  •  "), 10, timesRoman, C.secondary);
+    y -= 1;
+  }
 
-  y -= 4;
+  y -= 5;
   page.drawLine({
     start: { x: margin, y: y },
     end: { x: rightEdge, y: y },
     thickness: 1.5,
     color: C.black,
   });
-  y -= 14;
+  y -= 16;
 
   // ==================== SUMMARY ====================
 
   if (hasMeaningfulValue(cvData.personal?.summary)) {
     drawSectionHeader("Professional Summary");
-    const lines = wrapText(
-      stripHtmlTags(cvData.personal.summary),
-      timesRoman,
-      10,
-      contentWidth
-    );
+    const lines = wrapText(stripHtmlTags(cvData.personal.summary), timesRoman, 10, contentWidth);
     lines.forEach((line) => {
       ensureSpace(13);
       page.drawText(line, {
@@ -1232,12 +1206,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     drawSectionHeader("Education");
 
     for (const edu of cvData.education) {
-      if (
-        !hasMeaningfulValue(edu.institution) &&
-        !hasMeaningfulValue(edu.degree) &&
-        !hasMeaningfulValue(edu.field)
-      )
-        continue;
+      if (!hasMeaningfulValue(edu.institution) && !hasMeaningfulValue(edu.degree) && !hasMeaningfulValue(edu.field)) continue;
 
       ensureSpace(36);
 
@@ -1309,27 +1278,17 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     drawSectionHeader("Professional Experience");
 
     for (const exp of cvData.experience) {
-      if (!hasMeaningfulValue(exp.company) && !hasMeaningfulValue(exp.position))
-        continue;
+      if (!hasMeaningfulValue(exp.company) && !hasMeaningfulValue(exp.position)) continue;
 
       ensureSpace(40);
 
       let dateStr = "";
       if (exp.startDate || exp.endDate || exp.isCurrentRole)
-        dateStr = `${formatDate(exp.startDate)} - ${
-          exp.isCurrentRole ? "Present" : formatDate(exp.endDate)
-        }`;
+        dateStr = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
 
       if (hasMeaningfulValue(exp.position)) {
-        const dateW = dateStr
-          ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15
-          : 0;
-        const lines = wrapText(
-          stripHtmlTags(exp.position),
-          timesRomanBold,
-          10.5,
-          contentWidth - dateW
-        );
+        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
+        const lines = wrapText(stripHtmlTags(exp.position), timesRomanBold, 10.5, contentWidth - dateW);
         lines.forEach((l, i) =>
           page.drawText(l, {
             x: margin,
@@ -1380,21 +1339,13 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 
       let dateStr = "";
       if (proj.startDate || proj.endDate) {
-        dateStr =
-          proj.startDate && proj.endDate
-            ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
-            : formatDate(proj.startDate) || formatDate(proj.endDate);
+        dateStr = proj.startDate && proj.endDate
+          ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
+          : formatDate(proj.startDate) || formatDate(proj.endDate);
       }
 
-      const dateW = dateStr
-        ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15
-        : 0;
-      const lines = wrapText(
-        stripHtmlTags(proj.name),
-        timesRomanBold,
-        10.5,
-        contentWidth - dateW
-      );
+      const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
+      const lines = wrapText(stripHtmlTags(proj.name), timesRomanBold, 10.5, contentWidth - dateW);
       lines.forEach((l, i) =>
         page.drawText(l, {
           x: margin,
@@ -1409,16 +1360,13 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
       y -= 14;
 
       if (hasMeaningfulValue(proj.technologies)) {
-        page.drawText(
-          `Technologies: ${stripHtmlTags(proj.technologies)}`,
-          {
-            x: margin,
-            y: y,
-            size: 9,
-            font: timesRomanItalic,
-            color: C.secondary,
-          }
-        );
+        page.drawText(`Technologies: ${stripHtmlTags(proj.technologies)}`, {
+          x: margin,
+          y: y,
+          size: 9,
+          font: timesRomanItalic,
+          color: C.secondary,
+        });
         y -= 13;
       }
 
@@ -1472,12 +1420,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
       });
 
       if (list.length > 0) {
-        const lines = wrapText(
-          list.join(", "),
-          timesRoman,
-          9.5,
-          contentWidth - labelW - 4
-        );
+        const lines = wrapText(list.join(", "), timesRoman, 9.5, contentWidth - labelW - 4);
         const startY = y;
         lines.forEach((l, i) =>
           page.drawText(l, {
@@ -1508,14 +1451,9 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 
       let dateW = 0;
       if (hasMeaningfulValue(ach.date))
-        dateW = timesRoman.widthOfTextAtSize(stripHtmlTags(ach.date), 9.5) + 15;
+        dateW = timesRoman.widthOfTextAtSize(formatDate(ach.date), 9.5) + 15;
 
-      const lines = wrapText(
-        stripHtmlTags(ach.title),
-        timesRomanBold,
-        10.5,
-        contentWidth - dateW
-      );
+      const lines = wrapText(stripHtmlTags(ach.title), timesRomanBold, 10.5, contentWidth - dateW);
       lines.forEach((l, i) =>
         page.drawText(l, {
           x: margin,
@@ -1527,7 +1465,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
       );
       if (lines.length > 1) y -= (lines.length - 1) * 13;
       if (hasMeaningfulValue(ach.date))
-        drawDateRight(stripHtmlTags(ach.date), y);
+        drawDateRight(formatDate(ach.date), y);
       y -= 14;
 
       if (hasMeaningfulValue(ach.organization)) {
@@ -1542,23 +1480,11 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
       }
 
       if (hasMeaningfulValue(ach.description)) {
-        const descLines = wrapText(
-          stripHtmlTags(ach.description),
-          timesRoman,
-          9.5,
-          contentWidth
-        );
-        descLines.forEach((l) => {
-          ensureSpace(12);
-          page.drawText(l, {
-            x: margin,
-            y: y,
-            size: 9.5,
-            font: timesRoman,
-            color: C.body,
-          });
-          y -= 12;
-        });
+        const items = parseDescription(ach.description);
+        if (items.length > 0) {
+          y -= 2;
+          drawBullets(items, margin);
+        }
       }
 
       y -= 6;
@@ -1572,8 +1498,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     drawSectionHeader("Volunteer Experience");
 
     for (const vol of cvData.volunteer) {
-      if (!hasMeaningfulValue(vol.organization) && !hasMeaningfulValue(vol.role))
-        continue;
+      if (!hasMeaningfulValue(vol.organization) && !hasMeaningfulValue(vol.role)) continue;
 
       ensureSpace(36);
 
@@ -1582,15 +1507,8 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
         dateStr = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
 
       if (hasMeaningfulValue(vol.role)) {
-        const dateW = dateStr
-          ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15
-          : 0;
-        const lines = wrapText(
-          stripHtmlTags(vol.role),
-          timesRomanBold,
-          10.5,
-          contentWidth - dateW
-        );
+        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
+        const lines = wrapText(stripHtmlTags(vol.role), timesRomanBold, 10.5, contentWidth - dateW);
         lines.forEach((l, i) =>
           page.drawText(l, {
             x: margin,
@@ -1632,7 +1550,7 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 }
 
 // ============================================
-// MINIMAL TEMPLATE — Compact Professional
+// MINIMAL TEMPLATE
 // ============================================
 
 async function generateMinimalTemplate(pdfDoc, cvData, utils) {
@@ -1691,16 +1609,15 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     });
   };
 
-  // Section header — spaced letters + thin line
   const drawSectionHeader = (title) => {
-    ensureSpace(24);
-    y -= 10;
+    ensureSpace(22);
+    y -= 9;
 
     const spaced = title.toUpperCase().split("").join("  ");
     page.drawText(spaced, {
       x: margin,
       y: y,
-      size: 7,
+      size: 7.5,
       font: helvetica,
       color: C.muted,
     });
@@ -1713,7 +1630,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
       color: C.border,
     });
 
-    y -= 14;
+    y -= 13;
   };
 
   const drawBullets = (items, x) => {
@@ -1726,7 +1643,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
 
       const textX = x + 12;
       const maxW = contentWidth - (textX - margin);
-      const lines = wrapText(clean, helvetica, 9, maxW);
+      const lines = wrapText(clean, helvetica, 9.5, maxW);
 
       lines.forEach((line, idx) => {
         ensureSpace(12);
@@ -1734,7 +1651,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
           page.drawText("\u2013", {
             x: x,
             y: y,
-            size: 9,
+            size: 9.5,
             font: helvetica,
             color: C.light,
           });
@@ -1742,7 +1659,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
         page.drawText(line, {
           x: textX,
           y: y,
-          size: 9,
+          size: 9.5,
           font: helvetica,
           color: C.body,
         });
@@ -1752,18 +1669,29 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     }
   };
 
-  // ==================== HEADER ====================
+  // ==================== HEADER - IMPROVED ====================
 
-  ensureSpace(70);
+  ensureSpace(82);
 
   page.drawText(stripHtmlTags(cvData.personal?.fullName) || "Your Name", {
     x: margin,
     y: y,
-    size: 26,
+    size: 30,
     font: helvetica,
     color: C.black,
   });
-  y -= 34;
+  y -= 35;
+
+  if (hasMeaningfulValue(cvData.personal?.headline)) {
+    page.drawText(stripHtmlTags(cvData.personal.headline), {
+      x: margin,
+      y: y,
+      size: 11.5,
+      font: helvetica,
+      color: C.secondary,
+    });
+    y -= 19;
+  }
 
   const contacts = [];
   if (hasMeaningfulValue(cvData.personal?.email))
@@ -1778,43 +1706,33 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     contacts.push(stripHtmlTags(cvData.personal.website));
 
   if (contacts.length > 0) {
-    const contactLines = wrapText(
-      contacts.join("   |   "),
-      helvetica,
-      9,
-      contentWidth
-    );
+    const contactLines = wrapText(contacts.join("  |  "), helvetica, 9.5, contentWidth);
     contactLines.forEach((line) => {
       page.drawText(line, {
         x: margin,
         y: y,
-        size: 9,
+        size: 9.5,
         font: helvetica,
         color: C.muted,
       });
-      y -= 13;
+      y -= 12;
     });
+    y -= 3;
   }
 
-  y -= 3;
   page.drawLine({
     start: { x: margin, y: y },
-    end: { x: margin + 36, y: y },
+    end: { x: margin + 40, y: y },
     thickness: 1,
     color: C.black,
   });
-  y -= 16;
+  y -= 18;
 
   // ==================== SUMMARY ====================
 
   if (hasMeaningfulValue(cvData.personal?.summary)) {
     drawSectionHeader("Summary");
-    const lines = wrapText(
-      stripHtmlTags(cvData.personal.summary),
-      helvetica,
-      9.5,
-      contentWidth
-    );
+    const lines = wrapText(stripHtmlTags(cvData.personal.summary), helvetica, 9.5, contentWidth);
     lines.forEach((line) => {
       ensureSpace(13);
       page.drawText(line, {
@@ -1835,12 +1753,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     drawSectionHeader("Education");
 
     for (const edu of cvData.education) {
-      if (
-        !hasMeaningfulValue(edu.institution) &&
-        !hasMeaningfulValue(edu.degree) &&
-        !hasMeaningfulValue(edu.field)
-      )
-        continue;
+      if (!hasMeaningfulValue(edu.institution) && !hasMeaningfulValue(edu.degree) && !hasMeaningfulValue(edu.field)) continue;
 
       ensureSpace(34);
 
@@ -1855,9 +1768,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
         dateStr = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
 
       if (deg) {
-        const dateW = dateStr
-          ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-          : 0;
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
         const lines = wrapText(deg, helvetica, 10.5, contentWidth - dateW);
         lines.forEach((l, i) =>
           page.drawText(l, {
@@ -1914,27 +1825,17 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     drawSectionHeader("Experience");
 
     for (const exp of cvData.experience) {
-      if (!hasMeaningfulValue(exp.company) && !hasMeaningfulValue(exp.position))
-        continue;
+      if (!hasMeaningfulValue(exp.company) && !hasMeaningfulValue(exp.position)) continue;
 
       ensureSpace(38);
 
       let dateStr = "";
       if (exp.startDate || exp.endDate || exp.isCurrentRole)
-        dateStr = `${formatDate(exp.startDate)} - ${
-          exp.isCurrentRole ? "Present" : formatDate(exp.endDate)
-        }`;
+        dateStr = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
 
       if (hasMeaningfulValue(exp.position)) {
-        const dateW = dateStr
-          ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-          : 0;
-        const lines = wrapText(
-          stripHtmlTags(exp.position),
-          helvetica,
-          10.5,
-          contentWidth - dateW
-        );
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
+        const lines = wrapText(stripHtmlTags(exp.position), helvetica, 10.5, contentWidth - dateW);
         lines.forEach((l, i) =>
           page.drawText(l, {
             x: margin,
@@ -1982,21 +1883,13 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
 
       let dateStr = "";
       if (proj.startDate || proj.endDate) {
-        dateStr =
-          proj.startDate && proj.endDate
-            ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
-            : formatDate(proj.startDate) || formatDate(proj.endDate);
+        dateStr = proj.startDate && proj.endDate
+          ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
+          : formatDate(proj.startDate) || formatDate(proj.endDate);
       }
 
-      const dateW = dateStr
-        ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-        : 0;
-      const lines = wrapText(
-        stripHtmlTags(proj.name),
-        helvetica,
-        10.5,
-        contentWidth - dateW
-      );
+      const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
+      const lines = wrapText(stripHtmlTags(proj.name), helvetica, 10.5, contentWidth - dateW);
       lines.forEach((l, i) =>
         page.drawText(l, {
           x: margin,
@@ -2071,12 +1964,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
       });
 
       if (list.length > 0) {
-        const lines = wrapText(
-          list.join("  \u2022  "),
-          helvetica,
-          9,
-          contentWidth - labelW - 4
-        );
+        const lines = wrapText(list.join("  \u2022  "), helvetica, 9, contentWidth - labelW - 4);
         const startY = y;
         lines.forEach((l, i) =>
           page.drawText(l, {
@@ -2107,14 +1995,9 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
 
       let dateW = 0;
       if (hasMeaningfulValue(ach.date))
-        dateW = helvetica.widthOfTextAtSize(stripHtmlTags(ach.date), 8.5) + 15;
+        dateW = helvetica.widthOfTextAtSize(formatDate(ach.date), 8.5) + 15;
 
-      const lines = wrapText(
-        stripHtmlTags(ach.title),
-        helvetica,
-        10.5,
-        contentWidth - dateW
-      );
+      const lines = wrapText(stripHtmlTags(ach.title), helvetica, 10.5, contentWidth - dateW);
       lines.forEach((l, i) =>
         page.drawText(l, {
           x: margin,
@@ -2126,7 +2009,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
       );
       if (lines.length > 1) y -= (lines.length - 1) * 13;
       if (hasMeaningfulValue(ach.date))
-        drawDateRight(stripHtmlTags(ach.date), y);
+        drawDateRight(formatDate(ach.date), y);
       y -= 14;
 
       if (hasMeaningfulValue(ach.organization)) {
@@ -2141,23 +2024,11 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
       }
 
       if (hasMeaningfulValue(ach.description)) {
-        const descLines = wrapText(
-          stripHtmlTags(ach.description),
-          helvetica,
-          9,
-          contentWidth
-        );
-        descLines.forEach((l) => {
-          ensureSpace(12);
-          page.drawText(l, {
-            x: margin,
-            y: y,
-            size: 9,
-            font: helvetica,
-            color: C.body,
-          });
-          y -= 12;
-        });
+        const items = parseDescription(ach.description);
+        if (items.length > 0) {
+          y -= 2;
+          drawBullets(items, margin);
+        }
       }
 
       y -= 6;
@@ -2171,8 +2042,7 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     drawSectionHeader("Volunteer");
 
     for (const vol of cvData.volunteer) {
-      if (!hasMeaningfulValue(vol.organization) && !hasMeaningfulValue(vol.role))
-        continue;
+      if (!hasMeaningfulValue(vol.organization) && !hasMeaningfulValue(vol.role)) continue;
 
       ensureSpace(34);
 
@@ -2181,15 +2051,8 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
         dateStr = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
 
       if (hasMeaningfulValue(vol.role)) {
-        const dateW = dateStr
-          ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15
-          : 0;
-        const lines = wrapText(
-          stripHtmlTags(vol.role),
-          helvetica,
-          10.5,
-          contentWidth - dateW
-        );
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
+        const lines = wrapText(stripHtmlTags(vol.role), helvetica, 10.5, contentWidth - dateW);
         lines.forEach((l, i) =>
           page.drawText(l, {
             x: margin,
