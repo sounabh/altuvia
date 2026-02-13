@@ -61,7 +61,7 @@ const MONTH_NAMES = [
  */
 const DEFAULTS = {
   templateId: 'modern',
-  themeColor: '#1e40af',
+  themeColor: '#000000',  // black,
 };
 
 /**
