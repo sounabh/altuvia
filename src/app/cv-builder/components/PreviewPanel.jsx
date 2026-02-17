@@ -1,380 +1,172 @@
 import React from "react";
 import { Eye, Palette, Mail, Phone, MapPin, Linkedin, Globe } from "lucide-react";
 
-/**
- * Label component for form labels
- * @param {Object} props - Component props
- * @param {React.ReactNode} props.children - Label content
- * @param {string} props.className - Additional CSS classes
- */
-const Label = ({ children, className }) => (
-  <span className={className}>{children}</span>
-);
+const Label = ({ children, className }) => <span className={className}>{children}</span>;
 
-/**
- * Available theme colors for the CV templates
- * Each theme has a main color and a light variant for backgrounds
- */
-const THEME_COLORS = [
-  // Comment out all themes except black
-  // { name: "Navy Blue", value: "#1e40af", light: "#dbeafe" },
-  // { name: "Emerald", value: "#059669", light: "#d1fae5" },
-  // { name: "Purple", value: "#7c3aed", light: "#ede9fe" },
-  // { name: "Rose", value: "#e11d48", light: "#ffe4e6" },
-  // { name: "Amber", value: "#d97706", light: "#fef3c7" },
-  // { name: "Teal", value: "#0d9488", light: "#ccfbf1" },
-  // { name: "Indigo", value: "#4f46e5", light: "#e0e7ff" },
-  // { name: "Slate", value: "#475569", light: "#e2e8f0" },
-  { name: "Black", value: "#000000", light: "#f3f4f6" },
-];
+const THEME_COLORS = [{ name: "Black", value: "#000000", light: "#f3f4f6" }];
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-/**
- * Extracts skill name from various formats (string or object)
- * @param {string|Object} skill - Skill data in various formats
- * @returns {string} Cleaned skill name
- */
 const getSkillName = (skill) => {
-  if (!skill) return '';
-  if (typeof skill === 'string') return skill.trim();
-  if (typeof skill === 'object' && skill !== null) {
-    // Handle various object structures
-    return skill.name || skill.value || skill.skill || skill.label || skill.title || '';
-  }
+  if (!skill) return "";
+  if (typeof skill === "string") return skill.trim();
+  if (typeof skill === "object") return skill.name || skill.value || skill.skill || skill.label || skill.title || "";
   return String(skill);
 };
 
-/**
- * Cleans HTML tags and entities from text
- * @param {string} text - Text containing HTML
- * @returns {string} Clean text without HTML
- */
 const stripHtmlTags = (text) => {
-  if (!text) return '';
-  if (typeof text !== 'string') return String(text);
+  if (!text) return "";
+  if (typeof text !== "string") return String(text);
   return text
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
-    .replace(/&amp;/g, '&')  // Replace &amp; with &
-    .replace(/&lt;/g, '<')   // Replace &lt; with <
-    .replace(/&gt;/g, '>')   // Replace &gt; with >
-    .replace(/&quot;/g, '"') // Replace &quot; with "
-    .replace(/&#39;/g, "'")  // Replace &#39; with '
-    .trim();
+    .replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
 };
 
-/**
- * Gets skills list as array of strings from a category
- * @param {Object} category - Skill category object
- * @returns {Array} Array of skill names
- */
 const getSkillsList = (category) => {
-  if (!category || !category.skills) return [];
-  if (!Array.isArray(category.skills)) return [];
-  return category.skills
-    .map(skill => getSkillName(skill))
-    .filter(name => name.length > 0);
+  if (!category || !category.skills || !Array.isArray(category.skills)) return [];
+  return category.skills.map((s) => getSkillName(s)).filter((n) => n.length > 0);
 };
 
-/**
- * PreviewPanel - Main component for displaying CV preview with template selection
- * @param {Object} props - Component props
- * @param {string} props.selectedTemplate - Currently selected template name
- * @param {Function} props.onTemplateChange - Callback for template change
- * @param {Object} props.cvData - CV data object
- * @param {string} props.themeColor - Current theme color
- * @param {Function} props.onThemeColorChange - Callback for theme color change
- * @returns {JSX.Element} Preview panel component
- */
-export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#000000", onThemeColorChange }) => {
-  
-  /**
-   * Formats date from YYYY-MM format to human readable format
-   * @param {string} date - Date in YYYY-MM format
-   * @returns {string} Formatted date (e.g., "Jan 2023")
-   */
-  const formatDate = (date) => {
-    if (!date) return "";
-    const [year, month] = date.split("-");
-    const monthNames = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-    return `${monthNames[parseInt(month) - 1]} ${year}`;
-  };
+const normalizeFieldValue = (value) => {
+  if (!value) return "";
+  const cleaned = stripHtmlTags(value).trim();
+  const placeholders = /^(other|n\/a|none|not specified|enter |your |add |\[.*\]|\(.*\))$/i;
+  if (placeholders.test(cleaned)) return "";
+  return cleaned;
+};
 
-  /**
-   * Enhanced bullet point parsing with multiple format support
-   * @param {string|Array} description - Description content
-   * @returns {Array|null} Array of cleaned description items or null
-   */
+const parseDateValue = (date) => {
+  if (!date) return "";
+  const s = String(date).trim();
+  if (s.includes("T") || (s.length > 7 && s.includes("-") && s.split("-").length === 3)) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return `${names[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    }
+  }
+  const parts = s.split("-");
+  if (parts.length === 2 && parts[0].length === 4) {
+    const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const m = parseInt(parts[1], 10);
+    if (m >= 1 && m <= 12) return `${names[m - 1]} ${parts[0]}`;
+    return parts[0];
+  }
+  if (/^\d{4}$/.test(s)) return s;
+  return s;
+};
+
+export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, themeColor = "#000000", onThemeColorChange }) => {
+  const formatDate = (date) => parseDateValue(date);
+
   const renderDescription = (description) => {
     if (!description) return null;
-    
-    // If already an array, clean each item
-    if (Array.isArray(description)) {
-      return description.map(item => stripHtmlTags(item)).filter(Boolean);
-    }
-    
-    if (typeof description === 'string') {
+    if (Array.isArray(description)) return description.map((i) => stripHtmlTags(i)).filter(Boolean);
+    if (typeof description === "string") {
       let text = description;
-      
-      // Method 1: Parse HTML paragraph tags
-      if (text.includes('<p>')) {
-        const items = text
-          .split(/<\/p>/i)
-          .map(item => {
-            let cleaned = item.replace(/<p[^>]*>/gi, '');
-            cleaned = cleaned.replace(/<[^>]*>/g, '');
-            cleaned = cleaned.replace(/&nbsp;/g, ' ');
-            cleaned = cleaned.replace(/&amp;/g, '&');
-            cleaned = cleaned.trim();
-            cleaned = cleaned.replace(/^[•\s]+/, '');
-            return cleaned.trim();
-          })
-          .filter(item => item.length > 0);
-        
+      if (text.includes("<p>")) {
+        const items = text.split(/<\/p>/i)
+          .map((item) => item.replace(/<p[^>]*>/gi, "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/^[•\s]+/, "").trim())
+          .filter((i) => i.length > 0);
         if (items.length > 0) return items;
       }
-      
-      // Method 2: Split by bullet characters or list items
-      if (text.includes('<li>')) {
-        const items = text
-          .split(/<\/li>/i)
-          .map(item => {
-            let cleaned = item.replace(/<li[^>]*>/gi, '');
-            cleaned = cleaned.replace(/<[^>]*>/g, '');
-            cleaned = cleaned.replace(/&nbsp;/g, ' ');
-            cleaned = cleaned.replace(/&amp;/g, '&');
-            cleaned = cleaned.trim();
-            cleaned = cleaned.replace(/^[•\-\s]+/, '');
-            return cleaned.trim();
-          })
-          .filter(item => item.length > 0);
-        
+      if (text.includes("<li>")) {
+        const items = text.split(/<\/li>/i)
+          .map((item) => item.replace(/<li[^>]*>/gi, "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/^[•\-\s]+/, "").trim())
+          .filter((i) => i.length > 0);
         if (items.length > 0) return items;
       }
-      
-      // Method 3: Strip HTML and split by newlines
-      const cleanedDesc = stripHtmlTags(text);
-      const lines = cleanedDesc.split('\n').filter(line => line.trim());
-      const cleanedLines = lines.map(line => line.replace(/^[•\-]\s*/, '').trim()).filter(Boolean);
-      
-      if (cleanedLines.length > 1) return cleanedLines;
-      
-      // Method 4: Split by bullet character
-      if (cleanedDesc.includes('•')) {
-        const items = cleanedDesc.split('•').map(item => item.trim()).filter(Boolean);
-        if (items.length > 1) return items;
-      }
-      
-      // Method 5: Split by dash
-      if (cleanedDesc.includes('-')) {
-        const items = cleanedDesc.split('-').map(item => item.trim()).filter(Boolean);
-        if (items.length > 1) return items.slice(1); // Skip first empty item
-      }
-      
-      // Fallback: return as single item if it has content
-      return cleanedLines.length > 0 ? cleanedLines : null;
+      const clean = stripHtmlTags(text);
+      const lines = clean.split("\n").filter((l) => l.trim()).map((l) => l.replace(/^[•\-]\s*/, "").trim()).filter(Boolean);
+      if (lines.length > 1) return lines;
+      if (clean.includes("•")) { const items = clean.split("•").map((i) => i.trim()).filter(Boolean); if (items.length > 1) return items; }
+      return lines.length > 0 ? lines : null;
     }
-    
     return null;
   };
 
-  /**
-   * Safely extracts and validates CV data with default values
-   */
   const safeData = {
-    personal: cvData.personal || {},
-    education: Array.isArray(cvData.education) ? cvData.education : [],
-    experience: Array.isArray(cvData.experience) ? cvData.experience : [],
-    projects: Array.isArray(cvData.projects) ? cvData.projects : [],
-    skills: Array.isArray(cvData.skills) ? cvData.skills : [],
+    personal:     cvData.personal     || {},
+    education:    Array.isArray(cvData.education)    ? cvData.education    : [],
+    experience:   Array.isArray(cvData.experience)   ? cvData.experience   : [],
+    skills:       Array.isArray(cvData.skills)       ? cvData.skills       : [],
     achievements: Array.isArray(cvData.achievements) ? cvData.achievements : [],
-    volunteer: Array.isArray(cvData.volunteer) ? cvData.volunteer : [],
+    volunteer:    Array.isArray(cvData.volunteer)    ? cvData.volunteer    : [],
   };
 
-  /**
-   * Checks if a value has meaningful content (not empty or placeholder)
-   * @param {*} value - Value to check
-   * @returns {boolean} True if value is meaningful
-   */
   const hasMeaningfulValue = (value) => {
     if (value === null || value === undefined) return false;
-    if (Array.isArray(value)) {
-      return value.length > 0 && value.some(item => hasMeaningfulValue(item));
-    }
-    const stringValue = String(value).trim();
-    if (stringValue === "") return false;
-    const minimalPatterns = [
-      /^[.\-\s]*$/,
-      /^n\/a$/i,
-      /^not specified$/i,
-      /^enter /i,
-      /^your /i,
-      /^add /i,
-      /^\[.*\]$/,
-      /^\(.*\)$/,
-      /^\[object Object\]$/i,
-    ];
-    if (minimalPatterns.some(pattern => pattern.test(stringValue))) {
-      return false;
-    }
-    return true;
+    if (Array.isArray(value)) return value.length > 0 && value.some((i) => hasMeaningfulValue(i));
+    const s = String(value).trim();
+    if (s === "") return false;
+    const bad = [/^[.\-\s]*$/,/^n\/a$/i,/^not specified$/i,/^enter /i,/^your /i,/^add /i,/^\[.*\]$/,/^\(.*\)$/,/^\[object Object\]$/i,/^other$/i];
+    return !bad.some((p) => p.test(s));
   };
 
-  /**
-   * Checks if a section array has meaningful data
-   * @param {Array} section - Section data array
-   * @returns {boolean} True if section has meaningful data
-   */
   const hasData = (section) => {
     if (!section || !Array.isArray(section)) return false;
     return section.some((item) => {
-      if (!item || typeof item !== 'object') return false;
-      const filteredItem = { ...item };
-      delete filteredItem.id;
-      return Object.values(filteredItem).some(value => hasMeaningfulValue(value));
+      if (!item || typeof item !== "object") return false;
+      const f = { ...item }; delete f.id;
+      return Object.values(f).some((v) => hasMeaningfulValue(v));
     });
   };
 
-  /**
-   * Checks if a specific section has data
-   * @param {string} sectionName - Name of the section
-   * @returns {boolean} True if section has data
-   */
-  const hasSectionData = (sectionName) => {
-    const section = safeData[sectionName];
-    if (sectionName === 'personal') {
-      const { fullName, ...otherPersonalData } = section;
-      const hasOtherData = Object.values(otherPersonalData).some(value => hasMeaningfulValue(value));
-      return hasMeaningfulValue(fullName) || hasOtherData;
+  const hasSectionData = (name) => {
+    const section = safeData[name];
+    if (!section) return false;
+    if (name === "personal") {
+      const { fullName, ...rest } = section;
+      return hasMeaningfulValue(fullName) || Object.values(rest).some((v) => hasMeaningfulValue(v));
     }
-    if (sectionName === 'skills') {
-      // Special check for skills - ensure at least one category has actual skills
-      return section.some(category => {
-        const skillsList = getSkillsList(category);
-        return category.name || skillsList.length > 0;
-      });
-    }
+    if (name === "skills") return section.some((c) => c.name || getSkillsList(c).length > 0);
     return hasData(section);
   };
 
-  /**
-   * Checks if contact information exists
-   * @returns {boolean} True if contact info exists
-   */
   const hasContactInfo = () => {
-    const { fullName, summary, ...contactFields } = safeData.personal;
-    return Object.values(contactFields).some(value => hasMeaningfulValue(value));
+    const { fullName, summary, ...fields } = safeData.personal;
+    return Object.values(fields).some((v) => hasMeaningfulValue(v));
   };
 
-  /**
-   * Checks if professional summary exists
-   * @returns {boolean} True if summary exists
-   */
-  const hasSummary = () => {
-    return hasMeaningfulValue(safeData.personal?.summary);
+  const hasSummary = () => hasMeaningfulValue(safeData.personal?.summary);
+
+  const currentTheme = THEME_COLORS[0];
+
+  const commonProps = {
+    data: safeData, formatDate, hasSectionData, renderDescription,
+    themeColor: currentTheme, hasContactInfo, hasSummary,
+    getSkillsList, stripHtmlTags, normalizeFieldValue,
   };
 
-  // Get current theme object - always black
-  const currentTheme = THEME_COLORS.find(t => t.value === "#000000") || THEME_COLORS[0];
-
-  /**
-   * Renders the selected template component
-   * @returns {JSX.Element} Template component
-   */
   const renderTemplate = () => {
-    // Common props passed to all templates
-    const commonProps = {
-      data: safeData,
-      formatDate,
-      hasSectionData,
-      hasData,
-      renderDescription,
-      themeColor: currentTheme,
-      hasContactInfo,
-      hasSummary,
-      getSkillsList,
-      stripHtmlTags,
-    };
-
     switch (selectedTemplate) {
-      case "modern":
-        return <ModernPreview {...commonProps} />;
-      case "classic":
-        return <ClassicPreview {...commonProps} />;
-      case "minimal":
-        return <MinimalPreview {...commonProps} />;
-      default:
-        return <ModernPreview {...commonProps} />;
+      case "classic": return <ClassicPreview {...commonProps} />;
+      case "minimal": return <MinimalPreview {...commonProps} />;
+      default:        return <ModernPreview  {...commonProps} />;
     }
   };
 
   return (
-    /* Main container for preview panel */
     <div className="h-full flex flex-col bg-white">
-      
-      {/* Preview controls header */}
       <div className="p-4 border-b border-gray-300 bg-gray-50">
-        
-        {/* Title section */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Eye className="w-5 h-5 text-blue-600" />
             <h3 className="font-semibold text-gray-800">Live Preview</h3>
           </div>
         </div>
-
-        {/* Template and theme controls */}
-        <div className="flex items-center justify-between gap-4">
-          
-          {/* Template selection */}
+        <div className="flex items-center gap-4">
           <div className="flex items-center space-x-3">
             <Palette className="w-4 h-4 text-gray-600" />
             <Label className="text-gray-700 text-sm">Template:</Label>
-            <select
-              value={selectedTemplate}
-              onChange={(e) => onTemplateChange(e.target.value)}
-              className="w-[150px] border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={selectedTemplate} onChange={(e) => onTemplateChange(e.target.value)}
+              className="w-[150px] border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="modern">Modern</option>
               <option value="classic">Classic</option>
               <option value="minimal">Minimal</option>
             </select>
           </div>
-
-          {/* Theme color selection - REMOVED FROM UI BUT KEEP IN CODE */}
-          {/* 
-          <div className="flex items-center space-x-3">
-            <Label className="text-gray-700 text-sm">Theme:</Label>
-            <div className="flex gap-2">
-              {THEME_COLORS.map((color) => (
-                <button
-                  key={color.value}
-                  onClick={() => onThemeColorChange(color.value)}
-                  className={`w-6 h-6 rounded-full border-2 transition-all ${
-                    themeColor === color.value 
-                      ? 'border-gray-800 scale-110' 
-                      : 'border-gray-300 hover:border-gray-500'
-                  }`}
-                  style={{ backgroundColor: color.value }}
-                  title={color.name}
-                />
-              ))}
-            </div>
-          </div>
-          */}
         </div>
       </div>
-
-      {/* Preview content area */}
       <div className="flex-1 overflow-auto p-6 bg-gray-100">
-        
-        {/* CV preview container (A4 size simulation) */}
         <div className="bg-white shadow-xl mx-auto max-w-[210mm] rounded-sm overflow-hidden">
           {renderTemplate()}
         </div>
@@ -383,133 +175,102 @@ export const PreviewPanel = ({ selectedTemplate, onTemplateChange, cvData = {}, 
   );
 };
 
-// ============================================
-// MODERN TEMPLATE - Clean with accent colors
-// ============================================
+// ─── Shared edu title helpers ─────────────────────────────────────────────────
+const formatEduTitle = (edu, normalizeFieldValue) => {
+  const degree = stripHtmlTags(edu.degree || "");
+  const field  = normalizeFieldValue(edu.field || "");
+  if (degree && field) return `${degree} in ${field}`;
+  if (degree) return degree;
+  if (field)  return field;
+  return "";
+};
 
-/**
- * ModernPreview - Clean, contemporary CV template with accent colors
- * @param {Object} props - Template props
- * @param {Object} props.data - CV data
- * @param {Function} props.formatDate - Date formatting function
- * @param {Function} props.hasSectionData - Section data checker
- * @param {Function} props.renderDescription - Description renderer
- * @param {Object} props.themeColor - Theme color object
- * @param {Function} props.hasContactInfo - Contact info checker
- * @param {Function} props.hasSummary - Summary checker
- * @param {Function} props.getSkillsList - Skills list getter
- * @param {Function} props.stripHtmlTags - HTML stripper
- * @returns {JSX.Element} Modern template component
- */
-const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
-  
-  /**
-   * BulletList component for rendering bullet points
-   * @param {Object} props - Component props
-   * @param {Array|string} props.items - Items to render as bullets
-   * @param {string} props.className - Additional CSS classes
-   * @returns {JSX.Element|null} Bullet list or null if no items
-   */
-  const BulletList = ({ items, className = "" }) => {
-    const parsedItems = renderDescription(items);
-    if (!parsedItems || parsedItems.length === 0) return null;
-    
+const formatEduTitleClassic = (edu, normalizeFieldValue) => {
+  const degree = stripHtmlTags(edu.degree || "");
+  const field  = normalizeFieldValue(edu.field || "");
+  if (degree && field) return `${degree}, ${field}`;
+  if (degree) return degree;
+  if (field)  return field;
+  return "";
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODERN TEMPLATE  — centered header
+// ══════════════════════════════════════════════════════════════════════════════
+const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags, normalizeFieldValue }) => {
+
+  const BulletList = ({ items }) => {
+    const parsed = renderDescription(items);
+    if (!parsed || parsed.length === 0) return null;
     return (
-      <ul className={`space-y-1.5 mt-2 ${className}`}>
-        {parsedItems.map((item, idx) => (
-          <li key={idx} className="flex items-start gap-3 text-sm text-slate-700">
-            {/* Custom bullet point using theme color */}
-            <span 
-              className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" 
-              style={{ backgroundColor: themeColor.value }}
-            />
-            <span className="leading-relaxed">{item}</span>
+      <ul className="space-y-1.5 mt-2">
+        {parsed.map((item, i) => (
+          <li key={i} className="flex items-start gap-3 text-sm text-slate-700 leading-relaxed">
+            <span className="w-1.5 h-1.5 rounded-full mt-[0.4em] flex-shrink-0" style={{ backgroundColor: themeColor.value }} />
+            <span>{item}</span>
           </li>
         ))}
       </ul>
     );
   };
 
+  const SectionHeading = ({ label }) => (
+    <div className="flex items-center gap-3 mb-4">
+      <h2 className="text-[10px] font-bold uppercase tracking-[0.18em] whitespace-nowrap" style={{ color: themeColor.value }}>
+        {label}
+      </h2>
+      <div className="h-px flex-1" style={{ backgroundColor: `${themeColor.value}25` }} />
+    </div>
+  );
+
+  const DateBadge = ({ text }) => (
+    <span className="text-[11px] font-medium px-2.5 py-0.5 rounded whitespace-nowrap ml-3 flex-shrink-0"
+      style={{ backgroundColor: themeColor.light, color: "#555" }}>
+      {text}
+    </span>
+  );
+
+  const hasAdditional = hasSectionData("skills") || hasSectionData("achievements") || hasSectionData("volunteer");
+
   return (
-    /* Modern template container */
-    <div className="p-10 font-sans antialiased bg-white">
-      
-      {/* Header with name and contact info */}
-      <header className="mb-6">
-        
-        {/* Full name */}
-        <h1 
-          className="text-4xl font-bold tracking-tight mb-1"
-          style={{ color: themeColor.value }}
-        >
+    <div className="p-10 font-sans antialiased bg-white text-slate-800">
+
+      {/* ── Header — centered ── */}
+      <header className="text-center mb-7">
+        <h1 className="text-[2.15rem] font-bold tracking-tight leading-none mb-3"
+          style={{ color: themeColor.value }}>
           {data.personal?.fullName || "Your Name"}
         </h1>
-        
-        {/* Contact information */}
+
         {hasContactInfo() && (
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600 mt-4">
-            
-            {/* Email */}
+          <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-3">
             {data.personal?.email && (
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: themeColor.light }}
-                >
-                  <Mail className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
-                </div>
+              <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                <Mail className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
                 <span>{data.personal.email}</span>
               </div>
             )}
-            
-            {/* Phone */}
             {data.personal?.phone && (
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: themeColor.light }}
-                >
-                  <Phone className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
-                </div>
+              <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                <Phone className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
                 <span>{data.personal.phone}</span>
               </div>
             )}
-            
-            {/* Location */}
             {data.personal?.location && (
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: themeColor.light }}
-                >
-                  <MapPin className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
-                </div>
+              <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
                 <span>{data.personal.location}</span>
               </div>
             )}
-            
-            {/* LinkedIn */}
             {data.personal?.linkedin && (
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: themeColor.light }}
-                >
-                  <Linkedin className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
-                </div>
+              <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                <Linkedin className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
                 <span>{data.personal.linkedin}</span>
               </div>
             )}
-            
-            {/* Website */}
             {data.personal?.website && (
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: themeColor.light }}
-                >
-                  <Globe className="w-3.5 h-3.5" style={{ color: themeColor.value }} />
-                </div>
+              <div className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                <Globe className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
                 <span>{data.personal.website}</span>
               </div>
             )}
@@ -517,325 +278,165 @@ const ModernPreview = ({ data, formatDate, hasSectionData, renderDescription, th
         )}
       </header>
 
-      {/* Accent line separator */}
-      <div 
-        className="h-1 w-full rounded-full mb-6"
-        style={{ 
-          background: `linear-gradient(to right, ${themeColor.value}, ${themeColor.value}88, ${themeColor.value}44)` 
-        }}
-      />
+      {/* Symmetric fade divider */}
+      <div className="h-px w-full mb-7"
+        style={{ background: `linear-gradient(to right, transparent, ${themeColor.value}88, transparent)` }} />
 
-      {/* Professional Summary section */}
+      {/* ── 1. Professional Summary ── */}
       {hasSummary() && (
-        <section className="mb-6">
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Professional Summary
-          </h2>
-          <p className="text-sm text-slate-700 leading-relaxed pl-4 border-l-2 border-slate-100">
+        <section className="mb-7">
+          <SectionHeading label="Professional Summary" />
+          <p className="text-[13px] text-slate-600 leading-relaxed">
             {stripHtmlTags(data.personal.summary)}
           </p>
         </section>
       )}
 
-      {/* Education section */}
-      {hasSectionData('education') && (
-        <section className="mb-6">
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Education
-          </h2>
-          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
-            {data.education.map((edu, i) => (
-              (edu.institution || edu.degree || edu.field) && (
-                <div key={i}>
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-semibold text-slate-900">
-                      {edu.degree}{edu.field && ` in ${edu.field}`}
-                    </h3>
-                    {/* Date range with theme styling */}
-                    {(edu.startDate || edu.endDate) && (
-                      <span 
-                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
-                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
-                      >
-                        {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                      </span>
-                    )}
-                  </div>
-                  {edu.institution && (
-                    <p className="text-sm text-slate-600 mb-1">{edu.institution}</p>
-                  )}
-                  {edu.gpa && (
-                    <p className="text-sm text-slate-500">GPA: {edu.gpa}</p>
-                  )}
-                  {edu.description && <BulletList items={edu.description} />}
-                </div>
-              )
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Work Experience section */}
-      {hasSectionData('experience') && (
-        <section className="mb-6">
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Experience
-          </h2>
-          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
-            {data.experience.map((exp, i) => (
-              (exp.company || exp.position) && (
-                <div key={i}>
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-semibold text-slate-900">{exp.position}</h3>
-                    {/* Date range with theme styling */}
-                    {(exp.startDate || exp.endDate) && (
-                      <span 
-                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
-                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
-                      >
-                        {formatDate(exp.startDate)} - {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-600 mb-2">
-                    {exp.company}{exp.location && ` • ${exp.location}`}
-                  </p>
-                  {exp.description && <BulletList items={exp.description} />}
-                </div>
-              )
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Projects section */}
-      {hasSectionData('projects') && (
-        <section className="mb-6">
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Projects
-          </h2>
-          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
-            {data.projects.map((proj, i) => (
-              proj.name && (
-                <div key={i}>
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-semibold text-slate-900">{proj.name}</h3>
-                    {/* Project date range */}
-                    {(proj.startDate || proj.endDate) && (
-                      <span 
-                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
-                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
-                      >
-                        {proj.startDate ? formatDate(proj.startDate) : ''} 
-                        {proj.endDate ? ` - ${formatDate(proj.endDate)}` : ''}
-                      </span>
-                    )}
-                  </div>
-                  {/* Technology tags */}
-                  {proj.technologies && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {proj.technologies.split(',').map((tech, idx) => (
-                        <span 
-                          key={idx} 
-                          className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded"
-                        >
-                          {tech.trim()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {proj.description && <BulletList items={proj.description} />}
-                  {/* Project links */}
-                  {(proj.githubUrl || proj.liveUrl) && (
-                    <div className="flex gap-4 mt-2 text-xs" style={{ color: themeColor.value }}>
-                      {proj.githubUrl && <span>GitHub: {proj.githubUrl}</span>}
-                      {proj.liveUrl && <span>Live: {proj.liveUrl}</span>}
-                    </div>
-                  )}
-                </div>
-              )
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Technical Skills section */}
-      {hasSectionData('skills') && (
-        <section className="mb-6">
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Technical Skills
-          </h2>
-          <div className="grid grid-cols-2 gap-3 pl-4 border-l-2 border-slate-100">
-            {data.skills.map((category, i) => {
-              const skillsList = getSkillsList(category);
-              return (category.name || skillsList.length > 0) ? (
-                <div key={i} className="bg-slate-50 rounded-lg p-3">
-                  {category.name && (
-                    <h4 className="font-semibold text-slate-800 text-sm mb-1">
-                      {stripHtmlTags(category.name)}
-                    </h4>
-                  )}
-                  {skillsList.length > 0 && (
-                    <p className="text-slate-600 text-xs leading-relaxed">
-                      {skillsList.join(", ")}
-                    </p>
-                  )}
-                </div>
-              ) : null;
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Achievements section */}
-      {hasSectionData('achievements') && (
-        <section className="mb-6">
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Achievements
-          </h2>
-          <div className="pl-4 border-l-2 border-slate-100 space-y-3">
-            {data.achievements.map((ach, i) => (
-              ach.title && (
+      {/* ── 2. Professional Experience ── */}
+      {hasSectionData("experience") && (
+        <section className="mb-7">
+          <SectionHeading label="Professional Experience" />
+          <div className="space-y-5">
+            {data.experience.map((exp, i) =>
+              (exp.company || exp.position) ? (
                 <div key={i}>
                   <div className="flex justify-between items-start">
-                    <h3 className="font-semibold text-slate-900">{stripHtmlTags(ach.title)}</h3>
-                    {ach.date && (
-                      <span className="text-xs text-slate-500 ml-4">{ach.date}</span>
+                    <div>
+                      <h3 className="text-[13.5px] font-semibold text-slate-900 leading-snug">{exp.position}</h3>
+                      <p className="text-[12px] text-slate-500 mt-0.5">
+                        {exp.company}{exp.location && <span className="text-slate-400"> &middot; {exp.location}</span>}
+                      </p>
+                    </div>
+                    {(exp.startDate || exp.endDate) && (
+                      <DateBadge text={`${formatDate(exp.startDate)} – ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`} />
                     )}
                   </div>
-                  {ach.organization && (
-                    <p className="text-sm text-slate-600">{stripHtmlTags(ach.organization)}</p>
-                  )}
-                  {ach.description && <BulletList items={ach.description} />}
+                  {exp.description && <BulletList items={exp.description} />}
                 </div>
-              )
-            ))}
+              ) : null
+            )}
           </div>
         </section>
       )}
 
-      {/* Volunteer Experience section */}
-      {hasSectionData('volunteer') && (
-        <section>
-          <h2 
-            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"
-            style={{ color: themeColor.value }}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: themeColor.value }}
-            />
-            Volunteer Experience
-          </h2>
-          <div className="pl-4 border-l-2 border-slate-100 space-y-4">
-            {data.volunteer.map((vol, i) => (
-              (vol.organization || vol.role) && (
+      {/* ── 3. Education ── */}
+      {hasSectionData("education") && (
+        <section className="mb-7">
+          <SectionHeading label="Education" />
+          <div className="space-y-4">
+            {data.education.map((edu, i) =>
+              (edu.institution || edu.degree || edu.field) ? (
                 <div key={i}>
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-semibold text-slate-900">{vol.role}</h3>
-                    {/* Volunteer date range */}
-                    {(vol.startDate || vol.endDate) && (
-                      <span 
-                        className="text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ml-4"
-                        style={{ backgroundColor: themeColor.light, color: themeColor.value }}
-                      >
-                        {formatDate(vol.startDate)} - {formatDate(vol.endDate)}
-                      </span>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-[13.5px] font-semibold text-slate-900 leading-snug">
+                        {formatEduTitle(edu, normalizeFieldValue)}
+                      </h3>
+                      {edu.institution && <p className="text-[12px] text-slate-500 mt-0.5">{edu.institution}</p>}
+                      {edu.gpa && <p className="text-[11.5px] text-slate-400 mt-0.5">GPA: {edu.gpa}</p>}
+                    </div>
+                    {(edu.startDate || edu.endDate) && (
+                      <DateBadge text={`${formatDate(edu.startDate)} – ${formatDate(edu.endDate)}`} />
                     )}
                   </div>
-                  <p className="text-sm text-slate-600 mb-2">
-                    {vol.organization}{vol.location && ` • ${vol.location}`}
-                  </p>
-                  {vol.description && <BulletList items={vol.description} />}
+                  {edu.description && <BulletList items={edu.description} />}
                 </div>
-              )
-            ))}
+              ) : null
+            )}
           </div>
+        </section>
+      )}
+
+      {/* ── Additional Information ── */}
+      {hasAdditional && (
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-400">Additional Information</span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          {hasSectionData("skills") && (
+            <div className="mb-6">
+              <SectionHeading label="Skills" />
+              <div className="grid grid-cols-2 gap-2.5">
+                {data.skills.map((cat, i) => {
+                  const list = getSkillsList(cat);
+                  return (cat.name || list.length > 0) ? (
+                    <div key={i} className="bg-slate-50 border border-slate-100 rounded-md px-3 py-2.5">
+                      {cat.name && <h4 className="text-[11.5px] font-semibold text-slate-700 mb-1">{stripHtmlTags(cat.name)}</h4>}
+                      {list.length > 0 && <p className="text-[11px] text-slate-500 leading-relaxed">{list.join(" · ")}</p>}
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            </div>
+          )}
+
+          {hasSectionData("achievements") && (
+            <div className="mb-6">
+              <SectionHeading label="Achievements" />
+              <div className="space-y-3.5">
+                {data.achievements.map((ach, i) =>
+                  ach.title ? (
+                    <div key={i}>
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-[13px] font-semibold text-slate-900">{stripHtmlTags(ach.title)}</h3>
+                        {ach.date && <span className="text-[11px] text-slate-400 ml-3 flex-shrink-0">{formatDate(ach.date)}</span>}
+                      </div>
+                      {ach.organization && <p className="text-[12px] text-slate-500 mt-0.5">{stripHtmlTags(ach.organization)}</p>}
+                      {ach.description && <BulletList items={ach.description} />}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </div>
+          )}
+
+          {hasSectionData("volunteer") && (
+            <div>
+              <SectionHeading label="Volunteer Experience" />
+              <div className="space-y-4">
+                {data.volunteer.map((vol, i) =>
+                  (vol.organization || vol.role) ? (
+                    <div key={i}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-[13.5px] font-semibold text-slate-900 leading-snug">{vol.role}</h3>
+                          <p className="text-[12px] text-slate-500 mt-0.5">
+                            {vol.organization}{vol.location && <span className="text-slate-400"> &middot; {vol.location}</span>}
+                          </p>
+                        </div>
+                        {(vol.startDate || vol.endDate) && (
+                          <DateBadge text={`${formatDate(vol.startDate)} – ${formatDate(vol.endDate)}`} />
+                        )}
+                      </div>
+                      {vol.description && <BulletList items={vol.description} />}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </div>
+          )}
         </section>
       )}
     </div>
   );
 };
 
-// ============================================
-// CLASSIC TEMPLATE - Traditional formal style
-// ============================================
+// ══════════════════════════════════════════════════════════════════════════════
+// CLASSIC TEMPLATE  — centered header with icons, clean spacing
+// ══════════════════════════════════════════════════════════════════════════════
+const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags, normalizeFieldValue }) => {
 
-/**
- * ClassicPreview - Traditional, formal CV template
- * @param {Object} props - Template props
- * @param {Object} props.data - CV data
- * @param {Function} props.formatDate - Date formatting function
- * @param {Function} props.hasSectionData - Section data checker
- * @param {Function} props.renderDescription - Description renderer
- * @param {Object} props.themeColor - Theme color object
- * @param {Function} props.hasContactInfo - Contact info checker
- * @param {Function} props.hasSummary - Summary checker
- * @param {Function} props.getSkillsList - Skills list getter
- * @param {Function} props.stripHtmlTags - HTML stripper
- * @returns {JSX.Element} Classic template component
- */
-const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
-  
-  /**
-   * BulletList component for classic template
-   * @param {Object} props - Component props
-   * @param {Array|string} props.items - Items to render as bullets
-   * @returns {JSX.Element|null} Bullet list or null if no items
-   */
   const BulletList = ({ items }) => {
-    const parsedItems = renderDescription(items);
-    if (!parsedItems || parsedItems.length === 0) return null;
-    
+    const parsed = renderDescription(items);
+    if (!parsed || parsed.length === 0) return null;
     return (
-      <ul className="mt-2 ml-4 space-y-1">
-        {parsedItems.map((item, idx) => (
-          <li 
-            key={idx} 
-            className="relative pl-4 text-sm text-gray-700 leading-relaxed before:content-['•'] before:absolute before:left-0 before:text-gray-400"
-          >
+      <ul className="mt-1.5 space-y-1 pl-4">
+        {parsed.map((item, i) => (
+          <li key={i} className="relative pl-3 text-[12.5px] text-gray-700 leading-relaxed
+            before:content-['▸'] before:absolute before:left-0 before:text-gray-400 before:text-[10px] before:top-[2px]">
             {item}
           </li>
         ))}
@@ -843,504 +444,441 @@ const ClassicPreview = ({ data, formatDate, hasSectionData, renderDescription, t
     );
   };
 
+  const SectionHeading = ({ label }) => (
+    <h2 className="text-[10.5px] font-bold uppercase tracking-[0.16em] border-b mb-3.5 pb-1.5"
+      style={{ borderColor: themeColor.value, color: themeColor.value }}>{label}</h2>
+  );
+
+  const hasAdditional = hasSectionData("skills") || hasSectionData("achievements") || hasSectionData("volunteer");
+
   return (
-    /* Classic template container with serif font */
     <div className="p-10 font-serif antialiased bg-white text-gray-900">
-      
-      {/* Centered header with border */}
+
+      {/* ── Header — centered, well-spaced, with icons ── */}
       <header className="text-center mb-8 pb-5 border-b-2" style={{ borderColor: themeColor.value }}>
-        
-        {/* Uppercase name */}
-        <h1 
-          className="text-3xl font-bold tracking-wide mb-2"
-          style={{ color: themeColor.value }}
-        >
+
+        {/* Name */}
+        <h1 className="text-[1.75rem] font-bold tracking-[0.08em] mb-4 leading-tight"
+          style={{ color: themeColor.value }}>
           {(data.personal?.fullName || "Your Name").toUpperCase()}
         </h1>
-        
-        {/* Contact info in centered paragraphs */}
+
         {hasContactInfo() && (
-          <div className="text-sm text-gray-600 space-y-0.5">
-            <p>
-              {[data.personal?.email, data.personal?.phone].filter(Boolean).join("  •  ")}
-            </p>
-            <p>
-              {[data.personal?.location, data.personal?.linkedin, data.personal?.website].filter(Boolean).join("  •  ")}
-            </p>
+          <div className="space-y-2">
+            {/* Row 1 — email & phone */}
+            {(data.personal?.email || data.personal?.phone) && (
+              <div className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
+                {data.personal?.email && (
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-gray-500">
+                    <Mail className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
+                    {data.personal.email}
+                  </span>
+                )}
+                {data.personal?.email && data.personal?.phone && (
+                  <span className="text-gray-300 text-[10px] select-none">·</span>
+                )}
+                {data.personal?.phone && (
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-gray-500">
+                    <Phone className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
+                    {data.personal.phone}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Row 2 — location, linkedin, website */}
+            {(data.personal?.location || data.personal?.linkedin || data.personal?.website) && (
+              <div className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
+                {data.personal?.location && (
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-gray-500">
+                    <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
+                    {data.personal.location}
+                  </span>
+                )}
+                {data.personal?.location && (data.personal?.linkedin || data.personal?.website) && (
+                  <span className="text-gray-300 text-[10px] select-none">·</span>
+                )}
+                {data.personal?.linkedin && (
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-gray-500">
+                    <Linkedin className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
+                    {data.personal.linkedin}
+                  </span>
+                )}
+                {data.personal?.linkedin && data.personal?.website && (
+                  <span className="text-gray-300 text-[10px] select-none">·</span>
+                )}
+                {data.personal?.website && (
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-gray-500">
+                    <Globe className="w-3 h-3 flex-shrink-0" style={{ color: themeColor.value }} />
+                    {data.personal.website}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </header>
 
-      {/* Professional Summary section */}
+      {/* ── 1. Professional Summary ── */}
       {hasSummary() && (
-        <section className="mb-6">
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Professional Summary
-          </h2>
-          <p className="text-sm leading-relaxed text-justify text-gray-700">
+        <section className="mb-5">
+          <SectionHeading label="Professional Summary" />
+          <p className="text-[12.5px] leading-relaxed text-justify text-gray-700">
             {stripHtmlTags(data.personal.summary)}
           </p>
         </section>
       )}
 
-      {/* Education section */}
-      {hasSectionData('education') && (
-        <section className="mb-6">
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Education
-          </h2>
-          {data.education.map((edu, i) => (
-            (edu.institution || edu.degree || edu.field) && (
-              <div key={i} className="mb-3">
-                <div className="flex justify-between items-start mb-1">
-                  <strong className="text-gray-900">
-                    {edu.degree}{edu.field && `, ${edu.field}`}
-                  </strong>
-                  {(edu.startDate || edu.endDate) && (
-                    <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                      {formatDate(edu.startDate)} – {formatDate(edu.endDate)}
-                    </span>
-                  )}
-                </div>
-                {edu.institution && (
-                  <p className="text-sm italic text-gray-600 mb-1">{edu.institution}</p>
-                )}
-                {edu.gpa && (
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">GPA:</span> {edu.gpa}
-                  </p>
-                )}
-                {edu.description && <BulletList items={edu.description} />}
-              </div>
-            )
-          ))}
-        </section>
-      )}
-
-      {/* Professional Experience section */}
-      {hasSectionData('experience') && (
-        <section className="mb-6">
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Professional Experience
-          </h2>
-          {data.experience.map((exp, i) => (
-            (exp.company || exp.position) && (
-              <div key={i} className="mb-4">
-                <div className="flex justify-between items-start mb-1">
-                  <strong className="text-gray-900">{exp.position}</strong>
-                  {(exp.startDate || exp.endDate) && (
-                    <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                      {formatDate(exp.startDate)} – {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm italic text-gray-600 mb-2">
-                  {exp.company}{exp.location && `, ${exp.location}`}
-                </p>
-                {exp.description && <BulletList items={exp.description} />}
-              </div>
-            )
-          ))}
-        </section>
-      )}
-
-      {/* Technical Projects section */}
-      {hasSectionData('projects') && (
-        <section className="mb-6">
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Technical Projects
-          </h2>
-          {data.projects.map((proj, i) => (
-            proj.name && (
-              <div key={i} className="mb-4">
-                <div className="flex justify-between items-start mb-1">
-                  <strong className="text-gray-900">{proj.name}</strong>
-                  {(proj.startDate || proj.endDate) && (
-                    <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                      {proj.startDate ? formatDate(proj.startDate) : ''} 
-                      {proj.endDate ? ` – ${formatDate(proj.endDate)}` : ''}
-                    </span>
-                  )}
-                </div>
-                {proj.technologies && (
-                  <p className="text-sm italic text-gray-600 mb-2">
-                    Technologies: {proj.technologies}
-                  </p>
-                )}
-                {proj.description && <BulletList items={proj.description} />}
-                {(proj.githubUrl || proj.liveUrl) && (
-                  <div className="mt-2 text-sm space-y-0.5" style={{ color: themeColor.value }}>
-                    {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
-                    {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
-                  </div>
-                )}
-              </div>
-            )
-          ))}
-        </section>
-      )}
-
-      {/* Technical Skills section */}
-      {hasSectionData('skills') && (
-        <section className="mb-6">
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Technical Skills
-          </h2>
-          <div className="text-sm text-gray-700 space-y-2">
-            {data.skills.map((category, i) => {
-              const skillsList = getSkillsList(category);
-              return (category.name || skillsList.length > 0) ? (
-                <p key={i}>
-                  <span className="font-semibold text-gray-900">
-                    {stripHtmlTags(category.name)}:
-                  </span>{" "}
-                  {skillsList.join(", ")}
-                </p>
-              ) : null;
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Achievements section */}
-      {hasSectionData('achievements') && (
-        <section className="mb-6">
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Achievements
-          </h2>
-          <div className="space-y-3">
-            {data.achievements.map((ach, i) => (
-              ach.title && (
-                <div key={i}>
-                  <div className="flex justify-between items-start">
-                    <strong className="text-gray-900">{stripHtmlTags(ach.title)}</strong>
-                    {ach.date && (
-                      <span className="text-sm text-gray-600 ml-4">{ach.date}</span>
-                    )}
-                  </div>
-                  {ach.organization && (
-                    <p className="text-sm text-gray-600">{stripHtmlTags(ach.organization)}</p>
-                  )}
-                  {ach.description && <BulletList items={ach.description} />}
-                </div>
-              )
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Volunteer Experience section */}
-      {hasSectionData('volunteer') && (
-        <section>
-          <h2 
-            className="text-sm font-bold uppercase tracking-widest border-b pb-2 mb-4"
-            style={{ borderColor: themeColor.value, color: themeColor.value }}
-          >
-            Volunteer Experience
-          </h2>
+      {/* ── 2. Professional Experience ── */}
+      {hasSectionData("experience") && (
+        <section className="mb-5">
+          <SectionHeading label="Professional Experience" />
           <div className="space-y-4">
-            {data.volunteer.map((vol, i) => (
-              (vol.organization || vol.role) && (
+            {data.experience.map((exp, i) =>
+              (exp.company || exp.position) ? (
                 <div key={i}>
-                  <div className="flex justify-between items-start mb-1">
-                    <strong className="text-gray-900">{vol.role}</strong>
-                    {(vol.startDate || vol.endDate) && (
-                      <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
-                        {formatDate(vol.startDate)} – {formatDate(vol.endDate)}
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[13px] font-bold text-gray-900">{exp.position}</span>
+                    {(exp.startDate || exp.endDate) && (
+                      <span className="text-[11.5px] text-gray-500 whitespace-nowrap ml-4">
+                        {formatDate(exp.startDate)} – {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
                       </span>
                     )}
                   </div>
-                  <p className="text-sm italic text-gray-600 mb-2">
-                    {vol.organization}{vol.location && `, ${vol.location}`}
+                  <p className="text-[12px] italic text-gray-500 mt-0.5 mb-1">
+                    {exp.company}{exp.location && `, ${exp.location}`}
                   </p>
-                  {vol.description && <BulletList items={vol.description} />}
+                  {exp.description && <BulletList items={exp.description} />}
                 </div>
-              )
-            ))}
+              ) : null
+            )}
           </div>
         </section>
+      )}
+
+      {/* ── 3. Education ── */}
+      {hasSectionData("education") && (
+        <section className="mb-5">
+          <SectionHeading label="Education" />
+          <div className="space-y-3">
+            {data.education.map((edu, i) =>
+              (edu.institution || edu.degree || edu.field) ? (
+                <div key={i}>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[13px] font-bold text-gray-900">
+                      {formatEduTitleClassic(edu, normalizeFieldValue)}
+                    </span>
+                    {(edu.startDate || edu.endDate) && (
+                      <span className="text-[11.5px] text-gray-500 whitespace-nowrap ml-4">
+                        {formatDate(edu.startDate)} – {formatDate(edu.endDate)}
+                      </span>
+                    )}
+                  </div>
+                  {edu.institution && <p className="text-[12px] italic text-gray-500 mt-0.5">{edu.institution}</p>}
+                  {edu.gpa && <p className="text-[12px] text-gray-600 mt-0.5"><span className="font-semibold">GPA:</span> {edu.gpa}</p>}
+                  {edu.description && <BulletList items={edu.description} />}
+                </div>
+              ) : null
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Additional Information ── */}
+      {hasAdditional && (
+        <>
+          <div className="flex items-center gap-3 my-5">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-gray-400">Additional Information</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          {hasSectionData("skills") && (
+            <section className="mb-5">
+              <SectionHeading label="Skills" />
+              <div className="text-[12.5px] text-gray-700 space-y-1.5">
+                {data.skills.map((cat, i) => {
+                  const list = getSkillsList(cat);
+                  return (cat.name || list.length > 0) ? (
+                    <p key={i}>
+                      {cat.name && <span className="font-semibold text-gray-900">{stripHtmlTags(cat.name)}: </span>}
+                      <span className="text-gray-600">{list.join(", ")}</span>
+                    </p>
+                  ) : null;
+                })}
+              </div>
+            </section>
+          )}
+
+          {hasSectionData("achievements") && (
+            <section className="mb-5">
+              <SectionHeading label="Achievements" />
+              <div className="space-y-3">
+                {data.achievements.map((ach, i) =>
+                  ach.title ? (
+                    <div key={i}>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-[13px] font-bold text-gray-900">{stripHtmlTags(ach.title)}</span>
+                        {ach.date && <span className="text-[11.5px] text-gray-500 ml-4 flex-shrink-0">{formatDate(ach.date)}</span>}
+                      </div>
+                      {ach.organization && <p className="text-[12px] italic text-gray-500 mt-0.5">{stripHtmlTags(ach.organization)}</p>}
+                      {ach.description && <BulletList items={ach.description} />}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </section>
+          )}
+
+          {hasSectionData("volunteer") && (
+            <section>
+              <SectionHeading label="Volunteer Experience" />
+              <div className="space-y-3">
+                {data.volunteer.map((vol, i) =>
+                  (vol.organization || vol.role) ? (
+                    <div key={i}>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-[13px] font-bold text-gray-900">{vol.role}</span>
+                        {(vol.startDate || vol.endDate) && (
+                          <span className="text-[11.5px] text-gray-500 whitespace-nowrap ml-4">
+                            {formatDate(vol.startDate)} – {formatDate(vol.endDate)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[12px] italic text-gray-500 mt-0.5 mb-1">
+                        {vol.organization}{vol.location && `, ${vol.location}`}
+                      </p>
+                      {vol.description && <BulletList items={vol.description} />}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );
 };
 
-// ============================================
-// MINIMAL TEMPLATE - Ultra clean, lots of whitespace
-// ============================================
+// ══════════════════════════════════════════════════════════════════════════════
+// MINIMAL TEMPLATE  — centered header
+// ══════════════════════════════════════════════════════════════════════════════
+const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags, normalizeFieldValue }) => {
 
-/**
- * MinimalPreview - Clean, minimalist CV template with ample whitespace
- * @param {Object} props - Template props
- * @param {Object} props.data - CV data
- * @param {Function} props.formatDate - Date formatting function
- * @param {Function} props.hasSectionData - Section data checker
- * @param {Function} props.renderDescription - Description renderer
- * @param {Object} props.themeColor - Theme color object
- * @param {Function} props.hasContactInfo - Contact info checker
- * @param {Function} props.hasSummary - Summary checker
- * @param {Function} props.getSkillsList - Skills list getter
- * @param {Function} props.stripHtmlTags - HTML stripper
- * @returns {JSX.Element} Minimal template component
- */
-const MinimalPreview = ({ data, formatDate, hasSectionData, renderDescription, themeColor, hasContactInfo, hasSummary, getSkillsList, stripHtmlTags }) => {
-  
-  /**
-   * BulletList component for minimal template
-   * @param {Object} props - Component props
-   * @param {Array|string} props.items - Items to render as bullets
-   * @returns {JSX.Element|null} Bullet list or null if no items
-   */
   const BulletList = ({ items }) => {
-    const parsedItems = renderDescription(items);
-    if (!parsedItems || parsedItems.length === 0) return null;
-    
+    const parsed = renderDescription(items);
+    if (!parsed || parsed.length === 0) return null;
     return (
-      <ul className="mt-3 space-y-2">
-        {parsedItems.map((item, idx) => (
-          <li key={idx} className="flex items-start gap-4 text-sm text-gray-600">
-            <span className="text-gray-300 mt-0.5">—</span>
-            <span className="leading-relaxed">{item}</span>
+      <ul className="mt-2.5 space-y-1.5">
+        {parsed.map((item, i) => (
+          <li key={i} className="flex items-start gap-3 text-[12.5px] text-gray-500 leading-relaxed">
+            <span className="text-gray-300 flex-shrink-0 mt-0.5 text-xs">—</span>
+            <span>{item}</span>
           </li>
         ))}
       </ul>
     );
   };
 
+  const SectionHeading = ({ label }) => (
+    <h2 className="text-[9.5px] uppercase tracking-[0.3em] text-gray-400 mb-4 font-medium">{label}</h2>
+  );
+
+  const hasAdditional = hasSectionData("skills") || hasSectionData("achievements") || hasSectionData("volunteer");
+
   return (
-    /* Minimal template container with light font weight */
     <div className="p-12 font-sans antialiased bg-white" style={{ fontWeight: 300 }}>
-      
-      {/* Header with extra-light typography */}
-      <header className="mb-10">
-        <h1 
-          className="text-5xl font-extralight tracking-tight mb-2"
-          style={{ color: themeColor.value }}
-        >
+
+      {/* ── Header — centered ── */}
+      <header className="text-center mb-9">
+        <h1 className="text-[2.6rem] font-extralight tracking-tight leading-none mb-1"
+          style={{ color: themeColor.value }}>
           {data.personal?.fullName || "Your Name"}
         </h1>
-        
-        {/* Horizontal contact info with separator pipes */}
+
         {hasContactInfo() && (
-          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 mt-4">
-            {data.personal?.email && <span>{data.personal.email}</span>}
-            {data.personal?.email && data.personal?.phone && <span className="text-gray-300">|</span>}
-            {data.personal?.phone && <span>{data.personal.phone}</span>}
-            {data.personal?.phone && data.personal?.location && <span className="text-gray-300">|</span>}
-            {data.personal?.location && <span>{data.personal.location}</span>}
-            {data.personal?.location && data.personal?.linkedin && <span className="text-gray-300">|</span>}
-            {data.personal?.linkedin && <span>{data.personal.linkedin}</span>}
-            {data.personal?.linkedin && data.personal?.website && <span className="text-gray-300">|</span>}
-            {data.personal?.website && <span>{data.personal.website}</span>}
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[11.5px] text-gray-400 mt-4">
+            {data.personal?.email && (
+              <span className="flex items-center gap-1.5">
+                <Mail className="w-3 h-3 flex-shrink-0 text-gray-300" />
+                {data.personal.email}
+              </span>
+            )}
+            {data.personal?.email && data.personal?.phone && <span className="text-gray-200 select-none">|</span>}
+            {data.personal?.phone && (
+              <span className="flex items-center gap-1.5">
+                <Phone className="w-3 h-3 flex-shrink-0 text-gray-300" />
+                {data.personal.phone}
+              </span>
+            )}
+            {data.personal?.phone && data.personal?.location && <span className="text-gray-200 select-none">|</span>}
+            {data.personal?.location && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3 h-3 flex-shrink-0 text-gray-300" />
+                {data.personal.location}
+              </span>
+            )}
+            {data.personal?.location && data.personal?.linkedin && <span className="text-gray-200 select-none">|</span>}
+            {data.personal?.linkedin && (
+              <span className="flex items-center gap-1.5">
+                <Linkedin className="w-3 h-3 flex-shrink-0 text-gray-300" />
+                {data.personal.linkedin}
+              </span>
+            )}
+            {data.personal?.linkedin && data.personal?.website && <span className="text-gray-200 select-none">|</span>}
+            {data.personal?.website && (
+              <span className="flex items-center gap-1.5">
+                <Globe className="w-3 h-3 flex-shrink-0 text-gray-300" />
+                {data.personal.website}
+              </span>
+            )}
           </div>
         )}
       </header>
 
-      {/* Thin divider line */}
-      <div className="w-16 h-px mb-10" style={{ backgroundColor: themeColor.value }} />
+      {/* Centered short rule */}
+      <div className="flex justify-center mb-9">
+        <div className="w-12 h-px" style={{ backgroundColor: themeColor.value }} />
+      </div>
 
-      {/* Summary section */}
+      {/* ── 1. Summary ── */}
       {hasSummary() && (
-        <section className="mb-10">
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Summary
-          </h2>
-          <p className="text-sm text-gray-600 leading-loose max-w-2xl">
+        <section className="mb-9">
+          <SectionHeading label="Summary" />
+          <p className="text-[12.5px] text-gray-500 leading-loose max-w-2xl font-light">
             {stripHtmlTags(data.personal.summary)}
           </p>
         </section>
       )}
 
-      {/* Education section */}
-      {hasSectionData('education') && (
-        <section className="mb-10">
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Education
-          </h2>
-          <div className="space-y-4">
-            {data.education.map((edu, i) => (
-              (edu.institution || edu.degree || edu.field) && (
-                <div key={i}>
-                  <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="text-base font-normal text-gray-900">
-                      {edu.degree}{edu.field && `, ${edu.field}`}
-                    </h3>
-                    {(edu.startDate || edu.endDate) && (
-                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
-                        {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
-                      </span>
-                    )}
-                  </div>
-                  {edu.institution && (
-                    <p className="text-sm text-gray-500">{edu.institution}</p>
-                  )}
-                  {edu.gpa && (
-                    <p className="text-sm text-gray-400 mt-1">GPA: {edu.gpa}</p>
-                  )}
-                  {edu.description && <BulletList items={edu.description} />}
-                </div>
-              )
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Experience section */}
-      {hasSectionData('experience') && (
-        <section className="mb-10">
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Experience
-          </h2>
+      {/* ── 2. Professional Experience ── */}
+      {hasSectionData("experience") && (
+        <section className="mb-9">
+          <SectionHeading label="Professional Experience" />
           <div className="space-y-6">
-            {data.experience.map((exp, i) => (
-              (exp.company || exp.position) && (
+            {data.experience.map((exp, i) =>
+              (exp.company || exp.position) ? (
                 <div key={i}>
-                  <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="text-base font-normal text-gray-900">{exp.position}</h3>
+                  <div className="flex justify-between items-baseline">
+                    <h3 className="text-[13.5px] font-normal text-gray-800">{exp.position}</h3>
                     {(exp.startDate || exp.endDate) && (
-                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
+                      <span className="text-[11px] text-gray-400 whitespace-nowrap ml-4">
                         {formatDate(exp.startDate)} — {exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 mb-1">{exp.company}</p>
+                  <p className="text-[12px] text-gray-400 mt-0.5">
+                    {exp.company}{exp.location && <span className="text-gray-300"> · {exp.location}</span>}
+                  </p>
                   {exp.description && <BulletList items={exp.description} />}
                 </div>
-              )
-            ))}
+              ) : null
+            )}
           </div>
         </section>
       )}
 
-      {/* Projects section */}
-      {hasSectionData('projects') && (
-        <section className="mb-10">
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Projects
-          </h2>
-          <div className="space-y-6">
-            {data.projects.map((proj, i) => (
-              proj.name && (
-                <div key={i}>
-                  <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="text-base font-normal text-gray-900">{proj.name}</h3>
-                    {(proj.startDate || proj.endDate) && (
-                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
-                        {proj.startDate ? formatDate(proj.startDate) : ''} 
-                        {proj.endDate ? ` — ${formatDate(proj.endDate)}` : ''}
-                      </span>
-                    )}
-                  </div>
-                  {proj.technologies && (
-                    <p className="text-sm text-gray-400 mb-1">{proj.technologies}</p>
-                  )}
-                  {proj.description && <BulletList items={proj.description} />}
-                  {(proj.githubUrl || proj.liveUrl) && (
-                    <div className="mt-3 text-sm space-y-1" style={{ color: themeColor.value }}>
-                      {proj.githubUrl && <p>GitHub: {proj.githubUrl}</p>}
-                      {proj.liveUrl && <p>Live: {proj.liveUrl}</p>}
-                    </div>
-                  )}
-                </div>
-              )
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Skills section with two-column layout */}
-      {hasSectionData('skills') && (
-        <section className="mb-10">
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Skills
-          </h2>
-          <div className="space-y-3 text-sm">
-            {data.skills.map((category, i) => {
-              const skillsList = getSkillsList(category);
-              return (category.name || skillsList.length > 0) ? (
-                <div key={i} className="flex">
-                  <span className="w-28 text-gray-400 flex-shrink-0">
-                    {stripHtmlTags(category.name)}
-                  </span>
-                  <span className="text-gray-600">{skillsList.join(", ")}</span>
-                </div>
-              ) : null;
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Achievements section */}
-      {hasSectionData('achievements') && (
-        <section className="mb-10">
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Achievements
-          </h2>
-          <div className="space-y-4">
-            {data.achievements.map((ach, i) => (
-              ach.title && (
+      {/* ── 3. Education ── */}
+      {hasSectionData("education") && (
+        <section className="mb-9">
+          <SectionHeading label="Education" />
+          <div className="space-y-5">
+            {data.education.map((edu, i) =>
+              (edu.institution || edu.degree || edu.field) ? (
                 <div key={i}>
                   <div className="flex justify-between items-baseline">
-                    <h3 className="text-base font-normal text-gray-900">
-                      {stripHtmlTags(ach.title)}
+                    <h3 className="text-[13.5px] font-normal text-gray-800">
+                      {formatEduTitle(edu, normalizeFieldValue)}
                     </h3>
-                    {ach.date && (
-                      <span className="text-sm text-gray-400 ml-4">{ach.date}</span>
+                    {(edu.startDate || edu.endDate) && (
+                      <span className="text-[11px] text-gray-400 whitespace-nowrap ml-4">
+                        {formatDate(edu.startDate)} — {formatDate(edu.endDate)}
+                      </span>
                     )}
                   </div>
-                  {ach.organization && (
-                    <p className="text-sm text-gray-500">{stripHtmlTags(ach.organization)}</p>
-                  )}
-                  {ach.description && <BulletList items={ach.description} />}
+                  {edu.institution && <p className="text-[12px] text-gray-400 mt-0.5">{edu.institution}</p>}
+                  {edu.gpa && <p className="text-[11.5px] text-gray-300 mt-0.5">GPA: {edu.gpa}</p>}
+                  {edu.description && <BulletList items={edu.description} />}
                 </div>
-              )
-            ))}
+              ) : null
+            )}
           </div>
         </section>
       )}
 
-      {/* Volunteer section */}
-      {hasSectionData('volunteer') && (
-        <section>
-          <h2 className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-4">
-            Volunteer
-          </h2>
-          <div className="space-y-6">
-            {data.volunteer.map((vol, i) => (
-              (vol.organization || vol.role) && (
-                <div key={i}>
-                  <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="text-base font-normal text-gray-900">{vol.role}</h3>
-                    {(vol.startDate || vol.endDate) && (
-                      <span className="text-sm text-gray-400 whitespace-nowrap ml-4">
-                        {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500">{vol.organization}</p>
-                  {vol.description && <BulletList items={vol.description} />}
-                </div>
-              )
-            ))}
+      {/* ── Additional Information ── */}
+      {hasAdditional && (
+        <>
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-px flex-1 bg-gray-100" />
+            <span className="text-[8.5px] uppercase tracking-[0.4em] text-gray-300 font-medium">Additional Information</span>
+            <div className="h-px flex-1 bg-gray-100" />
           </div>
-        </section>
+
+          {hasSectionData("skills") && (
+            <section className="mb-9">
+              <SectionHeading label="Skills" />
+              <div className="space-y-2.5 text-[12.5px]">
+                {data.skills.map((cat, i) => {
+                  const list = getSkillsList(cat);
+                  return (cat.name || list.length > 0) ? (
+                    <div key={i} className="flex gap-4">
+                      <span className="w-28 text-gray-400 flex-shrink-0 font-light">{stripHtmlTags(cat.name)}</span>
+                      <span className="text-gray-500 font-light">{list.join(", ")}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            </section>
+          )}
+
+          {hasSectionData("achievements") && (
+            <section className="mb-9">
+              <SectionHeading label="Achievements" />
+              <div className="space-y-4">
+                {data.achievements.map((ach, i) =>
+                  ach.title ? (
+                    <div key={i}>
+                      <div className="flex justify-between items-baseline">
+                        <h3 className="text-[13.5px] font-normal text-gray-800">{stripHtmlTags(ach.title)}</h3>
+                        {ach.date && <span className="text-[11px] text-gray-400 ml-4 flex-shrink-0">{formatDate(ach.date)}</span>}
+                      </div>
+                      {ach.organization && <p className="text-[12px] text-gray-400 mt-0.5">{stripHtmlTags(ach.organization)}</p>}
+                      {ach.description && <BulletList items={ach.description} />}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </section>
+          )}
+
+          {hasSectionData("volunteer") && (
+            <section>
+              <SectionHeading label="Volunteer Experience" />
+              <div className="space-y-5">
+                {data.volunteer.map((vol, i) =>
+                  (vol.organization || vol.role) ? (
+                    <div key={i}>
+                      <div className="flex justify-between items-baseline">
+                        <h3 className="text-[13.5px] font-normal text-gray-800">{vol.role}</h3>
+                        {(vol.startDate || vol.endDate) && (
+                          <span className="text-[11px] text-gray-400 whitespace-nowrap ml-4">
+                            {formatDate(vol.startDate)} — {formatDate(vol.endDate)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[12px] text-gray-400 mt-0.5">
+                        {vol.organization}{vol.location && <span className="text-gray-300"> · {vol.location}</span>}
+                      </p>
+                      {vol.description && <BulletList items={vol.description} />}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );

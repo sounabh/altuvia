@@ -185,13 +185,9 @@ const stripHtmlTags = (text) => {
     .trim();
 };
 
-/**
- * FIXED: parseDescription now properly handles ReactQuill <p> tags
- */
 const parseDescription = (description) => {
   if (!description) return [];
 
-  // Array input
   if (Array.isArray(description)) {
     return description
       .map((item) => stripHtmlTags(item))
@@ -200,7 +196,7 @@ const parseDescription = (description) => {
 
   const descString = String(description);
 
-  // 1. Extract <li> items (ReactQuill <ul>/<ol> format)
+  // 1. Extract <li> items
   const bullets = [];
   let match;
   HTML_PATTERNS.listItems.lastIndex = 0;
@@ -210,24 +206,20 @@ const parseDescription = (description) => {
   }
   if (bullets.length > 0) return bullets;
 
-  // 2. Extract <p> items (ReactQuill paragraph format) - FIXED
-  // Each <p> tag represents a separate bullet point
+  // 2. Extract <p> items
   const pItems = [];
   HTML_PATTERNS.paragraphs.lastIndex = 0;
   while ((match = HTML_PATTERNS.paragraphs.exec(descString)) !== null) {
     let cleaned = match[1]
-      .replace(/<[^>]*>/g, '') // Remove any nested HTML tags
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       .trim();
-    
-    // Remove leading bullet characters if present
-    cleaned = cleaned.replace(/^[•●○◦▪▸►\s]+/, '').trim();
-    
+    cleaned = cleaned.replace(/^[•●○◦▪▸►\s]+/, "").trim();
     if (cleaned.length > 0) pItems.push(cleaned);
   }
   if (pItems.length > 0) return pItems;
@@ -260,7 +252,6 @@ const parseDescription = (description) => {
   }
   if (result.length > 0) return result;
 
-  // 5. Last resort
   const singleClean = withNewlines.replace(/\s+/g, " ").trim();
   return singleClean ? [singleClean] : [];
 };
@@ -296,18 +287,12 @@ const getSkillsList = (category) => {
 
 const formatDate = (date) => {
   if (!date) return "";
-  
-  // Handle ISO timestamp format (e.g., 2024-05-01T00:00:00.000Z)
-  if (date.includes('T')) {
+  if (date.includes("T")) {
     const d = new Date(date);
     if (!isNaN(d.getTime())) {
-      const month = MONTH_NAMES[d.getMonth()];
-      const year = d.getFullYear();
-      return `${month} ${year}`;
+      return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
     }
   }
-  
-  // Handle YYYY-MM format
   const parts = date.split("-");
   if (parts.length < 2) return date;
   const monthIndex = parseInt(parts[1]) - 1;
@@ -327,8 +312,6 @@ const hasEducationData = (d) =>
 const hasExperienceData = (d) =>
   Array.isArray(d) &&
   d.some((e) => hasMeaningfulValue(e.company) || hasMeaningfulValue(e.position));
-const hasProjectsData = (d) =>
-  Array.isArray(d) && d.some((p) => hasMeaningfulValue(p.name));
 const hasSkillsData = (d) =>
   Array.isArray(d) &&
   d.some((c) => hasMeaningfulValue(c.name) || getSkillsList(c).length > 0);
@@ -339,7 +322,33 @@ const hasVolunteerData = (d) =>
   d.some((v) => hasMeaningfulValue(v.organization) || hasMeaningfulValue(v.role));
 
 // ============================================
-// PDF GENERATION
+// TEXT WRAP UTILITY
+// ============================================
+
+function createWrapText(stripFn) {
+  return (text, font, size, maxWidth) => {
+    if (!text) return [];
+    const clean = stripFn(text.toString());
+    const words = clean.split(/\s+/).filter((w) => w);
+    if (words.length === 0) return [];
+    const lines = [];
+    let cur = "";
+    for (const word of words) {
+      const test = cur ? `${cur} ${word}` : word;
+      if (font.widthOfTextAtSize(test, size) > maxWidth && cur) {
+        lines.push(cur);
+        cur = word;
+      } else {
+        cur = test;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  };
+}
+
+// ============================================
+// PDF GENERATION ENTRY POINT
 // ============================================
 
 async function generatePDF(cvData, templateId, themeColor) {
@@ -369,25 +378,12 @@ async function generatePDF(cvData, templateId, themeColor) {
       : { r: 0, g: 0, b: 0 };
   };
 
-  const getLightColor = (hex) => {
-    const c = hexToRgb(hex);
-    const brightness = (c.r + c.g + c.b) / 3;
-    if (brightness < 0.1) return rgb(0.93, 0.93, 0.93);
-    return rgb(
-      Math.min(1, c.r * 0.15 + 0.85),
-      Math.min(1, c.g * 0.15 + 0.85),
-      Math.min(1, c.b * 0.15 + 0.85)
-    );
-  };
-
   const themeRgb = hexToRgb(themeColor);
   const primaryColor = rgb(themeRgb.r, themeRgb.g, themeRgb.b);
-  const lightColor = getLightColor(themeColor);
 
   const utils = {
     ...fonts,
     primaryColor,
-    lightColor,
     formatDate,
     rgb,
     stripHtmlTags,
@@ -407,30 +403,10 @@ async function generatePDF(cvData, templateId, themeColor) {
   }
 }
 
-function createWrapText(stripFn) {
-  return (text, font, size, maxWidth) => {
-    if (!text) return [];
-    const clean = stripFn(text.toString());
-    const words = clean.split(/\s+/).filter((w) => w);
-    if (words.length === 0) return [];
-    const lines = [];
-    let cur = "";
-    for (const word of words) {
-      const test = cur ? `${cur} ${word}` : word;
-      if (font.widthOfTextAtSize(test, size) > maxWidth && cur) {
-        lines.push(cur);
-        cur = word;
-      } else {
-        cur = test;
-      }
-    }
-    if (cur) lines.push(cur);
-    return lines;
-  };
-}
-
 // ============================================
 // MODERN TEMPLATE
+// Centered header · clean section headers with small square accent
+// Professional MBA-grade spacing and typography
 // ============================================
 
 async function generateModernTemplate(pdfDoc, cvData, utils) {
@@ -438,7 +414,6 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     helvetica,
     helveticaBold,
     primaryColor,
-    lightColor,
     formatDate,
     rgb,
     stripHtmlTags,
@@ -447,24 +422,25 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     hasMeaningfulValue,
   } = utils;
 
-  const pageWidth = PAGE.width;
+  const pageWidth  = PAGE.width;
   const pageHeight = PAGE.height;
-  const margin = PAGE.margin;
+  const margin     = PAGE.margin;
   const contentWidth = pageWidth - 2 * margin;
-  const rightEdge = pageWidth - margin;
+  const centerX      = pageWidth / 2;
+  const rightEdge    = pageWidth - margin;
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin;
+  let y    = pageHeight - margin;
 
   const C = {
-    black: rgb(0, 0, 0),
-    heading: rgb(0.05, 0.05, 0.05),
-    body: rgb(0.15, 0.15, 0.15),
-    secondary: rgb(0.3, 0.3, 0.3),
-    muted: rgb(0.45, 0.45, 0.45),
-    light: rgb(0.6, 0.6, 0.6),
-    border: rgb(0.78, 0.78, 0.78),
-    bgLight: rgb(0.93, 0.93, 0.93),
+    black:     rgb(0,    0,    0),
+    heading:   rgb(0.05, 0.05, 0.05),
+    body:      rgb(0.15, 0.15, 0.15),
+    secondary: rgb(0.30, 0.30, 0.30),
+    muted:     rgb(0.45, 0.45, 0.45),
+    light:     rgb(0.60, 0.60, 0.60),
+    border:    rgb(0.78, 0.78, 0.78),
+    veryLight: rgb(0.88, 0.88, 0.88),
   };
 
   const wrapText = createWrapText(stripHtmlTags);
@@ -478,204 +454,267 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
     if (y - needed < margin + 20) addNewPage();
   };
 
+  // Right-aligned date badge (matches preview DateBadge)
   const drawDateRight = (dateText, yPos) => {
     if (!dateText) return;
-    const w = helvetica.widthOfTextAtSize(dateText, 8.5);
+    const size = 8.5;
+    const w    = helvetica.widthOfTextAtSize(dateText, size);
+    const pad  = 5;
+    const bx   = rightEdge - w - pad * 2;
+    const bh   = 11;
+    // subtle pill background
+    page.drawRectangle({
+      x: bx,
+      y: yPos - 2,
+      width: w + pad * 2,
+      height: bh,
+      color: C.veryLight,
+    });
     page.drawText(dateText, {
-      x: rightEdge - w,
+      x: bx + pad,
       y: yPos,
-      size: 8.5,
+      size,
       font: helvetica,
       color: C.muted,
     });
   };
 
+  // Section header: small square accent + bold uppercase label + thin rule
   const drawSectionHeader = (title) => {
-    ensureSpace(22);
-    y -= 9;
+    ensureSpace(28);
+    y -= 10;
 
+    // Tiny filled square (matches preview theme dot)
     page.drawRectangle({
       x: margin,
-      y: y - 1,
-      width: 5,
-      height: 5,
-      color: C.black,
+      y: y - 0.5,
+      width: 4.5,
+      height: 4.5,
+      color: primaryColor,
     });
 
     page.drawText(title.toUpperCase(), {
-      x: margin + 12,
-      y: y - 3,
-      size: 10,
+      x: margin + 10,
+      y: y - 1,
+      size: 9,
       font: helveticaBold,
-      color: C.black,
+      color: C.heading,
     });
 
+    const titleW = helveticaBold.widthOfTextAtSize(title.toUpperCase(), 9);
     page.drawLine({
-      start: { x: margin + 12, y: y - 12 },
-      end: { x: rightEdge, y: y - 12 },
+      start: { x: margin + 10 + titleW + 6, y: y + 1.5 },
+      end:   { x: rightEdge,               y: y + 1.5 },
       thickness: 0.5,
       color: C.border,
     });
 
-    y -= 20;
+    y -= 16;
   };
 
+  // "ADDITIONAL INFORMATION" centered divider
+  const drawAdditionalDivider = () => {
+    ensureSpace(36);
+    y -= 18;
+    const label  = "ADDITIONAL INFORMATION";
+    const size   = 7;
+    const labelW = helvetica.widthOfTextAtSize(label, size);
+    const gap    = 10;
+    const lx     = centerX - labelW / 2;
+
+    page.drawLine({
+      start: { x: margin, y },
+      end:   { x: lx - gap, y },
+      thickness: 0.4,
+      color: C.veryLight,
+    });
+    page.drawText(label, {
+      x: lx,
+      y: y - 2.5,
+      size,
+      font: helvetica,
+      color: C.light,
+    });
+    page.drawLine({
+      start: { x: lx + labelW + gap, y },
+      end:   { x: rightEdge,         y },
+      thickness: 0.4,
+      color: C.veryLight,
+    });
+    y -= 16;
+  };
+
+  // Bullet list helper
   const drawBullets = (items, x) => {
+    const textX = x + 11;
+    const maxW  = contentWidth - (textX - margin);
     for (const item of items) {
       if (!item) continue;
       const clean = stripHtmlTags(item);
       if (!clean) continue;
-
-      ensureSpace(14);
-
-      const textX = x + 10;
-      const maxW = contentWidth - (textX - margin);
       const lines = wrapText(clean, helvetica, 9.5, maxW);
-
       lines.forEach((line, idx) => {
-        ensureSpace(12);
+        ensureSpace(13);
         if (idx === 0) {
-          page.drawCircle({
-            x: x + 3,
-            y: y - 3,
-            size: 1.5,
-            color: C.muted,
-          });
+          // Small filled circle bullet
+          page.drawCircle({ x: x + 3.5, y: y - 2.5, size: 1.6, color: C.muted });
         }
-        page.drawText(line, {
-          x: textX,
-          y: y,
-          size: 9.5,
-          font: helvetica,
-          color: C.body,
-        });
+        page.drawText(line, { x: textX, y, size: 9.5, font: helvetica, color: C.body });
         y -= 12;
       });
       y -= 1;
     }
   };
 
-  // ==================== HEADER - IMPROVED ====================
+  // ── HEADER (CENTERED) ──────────────────────────────────────────────────────
 
-  ensureSpace(85);
+  ensureSpace(90);
 
+  // Name — large, centered, bold
   const fullName = stripHtmlTags(cvData.personal?.fullName) || "Your Name";
+  const nameSize = 26;
+  const nameW    = helveticaBold.widthOfTextAtSize(fullName, nameSize);
   page.drawText(fullName, {
-    x: margin,
-    y: y,
-    size: 28,
+    x: centerX - nameW / 2,
+    y,
+    size: nameSize,
     font: helveticaBold,
-    color: C.black,
+    color: primaryColor,
   });
-  y -= 32;
+  y -= nameSize + 7;
 
+  // Headline / title — centered, medium weight
   if (hasMeaningfulValue(cvData.personal?.headline)) {
-    page.drawText(stripHtmlTags(cvData.personal.headline), {
-      x: margin,
-      y: y,
-      size: 10.5,
+    const hl  = stripHtmlTags(cvData.personal.headline);
+    const hlW = helvetica.widthOfTextAtSize(hl, 11);
+    page.drawText(hl, {
+      x: centerX - hlW / 2,
+      y,
+      size: 11,
       font: helvetica,
       color: C.secondary,
     });
-    y -= 17;
+    y -= 16;
   }
 
+  // Contact line — centered, smaller, separated by bullets
   const contactItems = [];
-  if (hasMeaningfulValue(cvData.personal?.email))
-    contactItems.push(stripHtmlTags(cvData.personal.email));
-  if (hasMeaningfulValue(cvData.personal?.phone))
-    contactItems.push(stripHtmlTags(cvData.personal.phone));
-  if (hasMeaningfulValue(cvData.personal?.location))
-    contactItems.push(stripHtmlTags(cvData.personal.location));
-  if (hasMeaningfulValue(cvData.personal?.linkedin))
-    contactItems.push(stripHtmlTags(cvData.personal.linkedin));
-  if (hasMeaningfulValue(cvData.personal?.website))
-    contactItems.push(stripHtmlTags(cvData.personal.website));
+  if (hasMeaningfulValue(cvData.personal?.email))    contactItems.push(stripHtmlTags(cvData.personal.email));
+  if (hasMeaningfulValue(cvData.personal?.phone))    contactItems.push(stripHtmlTags(cvData.personal.phone));
+  if (hasMeaningfulValue(cvData.personal?.location)) contactItems.push(stripHtmlTags(cvData.personal.location));
+  if (hasMeaningfulValue(cvData.personal?.linkedin)) contactItems.push(stripHtmlTags(cvData.personal.linkedin));
+  if (hasMeaningfulValue(cvData.personal?.website))  contactItems.push(stripHtmlTags(cvData.personal.website));
 
   if (contactItems.length > 0) {
-    const contactText = contactItems.join("  •  ");
-    const contactLines = wrapText(contactText, helvetica, 9.5, contentWidth);
-    contactLines.forEach((line) => {
+    const contactText  = contactItems.join("  •  ");
+    const contactLines = wrapText(contactText, helvetica, 9, contentWidth - 60);
+    for (const line of contactLines) {
+      const lw = helvetica.widthOfTextAtSize(line, 9);
       page.drawText(line, {
-        x: margin,
-        y: y,
-        size: 9.5,
+        x: centerX - lw / 2,
+        y,
+        size: 9,
         font: helvetica,
-        color: C.secondary,
+        color: C.muted,
       });
       y -= 12;
-    });
-    y -= 3;
+    }
+    y -= 4;
   }
 
+  // Full-width rule under header
   page.drawLine({
-    start: { x: margin, y: y },
-    end: { x: rightEdge, y: y },
+    start: { x: margin, y },
+    end:   { x: rightEdge, y },
     thickness: 1.2,
-    color: C.black,
+    color: primaryColor,
   });
-  y -= 16;
+  y -= 18;
 
-  // ==================== SUMMARY ====================
+  // ── 1. PROFESSIONAL SUMMARY ────────────────────────────────────────────────
 
   if (hasMeaningfulValue(cvData.personal?.summary)) {
     drawSectionHeader("Professional Summary");
-
-    const summaryLines = wrapText(
-      stripHtmlTags(cvData.personal.summary),
-      helvetica,
-      10,
-      contentWidth
-    );
-    summaryLines.forEach((line) => {
+    const lines = wrapText(stripHtmlTags(cvData.personal.summary), helvetica, 10, contentWidth);
+    for (const line of lines) {
       ensureSpace(13);
-      page.drawText(line, {
-        x: margin,
-        y: y,
-        size: 10,
-        font: helvetica,
-        color: C.body,
-      });
+      page.drawText(line, { x: margin, y, size: 10, font: helvetica, color: C.body });
       y -= 13;
-    });
-    y -= 5;
+    }
+    y -= 6;
   }
 
-  // ==================== EDUCATION ====================
+  // ── 2. PROFESSIONAL EXPERIENCE ────────────────────────────────────────────
+
+  if (hasExperienceData(cvData.experience)) {
+    drawSectionHeader("Professional Experience");
+
+    for (const exp of cvData.experience) {
+      const hasCo  = hasMeaningfulValue(exp.company);
+      const hasPos = hasMeaningfulValue(exp.position);
+      if (!hasCo && !hasPos) continue;
+      ensureSpace(42);
+
+      let dateStr = "";
+      if (exp.startDate || exp.endDate || exp.isCurrentRole)
+        dateStr = `${formatDate(exp.startDate)} – ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
+
+      // Position — bold, left
+      if (hasPos) {
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 26 : 0;
+        const lines = wrapText(stripHtmlTags(exp.position), helveticaBold, 11, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: helveticaBold, color: C.heading });
+        });
+        if (lines.length > 1) y -= (lines.length - 1) * 13;
+        if (dateStr) drawDateRight(dateStr, y);
+      }
+      y -= 14;
+
+      // Company + location — secondary
+      if (hasCo) {
+        let co = stripHtmlTags(exp.company);
+        if (hasMeaningfulValue(exp.location)) co += `  ·  ${stripHtmlTags(exp.location)}`;
+        page.drawText(co, { x: margin, y, size: 10, font: helvetica, color: C.secondary });
+        y -= 13;
+      }
+
+      // Bullets
+      if (hasMeaningfulValue(exp.description)) {
+        const items = parseDescription(exp.description);
+        if (items.length > 0) { y -= 1; drawBullets(items, margin + 4); }
+      }
+      y -= 7;
+    }
+    y -= 2;
+  }
+
+  // ── 3. EDUCATION ──────────────────────────────────────────────────────────
 
   if (hasEducationData(cvData.education)) {
     drawSectionHeader("Education");
 
     for (const edu of cvData.education) {
-      const hasInst = hasMeaningfulValue(edu.institution);
-      const hasDeg = hasMeaningfulValue(edu.degree);
+      const hasInst  = hasMeaningfulValue(edu.institution);
+      const hasDeg   = hasMeaningfulValue(edu.degree);
       const hasField = hasMeaningfulValue(edu.field);
       if (!hasInst && !hasDeg && !hasField) continue;
+      ensureSpace(38);
 
-      ensureSpace(36);
-
-      let degreeText = "";
-      if (hasDeg && hasField)
-        degreeText = `${stripHtmlTags(edu.degree)} in ${stripHtmlTags(edu.field)}`;
-      else if (hasDeg) degreeText = stripHtmlTags(edu.degree);
-      else if (hasField) degreeText = stripHtmlTags(edu.field);
+      let degText = "";
+      if (hasDeg && hasField) degText = `${stripHtmlTags(edu.degree)} in ${stripHtmlTags(edu.field)}`;
+      else if (hasDeg)        degText = stripHtmlTags(edu.degree);
+      else if (hasField)      degText = stripHtmlTags(edu.field);
 
       let dateStr = "";
       if (edu.startDate || edu.endDate)
-        dateStr = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
+        dateStr = `${formatDate(edu.startDate)} – ${formatDate(edu.endDate)}`;
 
-      if (degreeText) {
-        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-        const maxW = contentWidth - dateW;
-        const lines = wrapText(degreeText, helveticaBold, 11, maxW);
-        lines.forEach((line, idx) => {
-          page.drawText(line, {
-            x: margin,
-            y: y - idx * 13,
-            size: 11,
-            font: helveticaBold,
-            color: C.heading,
-          });
+      if (degText) {
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 26 : 0;
+        const lines = wrapText(degText, helveticaBold, 11, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: helveticaBold, color: C.heading });
         });
         if (lines.length > 1) y -= (lines.length - 1) * 13;
         if (dateStr) drawDateRight(dateStr, y);
@@ -683,298 +722,118 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
       y -= 14;
 
       if (hasInst) {
-        page.drawText(stripHtmlTags(edu.institution), {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helvetica,
-          color: C.secondary,
-        });
-        y -= 12;
+        page.drawText(stripHtmlTags(edu.institution), { x: margin, y, size: 10, font: helvetica, color: C.secondary });
+        y -= 13;
       }
 
       if (hasMeaningfulValue(edu.gpa)) {
-        page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, {
-          x: margin,
-          y: y,
-          size: 9.5,
-          font: helvetica,
-          color: C.muted,
-        });
-        y -= 11;
+        page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, { x: margin, y, size: 9.5, font: helvetica, color: C.muted });
+        y -= 12;
       }
 
       if (hasMeaningfulValue(edu.description)) {
         const items = parseDescription(edu.description);
-        if (items.length > 0) {
-          y -= 2;
-          drawBullets(items, margin + 4);
-        }
+        if (items.length > 0) { y -= 2; drawBullets(items, margin + 4); }
       }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== EXPERIENCE ====================
+  // ── ADDITIONAL INFORMATION DIVIDER ────────────────────────────────────────
 
-  if (hasExperienceData(cvData.experience)) {
-    drawSectionHeader("Work Experience");
+  const hasAdditional =
+    hasSkillsData(cvData.skills) ||
+    hasAchievementsData(cvData.achievements) ||
+    hasVolunteerData(cvData.volunteer);
 
-    for (const exp of cvData.experience) {
-      const hasCo = hasMeaningfulValue(exp.company);
-      const hasPos = hasMeaningfulValue(exp.position);
-      if (!hasCo && !hasPos) continue;
+  if (hasAdditional) drawAdditionalDivider();
 
-      ensureSpace(40);
-
-      let dateStr = "";
-      if (exp.startDate || exp.endDate || exp.isCurrentRole) {
-        dateStr = `${formatDate(exp.startDate)} - ${
-          exp.isCurrentRole ? "Present" : formatDate(exp.endDate)
-        }`;
-      }
-
-      if (hasPos) {
-        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-        const maxW = contentWidth - dateW;
-        const lines = wrapText(stripHtmlTags(exp.position), helveticaBold, 11, maxW);
-        lines.forEach((line, idx) => {
-          page.drawText(line, {
-            x: margin,
-            y: y - idx * 13,
-            size: 11,
-            font: helveticaBold,
-            color: C.heading,
-          });
-        });
-        if (lines.length > 1) y -= (lines.length - 1) * 13;
-        if (dateStr) drawDateRight(dateStr, y);
-      }
-      y -= 14;
-
-      if (hasCo) {
-        let companyText = stripHtmlTags(exp.company);
-        if (hasMeaningfulValue(exp.location))
-          companyText += `, ${stripHtmlTags(exp.location)}`;
-        page.drawText(companyText, {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helvetica,
-          color: C.secondary,
-        });
-        y -= 13;
-      }
-
-      if (hasMeaningfulValue(exp.description)) {
-        const items = parseDescription(exp.description);
-        if (items.length > 0) drawBullets(items, margin + 4);
-      }
-
-      y -= 6;
-    }
-    y -= 2;
-  }
-
-  // ==================== PROJECTS ====================
-
-  if (hasProjectsData(cvData.projects)) {
-    drawSectionHeader("Projects");
-
-    for (const proj of cvData.projects) {
-      if (!hasMeaningfulValue(proj.name)) continue;
-
-      ensureSpace(40);
-
-      let dateStr = "";
-      if (proj.startDate || proj.endDate) {
-        if (proj.startDate && proj.endDate)
-          dateStr = `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`;
-        else dateStr = formatDate(proj.startDate) || formatDate(proj.endDate);
-      }
-
-      const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-      const maxW = contentWidth - dateW;
-      const nameLines = wrapText(stripHtmlTags(proj.name), helveticaBold, 11, maxW);
-      nameLines.forEach((line, idx) => {
-        page.drawText(line, {
-          x: margin,
-          y: y - idx * 13,
-          size: 11,
-          font: helveticaBold,
-          color: C.heading,
-        });
-      });
-      if (nameLines.length > 1) y -= (nameLines.length - 1) * 13;
-      if (dateStr) drawDateRight(dateStr, y);
-      y -= 14;
-
-      if (hasMeaningfulValue(proj.technologies)) {
-        page.drawText(`Tech: ${stripHtmlTags(proj.technologies)}`, {
-          x: margin,
-          y: y,
-          size: 9,
-          font: helvetica,
-          color: C.muted,
-        });
-        y -= 11;
-      }
-
-      if (hasMeaningfulValue(proj.description)) {
-        const items = parseDescription(proj.description);
-        if (items.length > 0) drawBullets(items, margin + 4);
-      }
-
-      const links = [];
-      if (hasMeaningfulValue(proj.githubUrl))
-        links.push(`GitHub: ${stripHtmlTags(proj.githubUrl)}`);
-      if (hasMeaningfulValue(proj.liveUrl))
-        links.push(`Live: ${stripHtmlTags(proj.liveUrl)}`);
-      if (links.length > 0) {
-        ensureSpace(12);
-        page.drawText(links.join("   |   "), {
-          x: margin,
-          y: y,
-          size: 8,
-          font: helvetica,
-          color: C.secondary,
-        });
-        y -= 12;
-      }
-
-      y -= 6;
-    }
-    y -= 2;
-  }
-
-  // ==================== SKILLS ====================
+  // ── 4. SKILLS ─────────────────────────────────────────────────────────────
 
   if (hasSkillsData(cvData.skills)) {
     drawSectionHeader("Skills");
 
     for (const category of cvData.skills) {
-      const skillsList = getSkillsList(category);
+      const list    = getSkillsList(category);
       const hasName = hasMeaningfulValue(category.name);
-      if (!hasName && skillsList.length === 0) continue;
-
+      if (!hasName && list.length === 0) continue;
       ensureSpace(16);
 
-      const catName = stripHtmlTags(category.name) || "Skills";
-      const label = `${catName}: `;
-      const labelW = helveticaBold.widthOfTextAtSize(label, 10);
+      const catLabel = `${stripHtmlTags(category.name) || "Skills"}: `;
+      const labelW   = helveticaBold.widthOfTextAtSize(catLabel, 10);
 
-      page.drawText(label, {
-        x: margin,
-        y: y,
-        size: 10,
-        font: helveticaBold,
-        color: C.heading,
-      });
+      page.drawText(catLabel, { x: margin, y, size: 10, font: helveticaBold, color: C.heading });
 
-      if (skillsList.length > 0) {
-        const skillsText = skillsList.join(", ");
-        const skillLines = wrapText(skillsText, helvetica, 10, contentWidth - labelW - 4);
+      if (list.length > 0) {
+        const skillLines = wrapText(list.join(", "), helvetica, 10, contentWidth - labelW - 4);
         const startY = y;
-        skillLines.forEach((line, idx) => {
-          page.drawText(line, {
-            x: margin + labelW,
-            y: startY - idx * 12,
-            size: 10,
-            font: helvetica,
-            color: C.body,
-          });
+        skillLines.forEach((l, i) => {
+          page.drawText(l, { x: margin + labelW, y: startY - i * 12, size: 10, font: helvetica, color: C.body });
         });
         y = startY - skillLines.length * 12 - 4;
       } else {
         y -= 14;
       }
     }
-    y -= 2;
+    y -= 4;
   }
 
-  // ==================== ACHIEVEMENTS ====================
+  // ── 5. ACHIEVEMENTS ───────────────────────────────────────────────────────
 
   if (hasAchievementsData(cvData.achievements)) {
     drawSectionHeader("Achievements");
 
     for (const ach of cvData.achievements) {
       if (!hasMeaningfulValue(ach.title)) continue;
-
-      ensureSpace(28);
+      ensureSpace(30);
 
       let dateW = 0;
       if (hasMeaningfulValue(ach.date))
-        dateW = helvetica.widthOfTextAtSize(formatDate(ach.date), 8.5) + 15;
+        dateW = helvetica.widthOfTextAtSize(formatDate(ach.date), 8.5) + 26;
 
-      const maxW = contentWidth - dateW;
-      const titleLines = wrapText(stripHtmlTags(ach.title), helveticaBold, 11, maxW);
-      titleLines.forEach((line, idx) => {
-        page.drawText(line, {
-          x: margin,
-          y: y - idx * 13,
-          size: 11,
-          font: helveticaBold,
-          color: C.heading,
-        });
+      const tLines = wrapText(stripHtmlTags(ach.title), helveticaBold, 11, contentWidth - dateW);
+      tLines.forEach((l, i) => {
+        page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: helveticaBold, color: C.heading });
       });
-      if (titleLines.length > 1) y -= (titleLines.length - 1) * 13;
+      if (tLines.length > 1) y -= (tLines.length - 1) * 13;
       if (hasMeaningfulValue(ach.date)) drawDateRight(formatDate(ach.date), y);
       y -= 14;
 
       if (hasMeaningfulValue(ach.organization)) {
-        page.drawText(stripHtmlTags(ach.organization), {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helvetica,
-          color: C.secondary,
-        });
-        y -= 12;
+        page.drawText(stripHtmlTags(ach.organization), { x: margin, y, size: 10, font: helvetica, color: C.secondary });
+        y -= 13;
       }
 
       if (hasMeaningfulValue(ach.description)) {
         const items = parseDescription(ach.description);
-        if (items.length > 0) {
-          y -= 2;
-          drawBullets(items, margin + 4);
-        }
+        if (items.length > 0) { y -= 2; drawBullets(items, margin + 4); }
       }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== VOLUNTEER ====================
+  // ── 6. VOLUNTEER ──────────────────────────────────────────────────────────
 
   if (hasVolunteerData(cvData.volunteer)) {
     drawSectionHeader("Volunteer Experience");
 
     for (const vol of cvData.volunteer) {
-      const hasOrg = hasMeaningfulValue(vol.organization);
+      const hasOrg  = hasMeaningfulValue(vol.organization);
       const hasRole = hasMeaningfulValue(vol.role);
       if (!hasOrg && !hasRole) continue;
-
-      ensureSpace(36);
+      ensureSpace(38);
 
       let dateStr = "";
       if (vol.startDate || vol.endDate)
-        dateStr = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
+        dateStr = `${formatDate(vol.startDate)} – ${formatDate(vol.endDate)}`;
 
       if (hasRole) {
-        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-        const maxW = contentWidth - dateW;
-        const lines = wrapText(stripHtmlTags(vol.role), helveticaBold, 11, maxW);
-        lines.forEach((line, idx) => {
-          page.drawText(line, {
-            x: margin,
-            y: y - idx * 13,
-            size: 11,
-            font: helveticaBold,
-            color: C.heading,
-          });
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 26 : 0;
+        const lines = wrapText(stripHtmlTags(vol.role), helveticaBold, 11, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: helveticaBold, color: C.heading });
         });
         if (lines.length > 1) y -= (lines.length - 1) * 13;
         if (dateStr) drawDateRight(dateStr, y);
@@ -983,15 +842,8 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
 
       if (hasOrg) {
         let orgText = stripHtmlTags(vol.organization);
-        if (hasMeaningfulValue(vol.location))
-          orgText += `, ${stripHtmlTags(vol.location)}`;
-        page.drawText(orgText, {
-          x: margin,
-          y: y,
-          size: 10,
-          font: helvetica,
-          color: C.secondary,
-        });
+        if (hasMeaningfulValue(vol.location)) orgText += `  ·  ${stripHtmlTags(vol.location)}`;
+        page.drawText(orgText, { x: margin, y, size: 10, font: helvetica, color: C.secondary });
         y -= 13;
       }
 
@@ -999,8 +851,7 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
         const items = parseDescription(vol.description);
         if (items.length > 0) drawBullets(items, margin + 4);
       }
-
-      y -= 5;
+      y -= 6;
     }
   }
 
@@ -1008,7 +859,9 @@ async function generateModernTemplate(pdfDoc, cvData, utils) {
 }
 
 // ============================================
-// CLASSIC TEMPLATE  
+// CLASSIC TEMPLATE
+// Centered header · Times Roman · thick bottom rule
+// MBA traditional style — section headers bold+underline
 // ============================================
 
 async function generateClassicTemplate(pdfDoc, cvData, utils) {
@@ -1025,22 +878,23 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     hasMeaningfulValue,
   } = utils;
 
-  const pageWidth = PAGE.width;
-  const pageHeight = PAGE.height;
-  const margin = PAGE.margin;
+  const pageWidth    = PAGE.width;
+  const pageHeight   = PAGE.height;
+  const margin       = PAGE.margin;
   const contentWidth = pageWidth - 2 * margin;
-  const rightEdge = pageWidth - margin;
+  const centerX      = pageWidth / 2;
+  const rightEdge    = pageWidth - margin;
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin;
+  let y    = pageHeight - margin;
 
   const C = {
-    black: rgb(0, 0, 0),
-    heading: rgb(0.05, 0.05, 0.05),
-    body: rgb(0.15, 0.15, 0.15),
-    secondary: rgb(0.3, 0.3, 0.3),
-    muted: rgb(0.45, 0.45, 0.45),
-    light: rgb(0.6, 0.6, 0.6),
+    black:     rgb(0,    0,    0),
+    heading:   rgb(0.05, 0.05, 0.05),
+    body:      rgb(0.15, 0.15, 0.15),
+    secondary: rgb(0.30, 0.30, 0.30),
+    muted:     rgb(0.45, 0.45, 0.45),
+    light:     rgb(0.60, 0.60, 0.60),
   };
 
   const wrapText = createWrapText(stripHtmlTags);
@@ -1054,250 +908,179 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     if (y - needed < margin + 20) addNewPage();
   };
 
-  const drawCentered = (text, size, font, color) => {
+  // Centered text helper
+  const drawCenteredText = (text, size, font, color, lineSpacing = 4) => {
     const clean = stripHtmlTags(text);
-    const w = font.widthOfTextAtSize(clean, size);
+    const w     = font.widthOfTextAtSize(clean, size);
     page.drawText(clean, {
-      x: margin + (contentWidth - w) / 2,
-      y: y,
+      x: centerX - w / 2,
+      y,
       size,
       font,
       color,
     });
-    y -= size + 5;
+    y -= size + lineSpacing;
   };
 
   const drawDateRight = (dateText, yPos) => {
     if (!dateText) return;
-    const w = timesRoman.widthOfTextAtSize(dateText, 9.5);
+    const size = 9.5;
+    const w    = timesRoman.widthOfTextAtSize(dateText, size);
     page.drawText(dateText, {
       x: rightEdge - w,
       y: yPos,
-      size: 9.5,
+      size,
       font: timesRoman,
       color: C.muted,
     });
   };
 
+  // Classic section header: all-caps bold, full-width rule below
   const drawSectionHeader = (title) => {
-    ensureSpace(22);
-    y -= 9;
+    ensureSpace(28);
+    y -= 10;
 
     page.drawText(title.toUpperCase(), {
       x: margin,
-      y: y,
-      size: 11,
+      y,
+      size: 10.5,
       font: timesRomanBold,
-      color: C.black,
+      color: primaryColor,
     });
 
     page.drawLine({
-      start: { x: margin, y: y - 5 },
-      end: { x: rightEdge, y: y - 5 },
+      start: { x: margin,     y: y - 5 },
+      end:   { x: rightEdge,  y: y - 5 },
       thickness: 1,
-      color: C.black,
+      color: primaryColor,
     });
 
     y -= 18;
   };
 
+  // Additional info divider
+  const drawAdditionalDivider = () => {
+    ensureSpace(36);
+    y -= 18;
+    const label  = "ADDITIONAL INFORMATION";
+    const size   = 7.5;
+    const labelW = timesRoman.widthOfTextAtSize(label, size);
+    const gap    = 10;
+    const lx     = centerX - labelW / 2;
+
+    page.drawLine({ start: { x: margin, y }, end: { x: lx - gap, y }, thickness: 0.4, color: C.light });
+    page.drawText(label, { x: lx, y: y - 2.5, size, font: timesRoman, color: C.light });
+    page.drawLine({ start: { x: lx + labelW + gap, y }, end: { x: rightEdge, y }, thickness: 0.4, color: C.light });
+
+    y -= 16;
+  };
+
+  // Bullet list — classic triangle bullet
   const drawBullets = (items, x) => {
+    const textX = x + 10;
+    const maxW  = contentWidth - (textX - margin);
     for (const item of items) {
       if (!item) continue;
       const clean = stripHtmlTags(item);
       if (!clean) continue;
-
-      ensureSpace(13);
-
-      const textX = x + 10;
-      const maxW = contentWidth - (textX - margin);
       const lines = wrapText(clean, timesRoman, 10, maxW);
-
       lines.forEach((line, idx) => {
-        ensureSpace(12);
+        ensureSpace(13);
         if (idx === 0) {
-          page.drawText("\u2022", {
-            x: x,
-            y: y,
-            size: 10,
-            font: timesRoman,
-            color: C.light,
-          });
+          page.drawText(">", { x, y, size: 8, font: timesRoman, color: C.muted });
         }
-        page.drawText(line, {
-          x: textX,
-          y: y,
-          size: 10,
-          font: timesRoman,
-          color: C.body,
-        });
-        y -= 12;
+        page.drawText(line, { x: textX, y, size: 10, font: timesRoman, color: C.body });
+        y -= 12.5;
       });
       y -= 1;
     }
   };
 
-  // ==================== HEADER - IMPROVED ====================
+  // ── HEADER (CENTERED) ──────────────────────────────────────────────────────
 
-  ensureSpace(82);
+  ensureSpace(95);
 
-  const name = (stripHtmlTags(cvData.personal?.fullName) || "Your Name").toUpperCase();
-  drawCentered(name, 24, timesRomanBold, C.black);
-  y -= 3;
+  // Name — large centered all-caps
+  const name     = (stripHtmlTags(cvData.personal?.fullName) || "Your Name").toUpperCase();
+  const nameSize = 24;
+  const nameW    = timesRomanBold.widthOfTextAtSize(name, nameSize);
+  page.drawText(name, {
+    x: centerX - nameW / 2,
+    y,
+    size: nameSize,
+    font: timesRomanBold,
+    color: primaryColor,
+  });
+  y -= nameSize + 8;
 
+  // Headline
   if (hasMeaningfulValue(cvData.personal?.headline)) {
-    drawCentered(stripHtmlTags(cvData.personal.headline), 11.5, timesRoman, C.secondary);
-    y -= 1;
+    drawCenteredText(stripHtmlTags(cvData.personal.headline), 11, timesRomanItalic, C.secondary, 6);
   }
 
+  // Contact row 1: email · phone · location
   const row1 = [];
+  if (hasMeaningfulValue(cvData.personal?.email))    row1.push(stripHtmlTags(cvData.personal.email));
+  if (hasMeaningfulValue(cvData.personal?.phone))    row1.push(stripHtmlTags(cvData.personal.phone));
+  if (hasMeaningfulValue(cvData.personal?.location)) row1.push(stripHtmlTags(cvData.personal.location));
+
+  // Contact row 2: linkedin · website
   const row2 = [];
-  if (hasMeaningfulValue(cvData.personal?.email))
-    row1.push(stripHtmlTags(cvData.personal.email));
-  if (hasMeaningfulValue(cvData.personal?.phone))
-    row1.push(stripHtmlTags(cvData.personal.phone));
-  if (hasMeaningfulValue(cvData.personal?.location))
-    row1.push(stripHtmlTags(cvData.personal.location));
-  if (hasMeaningfulValue(cvData.personal?.linkedin))
-    row2.push(stripHtmlTags(cvData.personal.linkedin));
-  if (hasMeaningfulValue(cvData.personal?.website))
-    row2.push(stripHtmlTags(cvData.personal.website));
+  if (hasMeaningfulValue(cvData.personal?.linkedin)) row2.push(stripHtmlTags(cvData.personal.linkedin));
+  if (hasMeaningfulValue(cvData.personal?.website))  row2.push(stripHtmlTags(cvData.personal.website));
 
   if (row1.length > 0) {
-    drawCentered(row1.join("  •  "), 10, timesRoman, C.secondary);
-    y -= 1;
+    const t = row1.join("  ·  ");
+    const w = timesRoman.widthOfTextAtSize(t, 9.5);
+    page.drawText(t, { x: centerX - w / 2, y, size: 9.5, font: timesRoman, color: C.muted });
+    y -= 14;
   }
   if (row2.length > 0) {
-    drawCentered(row2.join("  •  "), 10, timesRoman, C.secondary);
-    y -= 1;
+    const t = row2.join("  ·  ");
+    const w = timesRoman.widthOfTextAtSize(t, 9.5);
+    page.drawText(t, { x: centerX - w / 2, y, size: 9.5, font: timesRoman, color: C.muted });
+    y -= 14;
   }
 
-  y -= 5;
-  page.drawLine({
-    start: { x: margin, y: y },
-    end: { x: rightEdge, y: y },
-    thickness: 1.5,
-    color: C.black,
-  });
+  y -= 6;
+
+  // Bold double rule
+  page.drawLine({ start: { x: margin, y: y + 1.5 }, end: { x: rightEdge, y: y + 1.5 }, thickness: 2.5, color: primaryColor });
+  page.drawLine({ start: { x: margin, y         }, end: { x: rightEdge, y         }, thickness: 0.5, color: primaryColor });
   y -= 16;
 
-  // ==================== SUMMARY ====================
+  // ── 1. PROFESSIONAL SUMMARY ────────────────────────────────────────────────
 
   if (hasMeaningfulValue(cvData.personal?.summary)) {
     drawSectionHeader("Professional Summary");
     const lines = wrapText(stripHtmlTags(cvData.personal.summary), timesRoman, 10, contentWidth);
-    lines.forEach((line) => {
+    for (const line of lines) {
       ensureSpace(13);
-      page.drawText(line, {
-        x: margin,
-        y: y,
-        size: 10,
-        font: timesRoman,
-        color: C.body,
-      });
+      page.drawText(line, { x: margin, y, size: 10, font: timesRoman, color: C.body });
       y -= 13;
-    });
+    }
     y -= 6;
   }
 
-  // ==================== EDUCATION ====================
-
-  if (hasEducationData(cvData.education)) {
-    drawSectionHeader("Education");
-
-    for (const edu of cvData.education) {
-      if (!hasMeaningfulValue(edu.institution) && !hasMeaningfulValue(edu.degree) && !hasMeaningfulValue(edu.field)) continue;
-
-      ensureSpace(36);
-
-      let deg = "";
-      if (hasMeaningfulValue(edu.degree) && hasMeaningfulValue(edu.field))
-        deg = `${stripHtmlTags(edu.degree)}, ${stripHtmlTags(edu.field)}`;
-      else if (hasMeaningfulValue(edu.degree)) deg = stripHtmlTags(edu.degree);
-      else if (hasMeaningfulValue(edu.field)) deg = stripHtmlTags(edu.field);
-
-      let dateStr = "";
-      if (edu.startDate || edu.endDate)
-        dateStr = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
-
-      if (deg) {
-        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
-        const lines = wrapText(deg, timesRomanBold, 10.5, contentWidth - dateW);
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin,
-            y: y - i * 13,
-            size: 10.5,
-            font: timesRomanBold,
-            color: C.heading,
-          })
-        );
-        if (lines.length > 1) y -= (lines.length - 1) * 13;
-        if (dateStr) drawDateRight(dateStr, y);
-      }
-      y -= 14;
-
-      if (hasMeaningfulValue(edu.institution)) {
-        page.drawText(stripHtmlTags(edu.institution), {
-          x: margin,
-          y: y,
-          size: 9.5,
-          font: timesRomanItalic,
-          color: C.secondary,
-        });
-        y -= 13;
-      }
-
-      if (hasMeaningfulValue(edu.gpa)) {
-        page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, {
-          x: margin,
-          y: y,
-          size: 9,
-          font: timesRoman,
-          color: C.muted,
-        });
-        y -= 12;
-      }
-
-      if (hasMeaningfulValue(edu.description)) {
-        const items = parseDescription(edu.description);
-        if (items.length > 0) {
-          y -= 2;
-          drawBullets(items, margin);
-        }
-      }
-
-      y -= 6;
-    }
-    y -= 2;
-  }
-
-  // ==================== EXPERIENCE ====================
+  // ── 2. PROFESSIONAL EXPERIENCE ────────────────────────────────────────────
 
   if (hasExperienceData(cvData.experience)) {
     drawSectionHeader("Professional Experience");
 
     for (const exp of cvData.experience) {
       if (!hasMeaningfulValue(exp.company) && !hasMeaningfulValue(exp.position)) continue;
-
-      ensureSpace(40);
+      ensureSpace(44);
 
       let dateStr = "";
       if (exp.startDate || exp.endDate || exp.isCurrentRole)
-        dateStr = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
+        dateStr = `${formatDate(exp.startDate)} – ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
 
       if (hasMeaningfulValue(exp.position)) {
-        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
-        const lines = wrapText(stripHtmlTags(exp.position), timesRomanBold, 10.5, contentWidth - dateW);
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin,
-            y: y - i * 13,
-            size: 10.5,
-            font: timesRomanBold,
-            color: C.heading,
-          })
-        );
+        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 20 : 0;
+        const lines = wrapText(stripHtmlTags(exp.position), timesRomanBold, 11, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: timesRomanBold, color: C.heading });
+        });
         if (lines.length > 1) y -= (lines.length - 1) * 13;
         if (dateStr) drawDateRight(dateStr, y);
       }
@@ -1305,99 +1088,79 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 
       if (hasMeaningfulValue(exp.company)) {
         let co = stripHtmlTags(exp.company);
-        if (hasMeaningfulValue(exp.location))
-          co += `, ${stripHtmlTags(exp.location)}`;
-        page.drawText(co, {
-          x: margin,
-          y: y,
-          size: 9.5,
-          font: timesRomanItalic,
-          color: C.secondary,
-        });
-        y -= 14;
+        if (hasMeaningfulValue(exp.location)) co += `, ${stripHtmlTags(exp.location)}`;
+        page.drawText(co, { x: margin, y, size: 9.5, font: timesRomanItalic, color: C.secondary });
+        y -= 13;
       }
 
       if (hasMeaningfulValue(exp.description)) {
         const items = parseDescription(exp.description);
         if (items.length > 0) drawBullets(items, margin);
       }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== PROJECTS ====================
+  // ── 3. EDUCATION ──────────────────────────────────────────────────────────
 
-  if (hasProjectsData(cvData.projects)) {
-    drawSectionHeader("Projects");
+  if (hasEducationData(cvData.education)) {
+    drawSectionHeader("Education");
 
-    for (const proj of cvData.projects) {
-      if (!hasMeaningfulValue(proj.name)) continue;
+    for (const edu of cvData.education) {
+      if (!hasMeaningfulValue(edu.institution) && !hasMeaningfulValue(edu.degree) && !hasMeaningfulValue(edu.field)) continue;
+      ensureSpace(38);
 
-      ensureSpace(36);
+      let deg = "";
+      if (hasMeaningfulValue(edu.degree) && hasMeaningfulValue(edu.field))
+        deg = `${stripHtmlTags(edu.degree)}, ${stripHtmlTags(edu.field)}`;
+      else if (hasMeaningfulValue(edu.degree)) deg = stripHtmlTags(edu.degree);
+      else if (hasMeaningfulValue(edu.field))  deg = stripHtmlTags(edu.field);
 
       let dateStr = "";
-      if (proj.startDate || proj.endDate) {
-        dateStr = proj.startDate && proj.endDate
-          ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
-          : formatDate(proj.startDate) || formatDate(proj.endDate);
-      }
+      if (edu.startDate || edu.endDate)
+        dateStr = `${formatDate(edu.startDate)} – ${formatDate(edu.endDate)}`;
 
-      const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
-      const lines = wrapText(stripHtmlTags(proj.name), timesRomanBold, 10.5, contentWidth - dateW);
-      lines.forEach((l, i) =>
-        page.drawText(l, {
-          x: margin,
-          y: y - i * 13,
-          size: 10.5,
-          font: timesRomanBold,
-          color: C.heading,
-        })
-      );
-      if (lines.length > 1) y -= (lines.length - 1) * 13;
-      if (dateStr) drawDateRight(dateStr, y);
+      if (deg) {
+        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 20 : 0;
+        const lines = wrapText(deg, timesRomanBold, 11, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: timesRomanBold, color: C.heading });
+        });
+        if (lines.length > 1) y -= (lines.length - 1) * 13;
+        if (dateStr) drawDateRight(dateStr, y);
+      }
       y -= 14;
 
-      if (hasMeaningfulValue(proj.technologies)) {
-        page.drawText(`Technologies: ${stripHtmlTags(proj.technologies)}`, {
-          x: margin,
-          y: y,
-          size: 9,
-          font: timesRomanItalic,
-          color: C.secondary,
-        });
+      if (hasMeaningfulValue(edu.institution)) {
+        page.drawText(stripHtmlTags(edu.institution), { x: margin, y, size: 9.5, font: timesRomanItalic, color: C.secondary });
         y -= 13;
       }
 
-      if (hasMeaningfulValue(proj.description)) {
-        const items = parseDescription(proj.description);
-        if (items.length > 0) drawBullets(items, margin);
-      }
-
-      const links = [];
-      if (hasMeaningfulValue(proj.githubUrl))
-        links.push(`GitHub: ${stripHtmlTags(proj.githubUrl)}`);
-      if (hasMeaningfulValue(proj.liveUrl))
-        links.push(`Live: ${stripHtmlTags(proj.liveUrl)}`);
-      if (links.length > 0) {
-        ensureSpace(12);
-        page.drawText(links.join("   |   "), {
-          x: margin,
-          y: y,
-          size: 8.5,
-          font: timesRoman,
-          color: C.secondary,
-        });
+      if (hasMeaningfulValue(edu.gpa)) {
+        page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, { x: margin, y, size: 9, font: timesRoman, color: C.muted });
         y -= 12;
       }
 
-      y -= 6;
+      if (hasMeaningfulValue(edu.description)) {
+        const items = parseDescription(edu.description);
+        if (items.length > 0) { y -= 2; drawBullets(items, margin); }
+      }
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== SKILLS ====================
+  // ── ADDITIONAL INFO DIVIDER ────────────────────────────────────────────────
+
+  const hasAdditional =
+    hasSkillsData(cvData.skills) ||
+    hasAchievementsData(cvData.achievements) ||
+    hasVolunteerData(cvData.volunteer);
+
+  if (hasAdditional) drawAdditionalDivider();
+
+  // ── 4. SKILLS ─────────────────────────────────────────────────────────────
 
   if (hasSkillsData(cvData.skills)) {
     drawSectionHeader("Skills");
@@ -1405,119 +1168,81 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
     for (const cat of cvData.skills) {
       const list = getSkillsList(cat);
       if (!hasMeaningfulValue(cat.name) && list.length === 0) continue;
-
       ensureSpace(16);
 
-      const label = `${stripHtmlTags(cat.name) || "Skills"}: `;
-      const labelW = timesRomanBold.widthOfTextAtSize(label, 9.5);
+      const label  = `${stripHtmlTags(cat.name) || "Skills"}: `;
+      const labelW = timesRomanBold.widthOfTextAtSize(label, 10);
 
-      page.drawText(label, {
-        x: margin,
-        y: y,
-        size: 9.5,
-        font: timesRomanBold,
-        color: C.heading,
-      });
+      page.drawText(label, { x: margin, y, size: 10, font: timesRomanBold, color: C.heading });
 
       if (list.length > 0) {
-        const lines = wrapText(list.join(", "), timesRoman, 9.5, contentWidth - labelW - 4);
+        const lines  = wrapText(list.join(", "), timesRoman, 10, contentWidth - labelW - 4);
         const startY = y;
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin + labelW,
-            y: startY - i * 12,
-            size: 9.5,
-            font: timesRoman,
-            color: C.body,
-          })
-        );
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin + labelW, y: startY - i * 12, size: 10, font: timesRoman, color: C.body });
+        });
         y = startY - lines.length * 12 - 4;
       } else {
         y -= 14;
       }
     }
-    y -= 2;
+    y -= 4;
   }
 
-  // ==================== ACHIEVEMENTS ====================
+  // ── 5. ACHIEVEMENTS ───────────────────────────────────────────────────────
 
   if (hasAchievementsData(cvData.achievements)) {
     drawSectionHeader("Achievements");
 
     for (const ach of cvData.achievements) {
       if (!hasMeaningfulValue(ach.title)) continue;
-
       ensureSpace(30);
 
       let dateW = 0;
       if (hasMeaningfulValue(ach.date))
-        dateW = timesRoman.widthOfTextAtSize(formatDate(ach.date), 9.5) + 15;
+        dateW = timesRoman.widthOfTextAtSize(formatDate(ach.date), 9.5) + 20;
 
-      const lines = wrapText(stripHtmlTags(ach.title), timesRomanBold, 10.5, contentWidth - dateW);
-      lines.forEach((l, i) =>
-        page.drawText(l, {
-          x: margin,
-          y: y - i * 13,
-          size: 10.5,
-          font: timesRomanBold,
-          color: C.heading,
-        })
-      );
+      const lines = wrapText(stripHtmlTags(ach.title), timesRomanBold, 11, contentWidth - dateW);
+      lines.forEach((l, i) => {
+        page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: timesRomanBold, color: C.heading });
+      });
       if (lines.length > 1) y -= (lines.length - 1) * 13;
-      if (hasMeaningfulValue(ach.date))
-        drawDateRight(formatDate(ach.date), y);
+      if (hasMeaningfulValue(ach.date)) drawDateRight(formatDate(ach.date), y);
       y -= 14;
 
       if (hasMeaningfulValue(ach.organization)) {
-        page.drawText(stripHtmlTags(ach.organization), {
-          x: margin,
-          y: y,
-          size: 9.5,
-          font: timesRoman,
-          color: C.secondary,
-        });
+        page.drawText(stripHtmlTags(ach.organization), { x: margin, y, size: 10, font: timesRomanItalic, color: C.secondary });
         y -= 13;
       }
 
       if (hasMeaningfulValue(ach.description)) {
         const items = parseDescription(ach.description);
-        if (items.length > 0) {
-          y -= 2;
-          drawBullets(items, margin);
-        }
+        if (items.length > 0) { y -= 2; drawBullets(items, margin); }
       }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== VOLUNTEER ====================
+  // ── 6. VOLUNTEER ──────────────────────────────────────────────────────────
 
   if (hasVolunteerData(cvData.volunteer)) {
     drawSectionHeader("Volunteer Experience");
 
     for (const vol of cvData.volunteer) {
       if (!hasMeaningfulValue(vol.organization) && !hasMeaningfulValue(vol.role)) continue;
-
-      ensureSpace(36);
+      ensureSpace(38);
 
       let dateStr = "";
       if (vol.startDate || vol.endDate)
-        dateStr = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
+        dateStr = `${formatDate(vol.startDate)} – ${formatDate(vol.endDate)}`;
 
       if (hasMeaningfulValue(vol.role)) {
-        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 15 : 0;
-        const lines = wrapText(stripHtmlTags(vol.role), timesRomanBold, 10.5, contentWidth - dateW);
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin,
-            y: y - i * 13,
-            size: 10.5,
-            font: timesRomanBold,
-            color: C.heading,
-          })
-        );
+        const dateW = dateStr ? timesRoman.widthOfTextAtSize(dateStr, 9.5) + 20 : 0;
+        const lines = wrapText(stripHtmlTags(vol.role), timesRomanBold, 11, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 11, font: timesRomanBold, color: C.heading });
+        });
         if (lines.length > 1) y -= (lines.length - 1) * 13;
         if (dateStr) drawDateRight(dateStr, y);
       }
@@ -1525,23 +1250,15 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 
       if (hasMeaningfulValue(vol.organization)) {
         let org = stripHtmlTags(vol.organization);
-        if (hasMeaningfulValue(vol.location))
-          org += `, ${stripHtmlTags(vol.location)}`;
-        page.drawText(org, {
-          x: margin,
-          y: y,
-          size: 9.5,
-          font: timesRomanItalic,
-          color: C.secondary,
-        });
-        y -= 14;
+        if (hasMeaningfulValue(vol.location)) org += `, ${stripHtmlTags(vol.location)}`;
+        page.drawText(org, { x: margin, y, size: 9.5, font: timesRomanItalic, color: C.secondary });
+        y -= 13;
       }
 
       if (hasMeaningfulValue(vol.description)) {
         const items = parseDescription(vol.description);
         if (items.length > 0) drawBullets(items, margin);
       }
-
       y -= 6;
     }
   }
@@ -1551,6 +1268,8 @@ async function generateClassicTemplate(pdfDoc, cvData, utils) {
 
 // ============================================
 // MINIMAL TEMPLATE
+// Centered header · ultra-light weight · spaced lettertracking on headings
+// Horizontal rule starts as short center accent, sections use spaced caps
 // ============================================
 
 async function generateMinimalTemplate(pdfDoc, cvData, utils) {
@@ -1567,23 +1286,24 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     hasMeaningfulValue,
   } = utils;
 
-  const pageWidth = PAGE.width;
-  const pageHeight = PAGE.height;
-  const margin = 52;
+  const pageWidth    = PAGE.width;
+  const pageHeight   = PAGE.height;
+  const margin       = 52;
   const contentWidth = pageWidth - 2 * margin;
-  const rightEdge = pageWidth - margin;
+  const centerX      = pageWidth / 2;
+  const rightEdge    = pageWidth - margin;
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin - 5;
+  let y    = pageHeight - margin - 5;
 
   const C = {
-    black: rgb(0, 0, 0),
+    black:   rgb(0,    0,    0),
     heading: rgb(0.05, 0.05, 0.05),
-    body: rgb(0.18, 0.18, 0.18),
-    secondary: rgb(0.35, 0.35, 0.35),
-    muted: rgb(0.48, 0.48, 0.48),
-    light: rgb(0.62, 0.62, 0.62),
-    border: rgb(0.82, 0.82, 0.82),
+    body:    rgb(0.18, 0.18, 0.18),
+    second:  rgb(0.35, 0.35, 0.35),
+    muted:   rgb(0.48, 0.48, 0.48),
+    light:   rgb(0.62, 0.62, 0.62),
+    border:  rgb(0.84, 0.84, 0.84),
   };
 
   const wrapText = createWrapText(stripHtmlTags);
@@ -1599,265 +1319,163 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
 
   const drawDateRight = (dateText, yPos) => {
     if (!dateText) return;
-    const w = helvetica.widthOfTextAtSize(dateText, 8.5);
-    page.drawText(dateText, {
-      x: rightEdge - w,
-      y: yPos,
-      size: 8.5,
-      font: helvetica,
-      color: C.muted,
-    });
+    const size = 8.5;
+    const w    = helvetica.widthOfTextAtSize(dateText, size);
+    page.drawText(dateText, { x: rightEdge - w, y: yPos, size, font: helvetica, color: C.muted });
   };
 
+  // Minimal section header: spaced small-caps, thin rule across full width
   const drawSectionHeader = (title) => {
-    ensureSpace(22);
+    ensureSpace(26);
+    y -= 10;
+
+    // Letter-spaced by inserting spaces
+    const spaced = title.toUpperCase().split("").join(" ");
+    page.drawText(spaced, { x: margin, y, size: 7, font: helveticaBold, color: C.muted });
+
     y -= 9;
-
-    const spaced = title.toUpperCase().split("").join("  ");
-    page.drawText(spaced, {
-      x: margin,
-      y: y,
-      size: 7.5,
-      font: helvetica,
-      color: C.muted,
-    });
-
-    y -= 8;
     page.drawLine({
-      start: { x: margin, y: y },
-      end: { x: rightEdge, y: y },
+      start: { x: margin, y },
+      end:   { x: rightEdge, y },
       thickness: 0.3,
       color: C.border,
     });
-
     y -= 13;
   };
 
+  // Additional info divider — spaced lettering style
+  const drawAdditionalDivider = () => {
+    ensureSpace(36);
+    y -= 18;
+    const label  = "A D D I T I O N A L   I N F O R M A T I O N";
+    const size   = 6.5;
+    const labelW = helvetica.widthOfTextAtSize(label, size);
+    const gap    = 10;
+    const lx     = centerX - labelW / 2;
+
+    page.drawLine({ start: { x: margin, y }, end: { x: lx - gap, y }, thickness: 0.3, color: C.border });
+    page.drawText(label, { x: lx, y: y - 2.5, size, font: helvetica, color: C.light });
+    page.drawLine({ start: { x: lx + labelW + gap, y }, end: { x: rightEdge, y }, thickness: 0.3, color: C.border });
+
+    y -= 16;
+  };
+
+  // Dash bullet — minimal style
   const drawBullets = (items, x) => {
+    const textX = x + 12;
+    const maxW  = contentWidth - (textX - margin);
     for (const item of items) {
       if (!item) continue;
       const clean = stripHtmlTags(item);
       if (!clean) continue;
-
-      ensureSpace(13);
-
-      const textX = x + 12;
-      const maxW = contentWidth - (textX - margin);
       const lines = wrapText(clean, helvetica, 9.5, maxW);
-
       lines.forEach((line, idx) => {
-        ensureSpace(12);
+        ensureSpace(13);
         if (idx === 0) {
-          page.drawText("\u2013", {
-            x: x,
-            y: y,
-            size: 9.5,
-            font: helvetica,
-            color: C.light,
-          });
+          page.drawText("\u2013", { x, y, size: 9.5, font: helvetica, color: C.light });
         }
-        page.drawText(line, {
-          x: textX,
-          y: y,
-          size: 9.5,
-          font: helvetica,
-          color: C.body,
-        });
+        page.drawText(line, { x: textX, y, size: 9.5, font: helvetica, color: C.body });
         y -= 12;
       });
       y -= 1;
     }
   };
 
-  // ==================== HEADER - IMPROVED ====================
+  // ── HEADER (CENTERED) ──────────────────────────────────────────────────────
 
-  ensureSpace(82);
+  ensureSpace(90);
 
-  page.drawText(stripHtmlTags(cvData.personal?.fullName) || "Your Name", {
-    x: margin,
-    y: y,
-    size: 30,
+  // Name — extra-light feel, large, centered
+  const fullName = stripHtmlTags(cvData.personal?.fullName) || "Your Name";
+  const nameSize = 30;
+  const nameW    = helvetica.widthOfTextAtSize(fullName, nameSize);
+  page.drawText(fullName, {
+    x: centerX - nameW / 2,
+    y,
+    size: nameSize,
     font: helvetica,
-    color: C.black,
+    color: primaryColor,
   });
-  y -= 35;
+  y -= nameSize + 9;
 
+  // Headline
   if (hasMeaningfulValue(cvData.personal?.headline)) {
-    page.drawText(stripHtmlTags(cvData.personal.headline), {
-      x: margin,
-      y: y,
-      size: 11.5,
-      font: helvetica,
-      color: C.secondary,
-    });
-    y -= 19;
+    const hl  = stripHtmlTags(cvData.personal.headline);
+    const hlW = helvetica.widthOfTextAtSize(hl, 11);
+    page.drawText(hl, { x: centerX - hlW / 2, y, size: 11, font: helvetica, color: C.second });
+    y -= 17;
   }
 
+  // Contact row — centered, pipe-separated
   const contacts = [];
-  if (hasMeaningfulValue(cvData.personal?.email))
-    contacts.push(stripHtmlTags(cvData.personal.email));
-  if (hasMeaningfulValue(cvData.personal?.phone))
-    contacts.push(stripHtmlTags(cvData.personal.phone));
-  if (hasMeaningfulValue(cvData.personal?.location))
-    contacts.push(stripHtmlTags(cvData.personal.location));
-  if (hasMeaningfulValue(cvData.personal?.linkedin))
-    contacts.push(stripHtmlTags(cvData.personal.linkedin));
-  if (hasMeaningfulValue(cvData.personal?.website))
-    contacts.push(stripHtmlTags(cvData.personal.website));
+  if (hasMeaningfulValue(cvData.personal?.email))    contacts.push(stripHtmlTags(cvData.personal.email));
+  if (hasMeaningfulValue(cvData.personal?.phone))    contacts.push(stripHtmlTags(cvData.personal.phone));
+  if (hasMeaningfulValue(cvData.personal?.location)) contacts.push(stripHtmlTags(cvData.personal.location));
+  if (hasMeaningfulValue(cvData.personal?.linkedin)) contacts.push(stripHtmlTags(cvData.personal.linkedin));
+  if (hasMeaningfulValue(cvData.personal?.website))  contacts.push(stripHtmlTags(cvData.personal.website));
 
   if (contacts.length > 0) {
-    const contactLines = wrapText(contacts.join("  |  "), helvetica, 9.5, contentWidth);
-    contactLines.forEach((line) => {
-      page.drawText(line, {
-        x: margin,
-        y: y,
-        size: 9.5,
-        font: helvetica,
-        color: C.muted,
-      });
+    const contactText  = contacts.join("  |  ");
+    const contactLines = wrapText(contactText, helvetica, 9, contentWidth - 60);
+    for (const line of contactLines) {
+      const lw = helvetica.widthOfTextAtSize(line, 9);
+      page.drawText(line, { x: centerX - lw / 2, y, size: 9, font: helvetica, color: C.muted });
       y -= 12;
-    });
-    y -= 3;
+    }
+    y -= 4;
   }
 
+  // Short center accent rule (matches minimal preview short rule)
+  const accentW = 44;
   page.drawLine({
-    start: { x: margin, y: y },
-    end: { x: margin + 40, y: y },
+    start: { x: centerX - accentW / 2, y },
+    end:   { x: centerX + accentW / 2, y },
     thickness: 1,
-    color: C.black,
+    color: primaryColor,
   });
-  y -= 18;
+  y -= 20;
 
-  // ==================== SUMMARY ====================
+  // ── 1. SUMMARY ────────────────────────────────────────────────────────────
 
   if (hasMeaningfulValue(cvData.personal?.summary)) {
     drawSectionHeader("Summary");
     const lines = wrapText(stripHtmlTags(cvData.personal.summary), helvetica, 9.5, contentWidth);
-    lines.forEach((line) => {
+    for (const line of lines) {
       ensureSpace(13);
-      page.drawText(line, {
-        x: margin,
-        y: y,
-        size: 9.5,
-        font: helvetica,
-        color: C.body,
-      });
+      page.drawText(line, { x: margin, y, size: 9.5, font: helvetica, color: C.body });
       y -= 13;
-    });
+    }
     y -= 6;
   }
 
-  // ==================== EDUCATION ====================
-
-  if (hasEducationData(cvData.education)) {
-    drawSectionHeader("Education");
-
-    for (const edu of cvData.education) {
-      if (!hasMeaningfulValue(edu.institution) && !hasMeaningfulValue(edu.degree) && !hasMeaningfulValue(edu.field)) continue;
-
-      ensureSpace(34);
-
-      let deg = "";
-      if (hasMeaningfulValue(edu.degree) && hasMeaningfulValue(edu.field))
-        deg = `${stripHtmlTags(edu.degree)}, ${stripHtmlTags(edu.field)}`;
-      else if (hasMeaningfulValue(edu.degree)) deg = stripHtmlTags(edu.degree);
-      else if (hasMeaningfulValue(edu.field)) deg = stripHtmlTags(edu.field);
-
-      let dateStr = "";
-      if (edu.startDate || edu.endDate)
-        dateStr = `${formatDate(edu.startDate)} - ${formatDate(edu.endDate)}`;
-
-      if (deg) {
-        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-        const lines = wrapText(deg, helvetica, 10.5, contentWidth - dateW);
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin,
-            y: y - i * 13,
-            size: 10.5,
-            font: helvetica,
-            color: C.heading,
-          })
-        );
-        if (lines.length > 1) y -= (lines.length - 1) * 13;
-        if (dateStr) drawDateRight(dateStr, y);
-      }
-      y -= 14;
-
-      if (hasMeaningfulValue(edu.institution)) {
-        page.drawText(stripHtmlTags(edu.institution), {
-          x: margin,
-          y: y,
-          size: 9,
-          font: helvetica,
-          color: C.muted,
-        });
-        y -= 12;
-      }
-
-      if (hasMeaningfulValue(edu.gpa)) {
-        page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, {
-          x: margin,
-          y: y,
-          size: 8.5,
-          font: helvetica,
-          color: C.muted,
-        });
-        y -= 11;
-      }
-
-      if (hasMeaningfulValue(edu.description)) {
-        const items = parseDescription(edu.description);
-        if (items.length > 0) {
-          y -= 2;
-          drawBullets(items, margin);
-        }
-      }
-
-      y -= 6;
-    }
-    y -= 2;
-  }
-
-  // ==================== EXPERIENCE ====================
+  // ── 2. PROFESSIONAL EXPERIENCE ────────────────────────────────────────────
 
   if (hasExperienceData(cvData.experience)) {
-    drawSectionHeader("Experience");
+    drawSectionHeader("Professional Experience");
 
     for (const exp of cvData.experience) {
       if (!hasMeaningfulValue(exp.company) && !hasMeaningfulValue(exp.position)) continue;
-
-      ensureSpace(38);
+      ensureSpace(40);
 
       let dateStr = "";
       if (exp.startDate || exp.endDate || exp.isCurrentRole)
-        dateStr = `${formatDate(exp.startDate)} - ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
+        dateStr = `${formatDate(exp.startDate)} – ${exp.isCurrentRole ? "Present" : formatDate(exp.endDate)}`;
 
       if (hasMeaningfulValue(exp.position)) {
-        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-        const lines = wrapText(stripHtmlTags(exp.position), helvetica, 10.5, contentWidth - dateW);
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin,
-            y: y - i * 13,
-            size: 10.5,
-            font: helvetica,
-            color: C.heading,
-          })
-        );
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 20 : 0;
+        const lines = wrapText(stripHtmlTags(exp.position), helveticaBold, 10.5, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 10.5, font: helveticaBold, color: C.heading });
+        });
         if (lines.length > 1) y -= (lines.length - 1) * 13;
         if (dateStr) drawDateRight(dateStr, y);
       }
       y -= 14;
 
       if (hasMeaningfulValue(exp.company)) {
-        page.drawText(stripHtmlTags(exp.company), {
-          x: margin,
-          y: y,
-          size: 9,
-          font: helvetica,
-          color: C.muted,
-        });
+        let co = stripHtmlTags(exp.company);
+        if (hasMeaningfulValue(exp.location)) co += `  ·  ${stripHtmlTags(exp.location)}`;
+        page.drawText(co, { x: margin, y, size: 9, font: helvetica, color: C.muted });
         y -= 13;
       }
 
@@ -1865,83 +1483,70 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
         const items = parseDescription(exp.description);
         if (items.length > 0) drawBullets(items, margin);
       }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== PROJECTS ====================
+  // ── 3. EDUCATION ──────────────────────────────────────────────────────────
 
-  if (hasProjectsData(cvData.projects)) {
-    drawSectionHeader("Projects");
+  if (hasEducationData(cvData.education)) {
+    drawSectionHeader("Education");
 
-    for (const proj of cvData.projects) {
-      if (!hasMeaningfulValue(proj.name)) continue;
+    for (const edu of cvData.education) {
+      if (!hasMeaningfulValue(edu.institution) && !hasMeaningfulValue(edu.degree) && !hasMeaningfulValue(edu.field)) continue;
+      ensureSpace(36);
 
-      ensureSpace(34);
+      let deg = "";
+      if (hasMeaningfulValue(edu.degree) && hasMeaningfulValue(edu.field))
+        deg = `${stripHtmlTags(edu.degree)}, ${stripHtmlTags(edu.field)}`;
+      else if (hasMeaningfulValue(edu.degree)) deg = stripHtmlTags(edu.degree);
+      else if (hasMeaningfulValue(edu.field))  deg = stripHtmlTags(edu.field);
 
       let dateStr = "";
-      if (proj.startDate || proj.endDate) {
-        dateStr = proj.startDate && proj.endDate
-          ? `${formatDate(proj.startDate)} - ${formatDate(proj.endDate)}`
-          : formatDate(proj.startDate) || formatDate(proj.endDate);
-      }
+      if (edu.startDate || edu.endDate)
+        dateStr = `${formatDate(edu.startDate)} – ${formatDate(edu.endDate)}`;
 
-      const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-      const lines = wrapText(stripHtmlTags(proj.name), helvetica, 10.5, contentWidth - dateW);
-      lines.forEach((l, i) =>
-        page.drawText(l, {
-          x: margin,
-          y: y - i * 13,
-          size: 10.5,
-          font: helvetica,
-          color: C.heading,
-        })
-      );
-      if (lines.length > 1) y -= (lines.length - 1) * 13;
-      if (dateStr) drawDateRight(dateStr, y);
+      if (deg) {
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 20 : 0;
+        const lines = wrapText(deg, helveticaBold, 10.5, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 10.5, font: helveticaBold, color: C.heading });
+        });
+        if (lines.length > 1) y -= (lines.length - 1) * 13;
+        if (dateStr) drawDateRight(dateStr, y);
+      }
       y -= 14;
 
-      if (hasMeaningfulValue(proj.technologies)) {
-        page.drawText(stripHtmlTags(proj.technologies), {
-          x: margin,
-          y: y,
-          size: 8.5,
-          font: helveticaOblique,
-          color: C.muted,
-        });
+      if (hasMeaningfulValue(edu.institution)) {
+        page.drawText(stripHtmlTags(edu.institution), { x: margin, y, size: 9, font: helvetica, color: C.muted });
+        y -= 13;
+      }
+
+      if (hasMeaningfulValue(edu.gpa)) {
+        page.drawText(`GPA: ${stripHtmlTags(edu.gpa)}`, { x: margin, y, size: 8.5, font: helvetica, color: C.muted });
         y -= 12;
       }
 
-      if (hasMeaningfulValue(proj.description)) {
-        const items = parseDescription(proj.description);
-        if (items.length > 0) drawBullets(items, margin);
+      if (hasMeaningfulValue(edu.description)) {
+        const items = parseDescription(edu.description);
+        if (items.length > 0) { y -= 2; drawBullets(items, margin); }
       }
-
-      const links = [];
-      if (hasMeaningfulValue(proj.githubUrl))
-        links.push(`GitHub: ${stripHtmlTags(proj.githubUrl)}`);
-      if (hasMeaningfulValue(proj.liveUrl))
-        links.push(`Live: ${stripHtmlTags(proj.liveUrl)}`);
-      if (links.length > 0) {
-        ensureSpace(12);
-        page.drawText(links.join("   |   "), {
-          x: margin,
-          y: y,
-          size: 8,
-          font: helvetica,
-          color: C.secondary,
-        });
-        y -= 12;
-      }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== SKILLS ====================
+  // ── ADDITIONAL INFORMATION DIVIDER ────────────────────────────────────────
+
+  const hasAdditional =
+    hasSkillsData(cvData.skills) ||
+    hasAchievementsData(cvData.achievements) ||
+    hasVolunteerData(cvData.volunteer);
+
+  if (hasAdditional) drawAdditionalDivider();
+
+  // ── 4. SKILLS ─────────────────────────────────────────────────────────────
 
   if (hasSkillsData(cvData.skills)) {
     drawSectionHeader("Skills");
@@ -1949,132 +1554,91 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
     for (const cat of cvData.skills) {
       const list = getSkillsList(cat);
       if (!hasMeaningfulValue(cat.name) && list.length === 0) continue;
-
       ensureSpace(16);
 
-      const catName = stripHtmlTags(cat.name) || "Skills";
-      const labelW = 90;
+      // Two-column layout: category name (fixed width), skills list
+      const catLabel = stripHtmlTags(cat.name) || "Skills";
+      const colW     = 92;
 
-      page.drawText(catName, {
-        x: margin,
-        y: y,
-        size: 9,
-        font: helvetica,
-        color: C.muted,
-      });
+      page.drawText(catLabel, { x: margin, y, size: 9, font: helvetica, color: C.muted });
 
       if (list.length > 0) {
-        const lines = wrapText(list.join("  \u2022  "), helvetica, 9, contentWidth - labelW - 4);
+        const lines  = wrapText(list.join("  ·  "), helvetica, 9, contentWidth - colW - 4);
         const startY = y;
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin + labelW,
-            y: startY - i * 12,
-            size: 9,
-            font: helvetica,
-            color: C.body,
-          })
-        );
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin + colW, y: startY - i * 12, size: 9, font: helvetica, color: C.body });
+        });
         y = startY - lines.length * 12 - 4;
       } else {
-        y -= 14;
+        y -= 13;
       }
     }
-    y -= 2;
+    y -= 4;
   }
 
-  // ==================== ACHIEVEMENTS ====================
+  // ── 5. ACHIEVEMENTS ───────────────────────────────────────────────────────
 
   if (hasAchievementsData(cvData.achievements)) {
     drawSectionHeader("Achievements");
 
     for (const ach of cvData.achievements) {
       if (!hasMeaningfulValue(ach.title)) continue;
-
-      ensureSpace(28);
+      ensureSpace(30);
 
       let dateW = 0;
       if (hasMeaningfulValue(ach.date))
-        dateW = helvetica.widthOfTextAtSize(formatDate(ach.date), 8.5) + 15;
+        dateW = helvetica.widthOfTextAtSize(formatDate(ach.date), 8.5) + 20;
 
-      const lines = wrapText(stripHtmlTags(ach.title), helvetica, 10.5, contentWidth - dateW);
-      lines.forEach((l, i) =>
-        page.drawText(l, {
-          x: margin,
-          y: y - i * 13,
-          size: 10.5,
-          font: helvetica,
-          color: C.heading,
-        })
-      );
+      const lines = wrapText(stripHtmlTags(ach.title), helveticaBold, 10.5, contentWidth - dateW);
+      lines.forEach((l, i) => {
+        page.drawText(l, { x: margin, y: y - i * 13, size: 10.5, font: helveticaBold, color: C.heading });
+      });
       if (lines.length > 1) y -= (lines.length - 1) * 13;
-      if (hasMeaningfulValue(ach.date))
-        drawDateRight(formatDate(ach.date), y);
+      if (hasMeaningfulValue(ach.date)) drawDateRight(formatDate(ach.date), y);
       y -= 14;
 
       if (hasMeaningfulValue(ach.organization)) {
-        page.drawText(stripHtmlTags(ach.organization), {
-          x: margin,
-          y: y,
-          size: 9,
-          font: helvetica,
-          color: C.muted,
-        });
-        y -= 12;
+        page.drawText(stripHtmlTags(ach.organization), { x: margin, y, size: 9, font: helvetica, color: C.muted });
+        y -= 13;
       }
 
       if (hasMeaningfulValue(ach.description)) {
         const items = parseDescription(ach.description);
-        if (items.length > 0) {
-          y -= 2;
-          drawBullets(items, margin);
-        }
+        if (items.length > 0) { y -= 2; drawBullets(items, margin); }
       }
-
-      y -= 6;
+      y -= 7;
     }
     y -= 2;
   }
 
-  // ==================== VOLUNTEER ====================
+  // ── 6. VOLUNTEER ──────────────────────────────────────────────────────────
 
   if (hasVolunteerData(cvData.volunteer)) {
-    drawSectionHeader("Volunteer");
+    drawSectionHeader("Volunteer Experience");
 
     for (const vol of cvData.volunteer) {
       if (!hasMeaningfulValue(vol.organization) && !hasMeaningfulValue(vol.role)) continue;
-
-      ensureSpace(34);
+      ensureSpace(36);
 
       let dateStr = "";
       if (vol.startDate || vol.endDate)
-        dateStr = `${formatDate(vol.startDate)} - ${formatDate(vol.endDate)}`;
+        dateStr = `${formatDate(vol.startDate)} – ${formatDate(vol.endDate)}`;
 
       if (hasMeaningfulValue(vol.role)) {
-        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 15 : 0;
-        const lines = wrapText(stripHtmlTags(vol.role), helvetica, 10.5, contentWidth - dateW);
-        lines.forEach((l, i) =>
-          page.drawText(l, {
-            x: margin,
-            y: y - i * 13,
-            size: 10.5,
-            font: helvetica,
-            color: C.heading,
-          })
-        );
+        const dateW = dateStr ? helvetica.widthOfTextAtSize(dateStr, 8.5) + 20 : 0;
+        const lines = wrapText(stripHtmlTags(vol.role), helveticaBold, 10.5, contentWidth - dateW);
+        lines.forEach((l, i) => {
+          page.drawText(l, { x: margin, y: y - i * 13, size: 10.5, font: helveticaBold, color: C.heading });
+        });
         if (lines.length > 1) y -= (lines.length - 1) * 13;
         if (dateStr) drawDateRight(dateStr, y);
       }
       y -= 14;
 
       if (hasMeaningfulValue(vol.organization)) {
-        page.drawText(stripHtmlTags(vol.organization), {
-          x: margin,
-          y: y,
-          size: 9,
-          font: helvetica,
-          color: C.muted,
-        });
+        let org = stripHtmlTags(vol.organization);
+        if (hasMeaningfulValue(vol.location)) org += `  ·  ${stripHtmlTags(vol.location)}`;
+        page.drawText(org, { x: margin, y, size: 9, font: helvetica, color: C.muted });
         y -= 13;
       }
 
@@ -2082,7 +1646,6 @@ async function generateMinimalTemplate(pdfDoc, cvData, utils) {
         const items = parseDescription(vol.description);
         if (items.length > 0) drawBullets(items, margin);
       }
-
       y -= 6;
     }
   }

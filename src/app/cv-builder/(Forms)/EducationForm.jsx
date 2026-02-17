@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 
 import "react-quill-new/dist/quill.snow.css";
 import dynamic from "next/dynamic";
@@ -13,13 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -63,13 +56,11 @@ import {
 } from "lucide-react";
 import { useCVData } from "@/lib/constants/CVDataContext";
 
-// Import React Quill dynamically to avoid SSR issues
-const ReactQuill = dynamic(() => import("react-quill-new"), { 
+const ReactQuill = dynamic(() => import("react-quill-new"), {
   ssr: false,
-  loading: () => <div className="h-32 bg-gray-100 animate-pulse rounded-md" />
+  loading: () => <div className="h-32 bg-gray-100 animate-pulse rounded-md" />,
 });
 
-// Quill modules configuration
 const quillModules = {
   toolbar: [
     ["bold", "italic", "underline"],
@@ -80,38 +71,46 @@ const quillModules = {
 
 const quillFormats = ["bold", "italic", "underline", "list"];
 
-// Degree types - focused on pre-MBA backgrounds
-const degreeTypes = [
-  { value: "bachelor", label: "Bachelor's Degree", icon: "🎓" },
-  { value: "master", label: "Master's Degree", icon: "📚" },
-  { value: "associate", label: "Associate Degree", icon: "📜" },
-  { value: "diploma", label: "Diploma/Certificate", icon: "📋" },
-  { value: "professional", label: "Professional Degree (JD, MD, etc.)", icon: "⚖️" },
-  { value: "other", label: "Other", icon: "📄" },
-];
-
-// Pre-MBA education templates (undergraduate degrees common for MBA applicants)
+// Quick-start templates (degree is now a plain string)
 const educationTemplates = [
   {
-    degree: "bachelor",
+    degree: "Bachelor of Business Administration (BBA)",
     field: "Business Administration",
     description: "<ul><li>Relevant coursework: Accounting, Finance, Marketing, Economics</li><li>Dean's List recognition</li></ul>",
   },
   {
-    degree: "bachelor",
+    degree: "B.Tech / B.E.",
     field: "Engineering",
     description: "<ul><li>Strong quantitative and analytical foundation</li><li>Project management experience through capstone projects</li></ul>",
   },
   {
-    degree: "bachelor",
+    degree: "Bachelor of Science (B.Sc.)",
     field: "Economics",
     description: "<ul><li>Coursework in Microeconomics, Macroeconomics, Econometrics</li><li>Research thesis on market analysis</li></ul>",
   },
   {
-    degree: "bachelor",
+    degree: "Bachelor of Science (B.Sc.)",
     field: "Computer Science",
     description: "<ul><li>Technical skills in programming and data analysis</li><li>Led team projects and hackathon participation</li></ul>",
   },
+];
+
+// Suggested degree names shown as chips below the input
+const degreeSuggestions = [
+  "B.Tech / B.E.",
+  "BBA",
+  "B.Com",
+  "B.Sc.",
+  "BA",
+  "LLB",
+  "MBBS / MD",
+  "MBA",
+  "M.Tech",
+  "M.Sc.",
+  "MCA",
+  "CA / CPA",
+  "Diploma",
+  "Other",
 ];
 
 export const EducationForm = () => {
@@ -122,15 +121,14 @@ export const EducationForm = () => {
 
   const calculateCompletion = () => {
     if (educations.length === 0) return 0;
-    const filledEducations = educations.filter(
+    const filled = educations.filter(
       (edu) => edu.institution && edu.field && edu.degree
     );
-    return Math.round((filledEducations.length / educations.length) * 100);
+    return Math.round((filled.length / educations.length) * 100);
   };
 
-  const toggleCardExpansion = (id) => {
+  const toggleCardExpansion = (id) =>
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
 
   const addEducation = (template = null) => {
     const newEducation = {
@@ -149,28 +147,22 @@ export const EducationForm = () => {
   };
 
   const duplicateEducation = (education) => {
-    const newEducation = {
+    const newEdu = {
       ...education,
       id: Date.now().toString(),
       institution: `${education.institution} (Copy)`,
     };
-    updateCVData("education", [...educations, newEducation]);
+    updateCVData("education", [...educations, newEdu]);
   };
 
-  const removeEducation = (id) => {
+  const removeEducation = (id) =>
     updateCVData("education", educations.filter((edu) => edu.id !== id));
-  };
 
-  const updateEducation = (id, field, value) => {
+  const updateEducation = (id, field, value) =>
     updateCVData(
       "education",
       educations.map((edu) => (edu.id === id ? { ...edu, [field]: value } : edu))
     );
-  };
-
-  const getDegreeInfo = (degreeValue) => {
-    return degreeTypes.find((d) => d.value === degreeValue) || null;
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
@@ -183,7 +175,8 @@ export const EducationForm = () => {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Header Section */}
+
+        {/* ── Header ── */}
         <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl p-6 border border-blue-500/20">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -205,14 +198,13 @@ export const EducationForm = () => {
               </TooltipTrigger>
               <TooltipContent side="left" className="max-w-xs">
                 <p className="text-sm">
-                  MBA programs look for strong academic foundations. Highlight 
+                  MBA programs look for strong academic foundations. Highlight
                   quantitative coursework, leadership roles, and academic achievements.
                 </p>
               </TooltipContent>
             </Tooltip>
           </div>
 
-          {/* Progress Indicator */}
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="cv-body">Section Completion</span>
@@ -228,7 +220,7 @@ export const EducationForm = () => {
           </div>
         </div>
 
-        {/* Quick Templates */}
+        {/* ── Quick Templates ── */}
         <Card className="border-cvBorder border-dashed bg-cvLightBg/30">
           <Collapsible open={showTemplates} onOpenChange={setShowTemplates}>
             <CollapsibleTrigger asChild>
@@ -247,35 +239,29 @@ export const EducationForm = () => {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="pt-0 grid grid-cols-1 md:grid-cols-2 gap-2">
-                {educationTemplates.map((template, index) => {
-                  const degreeInfo = getDegreeInfo(template.degree);
-                  return (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      onClick={() => addEducation(template)}
-                      className="justify-start h-auto py-3 px-4 border-cvBorder hover:border-cvAccent hover:bg-cvAccent/5 text-left"
-                    >
-                      <div className="text-2xl mr-3">{degreeInfo?.icon || "📄"}</div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm cv-heading truncate">
-                          {degreeInfo?.label || template.degree}
-                        </p>
-                        <p className="text-xs cv-body truncate">{template.field}</p>
-                      </div>
-                    </Button>
-                  );
-                })}
+                {educationTemplates.map((template, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    onClick={() => addEducation(template)}
+                    className="justify-start h-auto py-3 px-4 border-cvBorder hover:border-cvAccent hover:bg-cvAccent/5 text-left"
+                  >
+                    <span className="text-2xl mr-3">🎓</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm cv-heading truncate">{template.degree}</p>
+                      <p className="text-xs cv-body truncate">{template.field}</p>
+                    </div>
+                  </Button>
+                ))}
               </CardContent>
             </CollapsibleContent>
           </Collapsible>
         </Card>
 
-        {/* Education Cards */}
+        {/* ── Education Cards ── */}
         <div className="space-y-4">
           {educations.map((education, index) => {
             const isExpanded = expandedCards[education.id] !== false;
-            const degreeInfo = getDegreeInfo(education.degree);
             const isComplete = education.institution && education.degree && education.field;
 
             return (
@@ -285,12 +271,10 @@ export const EducationForm = () => {
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
-                    {/* Degree Icon */}
                     <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl shrink-0">
-                      {degreeInfo?.icon || "🎓"}
+                      🎓
                     </div>
 
-                    {/* Education Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold cv-heading truncate">
@@ -304,20 +288,21 @@ export const EducationForm = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-sm cv-body mt-0.5">
+                        {education.degree && <span className="truncate font-medium">{education.degree}</span>}
+                        {education.degree && education.field && <span className="text-cvBorder">·</span>}
                         {education.field && <span className="truncate">{education.field}</span>}
                         {education.startDate && (
                           <>
                             <span className="text-cvBorder">•</span>
                             <span>
                               {formatDate(education.startDate)}
-                              {education.endDate && ` - ${formatDate(education.endDate)}`}
+                              {education.endDate && ` – ${formatDate(education.endDate)}`}
                             </span>
                           </>
                         )}
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex items-center gap-1">
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -379,8 +364,10 @@ export const EducationForm = () => {
                 {isExpanded && (
                   <CardContent className="space-y-5 pt-0 border-t border-cvBorder/50">
                     <div className="pt-4 space-y-5">
+
                       {/* Institution & Degree Row */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Institution */}
                         <div className="space-y-2">
                           <Label className="cv-heading text-sm flex items-center gap-2">
                             <Building2 className="w-3.5 h-3.5 text-cvBody" />
@@ -390,7 +377,7 @@ export const EducationForm = () => {
                           <Input
                             value={education.institution}
                             onChange={(e) => updateEducation(education.id, "institution", e.target.value)}
-                            placeholder="e.g., University of Pennsylvania"
+                            placeholder="e.g., IIT Delhi, Harvard University"
                             className={`border-cvBorder focus:border-cvAccent ${!education.institution ? "border-orange-300" : ""}`}
                           />
                           {!education.institution && (
@@ -401,30 +388,42 @@ export const EducationForm = () => {
                           )}
                         </div>
 
+                        {/* Degree — free-text input with suggestion chips */}
                         <div className="space-y-2">
                           <Label className="cv-heading text-sm flex items-center gap-2">
                             <Award className="w-3.5 h-3.5 text-cvBody" />
-                            Degree Type
+                            Degree / Qualification
                             <span className="text-red-500">*</span>
                           </Label>
-                          <Select
+                          <Input
                             value={education.degree}
-                            onValueChange={(value) => updateEducation(education.id, "degree", value)}
-                          >
-                            <SelectTrigger className={`border-cvBorder ${!education.degree ? "border-orange-300" : ""}`}>
-                              <SelectValue placeholder="Select degree type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {degreeTypes.map((degree) => (
-                                <SelectItem key={degree.value} value={degree.value}>
-                                  <div className="flex items-center gap-2">
-                                    <span>{degree.icon}</span>
-                                    <span>{degree.label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            onChange={(e) => updateEducation(education.id, "degree", e.target.value)}
+                            placeholder="e.g., B.Tech, BBA, MBA, B.Com, M.Sc."
+                            className={`border-cvBorder focus:border-cvAccent ${!education.degree ? "border-orange-300" : ""}`}
+                          />
+                          {/* Quick-pick suggestion chips */}
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {degreeSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion}
+                                type="button"
+                                onClick={() => updateEducation(education.id, "degree", suggestion)}
+                                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors
+                                  ${education.degree === suggestion
+                                    ? "bg-cvAccent text-white border-cvAccent"
+                                    : "bg-white text-cvBody border-cvBorder hover:border-cvAccent hover:text-cvAccent"
+                                  }`}
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                          {!education.degree && (
+                            <p className="text-xs text-orange-500 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              Degree is required
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -438,12 +437,18 @@ export const EducationForm = () => {
                         <Input
                           value={education.field}
                           onChange={(e) => updateEducation(education.id, "field", e.target.value)}
-                          placeholder="e.g., Finance, Engineering, Economics"
+                          placeholder="e.g., Computer Science, Finance, Mechanical Engineering"
                           className={`border-cvBorder ${!education.field ? "border-orange-300" : ""}`}
                         />
+                        {!education.field && (
+                          <p className="text-xs text-orange-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Field of study is required
+                          </p>
+                        )}
                       </div>
 
-                      {/* Dates & GPA Row */}
+                      {/* Dates & GPA */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label className="cv-heading text-sm flex items-center gap-2">
@@ -473,16 +478,16 @@ export const EducationForm = () => {
 
                         <div className="space-y-2">
                           <Label className="cv-heading text-sm flex items-center gap-2">
-                            GPA
+                            GPA / Percentage
                             <Badge variant="outline" className="text-xs font-normal">Optional</Badge>
                           </Label>
                           <Input
                             value={education.gpa}
                             onChange={(e) => updateEducation(education.id, "gpa", e.target.value)}
-                            placeholder="e.g., 3.7/4.0"
+                            placeholder="e.g., 3.7/4.0 or 85%"
                             className="border-cvBorder"
                           />
-                          <p className="text-xs cv-body">Include if 3.3+ for MBA applications</p>
+                          <p className="text-xs cv-body">Include if 3.3+ / 75%+ for MBA applications</p>
                         </div>
                       </div>
 
@@ -508,31 +513,27 @@ export const EducationForm = () => {
                         </p>
                       </div>
 
-                      {/* Pre-MBA Tips */}
+                      {/* Tips box */}
                       <div className="bg-blue-50 rounded-lg p-4 space-y-2">
                         <p className="text-xs font-medium text-blue-900 flex items-center gap-1.5">
                           <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
                           What MBA Programs Look For
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800">
-                          <div className="flex items-start gap-2">
-                            <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                            <span>Quantitative coursework (calculus, statistics, economics)</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                            <span>Leadership in clubs, sports, or organizations</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                            <span>Academic achievements and honors</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                            <span>Study abroad or international experience</span>
-                          </div>
+                          {[
+                            "Quantitative coursework (calculus, statistics, economics)",
+                            "Leadership in clubs, sports, or organizations",
+                            "Academic achievements and honors",
+                            "Study abroad or international experience",
+                          ].map((tip) => (
+                            <div key={tip} className="flex items-start gap-2">
+                              <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                              <span>{tip}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
+
                     </div>
                   </CardContent>
                 )}
@@ -541,7 +542,7 @@ export const EducationForm = () => {
           })}
         </div>
 
-        {/* Empty State */}
+        {/* ── Empty State ── */}
         {educations.length === 0 && (
           <Card className="border-cvBorder border-dashed">
             <CardContent className="py-12 text-center">
@@ -560,7 +561,7 @@ export const EducationForm = () => {
           </Card>
         )}
 
-        {/* Add Education Button */}
+        {/* ── Add More Button ── */}
         {educations.length > 0 && (
           <Button
             onClick={() => addEducation()}
@@ -572,7 +573,7 @@ export const EducationForm = () => {
           </Button>
         )}
 
-        {/* Pro Tips */}
+        {/* ── Pro Tips ── */}
         <Card className="border-cvBorder bg-gradient-to-r from-blue-50 to-indigo-50">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
@@ -582,27 +583,23 @@ export const EducationForm = () => {
               <div className="space-y-2">
                 <h4 className="font-medium text-blue-900">Education Tips for MBA Applicants</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li className="flex items-start gap-2">
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>Strong GPA (3.3+) is important, but work experience matters more for top programs</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>Highlight quantitative courses to show analytical readiness</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>Include leadership roles in student organizations</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>Diverse academic backgrounds are valued - you don't need a business degree</span>
-                  </li>
+                  {[
+                    "Strong GPA (3.3+) is important, but work experience matters more for top programs",
+                    "Highlight quantitative courses to show analytical readiness",
+                    "Include leadership roles in student organizations",
+                    "Diverse academic backgrounds are valued – you don't need a business degree",
+                  ].map((tip) => (
+                    <li key={tip} className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 shrink-0" />
+                      <span>{tip}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
           </CardContent>
         </Card>
+
       </div>
 
       <style jsx global>{`
