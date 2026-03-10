@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "./provider";
 import { Toaster } from "sonner";
 import SmoothScroll from "@/lib/utils/Smoothscrollprovider";
+import { ThemeProvider } from "./theme/ThemeProvider";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -70,10 +71,12 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${plusJakartaSans.variable} antialiased`}>
         <SmoothScroll>
-        <Providers>{children}</Providers>
+          <ThemeProvider>
+            <Providers>{children}</Providers>
+          </ThemeProvider>
         </SmoothScroll>
         <Toaster />
       </body>

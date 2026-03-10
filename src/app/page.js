@@ -120,7 +120,7 @@ const Page = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: isLoading ? 0 : 1 }}
         transition={{ duration: 0.5 }}
-        className="relative"
+        className="relative min-h-screen bg-background text-foreground transition-colors"
       >
         <div className="relative z-10 w-full max-w-[1130px] mx-auto px-5">
           <Nav />

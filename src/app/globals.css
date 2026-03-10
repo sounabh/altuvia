@@ -121,7 +121,7 @@
   h1 {
     font-family: var(--font-jakarta), system-ui, sans-serif;
     font-weight: 700;
-    color: #002147;
+    color: var(--foreground);
     width: 100%;
     font-size: 36px;
     line-height: 45px;
@@ -138,14 +138,14 @@
     h1 { font-size: 65px; line-height: 80px; letter-spacing: -0.02em; }
   }
 
-  h2 { font-family: var(--font-jakarta), system-ui, sans-serif; font-weight: 600; color: #002147; }
-  h3 { font-family: var(--font-jakarta), system-ui, sans-serif; font-weight: 600; color: #002147; }
-  h4, h5, h6 { font-family: var(--font-jakarta), system-ui, sans-serif; font-weight: 500; color: #002147; }
+  h2 { font-family: var(--font-jakarta), system-ui, sans-serif; font-weight: 600; color: var(--foreground); }
+  h3 { font-family: var(--font-jakarta), system-ui, sans-serif; font-weight: 600; color: var(--foreground); }
+  h4, h5, h6 { font-family: var(--font-jakarta), system-ui, sans-serif; font-weight: 500; color: var(--foreground); }
 
   p {
     font-family: var(--font-jakarta), system-ui, sans-serif;
     font-weight: 400;
-    color: #6C7280;
+    color: var(--muted-foreground);
     font-size: 16px;
     line-height: 24px;
     width: 100%;

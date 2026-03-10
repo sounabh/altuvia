@@ -24,8 +24,9 @@ const Hero = () => {
 
   return (
     <>
-      {/* Background Gradient Blobs */}
-      <div className="fixed inset-0 -z-10 pointer-events-none">
+      {/* Background Gradient / Patterns */}
+      {/* Light mode: soft blue blobs + dot grid */}
+      <div className="fixed inset-0 -z-10 pointer-events-none dark:hidden">
         <motion.div
           variants={blobVariants}
           animate="animate"
@@ -63,12 +64,17 @@ const Hero = () => {
         />
       </div>
 
+      {/* Dark mode: simple subtle dark gradient background */}
+      <div className="fixed inset-0 -z-10 pointer-events-none hidden dark:block">
+        <div className="w-full h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
+      </div>
+
       <section className="relative flex items-center justify-center">
         <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 py-20 md:py-24 lg:py-30 w-full max-w-5xl mx-auto">
           {/* Badge */}
           <ScrollReveal direction="down" delay={0.1} duration={0.6}>
             <div className="mb-6 md:mb-8">
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-blue-100 text-[#002147] text-sm font-medium shadow-lg">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-blue-100 dark:border-slate-700 text-[#002147] dark:text-white text-sm font-medium shadow-lg">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
@@ -80,7 +86,7 @@ const Hero = () => {
 
           {/* Main Heading */}
           <ScrollReveal direction="up" delay={0.2} duration={0.8}>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-[#002147] leading-tight tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-[#002147] dark:text-white leading-tight tracking-tight">
               <span className="block">Admissions</span>
               <span className="block bg-gradient-to-r from-[#002147] to-[#3598FE] bg-clip-text text-transparent">
                 Made Effortless
@@ -90,7 +96,7 @@ const Hero = () => {
 
           {/* Subheading */}
           <ScrollReveal direction="up" delay={0.35} duration={0.8}>
-            <p className="mt-6 md:mt-8 text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl leading-relaxed tracking-tight">
+            <p className="mt-6 md:mt-8 text-lg sm:text-xl md:text-2xl text-gray-600 dark:text-slate-300 max-w-2xl leading-relaxed tracking-tight">
               Centralize all your MBA & college applications for a stress-free,
               streamlined experience.
             </p>
@@ -112,7 +118,7 @@ const Hero = () => {
               </Link>
 
               <Link href="/">
-                <button className="px-3 py-3 md:px-5 md:py-4 rounded-lg transition-all duration-700 ease-in-out bg-transparent border-2 border-[#002147] text-[#002147] font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
+                <button className="px-3 py-3 md:px-5 md:py-4 rounded-lg transition-all duration-700 ease-in-out bg-transparent border-2 border-[#002147] text-[#002147] dark:border-white dark:text-white font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
                   Learn More
                 </button>
               </Link>

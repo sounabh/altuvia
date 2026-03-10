@@ -91,7 +91,7 @@ const Index = () => {
 
   // ── Happy path ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-blue-50/60 relative overflow-hidden gpu-accelerated">
+    <div className="min-h-screen bg-blue-50/60 dark:bg-slate-950 relative overflow-hidden gpu-accelerated transition-colors">
       <BackgroundAnimation />
       <HeroHeader title={HERO_TITLE} subtitle={HERO_SUBTITLE} />
 

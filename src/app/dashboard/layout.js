@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -12,12 +12,15 @@ import {
   Book,
   Search,
   LogOut,
-  MessageSquare
-} from 'lucide-react';
-import { useRouter, usePathname } from 'next/navigation';
+  MessageSquare,
+  Moon,
+  Sun,
+} from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import Head from 'next/head';
-import Link from 'next/link';
+import Head from "next/head";
+import Link from "next/link";
+import { useTheme } from "../theme/ThemeProvider";
 
 // ============================================
 // SIDEBAR LAYOUT COMPONENT
@@ -27,6 +30,7 @@ import Link from 'next/link';
 const Layout = ({ children }) => {
   // ========== STATE MANAGEMENT ==========
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   
   // ========== ROUTING HOOKS ==========
   const router = useRouter();
@@ -145,7 +149,7 @@ const Layout = ({ children }) => {
     const currentItem = menuItems.find(item => isRouteActive(item));
     return currentItem 
       ? `${currentItem.label} - Altuvia University Application Platform`
-      : 'Altuvia - University Application Platform';
+      : "Altuvia - University Application Platform";
   };
 
   return (
@@ -164,7 +168,7 @@ const Layout = ({ children }) => {
       {/* ========== MAIN LAYOUT CONTAINER ========== */}
       {/* CHANGED: removed "flex h-screen w-screen" — sidebar is now fixed, 
           so body scrolls naturally and Lenis controls it */}
-      <div 
+      <div
         role="application"
         aria-label="University application platform"
       >
@@ -172,8 +176,8 @@ const Layout = ({ children }) => {
         {/* CHANGED: added "fixed top-0 left-0 h-screen z-40" 
             so sidebar stays in place while body scrolls via Lenis */}
         <aside
-          className={`fixed top-0 left-0 h-screen z-40 bg-white shadow-lg transition-all duration-300 ease-in-out ${
-            isCollapsed ? 'w-16' : 'w-64'
+          className={`fixed top-0 left-0 h-screen z-40 bg-white dark:bg-slate-900 shadow-lg transition-all duration-300 ease-in-out ${
+            isCollapsed ? "w-16" : "w-64"
           } flex flex-col justify-between`}
           role="navigation"
           aria-label="Main navigation"
@@ -181,11 +185,11 @@ const Layout = ({ children }) => {
           {/* ========== SIDEBAR TOP SECTION ========== */}
           <div>
             {/* ========== SIDEBAR HEADER ========== */}
-            <header className="flex items-center justify-between p-4 border-b border-[#6C7280]/10">
+            <header className="flex items-center justify-between p-4 border-b border-[#6C7280]/10 dark:border-slate-800">
               {!isCollapsed && (
                 <div className="flex items-center gap-2">
                   <span 
-                    className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-[#002147]"
+                    className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-[#002147] dark:text-white"
                     aria-label="Altuvia Logo"
                   >
                     Altu<span className="text-[#3598FE]">Via</span>
@@ -193,19 +197,34 @@ const Layout = ({ children }) => {
                 </div>
               )}
 
-              {/* ========== COLLAPSE TOGGLE BUTTON ========== */}
-              <button
-                onClick={toggleSidebar}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50"
-                aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                aria-expanded={!isCollapsed}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="w-5 h-5 text-gray-600" aria-hidden="true" />
-                ) : (
-                  <ChevronLeft className="w-5 h-5 text-gray-600" aria-hidden="true" />
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  aria-label="Toggle color theme"
+                >
+                  {theme === "dark" ? (
+                    <Sun className="w-4 h-4 text-amber-300" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-slate-700" />
+                  )}
+                </button>
+
+                {/* ========== COLLAPSE TOGGLE BUTTON ========== */}
+                <button
+                  onClick={toggleSidebar}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50"
+                  aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  aria-expanded={!isCollapsed}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="w-5 h-5 text-gray-600 dark:text-slate-200" aria-hidden="true" />
+                  ) : (
+                    <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-slate-200" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </header>
 
             {/* ========== NAVIGATION MENU ========== */}
@@ -233,13 +252,13 @@ const Layout = ({ children }) => {
                         >
                           {/* ========== MENU ITEM ICON ========== */}
                           <Icon
-                            className="w-5 h-5 transition-colors flex-shrink-0 text-[#002147]"
+                            className="w-5 h-5 transition-colors flex-shrink-0 text-[#002147] dark:text-slate-100"
                             aria-hidden="true"
                           />
 
                           {/* ========== MENU ITEM LABEL ========== */}
                           {!isCollapsed && (
-                            <span className="font-medium text-sm tracking-[0.4px] text-left truncate text-[#002147]">
+                            <span className="font-medium text-sm tracking-[0.4px] text-left truncate text-[#002147] dark:text-slate-100">
                               {item.label}
                             </span>
                           )}
@@ -265,9 +284,10 @@ const Layout = ({ children }) => {
                             w-full flex items-center gap-3 px-3 py-3 rounded-lg 
                             transition-all duration-200 group relative
                             focus:outline-none focus:ring-2 focus:ring-[#3598FE] focus:ring-opacity-50
-                            ${isActive
-                              ? 'bg-[#002147] text-white shadow-md'
-                              : 'text-[#002147] hover:bg-[#F0F4FA] hover:text-[#001e3e]'
+                            ${
+                              isActive
+                                ? "bg-[#002147] text-white shadow-md"
+                                : "text-[#002147] dark:text-slate-100 hover:bg-[#F0F4FA] dark:hover:bg-slate-800 hover:text-[#001e3e] dark:hover:text-white"
                             }
                           `}
                           role="menuitem"
@@ -279,9 +299,10 @@ const Layout = ({ children }) => {
                           <Icon
                             className={`
                               w-5 h-5 transition-colors flex-shrink-0
-                              ${isActive
-                                ? 'text-white'
-                                : 'text-[#002147] group-hover:text-[#001e3e]'
+                              ${
+                                isActive
+                                  ? "text-white"
+                                  : "text-[#002147] dark:text-slate-200 group-hover:text-[#001e3e] dark:group-hover:text-white"
                               }
                             `}
                             aria-hidden="true"
@@ -292,9 +313,10 @@ const Layout = ({ children }) => {
                             <span
                               className={`
                                 font-medium text-sm tracking-[0.4px] text-left truncate
-                                ${isActive
-                                  ? 'text-white'
-                                  : 'text-[#002147] group-hover:text-[#001e3e]'
+                                ${
+                                  isActive
+                                    ? "text-white"
+                                    : "text-[#002147] dark:text-slate-100 group-hover:text-[#001e3e] dark:group-hover:text-white"
                                 }
                               `}
                             >
@@ -311,7 +333,7 @@ const Layout = ({ children }) => {
           </div>
 
           {/* ========== SIDEBAR BOTTOM SECTION ========== */}
-          <div className="p-4 mb-3 space-y-2 border-t border-[#6C7280]/10">
+          <div className="p-4 mb-3 space-y-2 border-t border-[#6C7280]/10 dark:border-slate-800">
             {/* ========== FEEDBACK BUTTON ========== */}
             <button
               onClick={handleFeedback}
@@ -359,9 +381,9 @@ const Layout = ({ children }) => {
         {/* CHANGED: removed "flex-1 overflow-auto" 
             added "min-h-screen" + dynamic margin-left to match sidebar width
             Now content is in the body flow → Lenis scrolls it smoothly */}
-        <main 
-          className={`min-h-screen bg-blue-50/60 transition-all duration-300 ${
-            isCollapsed ? 'ml-16' : 'ml-64'
+        <main
+          className={`min-h-screen bg-blue-50/60 dark:bg-slate-950 transition-all duration-300 ${
+            isCollapsed ? "ml-16" : "ml-64"
           }`}
           role="main"
           aria-label="Application content"

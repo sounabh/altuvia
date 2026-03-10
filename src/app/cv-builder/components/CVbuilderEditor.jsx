@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
  * @param {string} message - Loading message to display
  */
 const LoadingSpinner = memo(({ message = "Loading CV Builder..." }) => (
-  <div className="min-h-screen bg-cvLightBg flex items-center justify-center">
+  <div className="min-h-screen bg-cvLightBg dark:bg-slate-950 flex items-center justify-center transition-colors">
     <div className="text-center">
       <Loader2 className="w-8 h-8 animate-spin text-[#002147] mx-auto mb-2" />
       <p className="text-sm text-gray-600">{message}</p>
@@ -161,7 +161,7 @@ const CVBuilderEditor = () => {
     /* CV Data Context Provider for sharing data across components */
     <CVDataContext.Provider value={{ cvData, updateCVData }}>
       {/* Main container with background */}
-      <div className="min-h-screen bg-cvLightBg">
+      <div className="min-h-screen bg-cvLightBg dark:bg-slate-950 transition-colors">
         
        
         {/* Header component with all action buttons */}

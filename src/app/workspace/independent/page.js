@@ -2045,8 +2045,8 @@ export default function IndependentWorkspacePage() {
 
   if (loading || status === "loading") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
-        <Card className="p-8 bg-white/70 backdrop-blur-sm shadow-xl">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center transition-colors">
+        <Card className="p-8 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm shadow-xl border border-gray-200/60 dark:border-slate-800">
           <div className="flex items-center space-x-4">
             <Loader2 className="w-8 h-8 animate-spin text-[#3598FE]" />
             <div>
@@ -2065,8 +2065,8 @@ export default function IndependentWorkspacePage() {
 
   if (error && !workspaceData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
-        <Card className="p-8 bg-white/70 backdrop-blur-sm shadow-xl max-w-md text-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center transition-colors">
+        <Card className="p-8 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm shadow-xl max-w-md text-center border border-gray-200/60 dark:border-slate-800">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-red-600 mb-2">
             Error Loading Workspace
@@ -2088,8 +2088,8 @@ export default function IndependentWorkspacePage() {
     (!workspaceData.universities || workspaceData.universities.length === 0)
   ) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
-        <Card className="p-8 bg-white/70 backdrop-blur-sm shadow-xl max-w-md text-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center transition-colors">
+        <Card className="p-8 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm shadow-xl max-w-md text-center border border-gray-200/60 dark:border-slate-800">
           <Building2 className="w-12 h-12 text-blue-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-[#002147] mb-2">
             No Saved Universities
@@ -2117,14 +2117,14 @@ export default function IndependentWorkspacePage() {
   // ==========================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors">
       {/* Header */}
       <header
         className="backdrop-blur-lg border-b sticky top-0 z-50 shadow-sm transition-all duration-300"
         style={{
           backgroundColor: currentUniversity
             ? `${currentUniversity.color}15`
-            : "rgba(255, 255, 255, 0.8)",
+            : "rgba(15, 23, 42, 0.85)",
           borderColor: currentUniversity?.color || "#e5e7eb",
         }}
       >
@@ -2275,7 +2275,7 @@ export default function IndependentWorkspacePage() {
         <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar */}
           <div className="col-span-12 lg:col-span-3">
-            <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm sticky top-28 hover:shadow-2xl transition-shadow">
+            <Card className="shadow-xl border border-gray-200/70 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm sticky top-28 hover:shadow-2xl transition-shadow">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-[#002147]">Essays</h3>
@@ -2384,7 +2384,7 @@ export default function IndependentWorkspacePage() {
 
           {/* Main Editor Area */}
           <div className="col-span-12 lg:col-span-6">
-            <Card className="min-h-[600px] shadow-xl border-0 bg-white/70 backdrop-blur-sm hover:shadow-2xl transition-shadow">
+            <Card className="min-h-[600px] shadow-xl border border-gray-200/70 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm hover:shadow-2xl transition-shadow">
               <div className="p-6">
                 {currentEssayData && currentEssay ? (
                   <>
@@ -2626,7 +2626,7 @@ export default function IndependentWorkspacePage() {
             })}
 
             {!currentEssay && (
-              <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm p-6">
+              <Card className="shadow-xl border border-gray-200/70 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm p-6">
                 <div className="text-center">
                   <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-sm font-semibold text-gray-600 mb-2">
@@ -2666,7 +2666,7 @@ export default function IndependentWorkspacePage() {
       `}</style>
 
       {/* Footer */}
-      <footer className="bg-white/50 backdrop-blur-sm border-t border-gray-200/50">
+      <footer className="bg-white/50 dark:bg-slate-900/80 backdrop-blur-sm border-t border-gray-200/50 dark:border-slate-800">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center space-x-4">

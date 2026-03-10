@@ -852,10 +852,10 @@ const SmartCalendar = () => {
   // ========================================
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors">
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-100 dark:border-slate-800 p-5 mb-5 transition-colors">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2.5 mb-2">
@@ -926,7 +926,7 @@ const SmartCalendar = () => {
 
         {/* Filters */}
         {showFilters && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 mb-5">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-100 dark:border-slate-800 p-5 mb-5 transition-colors">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs text-gray-600 mb-1.5">
@@ -993,7 +993,7 @@ const SmartCalendar = () => {
             {isLoading ? (
               <CalendarSkeleton />
             ) : (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden transition-colors">
                 {/* Custom Calendar Toolbar */}
                 <div className="p-5 border-b border-gray-100">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1096,7 +1096,7 @@ const SmartCalendar = () => {
               <>
                 {/* Selected Event Details */}
                 {selectedEvent && (
-                  <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 overflow-hidden transition-colors">
                     {/* Card Header with Color Strip */}
                     <div
                       className="h-2 w-full"
@@ -1339,7 +1339,7 @@ const SmartCalendar = () => {
                 )}
 
                 {/* Upcoming Events */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden transition-colors">
                   <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                     <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                       <div className="p-1.5 bg-[#002147] rounded-lg">
@@ -1467,7 +1467,7 @@ const SmartCalendar = () => {
 
                 {/* Overdue Events */}
                 {overdueEvents.length > 0 && (
-                  <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl shadow-sm border border-red-100 overflow-hidden">
+                  <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950 dark:via-red-900 dark:to-orange-950 rounded-xl shadow-sm border border-red-100 dark:border-red-900 overflow-hidden transition-colors">
                     <div className="p-4 border-b border-red-100 bg-gradient-to-r from-red-50 to-transparent">
                       <h3 className="text-sm font-semibold text-red-900 flex items-center gap-2">
                         <div className="p-1.5 bg-red-500 rounded-lg">
@@ -1554,7 +1554,7 @@ const SmartCalendar = () => {
       {/* Event Modal */}
       {showEventModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp transition-colors">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <div className="p-1.5 bg-[#002147] rounded-lg">
