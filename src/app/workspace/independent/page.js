@@ -59,11 +59,8 @@ const calculateStats = (workspaceData) => {
     programsByUniversity: {},
   };
 
+  // Process regular programs (no standalone detection inside loop)
   workspaceData.programs.forEach((program) => {
-    const isStandaloneProgram =
-      program.degreeType === "STANDALONE" ||
-      program.programName === "My Custom Essays";
-
     if (!stats.programsByUniversity[program.universityId]) {
       stats.programsByUniversity[program.universityId] = [];
     }
@@ -76,25 +73,30 @@ const calculateStats = (workspaceData) => {
         if (essay.userEssay) {
           stats.totalWords += essay.userEssay.wordCount || 0;
 
-          if (isStandaloneProgram) {
-            stats.standaloneEssays++;
-            if (essay.userEssay.isCompleted) {
-              stats.standaloneCompleted++;
-              stats.completedEssays++;
-            }
-          } else {
-            if (essay.userEssay.isCompleted) {
-              stats.completedEssays++;
-            }
+          if (essay.userEssay.isCompleted) {
+            stats.completedEssays++;
           }
         }
       });
     }
   });
 
+  // Add standalone essays from customEssays
+  if (workspaceData.customEssays) {
+    stats.standaloneEssays = workspaceData.customEssays.length;
+    stats.standaloneCompleted = workspaceData.customEssays.filter(
+      (e) => e.isCompleted
+    ).length;
+    stats.completedEssays += stats.standaloneCompleted;
+    stats.totalWords += workspaceData.customEssays.reduce(
+      (acc, e) => acc + (e.wordCount || 0),
+      0
+    );
+  }
+
   stats.averageProgress =
-    stats.totalEssayPrompts > 0
-      ? (stats.completedEssays / stats.totalEssayPrompts) * 100
+    stats.totalEssayPrompts + stats.standaloneEssays > 0
+      ? ((stats.completedEssays) / (stats.totalEssayPrompts + stats.standaloneEssays)) * 100
       : 0;
 
   return stats;
@@ -811,7 +813,7 @@ function StatsSummary({ stats, selectedUniversityId, universities }) {
       return {
         universities: universities?.length || 0,
         programs: stats?.totalPrograms || 0,
-        essays: stats?.totalEssayPrompts || 0,
+        essays: (stats?.totalEssayPrompts || 0) + (stats?.standaloneEssays || 0),
         completed: stats?.completedEssays || 0,
         words: stats?.totalWords || 0,
         progress: stats?.averageProgress || 0,
@@ -926,6 +928,8 @@ export default function IndependentWorkspacePage() {
   const [selectedUniversityId, setSelectedUniversityId] = useState("all");
   const [activeProgramId, setActiveProgramId] = useState(null);
   const [activeEssayPromptId, setActiveEssayPromptId] = useState(null);
+  // ===== CHANGE 5: Add active custom essay state =====
+  const [activeCustomEssayId, setActiveCustomEssayId] = useState(null);
   const [expandedPrograms, setExpandedPrograms] = useState(new Set());
 
   // UI state
@@ -971,35 +975,26 @@ export default function IndependentWorkspacePage() {
   }, [workspaceData]);
 
   // Separate standalone essays from regular program essays
+  // ===== CHANGE 1: Derive standalone essays from customEssays =====
   const { standaloneEssays, regularPrograms } = useMemo(() => {
-    if (!workspaceData?.programs) {
+    if (!workspaceData) {
       return { standaloneEssays: [], regularPrograms: [] };
     }
 
-    const standalone = [];
-    const regular = [];
+    // Regular programs are all programs (custom essays are no longer in programs)
+    const regular = workspaceData.programs || [];
 
-    workspaceData.programs.forEach((program) => {
-      const isStandaloneProgram =
-        program.degreeType === "STANDALONE" ||
-        program.programName === "My Custom Essays";
-
-      if (isStandaloneProgram) {
-        program.essays?.forEach((essayData) => {
-          if (essayData.userEssay) {
-            standalone.push({
-              ...essayData,
-              programId: program.id,
-              universityId: program.universityId,
-              universityName: program.universityName,
-              universityColor: program.universityColor,
-            });
-          }
-        });
-      } else {
-        regular.push(program);
-      }
-    });
+    // Standalone essays come directly from customEssays
+    const standalone = (workspaceData.customEssays ?? []).map(essay => ({
+      promptId: essay.id,
+      promptTitle: essay.title,
+      promptText: essay.prompt,
+      wordLimit: essay.wordLimit,
+      userEssay: essay,
+      programId: essay.programId,
+      universityId: essay.universityId,
+      universityName: essay.universityName ?? "My Essays",
+    }));
 
     return { standaloneEssays: standalone, regularPrograms: regular };
   }, [workspaceData]);
@@ -1035,7 +1030,7 @@ export default function IndependentWorkspacePage() {
     return programs;
   }, [regularPrograms, selectedUniversityId, filterStatus]);
 
-  // Current program and essay
+  // Current program and essay for regular essays
   const currentProgram = useMemo(() => {
     return workspaceData?.programs?.find((p) => p.id === activeProgramId);
   }, [workspaceData, activeProgramId]);
@@ -1049,6 +1044,12 @@ export default function IndependentWorkspacePage() {
   const currentEssay = useMemo(() => {
     return currentEssayData?.userEssay;
   }, [currentEssayData]);
+
+  // ===== CHANGE 5: Current custom essay =====
+  const currentCustomEssay = useMemo(() => {
+    if (!activeCustomEssayId) return null;
+    return workspaceData?.customEssays?.find(e => e.id === activeCustomEssayId) ?? null;
+  }, [workspaceData, activeCustomEssayId]);
 
   // Current university for header
   const currentUniversity = useMemo(() => {
@@ -1126,12 +1127,13 @@ export default function IndependentWorkspacePage() {
   // ==========================================
 
   const autoSaveEssay = useCallback(async () => {
-    // ✅ FIX: Block auto-save if version save is running
+    // Unified essay to save (either regular or custom)
+    const essayToSave = currentEssay ?? currentCustomEssay;
     if (
-      !currentEssay || 
-      isSaving || 
-      isSavingVersion ||  // ← ADDED THIS CHECK
-      !hasUnsavedChanges || 
+      !essayToSave ||
+      isSaving ||
+      isSavingVersion ||
+      !hasUnsavedChanges ||
       isUpdatingRef.current
     ) {
       return false;
@@ -1141,15 +1143,15 @@ export default function IndependentWorkspacePage() {
       setIsSaving(true);
       isUpdatingRef.current = true;
 
-      const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
-      const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
+      const contentToSave = pendingContentRef.current?.content ?? essayToSave.content;
+      const wordCountToSave = pendingContentRef.current?.wordCount ?? essayToSave.wordCount;
 
       const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          essayId: currentEssay.id,
+          essayId: essayToSave.id,
           content: contentToSave,
           wordCount: wordCountToSave,
           isAutoSave: true,
@@ -1162,31 +1164,41 @@ export default function IndependentWorkspacePage() {
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
-          const updated = {
-            ...prev,
-            programs: prev.programs.map((program) =>
-              program.id === activeProgramId
-                ? {
-                    ...program,
-                    essays: program.essays.map((essayData) =>
-                      essayData.promptId === activeEssayPromptId
-                        ? {
-                            ...essayData,
-                            userEssay: {
-                              ...essayData.userEssay,
-                              ...result.essay,
-                              lastModified: new Date(),
-                            },
-                          }
-                        : essayData,
-                    ),
-                  }
-                : program,
-            ),
-          };
-
-          updated.stats = calculateStats(updated);
-          return updated;
+          if (activeCustomEssayId) {
+            // Update custom essays
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === activeCustomEssayId
+                  ? { ...e, ...result.essay, lastModified: new Date() }
+                  : e
+              ),
+            };
+          } else {
+            // Update regular program essays
+            return {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: {
+                                ...essayData.userEssay,
+                                ...result.essay,
+                                lastModified: new Date(),
+                              },
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+          }
         });
 
         setLastSaved(new Date());
@@ -1204,8 +1216,10 @@ export default function IndependentWorkspacePage() {
     }
   }, [
     currentEssay,
+    currentCustomEssay,
+    activeCustomEssayId,
     isSaving,
-    isSavingVersion,  // ← ADDED THIS DEPENDENCY
+    isSavingVersion,
     hasUnsavedChanges,
     activeProgramId,
     activeEssayPromptId,
@@ -1223,14 +1237,14 @@ export default function IndependentWorkspacePage() {
 
     // ✅ FIX: Don't auto-save if version save is in progress
     if (
-      hasUnsavedChanges && 
-      currentEssay && 
-      !isSaving && 
-      !isSavingVersion &&  // ← ADDED THIS CHECK
+      hasUnsavedChanges &&
+      (currentEssay || currentCustomEssay) &&
+      !isSaving &&
+      !isSavingVersion &&
       !isUpdatingRef.current
     ) {
       const timeSinceLastActivity = Date.now() - lastUserActivity;
-      const INACTIVITY_THRESHOLD = 20 * 1000; // ✅ FIX: 20 seconds (not 4 minutes)
+      const INACTIVITY_THRESHOLD = 20 * 1000; // ✅ FIX: 20 seconds
 
       // Only auto-save if user has been inactive for 20+ seconds
       if (timeSinceLastActivity >= INACTIVITY_THRESHOLD) {
@@ -1249,12 +1263,13 @@ export default function IndependentWorkspacePage() {
       }
     };
   }, [
-    hasUnsavedChanges, 
-    currentEssay?.id, 
-    isSaving, 
-    isSavingVersion,  // ← ADDED THIS DEPENDENCY
-    lastUserActivity, 
-    isUserActive, 
+    hasUnsavedChanges,
+    currentEssay?.id,
+    currentCustomEssay?.id,
+    isSaving,
+    isSavingVersion,
+    lastUserActivity,
+    isUserActive,
     autoSaveEssay
   ]);
 
@@ -1272,12 +1287,12 @@ export default function IndependentWorkspacePage() {
         clearTimeout(activityTimeoutRef.current);
       }
 
-      // ✅ FIX: Set to inactive after 20 seconds (not 2 minutes)
+      // ✅ FIX: Set to inactive after 20 seconds
       activityTimeoutRef.current = setTimeout(
         () => {
           setIsUserActive(false);
         },
-        20 * 1000,  // ✅ 20 seconds
+        20 * 1000,
       );
     };
 
@@ -1311,7 +1326,9 @@ export default function IndependentWorkspacePage() {
 
   const updateEssayContent = useCallback(
     (content, wordCount) => {
-      if (isUpdatingRef.current || !currentEssay) return;
+      if (isUpdatingRef.current) return;
+      const essayToCheck = currentEssay ?? currentCustomEssay;
+      if (!essayToCheck) return;
       if (content === lastContentRef.current) return;
 
       try {
@@ -1322,32 +1339,42 @@ export default function IndependentWorkspacePage() {
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
-          const updated = {
-            ...prev,
-            programs: prev.programs.map((program) =>
-              program.id === activeProgramId
-                ? {
-                    ...program,
-                    essays: program.essays.map((essayData) =>
-                      essayData.promptId === activeEssayPromptId
-                        ? {
-                            ...essayData,
-                            userEssay: {
-                              ...essayData.userEssay,
-                              content,
-                              wordCount,
-                              lastModified: new Date(),
-                            },
-                          }
-                        : essayData,
-                    ),
-                  }
-                : program,
-            ),
-          };
-
-          updated.stats = calculateStats(updated);
-          return updated;
+          if (activeCustomEssayId) {
+            // Update custom essays
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === activeCustomEssayId
+                  ? { ...e, content, wordCount, lastModified: new Date() }
+                  : e
+              ),
+            };
+          } else {
+            // Update regular program essays
+            return {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: {
+                                ...essayData.userEssay,
+                                content,
+                                wordCount,
+                                lastModified: new Date(),
+                              },
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+          }
         });
 
         lastContentRef.current = content;
@@ -1358,7 +1385,7 @@ export default function IndependentWorkspacePage() {
         isUpdatingRef.current = false;
       }
     },
-    [currentEssay, activeProgramId, activeEssayPromptId],
+    [currentEssay, currentCustomEssay, activeProgramId, activeEssayPromptId, activeCustomEssayId],
   );
 
   // ==========================================
@@ -1374,6 +1401,7 @@ export default function IndependentWorkspacePage() {
     }
   }, []);
 
+  // ===== CHANGE 5: Enhanced essay selection =====
   const handleEssaySelect = useCallback(
     (programId, promptId) => {
       if (autoSaveTimerRef.current) {
@@ -1383,17 +1411,31 @@ export default function IndependentWorkspacePage() {
 
       pendingContentRef.current = null;
 
-      setActiveProgramId(programId);
-      setActiveEssayPromptId(promptId);
+      // Check if this is a custom essay
+      const isCustom = workspaceData?.customEssays?.some(e => e.id === promptId);
+      if (isCustom) {
+        setActiveCustomEssayId(promptId);
+        setActiveProgramId(null);
+        setActiveEssayPromptId(null);
+      } else {
+        setActiveCustomEssayId(null);
+        setActiveProgramId(programId);
+        setActiveEssayPromptId(promptId);
+      }
+
       setHasUnsavedChanges(false);
       setLastSaved(null);
       setError(null);
 
-      setExpandedPrograms((prev) => new Set([...prev, programId]));
+      if (!isCustom && programId) {
+        setExpandedPrograms((prev) => new Set([...prev, programId]));
+      }
 
-      const program = workspaceData?.programs?.find((p) => p.id === programId);
-      const essayData = program?.essays?.find((e) => e.promptId === promptId);
-      lastContentRef.current = essayData?.userEssay?.content || "";
+      const essay = isCustom
+        ? workspaceData?.customEssays?.find(e => e.id === promptId)
+        : workspaceData?.programs?.find((p) => p.id === programId)?.essays?.find((e) => e.promptId === promptId)?.userEssay;
+
+      lastContentRef.current = essay?.content || "";
     },
     [workspaceData],
   );
@@ -1415,20 +1457,21 @@ export default function IndependentWorkspacePage() {
   // ==========================================
 
   const manualSave = useCallback(async () => {
-    if (!currentEssay || isSaving) return false;
+    const essayToSave = currentEssay ?? currentCustomEssay;
+    if (!essayToSave || isSaving) return false;
 
     try {
       setIsSaving(true);
 
-      const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
-      const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
+      const contentToSave = pendingContentRef.current?.content ?? essayToSave.content;
+      const wordCountToSave = pendingContentRef.current?.wordCount ?? essayToSave.wordCount;
 
       const response = await fetch(`/api/essay/independent`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          essayId: currentEssay.id,
+          essayId: essayToSave.id,
           content: contentToSave,
           wordCount: wordCountToSave,
           isAutoSave: false,
@@ -1441,31 +1484,39 @@ export default function IndependentWorkspacePage() {
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
-          const updated = {
-            ...prev,
-            programs: prev.programs.map((program) =>
-              program.id === activeProgramId
-                ? {
-                    ...program,
-                    essays: program.essays.map((essayData) =>
-                      essayData.promptId === activeEssayPromptId
-                        ? {
-                            ...essayData,
-                            userEssay: {
-                              ...essayData.userEssay,
-                              ...result.essay,
-                              lastModified: new Date(),
-                            },
-                          }
-                        : essayData,
-                    ),
-                  }
-                : program,
-            ),
-          };
-
-          updated.stats = calculateStats(updated);
-          return updated;
+          if (activeCustomEssayId) {
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === activeCustomEssayId
+                  ? { ...e, ...result.essay, lastModified: new Date() }
+                  : e
+              ),
+            };
+          } else {
+            return {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: {
+                                ...essayData.userEssay,
+                                ...result.essay,
+                                lastModified: new Date(),
+                              },
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+          }
         });
 
         setLastSaved(new Date());
@@ -1484,7 +1535,7 @@ export default function IndependentWorkspacePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [currentEssay, isSaving, activeProgramId, activeEssayPromptId]);
+  }, [currentEssay, currentCustomEssay, isSaving, activeProgramId, activeEssayPromptId, activeCustomEssayId]);
 
   // ==========================================
   // ✅ FIXED: SAVE VERSION FUNCTION
@@ -1492,18 +1543,19 @@ export default function IndependentWorkspacePage() {
 
   const saveVersion = useCallback(
     async (label) => {
-      if (!currentEssay || isSaving || isSavingVersion || !userId) {
-        console.warn("Cannot save version:", { 
-          hasEssay: !!currentEssay, 
-          isSaving, 
-          isSavingVersion, 
-          userId 
+      const essayToSave = currentEssay ?? currentCustomEssay;
+      if (!essayToSave || isSaving || isSavingVersion || !userId) {
+        console.warn("Cannot save version:", {
+          hasEssay: !!essayToSave,
+          isSaving,
+          isSavingVersion,
+          userId
         });
         return false;
       }
 
-      const contentToSave = pendingContentRef.current?.content ?? currentEssay.content;
-      const wordCountToSave = pendingContentRef.current?.wordCount ?? currentEssay.wordCount;
+      const contentToSave = pendingContentRef.current?.content ?? essayToSave.content;
+      const wordCountToSave = pendingContentRef.current?.wordCount ?? essayToSave.wordCount;
 
       try {
         setIsSavingVersion(true);
@@ -1516,9 +1568,8 @@ export default function IndependentWorkspacePage() {
         }
 
         // ✅ FIX: Only auto-save if there are ACTUALLY unsaved changes
-        // Skip if content matches last saved
-        const needsAutoSave = hasUnsavedChanges && 
-          contentToSave !== currentEssay.content;
+        const needsAutoSave = hasUnsavedChanges &&
+          contentToSave !== essayToSave.content;
 
         if (needsAutoSave) {
           const autoSaved = await autoSaveEssay();
@@ -1530,7 +1581,7 @@ export default function IndependentWorkspacePage() {
         }
 
         console.log("💾 Saving version:", {
-          essayId: currentEssay.id,
+          essayId: essayToSave.id,
           label: label || `Version ${new Date().toLocaleString()}`,
           wordCount: wordCountToSave,
         });
@@ -1541,11 +1592,11 @@ export default function IndependentWorkspacePage() {
           credentials: "include",
           body: JSON.stringify({
             action: "save_version",
-            essayId: currentEssay.id,
+            essayId: essayToSave.id,
             content: contentToSave,
             wordCount: wordCountToSave,
             label: label || `Version ${new Date().toLocaleString()}`,
-            isCustomEssay: true,
+            isCustomEssay: !!activeCustomEssayId, // indicate if custom
           }),
         });
 
@@ -1567,24 +1618,35 @@ export default function IndependentWorkspacePage() {
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
-          return {
-            ...prev,
-            programs: prev.programs.map((program) =>
-              program.id === activeProgramId
-                ? {
-                    ...program,
-                    essays: program.essays.map((essayData) =>
-                      essayData.promptId === activeEssayPromptId
-                        ? {
-                            ...essayData,
-                            userEssay: result.essay,
-                          }
-                        : essayData,
-                    ),
-                  }
-                : program,
-            ),
-          };
+          if (activeCustomEssayId) {
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === activeCustomEssayId
+                  ? { ...e, ...result.essay }
+                  : e
+              ),
+            };
+          } else {
+            return {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: result.essay,
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+          }
         });
 
         pendingContentRef.current = null;
@@ -1604,6 +1666,8 @@ export default function IndependentWorkspacePage() {
     },
     [
       currentEssay,
+      currentCustomEssay,
+      activeCustomEssayId,
       isSaving,
       isSavingVersion,
       hasUnsavedChanges,
@@ -1717,7 +1781,7 @@ export default function IndependentWorkspacePage() {
       if (result.success) {
         // Close modal first
         setShowStandaloneEssayModal(false);
-        
+
         // Refresh workspace data to get the new essay
         await fetchWorkspaceData();
 
@@ -1725,13 +1789,7 @@ export default function IndependentWorkspacePage() {
           description: "Your essay is ready for writing",
         });
 
-        // Auto-select the newly created essay
-        if (result.programId && result.essayPromptId) {
-          // Wait for state to update
-          setTimeout(() => {
-            handleEssaySelect(result.programId, result.essayPromptId);
-          }, 300);
-        }
+        // ===== CHANGE 3: Removed auto-select block – user can click on the new essay
       }
     } catch (error) {
       console.error("❌ Error creating standalone essay:", error);
@@ -1742,6 +1800,7 @@ export default function IndependentWorkspacePage() {
     }
   };
 
+  // ===== CHANGE 4: Enhanced delete handling =====
   const handleDeleteEssay = async (essayId) => {
     if (
       !confirm(
@@ -1770,9 +1829,10 @@ export default function IndependentWorkspacePage() {
       await fetchWorkspaceData();
 
       // Clear selection if deleted essay was selected
-      if (currentEssay?.id === essayId) {
+      if (currentEssay?.id === essayId || activeEssayPromptId === essayId || activeCustomEssayId === essayId) {
         setActiveEssayPromptId(null);
         setActiveProgramId(null);
+        setActiveCustomEssayId(null);
         lastContentRef.current = "";
         pendingContentRef.current = null;
       }
@@ -1793,22 +1853,31 @@ export default function IndependentWorkspacePage() {
       setWorkspaceData((prev) => {
         if (!prev) return prev;
 
+        // Update regular programs
+        const updatedPrograms = prev.programs.map((program) => ({
+          ...program,
+          essays: program.essays.map((essayData) =>
+            essayData.userEssay?.id === essayId
+              ? {
+                  ...essayData,
+                  userEssay: {
+                    ...essayData.userEssay,
+                    isCompleted: newStatus,
+                  },
+                }
+              : essayData,
+          ),
+        }));
+
+        // Update custom essays
+        const updatedCustom = (prev.customEssays ?? []).map(e =>
+          e.id === essayId ? { ...e, isCompleted: newStatus } : e
+        );
+
         const updated = {
           ...prev,
-          programs: prev.programs.map((program) => ({
-            ...program,
-            essays: program.essays.map((essayData) =>
-              essayData.userEssay?.id === essayId
-                ? {
-                    ...essayData,
-                    userEssay: {
-                      ...essayData.userEssay,
-                      isCompleted: newStatus,
-                    },
-                  }
-                : essayData,
-            ),
-          })),
+          programs: updatedPrograms,
+          customEssays: updatedCustom,
         };
 
         updated.stats = calculateStats(updated);
@@ -1830,26 +1899,33 @@ export default function IndependentWorkspacePage() {
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
-          const updated = {
+          const revertedPrograms = prev.programs.map((program) => ({
+            ...program,
+            essays: program.essays.map((essayData) =>
+              essayData.userEssay?.id === essayId
+                ? {
+                    ...essayData,
+                    userEssay: {
+                      ...essayData.userEssay,
+                      isCompleted: currentStatus,
+                    },
+                  }
+                : essayData,
+            ),
+          }));
+
+          const revertedCustom = (prev.customEssays ?? []).map(e =>
+            e.id === essayId ? { ...e, isCompleted: currentStatus } : e
+          );
+
+          const reverted = {
             ...prev,
-            programs: prev.programs.map((program) => ({
-              ...program,
-              essays: program.essays.map((essayData) =>
-                essayData.userEssay?.id === essayId
-                  ? {
-                      ...essayData,
-                      userEssay: {
-                        ...essayData.userEssay,
-                        isCompleted: currentStatus,
-                      },
-                    }
-                  : essayData,
-              ),
-            })),
+            programs: revertedPrograms,
+            customEssays: revertedCustom,
           };
 
-          updated.stats = calculateStats(updated);
-          return updated;
+          reverted.stats = calculateStats(reverted);
+          return reverted;
         });
 
         throw new Error("Failed to update completion status");
@@ -1862,23 +1938,29 @@ export default function IndependentWorkspacePage() {
           setWorkspaceData((prev) => {
             if (!prev) return prev;
 
-            const updated = {
-              ...prev,
-              programs: prev.programs.map((program) => ({
-                ...program,
-                essays: program.essays.map((essayData) =>
-                  essayData.userEssay?.id === essayId
-                    ? {
-                        ...essayData,
-                        userEssay: result.essay,
-                      }
-                    : essayData,
+            if (prev.customEssays?.some(e => e.id === essayId)) {
+              return {
+                ...prev,
+                customEssays: (prev.customEssays ?? []).map(e =>
+                  e.id === essayId ? { ...e, ...result.essay } : e
                 ),
-              })),
-            };
-
-            updated.stats = calculateStats(updated);
-            return updated;
+              };
+            } else {
+              return {
+                ...prev,
+                programs: prev.programs.map((program) => ({
+                  ...program,
+                  essays: program.essays.map((essayData) =>
+                    essayData.userEssay?.id === essayId
+                      ? {
+                          ...essayData,
+                          userEssay: result.essay,
+                        }
+                      : essayData,
+                  ),
+                })),
+              };
+            }
           });
         }
       } catch (parseError) {
@@ -1902,7 +1984,8 @@ export default function IndependentWorkspacePage() {
   // ==========================================
 
   const handleRestoreVersion = useCallback(async (versionId) => {
-    if (!currentEssay) return;
+    const essayToRestore = currentEssay ?? currentCustomEssay;
+    if (!essayToRestore) return;
 
     try {
       setError(null);
@@ -1912,7 +1995,7 @@ export default function IndependentWorkspacePage() {
         credentials: "include",
         body: JSON.stringify({
           action: "restore_version",
-          essayId: currentEssay.id,
+          essayId: essayToRestore.id,
           versionId,
         }),
       });
@@ -1924,27 +2007,35 @@ export default function IndependentWorkspacePage() {
           setWorkspaceData((prev) => {
             if (!prev) return prev;
 
-            const updated = {
-              ...prev,
-              programs: prev.programs.map((program) =>
-                program.id === activeProgramId
-                  ? {
-                      ...program,
-                      essays: program.essays.map((essayData) =>
-                        essayData.promptId === activeEssayPromptId
-                          ? {
-                              ...essayData,
-                              userEssay: result.essay,
-                            }
-                          : essayData,
-                      ),
-                    }
-                  : program,
-              ),
-            };
-
-            updated.stats = calculateStats(updated);
-            return updated;
+            if (activeCustomEssayId) {
+              return {
+                ...prev,
+                customEssays: (prev.customEssays ?? []).map(e =>
+                  e.id === activeCustomEssayId
+                    ? { ...e, ...result.essay }
+                    : e
+                ),
+              };
+            } else {
+              return {
+                ...prev,
+                programs: prev.programs.map((program) =>
+                  program.id === activeProgramId
+                    ? {
+                        ...program,
+                        essays: program.essays.map((essayData) =>
+                          essayData.promptId === activeEssayPromptId
+                            ? {
+                                ...essayData,
+                                userEssay: result.essay,
+                              }
+                            : essayData,
+                        ),
+                      }
+                    : program,
+                ),
+              };
+            }
           });
 
           lastContentRef.current = result.essay.content || "";
@@ -1964,10 +2055,11 @@ export default function IndependentWorkspacePage() {
       setError("Error restoring version");
       toast.error("Error restoring version");
     }
-  }, [currentEssay, activeProgramId, activeEssayPromptId]);
+  }, [currentEssay, currentCustomEssay, activeProgramId, activeEssayPromptId, activeCustomEssayId]);
 
   const handleDeleteVersion = useCallback(async (versionId) => {
-    if (!currentEssay) return;
+    const essay = currentEssay ?? currentCustomEssay;
+    if (!essay) return;
 
     try {
       setError(null);
@@ -1978,7 +2070,7 @@ export default function IndependentWorkspacePage() {
         body: JSON.stringify({
           action: "delete_version",
           versionId,
-          essayId: currentEssay.id,
+          essayId: essay.id,
         }),
       });
 
@@ -1986,33 +2078,46 @@ export default function IndependentWorkspacePage() {
         setWorkspaceData((prev) => {
           if (!prev) return prev;
 
-          const updated = {
-            ...prev,
-            programs: prev.programs.map((program) =>
-              program.id === activeProgramId
-                ? {
-                    ...program,
-                    essays: program.essays.map((essayData) =>
-                      essayData.promptId === activeEssayPromptId
-                        ? {
-                            ...essayData,
-                            userEssay: {
-                              ...essayData.userEssay,
-                              versions:
-                                essayData.userEssay?.versions?.filter(
-                                  (v) => v.id !== versionId,
-                                ) || [],
-                            },
-                          }
-                        : essayData,
-                    ),
-                  }
-                : program,
-            ),
-          };
-
-          updated.stats = calculateStats(updated);
-          return updated;
+          if (activeCustomEssayId) {
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === activeCustomEssayId
+                  ? {
+                      ...e,
+                      versions: (e.versions ?? []).filter(
+                        (v) => v.id !== versionId
+                      ),
+                    }
+                  : e
+              ),
+            };
+          } else {
+            return {
+              ...prev,
+              programs: prev.programs.map((program) =>
+                program.id === activeProgramId
+                  ? {
+                      ...program,
+                      essays: program.essays.map((essayData) =>
+                        essayData.promptId === activeEssayPromptId
+                          ? {
+                              ...essayData,
+                              userEssay: {
+                                ...essayData.userEssay,
+                                versions:
+                                  essayData.userEssay?.versions?.filter(
+                                    (v) => v.id !== versionId,
+                                  ) || [],
+                              },
+                            }
+                          : essayData,
+                      ),
+                    }
+                  : program,
+              ),
+            };
+          }
         });
         toast.success("Version deleted successfully");
       } else {
@@ -2025,7 +2130,7 @@ export default function IndependentWorkspacePage() {
       setError("Error deleting version");
       toast.error("Error deleting version");
     }
-  }, [currentEssay, activeProgramId, activeEssayPromptId]);
+  }, [currentEssay, currentCustomEssay, activeProgramId, activeEssayPromptId, activeCustomEssayId]);
 
   // Cleanup
   useEffect(() => {
@@ -2105,7 +2210,6 @@ export default function IndependentWorkspacePage() {
             >
               Browse Universities
             </Button>
-            
           </div>
         </Card>
       </div>
@@ -2171,12 +2275,13 @@ export default function IndependentWorkspacePage() {
                 <span className="text-sm font-medium sm:hidden">New</span>
               </button>
 
-              {currentEssay && (
+              {(currentEssay || currentCustomEssay) && (
                 <div className="hidden lg:flex items-center space-x-3 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                   <Target className="w-5 h-5 text-[#6C7280]" />
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-semibold text-[#002147]">
-                      {currentEssay.wordCount}/{currentEssayData?.wordLimit || 0}
+                      {(currentEssay ?? currentCustomEssay)?.wordCount ?? 0}/
+                      {currentEssayData?.wordLimit || currentCustomEssay?.wordLimit || 0}
                     </span>
                     <div className="flex items-center space-x-1">
                       {isSaving ? (
@@ -2310,7 +2415,7 @@ export default function IndependentWorkspacePage() {
                           <StandaloneEssayCard
                             key={essayData.promptId}
                             essayData={essayData}
-                            isActive={activeEssayPromptId === essayData.promptId}
+                            isActive={activeCustomEssayId === essayData.userEssay?.id}
                             onSelect={() =>
                               handleEssaySelect(essayData.programId, essayData.promptId)
                             }
@@ -2386,24 +2491,34 @@ export default function IndependentWorkspacePage() {
           <div className="col-span-12 lg:col-span-6">
             <Card className="min-h-[600px] shadow-xl border-0 bg-white/70 backdrop-blur-sm hover:shadow-2xl transition-shadow">
               <div className="p-6">
-                {currentEssayData && currentEssay ? (
+                {/* ===== CHANGE 5: Unified editor rendering ===== */}
+                {(currentEssayData && currentEssay) || currentCustomEssay ? (
                   <>
                     {/* Essay Header */}
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1 pr-4">
                         <div className="flex items-center space-x-2 mb-2">
-                          <div
-                            className="w-3 h-3 rounded-full shadow-sm flex-shrink-0"
-                            style={{
-                              backgroundColor: currentProgram?.universityColor || "#002147",
-                            }}
-                          />
-                          <span className="text-xs text-gray-500">
-                            {currentProgram?.universityName} • {currentProgram?.name}
-                          </span>
+                          {!currentCustomEssay && (
+                            <>
+                              <div
+                                className="w-3 h-3 rounded-full shadow-sm flex-shrink-0"
+                                style={{
+                                  backgroundColor: currentProgram?.universityColor || "#002147",
+                                }}
+                              />
+                              <span className="text-xs text-gray-500">
+                                {currentProgram?.universityName} • {currentProgram?.name}
+                              </span>
+                            </>
+                          )}
+                          {currentCustomEssay && (
+                            <span className="text-xs text-gray-500">
+                              My Custom Essays
+                            </span>
+                          )}
                         </div>
                         <h2 className="text-xl font-bold text-[#002147]">
-                          {currentEssayData.promptTitle}
+                          {currentEssayData?.promptTitle ?? currentCustomEssay?.title}
                         </h2>
 
                         <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
@@ -2417,11 +2532,11 @@ export default function IndependentWorkspacePage() {
                               wordBreak: "break-word",
                             }}
                           >
-                            {currentEssayData.promptText}
+                            {currentEssayData?.promptText ?? currentCustomEssay?.prompt}
                           </p>
                           <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
-                            <span>Word limit: {currentEssayData.wordLimit}</span>
-                            {currentEssayData.isMandatory && (
+                            <span>Word limit: {currentEssayData?.wordLimit ?? currentCustomEssay?.wordLimit}</span>
+                            {currentEssayData?.isMandatory && (
                               <span className="text-red-600 font-medium">• Required</span>
                             )}
                           </div>
@@ -2445,17 +2560,17 @@ export default function IndependentWorkspacePage() {
                         `}
                       >
                         <Clock className="w-4 h-4 mr-2" />
-                        Versions ({currentEssay.versions?.length || 0})
+                        Versions ({(currentEssay?.versions?.length ?? currentCustomEssay?.versions?.length) || 0})
                       </Button>
                     </div>
 
                     {/* Editor */}
                     <EssayEditor
-                      key={`editor-${currentEssay.id}`}
-                      content={currentEssay.content}
+                      key={`editor-${currentEssay?.id ?? currentCustomEssay?.id}`}
+                      content={currentEssay?.content ?? currentCustomEssay?.content ?? ""}
                       onChange={updateEssayContent}
-                      wordLimit={currentEssayData.wordLimit}
-                      essayId={currentEssay.id}
+                      wordLimit={currentEssayData?.wordLimit ?? currentCustomEssay?.wordLimit ?? 500}
+                      essayId={currentEssay?.id ?? currentCustomEssay?.id}
                       lastSaved={lastSaved}
                       hasUnsavedChanges={hasUnsavedChanges}
                       isSaving={isSaving}
@@ -2466,7 +2581,9 @@ export default function IndependentWorkspacePage() {
                     <div className="mt-6 flex justify-between items-center">
                       <div className="flex items-center space-x-4 text-xs text-[#6C7280]">
                         <span>
-                          Last modified: {new Date(currentEssay.lastModified).toLocaleString()}
+                          Last modified: {new Date(
+                            (currentEssay?.lastModified ?? currentCustomEssay?.lastModified) || Date.now()
+                          ).toLocaleString()}
                         </span>
                         {lastSaved && (
                           <span className="text-green-600">
@@ -2570,54 +2687,57 @@ export default function IndependentWorkspacePage() {
           {/* Right Sidebar - Panels */}
           <div className="col-span-12 lg:col-span-3 space-y-6">
             {panelOrder.map((panelName) => {
-              if (panelName === "versions" && showVersions && currentEssay) {
+              const essayForPanels = currentEssay ?? currentCustomEssay;
+              if (panelName === "versions" && showVersions && essayForPanels) {
                 return (
                   <VersionManager
-                    key={`versions-${currentEssay.id}`}
-                    versions={currentEssay.versions || []}
-                    currentContent={currentEssay.content}
+                    key={`versions-${essayForPanels.id}`}
+                    versions={essayForPanels.versions || []}
+                    currentContent={essayForPanels.content}
                     onRestoreVersion={handleRestoreVersion}
                     onDeleteVersion={handleDeleteVersion}
-                    essayId={currentEssay.id}
-                    universityName={currentProgram?.universityName || "University"}
+                    essayId={essayForPanels.id}
+                    universityName={currentProgram?.universityName || (currentCustomEssay ? "My Essays" : "University")}
                     isLoading={loading}
                   />
                 );
               }
 
-              if (panelName === "analytics" && showAnalytics && currentEssay) {
+              if (panelName === "analytics" && showAnalytics && essayForPanels) {
                 return (
                   <EssayAnalytics
-                    key={`analytics-${currentEssay.id}`}
+                    key={`analytics-${essayForPanels.id}`}
                     essay={{
-                      ...currentEssay,
-                      wordLimit: currentEssayData?.wordLimit,
+                      ...essayForPanels,
+                      wordLimit: currentEssayData?.wordLimit ?? currentCustomEssay?.wordLimit,
                     }}
                     allEssays={
-                      currentProgram?.essays
-                        ?.filter((e) => e.userEssay)
-                        .map((e) => ({
-                          ...e.userEssay,
-                          wordLimit: e.wordLimit,
-                        })) || []
+                      currentCustomEssay
+                        ? standaloneEssays.map(e => e.userEssay)
+                        : (currentProgram?.essays
+                            ?.filter((e) => e.userEssay)
+                            .map((e) => ({
+                              ...e.userEssay,
+                              wordLimit: e.wordLimit,
+                            })) || [])
                     }
-                    essayId={currentEssay.id}
+                    essayId={essayForPanels.id}
                     userId={userId}
-                    universityName={currentProgram?.universityName || "University"}
+                    universityName={currentProgram?.universityName || (currentCustomEssay ? "My Essays" : "University")}
                   />
                 );
               }
 
-              if (panelName === "ai" && showAI && currentEssay) {
+              if (panelName === "ai" && showAI && essayForPanels) {
                 return (
                   <AISuggestions
-                    key={`ai-${currentEssay.id}`}
-                    content={currentEssay.content}
-                    prompt={currentEssayData?.promptText}
-                    wordCount={currentEssay.wordCount}
-                    wordLimit={currentEssayData?.wordLimit}
-                    essayId={currentEssay.id}
-                    universityName={currentProgram?.universityName || "University"}
+                    key={`ai-${essayForPanels.id}`}
+                    content={essayForPanels.content}
+                    prompt={currentEssayData?.promptText ?? currentCustomEssay?.prompt}
+                    wordCount={essayForPanels.wordCount}
+                    wordLimit={currentEssayData?.wordLimit ?? currentCustomEssay?.wordLimit}
+                    essayId={essayForPanels.id}
+                    universityName={currentProgram?.universityName || (currentCustomEssay ? "My Essays" : "University")}
                   />
                 );
               }
@@ -2625,7 +2745,7 @@ export default function IndependentWorkspacePage() {
               return null;
             })}
 
-            {!currentEssay && (
+            {!currentEssay && !currentCustomEssay && (
               <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm p-6">
                 <div className="text-center">
                   <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
