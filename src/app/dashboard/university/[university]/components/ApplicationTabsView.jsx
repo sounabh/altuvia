@@ -60,17 +60,17 @@ import { AISuggestions } from "@/app/workspace/components/AiSuggestion";
 // ============================================================
 export const renderPanels = ({
   currentEssay,
+  currentCustomEssay,      // ← ADDED
   openPanels,
   isUniversityAdded,
   currentProgram,
+  selectedEssayInfo,       // already present, used for isCustom detection
   isPanelOpen,
   closePanel,
   handleRestoreVersion,
-  
   handleDeleteVersion,
   workspaceLoading,
   currentEssayData,
-  selectedEssayInfo,
   customEssays,
   programsWithEssays,
   userId,
@@ -82,9 +82,9 @@ export const renderPanels = ({
     return null;
   }
 
-  // Determine if current essay is custom
+  // Determine if current essay is custom — use selectedEssayInfo or currentCustomEssay
   const isCustom =
-    currentProgram?.degreeType === "STANDALONE" || currentProgram?.isCustom;
+    selectedEssayInfo?.isCustom === true || !!currentCustomEssay;
 
   return (
     <>
@@ -111,14 +111,16 @@ export const renderPanels = ({
                 isLoading={workspaceLoading}
               />
             )}
-            
+
             {/* Analytics Panel */}
             {name === "analytics" && (
               <EssayAnalytics
                 essay={{
                   ...currentEssay,
                   wordLimit:
-                    currentEssayData?.wordLimit || selectedEssayInfo.wordLimit,
+                    currentEssayData?.wordLimit ||
+                    currentCustomEssay?.wordLimit ||
+                    selectedEssayInfo?.wordLimit,
                   priority: currentEssayData?.priority,
                 }}
                 allEssays={
@@ -133,17 +135,21 @@ export const renderPanels = ({
                 universityName={universityName}
               />
             )}
-            
+
             {/* AI Suggestions Panel */}
             {name === "ai" && (
               <AISuggestions
                 content={currentEssay.content || ""}
                 prompt={
-                  currentEssayData?.promptText || selectedEssayInfo.promptText
+                  currentEssayData?.promptText ||
+                  currentCustomEssay?.prompt ||
+                  selectedEssayInfo?.promptText
                 }
                 wordCount={currentEssay.wordCount || 0}
                 wordLimit={
-                  currentEssayData?.wordLimit || selectedEssayInfo.wordLimit
+                  currentEssayData?.wordLimit ||
+                  currentCustomEssay?.wordLimit ||
+                  selectedEssayInfo?.wordLimit
                 }
                 essayId={currentEssay.id}
                 universityName={universityName}
@@ -184,9 +190,7 @@ export const renderListView = ({
 
   return (
     <Tabs defaultValue="essays" className="w-full">
-      {/* ============================================================ */}
       {/* TAB LIST */}
-      {/* ============================================================ */}
       <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 h-14">
         <TabsTrigger
           value="essays"
@@ -206,9 +210,7 @@ export const renderListView = ({
         </TabsTrigger>
       </TabsList>
 
-      {/* ============================================================ */}
       {/* ESSAYS TAB CONTENT */}
-      {/* ============================================================ */}
       <TabsContent value="essays" className="mt-8">
         {!isUniversityAdded ? (
           <LockedTabContent
@@ -244,9 +246,7 @@ export const renderListView = ({
               </Button>
             </div>
 
-            {/* ============================================================ */}
             {/* CUSTOM ESSAYS SECTION */}
-            {/* ============================================================ */}
             {uniqueCustomEssays.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 mb-2">
@@ -273,9 +273,7 @@ export const renderListView = ({
               </div>
             )}
 
-            {/* ============================================================ */}
             {/* REGULAR ESSAYS SECTION */}
-            {/* ============================================================ */}
             <div className="space-y-4">
               {uniqueCustomEssays.length > 0 && (
                 <div className="flex items-center space-x-2 mb-2">
@@ -321,9 +319,7 @@ export const renderListView = ({
         )}
       </TabsContent>
 
-      {/* ============================================================ */}
       {/* TASKS & EVENTS TAB CONTENT */}
-      {/* ============================================================ */}
       <TabsContent value="deadlines" className="mt-8">
         {!isUniversityAdded ? (
           <LockedTabContent
@@ -334,7 +330,6 @@ export const renderListView = ({
           />
         ) : (
           <div className="space-y-6">
-            {/* Header with calendar button */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-2xl font-bold text-white">
@@ -354,7 +349,6 @@ export const renderListView = ({
               </Button>
             </div>
 
-            {/* Tasks/Events List */}
             <div className="grid gap-4">
               {tasksAndEvents.length === 0 ? (
                 <div className="text-center py-12">
@@ -363,8 +357,7 @@ export const renderListView = ({
                     No Tasks or Events
                   </h4>
                   <p className="text-gray-300 mb-6">
-                    Your application tasks and events will appear
-                    here.
+                    Your application tasks and events will appear here.
                   </p>
                 </div>
               ) : (
@@ -460,6 +453,7 @@ export const renderEditorView = ({
   workspaceData,
   currentEssayData,
   currentEssay,
+  currentCustomEssay,      // ← ADDED
   currentProgram,
   selectedEssayInfo,
   displayTitle,
@@ -475,6 +469,7 @@ export const renderEditorView = ({
   isPanelOpen,
   handleProgramSelect,
   handleEssayPromptSelect,
+  handleOpenEditor,        // ← ADDED (needed for sidebar custom essay clicks)
   handleRestoreVersion,
   handleDeleteVersion,
   createEssay,
@@ -491,9 +486,7 @@ export const renderEditorView = ({
   isSavingVersion,
   PANEL_CONFIG,
 }) => {
-  // ============================================================
   // LOCKED STATE
-  // ============================================================
   if (!isUniversityAdded) {
     return (
       <LockedTabContent
@@ -505,43 +498,32 @@ export const renderEditorView = ({
     );
   }
 
-  // ============================================================
   // SESSION WARNING
-  // ============================================================
   if (!userId && sessionStatus === "authenticated") {
     return (
       <div className="bg-amber-500/20 border border-amber-400/30 rounded-xl p-4 flex items-center">
         <AlertTriangle className="w-5 h-5 text-amber-400 mr-3" />
         <div>
-          <p className="text-amber-200 font-medium">
-            Session issue detected
-          </p>
+          <p className="text-amber-200 font-medium">Session issue detected</p>
           <p className="text-amber-300/70 text-sm">
-            User ID not found. Try refreshing or signing out and
-            back in.
+            User ID not found. Try refreshing or signing out and back in.
           </p>
         </div>
       </div>
     );
   }
 
-  // ============================================================
   // LOADING STATE
-  // ============================================================
-  if (workspaceLoading && !currentEssayData) {
+  if (workspaceLoading && !currentEssayData && !currentCustomEssay) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-white" />
-        <span className="ml-3 text-white">
-          Loading workspace...
-        </span>
+        <span className="ml-3 text-white">Loading workspace...</span>
       </div>
     );
   }
 
-  // ============================================================
   // ERROR STATE
-  // ============================================================
   if (workspaceError) {
     return (
       <div className="text-center py-12">
@@ -550,19 +532,14 @@ export const renderEditorView = ({
           Error Loading Workspace
         </h4>
         <p className="text-white/60 mb-4">{workspaceError}</p>
-        <Button
-          onClick={fetchWorkspaceData}
-          className="bg-blue-500 hover:bg-blue-600"
-        >
+        <Button onClick={fetchWorkspaceData} className="bg-blue-500 hover:bg-blue-600">
           Try Again
         </Button>
       </div>
     );
   }
 
-  // ============================================================
   // AUTH REQUIRED STATE
-  // ============================================================
   if (!userId) {
     return (
       <div className="text-center py-12">
@@ -577,52 +554,37 @@ export const renderEditorView = ({
     );
   }
 
-  // ============================================================
+  // Resolve prompt and wordLimit — custom essay takes priority over program essay
+  const resolvedPromptText =
+    currentEssayData?.promptText ||
+    currentCustomEssay?.prompt ||
+    selectedEssayInfo?.promptText ||
+    "";
+
+  const resolvedWordLimit =
+    currentEssayData?.wordLimit ||
+    currentCustomEssay?.wordLimit ||
+    selectedEssayInfo?.wordLimit ||
+    500;
+
   // MAIN EDITOR VIEW
-  // ============================================================
   return (
     <div className="grid grid-cols-12 gap-6">
-      {/* ============================================================ */}
-      {/* LEFT SIDEBAR - Essay Selector */}
-      {/* ============================================================ */}
+      {/* LEFT SIDEBAR */}
       <div className="col-span-12 lg:col-span-3">
         <div className="bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-xl">
           <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-white/10">
             <div className="p-2 bg-blue-500/20 rounded-lg">
               <BookOpen className="w-5 h-5 text-blue-400" />
             </div>
-            <h3 className="font-bold text-white">
-              Programs & Essays
-            </h3>
+            <h3 className="font-bold text-white">Programs & Essays</h3>
           </div>
 
           <div className="space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-1">
-            {/* ============================================================ */}
             {/* CUSTOM ESSAYS IN SIDEBAR */}
-            {/* ============================================================ */}
             {uniqueCustomEssays.length > 0 && (
               <div className="space-y-1 mb-3">
-                <div
-                  onClick={() => {
-                    const standaloneProgram =
-                      workspaceData?.programs?.find(
-                        (p) =>
-                          p.degreeType === "STANDALONE" ||
-                          p.isCustom
-                      );
-                    if (standaloneProgram) {
-                      handleProgramSelect(
-                        standaloneProgram.id
-                      );
-                    }
-                  }}
-                  className={`px-2 py-2 flex items-center space-x-2 cursor-pointer rounded-lg transition-all ${
-                    currentProgram?.degreeType ===
-                      "STANDALONE" || currentProgram?.isCustom
-                      ? "bg-gradient-to-r from-purple-500/30 to-pink-500/20 border-l-4 border-purple-400"
-                      : "hover:bg-white/10 border-l-4 border-transparent"
-                  }`}
-                >
+                <div className="px-2 py-2 flex items-center space-x-2 rounded-lg bg-white/5">
                   <Sparkles className="w-4 h-4 text-purple-400" />
                   <span className="text-sm font-semibold text-white">
                     My Custom Essays
@@ -631,75 +593,48 @@ export const renderEditorView = ({
                     {uniqueCustomEssays.length}
                   </span>
                 </div>
-                
-                {/* Custom essay items */}
-                {(currentProgram?.degreeType === "STANDALONE" ||
-                  currentProgram?.isCustom) &&
-                  workspaceData?.programs
-                    ?.find((p) => p.id === activeProgramId)
-                    ?.essays?.map((essay) => (
-                      <div
-                        key={`custom-essay-${essay.promptId}-${essay.programId || ""}`}
-                        onClick={() =>
-                          handleEssayPromptSelect(
-                            essay.promptId,
-                            {
-                              title: essay.promptTitle,
-                              programName: "My Custom Essays",
-                              isCustom: true,
-                              promptText: essay.promptText,
-                              wordLimit: essay.wordLimit,
-                            }
-                          )
-                        }
-                        className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
-                          activeEssayPromptId ===
-                          essay.promptId
-                            ? "bg-gradient-to-r from-purple-500/50 to-pink-500/30 border-l-2 border-pink-400"
-                            : "hover:bg-white/10 border-l-2 border-white/10"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/90 truncate flex-1">
-                            {essay.promptTitle}
-                          </span>
-                          {essay.userEssay?.wordCount > 0 && (
-                            <span className="text-purple-400 text-[10px] ml-2 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">
-                              {Math.round(
-                                (essay.userEssay.wordCount /
-                                  essay.wordLimit) *
-                                  100
-                              )}
-                              %
-                            </span>
+                {uniqueCustomEssays.map((essay) => (
+                  <div
+                    key={essay.id}
+                    onClick={() => handleOpenEditor(essay, true)}
+                    className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
+                      currentEssay?.id === essay.id
+                        ? "bg-gradient-to-r from-purple-500/50 to-pink-500/30 border-l-2 border-pink-400"
+                        : "hover:bg-white/10 border-l-2 border-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/90 truncate flex-1">
+                        {essay.title}
+                      </span>
+                      {essay.wordCount > 0 && (
+                        <span className="text-purple-400 text-[10px] ml-2 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">
+                          {Math.round(
+                            (essay.wordCount / essay.wordLimit) * 100
                           )}
-                        </div>
-                      </div>
-                    ))}
+                          %
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* ============================================================ */}
             {/* REGULAR PROGRAMS IN SIDEBAR */}
-            {/* ============================================================ */}
             {programsWithEssays.length === 0 &&
             uniqueCustomEssays.length === 0 ? (
               <div className="text-center py-6">
                 <FileText className="w-8 h-8 text-white/30 mx-auto mb-2" />
-                <p className="text-sm text-white/50">
-                  No programs with essays
-                </p>
+                <p className="text-sm text-white/50">No programs with essays</p>
               </div>
             ) : (
               programsWithEssays.map((program) => (
                 <div key={program.id} className="space-y-1">
                   <div
-                    onClick={() =>
-                      handleProgramSelect(program.id)
-                    }
+                    onClick={() => handleProgramSelect(program.id)}
                     className={`p-3 rounded-xl cursor-pointer transition-all text-sm ${
-                      activeProgramId === program.id &&
-                      program.degreeType !== "STANDALONE"
+                      activeProgramId === program.id
                         ? "bg-gradient-to-r from-blue-500/30 to-cyan-500/20 border-l-4 border-blue-400 shadow-lg"
                         : "hover:bg-white/10 border-l-4 border-transparent"
                     }`}
@@ -714,33 +649,24 @@ export const renderEditorView = ({
                     </div>
                   </div>
 
-                  {/* Essay items for selected program */}
                   {activeProgramId === program.id &&
                     program.essays?.map((essayData) => {
-                      const hasContent =
-                        essayData.userEssay?.wordCount > 0;
+                      const hasContent = essayData.userEssay?.wordCount > 0;
                       return (
                         <div
                           key={`regular-${essayData.promptId}-${program.id}`}
                           onClick={() =>
-                            handleEssayPromptSelect(
-                              essayData.promptId,
-                              {
-                                title: essayData.promptTitle,
-                                programName:
-                                  program.programName ||
-                                  program.name,
-                                isCustom: false,
-                                promptText:
-                                  essayData.promptText,
-                                wordLimit:
-                                  essayData.wordLimit,
-                              }
-                            )
+                            handleEssayPromptSelect(essayData.promptId, {
+                              title: essayData.promptTitle,
+                              programName:
+                                program.programName || program.name,
+                              isCustom: false,
+                              promptText: essayData.promptText,
+                              wordLimit: essayData.wordLimit,
+                            })
                           }
                           className={`p-2.5 pl-5 ml-3 rounded-lg cursor-pointer transition-all text-xs ${
-                            activeEssayPromptId ===
-                            essayData.promptId
+                            activeEssayPromptId === essayData.promptId
                               ? "bg-gradient-to-r from-blue-500/50 to-cyan-500/30 border-l-2 border-cyan-400"
                               : "hover:bg-white/10 border-l-2 border-white/10"
                           }`}
@@ -752,8 +678,7 @@ export const renderEditorView = ({
                             {hasContent && (
                               <span className="text-emerald-400 text-[10px] ml-2 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
                                 {Math.round(
-                                  (essayData.userEssay
-                                    .wordCount /
+                                  (essayData.userEssay.wordCount /
                                     essayData.wordLimit) *
                                     100
                                 )}
@@ -771,32 +696,24 @@ export const renderEditorView = ({
         </div>
       </div>
 
-      {/* ============================================================ */}
       {/* MAIN EDITOR AREA */}
-      {/* ============================================================ */}
       <div className="col-span-12 lg:col-span-9">
-        {currentEssayData || selectedEssayInfo.title ? (
+        {currentEssayData || selectedEssayInfo?.title || currentCustomEssay ? (
           <div className="space-y-5">
-            {/* ============================================================ */}
             {/* ESSAY HEADER WITH PANEL TOGGLES */}
-            {/* ============================================================ */}
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h3 className="text-xl font-bold text-white">
-                  {displayTitle}
-                </h3>
+                <h3 className="text-xl font-bold text-white">{displayTitle}</h3>
                 <p className="text-sm text-white/60">
                   {displayProgramName}
-                  {selectedEssayInfo.isCustom && (
+                  {selectedEssayInfo?.isCustom && (
                     <span className="ml-2 inline-flex items-center gap-1 text-purple-400">
-                      <Sparkles className="w-3 h-3" /> My
-                      Custom Essay
+                      <Sparkles className="w-3 h-3" /> My Custom Essay
                     </span>
                   )}
                 </p>
               </div>
 
-              {/* Panel Toggle Buttons */}
               {currentEssay && (
                 <div className="flex items-center gap-2">
                   {Object.entries(PANEL_CONFIG).map(([name, config]) => (
@@ -805,36 +722,41 @@ export const renderEditorView = ({
                       onClick={() => togglePanel(name)}
                       className={`text-xs px-4 py-2 rounded-xl transition-all flex items-center font-medium ${
                         isPanelOpen(name)
-                          ? `bg-gradient-to-r ${name === "versions" ? "from-blue-500 to-cyan-500" : name === "analytics" ? "from-purple-500 to-pink-500" : "from-amber-500 to-orange-500"} text-white shadow-lg shadow-${name === "versions" ? "blue" : name === "analytics" ? "purple" : "amber"}-500/30`
+                          ? `bg-gradient-to-r ${
+                              name === "versions"
+                                ? "from-blue-500 to-cyan-500"
+                                : name === "analytics"
+                                  ? "from-purple-500 to-pink-500"
+                                  : "from-amber-500 to-orange-500"
+                            } text-white shadow-lg`
                           : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20"
                       }`}
                     >
                       <config.icon className="w-4 h-4 mr-2" />
                       {config.title.split(" ")[0]}
-                      {name === "versions" && currentEssay.versions?.length > 0 && (
-                        <span className="ml-2 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
-                          {currentEssay.versions.length}
-                        </span>
-                      )}
+                      {name === "versions" &&
+                        currentEssay.versions?.length > 0 && (
+                          <span className="ml-2 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
+                            {currentEssay.versions.length}
+                          </span>
+                        )}
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* ============================================================ */}
             {/* PROMPT DISPLAY */}
-            {/* ============================================================ */}
             <div
               className={`p-4 rounded-xl border ${
-                selectedEssayInfo.isCustom
+                selectedEssayInfo?.isCustom
                   ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30"
                   : "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border-blue-400/30"
               }`}
             >
               <p
                 className={`text-xs font-semibold mb-2 uppercase tracking-wider ${
-                  selectedEssayInfo.isCustom
+                  selectedEssayInfo?.isCustom
                     ? "text-purple-300"
                     : "text-blue-300"
                 }`}
@@ -842,40 +764,34 @@ export const renderEditorView = ({
                 Prompt
               </p>
               <p className="text-sm text-white/90 leading-relaxed whitespace-pre-wrap">
-                {currentEssayData?.promptText ||
-                  selectedEssayInfo.promptText ||
-                  "Loading..."}
+                {resolvedPromptText || "Loading..."}
               </p>
               <p
                 className={`text-xs mt-3 flex items-center ${
-                  selectedEssayInfo.isCustom
+                  selectedEssayInfo?.isCustom
                     ? "text-purple-300/70"
                     : "text-blue-300/70"
                 }`}
               >
                 <FileText className="w-3 h-3 mr-1" />
-                Word limit:{" "}
-                {currentEssayData?.wordLimit ||
-                  selectedEssayInfo.wordLimit ||
-                  500}
+                Word limit: {resolvedWordLimit}
               </p>
             </div>
 
-            {/* ============================================================ */}
             {/* STACKED PANELS */}
-            {/* ============================================================ */}
             {renderPanels({
               currentEssay,
+              currentCustomEssay,   // ← PASSED DOWN
               openPanels,
               isUniversityAdded,
               currentProgram,
+              selectedEssayInfo,
               isPanelOpen,
               closePanel,
               handleRestoreVersion,
               handleDeleteVersion,
               workspaceLoading,
               currentEssayData,
-              selectedEssayInfo,
               customEssays,
               programsWithEssays,
               userId,
@@ -883,36 +799,26 @@ export const renderEditorView = ({
               PANEL_CONFIG,
             })}
 
-            {/* ============================================================ */}
             {/* EDITOR OR CREATE BUTTON */}
-            {/* ============================================================ */}
             {currentEssay ? (
               <>
                 <EssayEditor
                   key={editorKey}
                   content={editorContent}
                   onChange={updateEssayContent}
-                  wordLimit={
-                    currentEssayData?.wordLimit ||
-                    selectedEssayInfo.wordLimit ||
-                    500
-                  }
+                  wordLimit={resolvedWordLimit}
                   essayId={currentEssay.id}
                   onSave={autoSaveEssay}
                   lastSaved={lastSaved}
                 />
 
-                {/* ============================================================ */}
                 {/* FOOTER ACTIONS */}
-                {/* ============================================================ */}
                 <div className="flex justify-between items-center text-xs text-white/50 pt-2">
                   <span className="flex items-center">
                     <Clock className="w-3 h-3 mr-1" />
                     Last modified:{" "}
                     {currentEssay.lastModified
-                      ? new Date(
-                          currentEssay.lastModified
-                        ).toLocaleString()
+                      ? new Date(currentEssay.lastModified).toLocaleString()
                       : "Never"}
                     <span className="ml-3 text-white/30">
                       • Auto-saves every 20 seconds
@@ -925,13 +831,10 @@ export const renderEditorView = ({
                     )}
                   </span>
                   <div className="flex items-center gap-2">
-                    {/* Manual Save Hint */}
                     <span className="flex items-center text-white/60 text-xs">
                       <Save className="w-3 h-3 mr-1.5" />
                       Press Ctrl+S to save
                     </span>
-                    
-                    {/* Save Version Button */}
                     <Button
                       size="sm"
                       onClick={() => saveVersion()}
@@ -954,43 +857,42 @@ export const renderEditorView = ({
                 </div>
               </>
             ) : (
-              // ============================================================
-              // CREATE ESSAY PROMPT
-              // ============================================================
-              <div className="text-center py-16 bg-gradient-to-b from-white/10 to-white/5 rounded-2xl border border-white/20">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
-                  <BookOpen className="w-8 h-8 text-blue-400" />
+              // CREATE ESSAY PROMPT — only shown for non-custom essays
+              // (custom essays are created via the modal, not this button)
+              !selectedEssayInfo?.isCustom && (
+                <div className="text-center py-16 bg-gradient-to-b from-white/10 to-white/5 rounded-2xl border border-white/20">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
+                    <BookOpen className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <h4 className="text-xl font-bold text-white mb-2">
+                    Start Writing
+                  </h4>
+                  <p className="text-white/60 mb-6">
+                    Create your essay for this prompt
+                  </p>
+                  <Button
+                    onClick={createEssay}
+                    disabled={isCreatingEssay || !userId}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/30 px-8"
+                  >
+                    {isCreatingEssay ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Start Essay
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <h4 className="text-xl font-bold text-white mb-2">
-                  Start Writing
-                </h4>
-                <p className="text-white/60 mb-6">
-                  Create your essay for this prompt
-                </p>
-                <Button
-                  onClick={createEssay}
-                  disabled={isCreatingEssay || !userId}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/30 px-8"
-                >
-                  {isCreatingEssay ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Edit3 className="w-4 h-4 mr-2" />
-                      Start Essay
-                    </>
-                  )}
-                </Button>
-              </div>
+              )
             )}
           </div>
         ) : (
-          // ============================================================
           // NO ESSAY SELECTED STATE
-          // ============================================================
           <div className="text-center py-16">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
               <Target className="w-8 h-8 text-white/40" />

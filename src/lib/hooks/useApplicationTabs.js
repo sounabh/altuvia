@@ -192,27 +192,22 @@ export const useApplicationTabs = (university) => {
     );
   }, [workspaceData]);
 
-  // Custom essays from standalone programs
+  // ===== CHANGE 1: customEssays now reads from workspaceData.customEssays =====
   const customEssays = useMemo(() => {
-    if (!workspaceData?.programs) return [];
-
-    return workspaceData.programs
-      .filter((p) => p.degreeType === "STANDALONE" || p.isCustom)
-      .flatMap(
-        (p) =>
-          p.essays
-            ?.map((e) => ({
-              ...e.userEssay,
-              promptId: e.promptId,
-              promptTitle: e.promptTitle,
-              prompt: e.promptText,
-              wordLimit: e.wordLimit,
-              programId: p.id,
-              universityId: p.universityId,
-            }))
-            .filter(Boolean) || []
-      );
+    return workspaceData?.customEssays ?? [];
   }, [workspaceData]);
+
+  // ===== CHANGE 2: uniqueCustomEssays merges workspace and university props =====
+  const uniqueCustomEssays = useMemo(() => {
+    const fromWorkspace = workspaceData?.customEssays ?? [];
+    const fromUniversity = (university?.userCustomEssays ?? []).map(e => ({ ...e, isCustom: true }));
+    const seen = new Set();
+    return [...fromWorkspace, ...fromUniversity].filter(e => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
+  }, [workspaceData, university]);
 
   // Currently selected program
   const currentProgram = useMemo(() => {
@@ -220,31 +215,31 @@ export const useApplicationTabs = (university) => {
     return workspaceData?.programs?.find((p) => p.id === activeProgramId);
   }, [workspaceData, activeProgramId]);
 
-  // Currently selected essay data
+  // Currently selected essay data (for non‑custom essays)
   const currentEssayData = useMemo(() => {
     if (!currentProgram || !activeEssayPromptId) return null;
-
     return currentProgram.essays?.find(
       (e) => e.promptId === activeEssayPromptId
     );
   }, [currentProgram, activeEssayPromptId]);
 
-  // Currently selected user essay
+  // ===== CHANGE 6: currentCustomEssay and updated currentEssay =====
+  const currentCustomEssay = useMemo(() => {
+    if (!selectedEssayInfo.isCustom) return null;
+    return workspaceData?.customEssays?.find(
+      e => e.title === selectedEssayInfo.title
+    ) ?? null;
+  }, [workspaceData, selectedEssayInfo]);
+
   const currentEssay = useMemo(() => {
+    if (selectedEssayInfo.isCustom) return currentCustomEssay;
     return currentEssayData?.userEssay;
-  }, [currentEssayData]);
+  }, [currentEssayData, currentCustomEssay, selectedEssayInfo.isCustom]);
 
   // Progress calculation
   const progressData = useMemo(() => {
     return calculateProgressData(university, customEssays);
   }, [university, customEssays]);
-
-  // Unique custom essays (deduplicated)
-  const uniqueCustomEssays = useMemo(() => {
-    return Array.from(
-      new Map(customEssays.map((essay) => [essay.id, essay])).values()
-    );
-  }, [customEssays]);
 
   // Display title for current essay
   const displayTitle = useMemo(() => {
@@ -483,17 +478,15 @@ export const useApplicationTabs = (university) => {
           // Force immediate refresh from API
           await forceRefresh();
           
-          // Then navigate to the new essay
-          setActiveProgramId(result.programId);
-          setActiveEssayPromptId(result.essayPromptId);
+          // ===== CHANGE 4: No program/prompt IDs – just update selectedEssayInfo =====
           setSelectedEssayInfo({
-            title: result.essay.title,
+            title: result.essay.customPromptTitle ?? result.essay.title,
             programName: "My Custom Essays",
             isCustom: true,
-            promptText: result.essay.prompt,
-            wordLimit: result.essay.wordLimit,
+            promptText: result.essay.customPromptText ?? result.essay.prompt,
+            wordLimit: result.essay.customWordLimit ?? result.essay.wordLimit,
           });
-          setActiveView("editor");
+          // Do not navigate to editor – let user click to open
         } else {
           throw new Error(result.error || "Failed to create custom essay");
         }
@@ -533,28 +526,12 @@ export const useApplicationTabs = (university) => {
       });
 
       if (response.ok) {
-        // Remove from workspace data immediately
+        // ===== CHANGE 3: Remove from customEssays array, not from programs =====
         setWorkspaceData((prev) => {
           if (!prev) return prev;
-
           return {
             ...prev,
-            programs: prev.programs
-              .map((program) =>
-                program.degreeType === "STANDALONE" || program.isCustom
-                  ? {
-                      ...program,
-                      essays: program.essays.filter(
-                        (e) => e.userEssay?.id !== essayId
-                      ),
-                    }
-                  : program
-              )
-              .filter(
-                (p) =>
-                  (p.degreeType !== "STANDALONE" && !p.isCustom) ||
-                  (p.essays && p.essays.length > 0)
-              ),
+            customEssays: (prev.customEssays ?? []).filter(e => e.id !== essayId),
           };
         });
 
@@ -593,21 +570,6 @@ export const useApplicationTabs = (university) => {
   // Auto-save and manual save functionality
   // ============================================================
 
-  // ─── FIX 1 ───────────────────────────────────────────────────
-  // ROOT CAUSE: two things blocked this from ever running:
-  //   (a) `isUpdatingRef.current` was checked here, but saveVersion and
-  //       updateEssayContent both set it true — so any call triggered by
-  //       the auto-save timer while a debounce was in-flight would bail.
-  //   (b) content was read from `currentEssay.content` first, and only
-  //       fell back to pendingContentRef.  Because currentEssay is a
-  //       useMemo over workspaceData, it doesn't update until AFTER a
-  //       successful save round-trips — meaning the very first save of
-  //       new content always sent stale (or empty) data.
-  // FIX: read pendingContentRef FIRST (it is the real source of truth
-  //      while the user is typing), drop the isUpdatingRef guard entirely
-  //      (nothing else should be mutating the essay at the same time as
-  //      auto-save; saveVersion now serialises properly — see FIX 2).
-  // ─────────────────────────────────────────────────────────────
   const autoSaveEssay = useCallback(async () => {
     // Read pending content FIRST — this is the source of truth during typing
     const contentToSave = pendingContentRef.current?.content ?? currentEssay?.content;
@@ -650,9 +612,19 @@ export const useApplicationTabs = (university) => {
       if (response.ok) {
         const result = await response.json();
         
-        // Update workspace data with server response
+        // ===== CHANGE 7: Update workspaceData with branch for custom essays =====
         setWorkspaceData((prev) => {
           if (!prev) return prev;
+
+          if (selectedEssayInfo.isCustom) {
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === currentEssay.id ? { ...e, ...result.essay } : e
+              ),
+            };
+          }
+
           return {
             ...prev,
             programs: prev.programs.map((program) =>
@@ -697,6 +669,7 @@ export const useApplicationTabs = (university) => {
     isUniversityAdded,
     activeProgramId,
     activeEssayPromptId,
+    selectedEssayInfo.isCustom,  // added dependency
   ]);
 
   // ============================================================
@@ -896,22 +869,6 @@ export const useApplicationTabs = (university) => {
   // SAVE VERSION FUNCTION
   // Save current essay as a named version
   // ============================================================
-
-  // ─── FIX 2 ───────────────────────────────────────────────────
-  // ROOT CAUSE: `isUpdatingRef.current = true` was set at the TOP of the
-  //   try block, BEFORE `autoSaveEssay()` was called.  autoSaveEssay
-  //   (pre-FIX-1) checked `isUpdatingRef.current` and returned `false`
-  //   immediately — so the "save pending changes first" step silently
-  //   failed, and the user saw "Failed to save current changes" with
-  //   zero explanation.
-  // FIX:
-  //   1. Move `isUpdatingRef = true` to AFTER autoSaveEssay completes.
-  //   2. Show a friendly "Saving current changes…" toast before the
-  //      auto-save attempt so the user knows what is happening.
-  //   3. On failure show an actionable message ("try Ctrl+S first").
-  //   4. Re-read content after the flush so the version payload always
-  //      contains the latest text.
-  // ─────────────────────────────────────────────────────────────
   const saveVersion = useCallback(
     async (label) => {
       if (
@@ -996,9 +953,18 @@ export const useApplicationTabs = (university) => {
 
         console.log('✅ Version saved successfully:', result);
 
-        // Update workspace data with complete essay data
+        // ===== CHANGE 7: Update workspaceData with branch for custom essays =====
         setWorkspaceData((prev) => {
           if (!prev) return prev;
+
+          if (selectedEssayInfo.isCustom) {
+            return {
+              ...prev,
+              customEssays: (prev.customEssays ?? []).map(e =>
+                e.id === currentEssay.id ? { ...e, ...result.essay } : e
+              ),
+            };
+          }
 
           return {
             ...prev,
@@ -1055,6 +1021,7 @@ export const useApplicationTabs = (university) => {
       userId,
       userEmail,
       isUniversityAdded,
+      selectedEssayInfo.isCustom,  // added dependency
     ]
   );
 
@@ -1291,7 +1258,24 @@ export const useApplicationTabs = (university) => {
         }
       }
 
-      // If not found, create new selection
+      // ===== CHANGE 5: Custom essays are now in customEssays =====
+      if (isCustom) {
+        const customEssay = workspaceData?.customEssays?.find(e => e.id === essay.id);
+        if (customEssay) {
+          lastContentRef.current = customEssay.content || "";
+          setSelectedEssayInfo({
+            title: customEssay.title,
+            programName: "My Custom Essays",
+            isCustom: true,
+            promptText: customEssay.prompt,
+            wordLimit: customEssay.wordLimit,
+          });
+        }
+        setActiveView("editor");
+        return;
+      }
+
+      // If not found, create new selection (fallback for non‑custom)
       setSelectedEssayInfo({
         title: essay.title || essay.promptTitle || "Essay",
         programName: isCustom ? "My Custom Essays" : "",
@@ -1299,23 +1283,6 @@ export const useApplicationTabs = (university) => {
         promptText: essay.text || essay.prompt || essay.promptText || "",
         wordLimit: essay.wordLimit || 500,
       });
-
-      // For custom essays, try to find the standalone program
-      if (isCustom && workspaceData) {
-        const standaloneProgram = workspaceData.programs.find(
-          (p) => p.degreeType === "STANDALONE" || p.isCustom
-        );
-        if (standaloneProgram) {
-          setActiveProgramId(standaloneProgram.id);
-          const customEssay = standaloneProgram.essays?.find(
-            (e) => e.userEssay?.id === essay.id
-          );
-          if (customEssay) {
-            setActiveEssayPromptId(customEssay.promptId);
-            lastContentRef.current = customEssay.userEssay?.content || "";
-          }
-        }
-      }
 
       setActiveView("editor");
       setHasUnsavedChanges(false);
@@ -1386,23 +1353,6 @@ export const useApplicationTabs = (university) => {
   // ============================================================
   // AUTO-SAVE TIMER EFFECT
   // ============================================================
-
-  // ─── FIX 3 ───────────────────────────────────────────────────
-  // ROOT CAUSE: the previous effect used a single `setTimeout(…, 20000)`.
-  //   Every time ANY dependency in the array changed (hasUnsavedChanges,
-  //   currentEssay?.id, isSaving…) the cleanup ran, cleared the timer,
-  //   and the effect re-ran — restarting the 20 s clock from zero.
-  //   Because `hasUnsavedChanges` flips true on every keystroke batch
-  //   (via updateEssayContent's 600 ms debounce), the 20 s timer was
-  //   effectively reset every ~600 ms and NEVER fired.
-  //   Additionally, the nested 15 s idle check added a second condition
-  //   that could fail near boundaries.
-  // FIX: replace the one-shot setTimeout with a `setInterval` that
-  //   ticks every 5 s.  Each tick reads `lastTypingTimeRef` directly
-  //   (no stale closure) and only fires autoSaveEssay when idle ≥ 15 s.
-  //   The interval is started/stopped only when the coarse conditions
-  //   change (view, essay id, university-added) — NOT on every keystroke.
-  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     // Clear any leftover one-shot timer from previous renders
     if (autoSaveTimerRef.current) {
@@ -1537,6 +1487,7 @@ export const useApplicationTabs = (university) => {
     currentProgram,
     currentEssayData,
     currentEssay,
+    currentCustomEssay,       // ← added
     progressData,
     displayTitle,
     displayProgramName,
