@@ -1,5 +1,5 @@
 /**
- * useDashboardData.js  (optimized)
+ * useDashboardData.js  (optimized with SWR onError auth handling)
  *
  * Orchestrates SWR + auth + data extraction.
  * All logic sub-concerns are delegated to focused sub-modules:
@@ -8,7 +8,7 @@
  *   - useAuthGuard        → JWT error handling + redirect
  *   - useRemoveUniversity → optimistic remove action
  *
- * No logic was changed — only moved to the right home.
+ * Auth errors are caught directly in SWR's onError to immediately trigger sign-out/redirect.
  */
 
 'use client';
@@ -61,7 +61,6 @@ export const useDashboardData = () => {
   // Memoize fetcher — only recreates when token/baseUrl changes
   const fetcher = useMemo(
     () => (shouldFetch ? createFetcher(session.token, API_BASE_URL) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [shouldFetch, session?.token, API_BASE_URL]
   );
 
@@ -81,22 +80,23 @@ export const useDashboardData = () => {
           console.error('❌ SWR error:', err);
           setIsInitialized(true);
         }
+
+        // ── Auth error handling directly inside SWR onError ──
+        // This is the key change: instead of a separate useEffect, we call handleAuthError immediately.
+        if (
+          err.status === 401 ||
+          err.message?.toLowerCase().includes('jwt') ||
+          err.message?.toLowerCase().includes('token') ||
+          err.message?.toLowerCase().includes('authentication')
+        ) {
+          handleAuthError(err.message || 'Authentication failed');
+        }
       },
     }
   );
 
-  // ── Auth error side-effect ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!error || !mountedRef.current) return;
-
-    if (
-      error.status === 401 ||
-      error.message?.toLowerCase().includes('jwt') ||
-      error.message?.toLowerCase().includes('token')
-    ) {
-      handleAuthError(error.message || 'Authentication failed');
-    }
-  }, [error, handleAuthError]);
+  // ── REMOVED: the separate useEffect that watched 'error' and called handleAuthError.
+  // Auth errors are now handled directly in onError above.
 
   // ── Redirect unauthenticated users ──────────────────────────────────────────
   useEffect(() => {

@@ -9,7 +9,17 @@ import { useCallback, useRef } from 'react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
-const JWT_KEYWORDS = ['jwt', 'token', 'expired', 'invalid'];
+const JWT_KEYWORDS = [
+  'jwt',
+  'token',
+  'expired',
+  'invalid',
+  'authentication',
+  'unauthorized',
+  'unauthenticated',
+  '401',
+  'no authentication token',   // <-- added to catch missing token error
+];
 
 const isJwtError = (msg) => {
   if (!msg) return false;
