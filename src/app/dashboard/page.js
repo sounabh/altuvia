@@ -19,7 +19,7 @@ import {
 } from '@/components/DashboardStatic';
 import { UniversitiesSection } from '@/components/UniversitySection';
 import { LoadingView, AuthCheckView, ErrorView } from '@/components/skeletons/dashboardLoading';
-import { Next30Days } from '@/components/Next30Days';
+import { Next30Days } from '@/components/Next30days';
 
 const HERO_TITLE    = <> Your <span className="text-[#3598FE]">Dashboard.</span></>;
 const HERO_SUBTITLE = 'Track your saved universities and manage your applications with ease.';
