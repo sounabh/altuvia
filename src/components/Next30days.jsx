@@ -6,48 +6,67 @@ import { CalendarDays, Clock, MapPin, ChevronRight } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function hexToRgba(hex, alpha) {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function darkenHex(hex, amt = 0.35) {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  return '#' + [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]
+    .map(c => Math.round(c * (1 - amt)).toString(16).padStart(2,'0'))
+    .join('');
+}
+
 function getNext30DaysEvents(universities) {
+  if (!universities || !Array.isArray(universities) || universities.length === 0) return [];
+
   const now = new Date();
   const cutoff = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
   const events = [];
 
-  universities.forEach((uni) => {
-    // Calendar events attached to each university
-    const calEvents = uni.calendarEvents || uni.events || [];
-    calEvents.forEach((ev) => {
-      const start = new Date(ev.startDate || ev.start);
+  universities.forEach((uni, uniIndex) => {
+    const calEvents = uni?.calendarEvents || [];
+
+    calEvents.forEach((ev, evIndex) => {
+      if (!ev) return;
+      const startDateValue = ev.startDate || ev.start || ev.date;
+      if (!startDateValue) return;
+      const start = new Date(startDateValue);
+      if (isNaN(start.getTime())) return;
       if (start >= now && start <= cutoff) {
         events.push({
-          id: ev.id,
-          title: ev.title,
+          id: ev.id || `event-${uniIndex}-${evIndex}`,
+          title: ev.title || 'Untitled Event',
           start,
           isAllDay: ev.isAllDay || false,
-          location: ev.location || ev.interviewLocation || null,
+          location: ev.location || null,
           school: uni.universityName || uni.school || 'General',
-          program: ev.program || uni.primaryProgram || null,
-          eventType: ev.eventType || ev.type || 'task',
+          eventType: ev.eventType || 'task',
           color: ev.color || uni.schoolColor || '#6b7280',
         });
       }
     });
 
-    // Admission deadlines
-    const admissions = uni.admissions || [];
-    admissions.forEach((adm) => {
-      (adm.deadlines || []).forEach((dl) => {
+    const admissions = uni?.admissions || [];
+    admissions.forEach((adm, admIndex) => {
+      (adm?.deadlines || []).forEach((dl, dlIndex) => {
+        if (!dl?.deadlineDate) return;
         const date = new Date(dl.deadlineDate);
+        if (isNaN(date.getTime())) return;
         if (date >= now && date <= cutoff) {
           events.push({
-            id: `dl-${dl.id}`,
-            title: dl.title || `${dl.deadlineType} deadline`,
+            id: dl.id || `dl-${uniIndex}-${admIndex}-${dlIndex}`,
+            title: dl.title || `${dl.deadlineType || 'Application'} deadline`,
             start: date,
-            isAllDay: false,
+            isAllDay: true,
             location: null,
             school: uni.universityName || uni.school || 'General',
-            program: null,
             eventType: 'deadline',
-            color: uni.schoolColor || '#6b7280',
+            color: uni.schoolColor || '#ef4444',
           });
         }
       });
@@ -64,29 +83,17 @@ function formatTime(date, isAllDay) {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-const TYPE_COLORS = {
-  deadline:  { bg: 'bg-red-50',    text: 'text-red-600',    dot: '#ef4444' },
-  interview: { bg: 'bg-purple-50', text: 'text-purple-600', dot: '#7c3aed' },
-  task:      { bg: 'bg-blue-50',   text: 'text-blue-600',   dot: '#3598FE' },
-  meeting:   { bg: 'bg-amber-50',  text: 'text-amber-600',  dot: '#f59e0b' },
-  default:   { bg: 'bg-gray-50',   text: 'text-gray-500',   dot: '#6b7280' },
-};
-
-function typeStyle(eventType) {
-  return TYPE_COLORS[eventType] || TYPE_COLORS.default;
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const DateBadge = memo(({ date, color }) => (
   <div
-    className="flex flex-col items-center justify-center rounded-xl min-w-[52px] h-[56px] px-2 select-none"
-    style={{ background: `${color}18` }}
+    className="flex flex-col items-center justify-center rounded-xl min-w-[50px] h-[54px] px-2 select-none flex-shrink-0"
+    style={{ background: hexToRgba(color, 0.10) }}
   >
     <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color }}>
       {MONTH_ABBR[date.getMonth()]}
     </span>
-    <span className="text-xl font-bold leading-none" style={{ color }}>
+    <span className="text-xl font-medium leading-none" style={{ color }}>
       {date.getDate()}
     </span>
   </div>
@@ -94,27 +101,30 @@ const DateBadge = memo(({ date, color }) => (
 DateBadge.displayName = 'DateBadge';
 
 const EventCard = memo(({ event }) => {
-  const style = typeStyle(event.eventType);
+  const tagBg  = hexToRgba(event.color, 0.12);
+  const tagTxt = darkenHex(event.color, 0.20);
+
   return (
-    <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-3 hover:border-[#3598FE]/40 hover:shadow-sm transition-all duration-200 min-w-[220px] flex-shrink-0 lg:min-w-0 lg:flex-shrink">
+    <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-3 hover:border-gray-200 hover:shadow-sm transition-all duration-200 min-w-[220px] flex-shrink-0 lg:min-w-0 lg:flex-shrink">
       <DateBadge date={event.start} color={event.color} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[#002147] truncate leading-snug">{event.title}</p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="flex items-center gap-1 text-xs text-gray-400">
-            <Clock className="w-3 h-3 flex-shrink-0" />
-            {formatTime(event.start, event.isAllDay)}
-          </span>
+        <p className="text-sm font-medium text-[#002147] truncate leading-snug">{event.title}</p>
+        <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
+          <Clock className="w-3 h-3 flex-shrink-0" />
+          <span>{formatTime(event.start, event.isAllDay)}</span>
           {event.location && (
-            <span className="flex items-center gap-1 text-xs text-gray-400 truncate max-w-[120px]">
+            <>
+              <span className="mx-0.5">·</span>
               <MapPin className="w-3 h-3 flex-shrink-0" />
-              {event.location}
-            </span>
+              <span className="truncate max-w-[100px]">{event.location}</span>
+            </>
           )}
         </div>
-        <span className={`inline-block mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+        <span
+          className="inline-block mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full"
+          style={{ background: tagBg, color: tagTxt }}
+        >
           {event.school}
-          {event.program ? ` · ${event.program}` : ''}
         </span>
       </div>
     </div>
@@ -131,7 +141,6 @@ export const Next30Days = memo(({ universities = [] }) => {
 
   return (
     <section className="mt-8 mb-2" aria-labelledby="next30-heading">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-[#3598FE]/10 rounded-xl" aria-hidden="true">
@@ -151,8 +160,8 @@ export const Next30Days = memo(({ universities = [] }) => {
         </Link>
       </div>
 
-      {/* Cards — horizontal scroll on mobile, grid on lg */}
-      <div className="flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-2 xl:grid-cols-4 lg:overflow-visible lg:pb-0 scrollbar-hide">
+      {/* horizontal scroll on mobile, grid on lg */}
+      <div className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-2 xl:grid-cols-4 lg:overflow-visible lg:pb-0 scrollbar-hide">
         {events.slice(0, 8).map((event) => (
           <EventCard key={event.id} event={event} />
         ))}

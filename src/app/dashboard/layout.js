@@ -12,7 +12,9 @@ import {
   Book,
   Search,
   LogOut,
-  MessageSquare
+  MessageSquare,
+  Sparkles,
+  GraduationCap
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { signOut } from "next-auth/react";
@@ -77,6 +79,23 @@ const Layout = ({ children }) => {
       comingSoon: false,
       description: 'Build and edit your CV/resume'
     },
+    {
+  id: 'alumni',
+  label: 'Alumni',
+  icon: GraduationCap,
+  href: '/dashboard/alumni',
+  comingSoon: false,
+  description: 'Connect with alumni and mentors'
+},
+
+{
+  id: 'learn',
+  label: 'Learn',
+  icon: Sparkles,
+  href: '/dashboard/learn',
+  comingSoon: false,
+  description: 'Access learning materials and guides'
+},
     { 
       id: 'settings', 
       label: 'Settings', 
