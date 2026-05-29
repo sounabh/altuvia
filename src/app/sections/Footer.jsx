@@ -12,7 +12,7 @@ export default function AltuviaFooter() {
         {/* Footer Bottom - Copyright */}
         {/* ========================== */}
         <div className="border-t border-white/10 pt-4 sm:pt-6 text-center text-sm text-white font-inter">
-          © {new Date().getFullYear()} Altu<span className="text-[#3598FE]">via</span>. All rights reserved.
+          © {new Date().getFullYear()} Apply<span className="text-[#3598FE]">Mate</span>. All rights reserved.
         </div>
       </div>
     </footer>

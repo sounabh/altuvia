@@ -1,3 +1,4 @@
+// ─── Nav.tsx ─────────────────────────────────────────────────────
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
@@ -8,14 +9,10 @@ const Nav = () => {
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated" && !!session?.user;
 
-  //console.log("🔐 Session Data:", session);
-  //console.log("Status:", status);
-
   return (
     <nav className="pt-4">
       <div className="flex items-center justify-between">
-        {/* Brand / Logo */}
-        <div className=" font-semibold tracking-[-0.1px] leading-[28.8px] text-[22px] text-[#002147] flex items-center">
+        <div className="font-semibold tracking-[-0.1px] leading-[28.8px] text-[22px] text-[#002147] flex items-center">
           <motion.span
             initial={{ x: -30, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -23,21 +20,20 @@ const Nav = () => {
           >
             A
           </motion.span>
-          <span>ltu</span>
+          <span>pply</span>
           <motion.span
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
             className="text-[#3598FE]"
           >
-            via
+            Mate
           </motion.span>
         </div>
 
-        {/* Conditional button isLoggedIn && session?.hasCompleteProfile */}
         <Link href={isLoggedIn ? "/dashboard" : "/onboarding/signup"}>
           <button className="px-3 py-3 md:px-6 md:py-2 rounded-lg hover:bg-[#3598FE] transition-all duration-700 ease-in-out bg-[#002147] text-white font-medium text-balance text-[15px] flex items-center justify-center transform hover:rounded-3xl">
-            {isLoggedIn  ? "Dashboard" : "Sign Up"}
+            {isLoggedIn ? "Dashboard" : "Sign Up"}
           </button>
         </Link>
       </div>

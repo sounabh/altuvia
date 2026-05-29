@@ -1,3 +1,4 @@
+// globals/layout.tsx
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./provider";
@@ -19,42 +20,30 @@ export const metadata = {
   },
   description: "Manage university Mba applications with universities key infos, write essays, build CVs, plan timelines, track progress, and never miss deadlines.",
   keywords: ["MBA admissions", "college applications", "Essay editor with ai", "CV Builder"],
-  authors: [{ name: "Altuvia" }],
-  creator: "Altuvia",
-  publisher: "Altuvia",
-  
+  authors: [{ name: "ApplyMate" }],
+  creator: "ApplyMate",
+  publisher: "ApplyMate",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://altuvia-beta.vercel.app",
-    siteName: "Altuvia - The way of path",
+    siteName: "ApplyMate",
     title: "Admissions Made Effortless | Your Education Journey",
     description: "Centralize all your MBA & college applications for a stress-free experience",
-    images: [
-      {
-        url: "/logo_emblem.png",
-        width: 1200,
-        height: 630,
-        alt: "Your Education Journey"
-      }
-    ]
+    images: [{ url: "/logo_emblem.png", width: 1200, height: 630, alt: "Your Education Journey" }]
   },
-  
   twitter: {
     card: "summary_large_image",
     title: "Admissions Made Effortless | Your Education Journey",
     description: "Centralize all your MBA & college applications for a stress-free experience",
-    creator: "@altuvia",
+    creator: "@applymate",
     images: ["/logo_emblem.png"],
   },
-  
-  // Discord and other social platforms use Open Graph, but we can add specific overrides
   other: {
-    'og:image': '/discord.png', // Discord-specific image
+    'og:image': '/discord.png',
     'og:image:width': '1200',
     'og:image:height': '630',
   },
-  
   robots: {
     index: true,
     follow: true,
@@ -73,7 +62,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${plusJakartaSans.variable} antialiased`}>
         <SmoothScroll>
-        <Providers>{children}</Providers>
+          <Providers>{children}</Providers>
         </SmoothScroll>
         <Toaster />
       </body>
