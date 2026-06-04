@@ -20,14 +20,14 @@ export const metadata = {
   },
   description: "Manage university Mba applications with universities key infos, write essays, build CVs, plan timelines, track progress, and never miss deadlines.",
   keywords: ["MBA admissions", "college applications", "Essay editor with ai", "CV Builder"],
-  authors: [{ name: "ApplyMate" }],
-  creator: "ApplyMate",
-  publisher: "ApplyMate",
+  authors: [{ name: "ApplyKit" }],
+  creator: "ApplyKit",
+  publisher: "ApplyKit",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://altuvia-beta.vercel.app",
-    siteName: "ApplyMate",
+    siteName: "ApplyKit",
     title: "Admissions Made Effortless | Your Education Journey",
     description: "Centralize all your MBA & college applications for a stress-free experience",
     images: [{ url: "/logo_emblem.png", width: 1200, height: 630, alt: "Your Education Journey" }]
@@ -36,7 +36,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "Admissions Made Effortless | Your Education Journey",
     description: "Centralize all your MBA & college applications for a stress-free experience",
-    creator: "@applymate",
+    creator: "@applykit",
     images: ["/logo_emblem.png"],
   },
   other: {

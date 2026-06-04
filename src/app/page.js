@@ -51,7 +51,7 @@ const LoadingScreen = ({ onComplete }) => {
             className="text-6xl md:text-8xl lg:text-9xl font-bold bg-gradient-to-r from-[#3598FE] to-[#60B4FF] bg-clip-text text-transparent"
             style={{ willChange: "transform, opacity" }}
           >
-            MATE
+            KIT
           </motion.div>
         </div>
 

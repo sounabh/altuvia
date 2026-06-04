@@ -27,7 +27,7 @@ const Nav = () => {
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
             className="text-[#3598FE]"
           >
-            Mate
+            Kit
           </motion.span>
         </div>
 

@@ -82,7 +82,7 @@ const Layout = ({ children }) => {
                     className="font-roboto font-semibold tracking-[0.7px] leading-[28.8px] text-[22px] text-[#002147]"
                     aria-label="ApplyMate Logo"
                   >
-                    Apply<span className="text-[#3598FE]">Mate</span>
+                    Apply<span className="text-[#3598FE]">Kit</span>
                   </span>
                 </div>
               )}
