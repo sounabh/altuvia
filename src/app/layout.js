@@ -13,46 +13,71 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata = {
-  metadataBase: new URL('https://altuvia-beta.vercel.app'),
+  metadataBase: new URL('https://applykit-beta.vercel.app'),
+
   title: {
     default: "All-in-One AI Platform for University Applications",
-    template: "%s | AI University Applications"
+    template: "%s | ApplyKit"
   },
-  description: "Manage university Mba applications with universities key infos, write essays, build CVs, plan timelines, track progress, and never miss deadlines.",
-  keywords: ["MBA admissions", "college applications", "Essay editor with ai", "CV Builder"],
+
+  description:
+    "Manage university and MBA applications, write essays, build CVs, plan timelines, track progress, and never miss deadlines.",
+
+  keywords: [
+    "MBA admissions",
+    "college applications",
+    "AI essay editor",
+    "CV builder",
+    "university applications",
+    "ApplyKit"
+  ],
+
   authors: [{ name: "ApplyKit" }],
   creator: "ApplyKit",
   publisher: "ApplyKit",
+
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://altuvia-beta.vercel.app",
+    url: "https://applykit-beta.vercel.app",
     siteName: "ApplyKit",
-    title: "Admissions Made Effortless | Your Education Journey",
-    description: "Centralize all your MBA & college applications for a stress-free experience",
-    images: [{ url: "/logo_emblem.png", width: 1200, height: 630, alt: "Your Education Journey" }]
+    title: "Admissions Made Effortless | ApplyKit",
+    description:
+      "Centralize all your MBA and university applications in one place.",
+    images: [
+      {
+        url: "/logo_emblem.png",
+        width: 1200,
+        height: 630,
+        alt: "ApplyKit",
+      },
+    ],
   },
+
   twitter: {
     card: "summary_large_image",
-    title: "Admissions Made Effortless | Your Education Journey",
-    description: "Centralize all your MBA & college applications for a stress-free experience",
+    title: "Admissions Made Effortless | ApplyKit",
+    description:
+      "Centralize all your MBA and university applications in one place.",
     creator: "@applykit",
     images: ["/logo_emblem.png"],
   },
+
   other: {
-    'og:image': '/discord.png',
-    'og:image:width': '1200',
-    'og:image:height': '630',
+    "og:image": "/logo_emblem.png",
+    "og:image:width": "1200",
+    "og:image:height": "630",
   },
+
   robots: {
     index: true,
     follow: true,
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
 };
