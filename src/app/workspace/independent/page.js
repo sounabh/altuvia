@@ -2330,12 +2330,13 @@ export default function IndependentWorkspacePage() {
                     handlePanelToggle("ai", showAI);
                     setShowAI(!showAI);
                   }}
+                  disabled
                   className={`
                     transition-all duration-200 font-medium shadow-sm
                     ${
                       showAI
                         ? "bg-gradient-to-r from-[#3598FE] to-[#2563EB] text-white border-0 shadow-blue-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                        : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95"
+                        : "bg-white border-2 border-[#3598FE] text-[#3598FE] hover:bg-blue-50 hover:border-[#2563EB] hover:shadow-md active:scale-95 hidden"
                     }
                   `}
                 >

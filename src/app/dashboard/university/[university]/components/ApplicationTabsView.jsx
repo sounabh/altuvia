@@ -52,7 +52,7 @@ import PanelLoader from "@/lib/constants/ApplicationTab/PanelLoader";
 // Import editor components
 // ============================================================
 import { EssayEditor } from "@/app/workspace/components/EssayEditor";
-import { AISuggestions } from "@/app/workspace/components/AiSuggestion";
+//import { AISuggestions } from "@/app/workspace/components/AiSuggestion";
 
 // ============================================================
 // RENDER PANELS FUNCTION
@@ -136,8 +136,7 @@ export const renderPanels = ({
               />
             )}
 
-            {/* AI Suggestions Panel */}
-            {name === "ai" && (
+           {/**  {name === "ai" && (
               <AISuggestions
                 content={currentEssay.content || ""}
                 prompt={
@@ -157,7 +156,8 @@ export const renderPanels = ({
                 versions={currentEssay.versions || []}
                 isCustomEssay={isCustom}
               />
-            )}
+            )}*/} {/* AI Suggestions Panel */}
+           
           </Suspense>
         </Panel>
       ))}

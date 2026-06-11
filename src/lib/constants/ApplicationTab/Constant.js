@@ -37,11 +37,12 @@ export const PANEL_CONFIG = {
     icon: PieChart,
     iconColor: "from-purple-500/20 to-pink-500/20",
   },
+  /*
   ai: {
     title: "AI Assistant",
     icon: Brain,
     iconColor: "from-amber-500/20 to-orange-500/20",
-  },
+  },*/
 };
 
 // API routes
